@@ -57,14 +57,107 @@ export type ExamStudentSummarySortOption =
   | "submittedAt"
   | "overallStatus";
 
+export type ExamStudentDashboardStatus =
+  | "not-started"
+  | "in-progress"
+  | "pending"
+  | "grading"
+  | "proposed-ready"
+  | "graded"
+  | "failed";
+
+function formatScoreNumber(score: number): string {
+  if (Number.isInteger(score)) return String(score);
+  return score.toFixed(1).replace(/\.0$/, "");
+}
+
+/** 채점 현황 카드/행의 "총점" 칸에 표시할 점수 텍스트. */
+export function overallScoreLabel(
+  student: Pick<ExamStudentSummary, "overallScore" | "proposedOverallScore">,
+): string {
+  if (student.overallScore != null) {
+    return `${formatScoreNumber(student.overallScore)}점`;
+  }
+  if (student.proposedOverallScore != null) {
+    return `가채점 ${formatScoreNumber(student.proposedOverallScore)}점`;
+  }
+  return "—";
+}
+
+/** 제출/채점/가채점 상태를 학생 목록용 단일 상태로 정리한다. */
+export function dashboardStatus(
+  student: Pick<
+    ExamStudentSummary,
+    | "status"
+    | "overallStatus"
+    | "overallScore"
+    | "bulkGradeStatus"
+    | "proposedOverallScore"
+  >,
+): ExamStudentDashboardStatus {
+  if (student.status === "in-progress") return "in-progress";
+  if (student.status !== "submitted") return "not-started";
+
+  if (
+    student.overallStatus === "manually_graded" ||
+    student.overallStatus === "ai_graded" ||
+    student.overallScore != null
+  ) {
+    return "graded";
+  }
+
+  if (
+    student.overallStatus === "failed" ||
+    student.bulkGradeStatus === "failed"
+  ) {
+    return "failed";
+  }
+
+  if (
+    student.bulkGradeStatus === "proposed_ready" ||
+    student.proposedOverallScore != null
+  ) {
+    return "proposed-ready";
+  }
+
+  if (
+    student.overallStatus === "grading" ||
+    student.bulkGradeStatus === "grading"
+  ) {
+    return "grading";
+  }
+
+  return "pending";
+}
+
+export function dashboardStatusLabel(status: ExamStudentDashboardStatus): string {
+  switch (status) {
+    case "in-progress":
+      return "응시중";
+    case "pending":
+      return "채점대기";
+    case "grading":
+      return "채점중";
+    case "proposed-ready":
+      return "가채점완료";
+    case "graded":
+      return "채점완료";
+    case "failed":
+      return "채점실패";
+    default:
+      return "미시작";
+  }
+}
+
 /** 채점 현황 카드/행의 "서술" 칸에 표시할 상태 텍스트. */
 export function caseStatusLabel(
   status: ExamStudentSessionStatus,
   caseProgress: CaseProgress,
 ): string {
   if (status !== "submitted" || caseProgress.total === 0) return "—";
-  if (caseProgress.graded === 0) return `제출됨 0/${caseProgress.total}`;
-  if (caseProgress.graded >= caseProgress.total)
-    return `채점 완료 ${caseProgress.total}/${caseProgress.total}`;
-  return `제출됨 ${caseProgress.graded}/${caseProgress.total}`;
+  if (caseProgress.submitted === 0) return "미제출";
+  if (caseProgress.submitted < caseProgress.total) {
+    return `일부 제출 ${caseProgress.submitted}/${caseProgress.total}`;
+  }
+  return "제출됨";
 }
