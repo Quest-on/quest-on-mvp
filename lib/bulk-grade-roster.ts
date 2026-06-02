@@ -47,7 +47,7 @@ export function computeMissingBulkGradeStudents(params: {
     .map((s) => ({
       sessionId: s.sessionId,
       studentName: s.name ?? `Student ${s.sessionId.slice(0, 8)}`,
-      studentMeta: [s.studentNumber, s.school, s.email].filter(Boolean).join(" · "),
+      studentMeta: [s.studentNumber, s.email].filter(Boolean).join(" · "),
       failed: Boolean(processedSessionIds[s.sessionId]),
     }));
 }

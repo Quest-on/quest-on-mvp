@@ -67,15 +67,19 @@ describe("computeMissingBulkGradeStudents", () => {
     expect(missing[0].studentName).toBe("Student abcdef12");
   });
 
-  it("메타는 학번·학교·이메일을 · 로 합치고 빈 값은 건너뛴다", () => {
+  it("메타는 학번·이메일만 · 로 합치고 학교명은 제외한다", () => {
     const missing = computeMissingBulkGradeStudents({
-      students: roster,
+      students: [
+        { sessionId: "s1", name: "김철수", studentNumber: "2024-1", school: "A대", email: "kim@x.io" },
+        { sessionId: "s2", name: "이영희" },
+      ],
       reviewGrades: {},
       processedSessionIds: {},
       committed: false,
       gradingAttempted: true,
     });
-    expect(missing.find((m) => m.sessionId === "s1")!.studentMeta).toBe("2024-1 · A대");
+    // 학교명("A대")은 빠지고 학번·이메일만
+    expect(missing.find((m) => m.sessionId === "s1")!.studentMeta).toBe("2024-1 · kim@x.io");
     expect(missing.find((m) => m.sessionId === "s2")!.studentMeta).toBe("");
   });
 });

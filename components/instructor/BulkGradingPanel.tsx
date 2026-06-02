@@ -119,20 +119,12 @@ type FinalResultRow = {
   statusLabel: string;
 };
 
-function BulkGradeChatSection({
+function BulkGradeChatMessages({
   messages,
   isLoading,
-  draft,
-  onDraftChange,
-  onSubmit,
-  isSubmitting,
 }: {
   messages: BulkGradeChatMessage[];
   isLoading: boolean;
-  draft: string;
-  onDraftChange: (value: string) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  isSubmitting: boolean;
 }) {
   return (
     <section
@@ -148,10 +140,7 @@ function BulkGradeChatSection({
         <span className="text-[11px] text-muted-foreground">토론 전용</span>
       </div>
 
-      <div
-        className="max-h-64 space-y-2 overflow-y-auto rounded-md border bg-muted/20 p-3"
-        data-testid="bulk-grade-chat-messages"
-      >
+      <div className="space-y-2" data-testid="bulk-grade-chat-messages">
         {isLoading ? (
           <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
             <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
@@ -159,7 +148,7 @@ function BulkGradeChatSection({
           </div>
         ) : messages.length === 0 ? (
           <p className="py-5 text-center text-xs text-muted-foreground">
-            아직 대화가 없습니다.
+            아직 대화가 없습니다. 아래 입력란에서 가채점 기준이나 결과를 질문하세요.
           </p>
         ) : (
           messages.map((message) => (
@@ -184,38 +173,60 @@ function BulkGradeChatSection({
           ))
         )}
       </div>
-
-      <form onSubmit={onSubmit} className="space-y-2">
-        <div className="rounded-md border bg-background px-3 pb-2 pt-3 shadow-sm focus-within:ring-1 focus-within:ring-ring">
-          <Textarea
-            value={draft}
-            onChange={(event) => onDraftChange(event.target.value)}
-            placeholder="가채점 기준, 결과 해석, 검토 관점을 질문하세요."
-            disabled={isSubmitting}
-            data-testid="bulk-grade-chat-input"
-            className="min-h-[76px] resize-none border-0 p-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
-          />
-          <div className="flex items-center justify-between gap-2 pt-2">
-            <p className="text-[11px] text-muted-foreground">
-              점수 변경은 결과 표 입력과 확정 버튼으로만 반영됩니다.
-            </p>
-            <Button
-              type="submit"
-              size="icon"
-              aria-label="가채점 대화 전송"
-              disabled={!draft.trim() || isSubmitting}
-              className="h-8 w-8 rounded-lg"
-            >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-        </div>
-      </form>
     </section>
+  );
+}
+
+function BulkGradeChatInput({
+  draft,
+  onDraftChange,
+  onSubmit,
+  isSubmitting,
+}: {
+  draft: string;
+  onDraftChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  isSubmitting: boolean;
+}) {
+  return (
+    <form onSubmit={onSubmit}>
+      <div className="rounded-md border bg-background px-3 pb-2 pt-3 shadow-sm focus-within:ring-1 focus-within:ring-ring">
+        <Textarea
+          value={draft}
+          onChange={(event) => onDraftChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              if (draft.trim() && !isSubmitting) {
+                event.currentTarget.form?.requestSubmit();
+              }
+            }
+          }}
+          placeholder="가채점 기준, 결과 해석, 검토 관점을 질문하세요. (Enter 전송 · Shift+Enter 줄바꿈)"
+          disabled={isSubmitting}
+          data-testid="bulk-grade-chat-input"
+          className="min-h-[60px] resize-none border-0 p-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
+        />
+        <div className="flex items-center justify-between gap-2 pt-2">
+          <p className="text-[11px] text-muted-foreground">
+            점수 변경은 결과 표 입력과 확정 버튼으로만 반영됩니다.
+          </p>
+          <Button
+            type="submit"
+            size="icon"
+            aria-label="가채점 대화 전송"
+            disabled={!draft.trim() || isSubmitting}
+            className="h-8 w-8 rounded-lg"
+          >
+            {isSubmitting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </div>
+    </form>
   );
 }
 
@@ -347,7 +358,6 @@ export function BulkGradingPanel({
       const summary = finalSummariesBySessionId.get(identity.sessionId);
       const studentMeta = [
         identity.studentNumber ?? summary?.studentNumber,
-        identity.school ?? summary?.school,
         identity.email ?? summary?.email,
       ]
         .filter(Boolean)
@@ -366,7 +376,7 @@ export function BulkGradingPanel({
 
     for (const summary of finalSummaries) {
       if (rows.some((row) => row.sessionId === summary.sessionId)) continue;
-      const studentMeta = [summary.studentNumber, summary.school, summary.email]
+      const studentMeta = [summary.studentNumber, summary.email]
         .filter(Boolean)
         .join(" · ");
       rows.push({
@@ -454,7 +464,7 @@ export function BulkGradingPanel({
     for (const [sessionId, qMap] of Object.entries(reviewGrades)) {
       const studentEntry = studentsBySessionId.get(sessionId);
       const student = studentEntry?.student;
-      const studentMeta = [student?.studentNumber, student?.school, student?.email]
+      const studentMeta = [student?.studentNumber, student?.email]
         .filter(Boolean)
         .join(" · ");
       for (const [qIdxStr, { score, comment }] of Object.entries(qMap)) {
@@ -930,58 +940,64 @@ export function BulkGradingPanel({
                 </div>
               )}
 
-              <BulkGradeChatSection
+              <BulkGradeChatMessages
                 messages={chatData?.messages ?? []}
                 isLoading={chatLoading}
-                draft={chatDraft}
-                onDraftChange={setChatDraft}
-                onSubmit={handleChatSubmit}
-                isSubmitting={chatMutation.isPending}
               />
             </div>
           )}
         </div>
 
-        {!committed && (isGrading || gradingDone) && (
-        <div className="flex shrink-0 flex-col gap-2 border-t px-6 py-4">
-          {isGrading && (
-            <Button type="button" variant="secondary" className="w-full" disabled>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              전체 CASE 가채점 중
-            </Button>
-          )}
-
-          {canStartGrading && gradingDone && (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => startGradingMutation.mutate()}
-              disabled={startGradingMutation.isPending}
-            >
-              전체 CASE 다시 가채점
-            </Button>
-          )}
-
-          {gradingDone && currentGrades && Object.keys(currentGrades).length > 0 && !isGrading && (
-            <Button
-              type="button"
-              className="w-full"
-              onClick={handleCommit}
-              disabled={commitMutation.isPending}
-            >
-              {commitMutation.isPending ? (
-                <>
+        {/* 하단 고정 영역: 액션 버튼(조건부) + 채팅 입력란(항상) */}
+        <div className="shrink-0 space-y-3 border-t px-6 py-4">
+          {!committed && (isGrading || gradingDone) && (
+            <div className="flex flex-col gap-2">
+              {isGrading && (
+                <Button type="button" variant="secondary" className="w-full" disabled>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  저장 중...
-                </>
-              ) : (
-                `채점 확정 (${totalGrades}개)`
+                  전체 CASE 가채점 중
+                </Button>
               )}
-            </Button>
+
+              {canStartGrading && gradingDone && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => startGradingMutation.mutate()}
+                  disabled={startGradingMutation.isPending}
+                >
+                  전체 CASE 다시 가채점
+                </Button>
+              )}
+
+              {gradingDone && currentGrades && Object.keys(currentGrades).length > 0 && !isGrading && (
+                <Button
+                  type="button"
+                  className="w-full"
+                  onClick={handleCommit}
+                  disabled={commitMutation.isPending}
+                >
+                  {commitMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      저장 중...
+                    </>
+                  ) : (
+                    `채점 확정 (${totalGrades}개)`
+                  )}
+                </Button>
+              )}
+            </div>
           )}
+
+          <BulkGradeChatInput
+            draft={chatDraft}
+            onDraftChange={setChatDraft}
+            onSubmit={handleChatSubmit}
+            isSubmitting={chatMutation.isPending}
+          />
         </div>
-        )}
     </aside>
   );
 }
