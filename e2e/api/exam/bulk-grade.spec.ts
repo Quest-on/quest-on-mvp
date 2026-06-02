@@ -17,6 +17,7 @@ test.describe("GET /api/exam/[examId]/bulk-grade", () => {
   test.afterEach(async () => {
     await cleanupTestData();
     await supabase.from("profiles").delete().eq("id", APP_USER_STUDENT_ID);
+    await supabase.auth.admin.deleteUser(APP_USER_STUDENT_ID);
   });
 
   test("returns submitted student identities with stable session mapping", async ({
@@ -43,6 +44,13 @@ test.describe("GET /api/exam/[examId]/bulk-grade", () => {
       student_number: "2026-1001",
       school: "Quest University",
     });
+    const { error: appUserError } = await supabase.auth.admin.createUser({
+      id: APP_USER_STUDENT_ID,
+      email: "app-fallback-student@example.com",
+      email_confirm: true,
+      password: "Temp-pass-123456!",
+    });
+    expect(appUserError).toBeNull();
     const { error: appProfileError } = await supabase.from("profiles").upsert({
       id: APP_USER_STUDENT_ID,
       display_name: "App Fallback Student",
