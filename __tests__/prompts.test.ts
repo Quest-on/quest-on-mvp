@@ -9,6 +9,7 @@ import {
   buildAssignmentResearchSummarySystemPrompt,
   buildAssignmentQuizGenerationPrompt,
   buildCaseQuestionGenerationPrompt,
+  buildPerStudentGradingSystemPrompt,
 } from "@/lib/prompts";
 
 describe("sanitizeForPrompt", () => {
@@ -317,5 +318,29 @@ describe("buildCaseQuestionGenerationPrompt research assignment mode", () => {
     expect(system).toContain("CASE");
     expect(user).toContain("국내 배달앱 3사의 최근 수익성 변화");
     expect(user).not.toContain("사례형 문제");
+  });
+});
+
+describe("buildPerStudentGradingSystemPrompt", () => {
+  const build = () =>
+    buildPerStudentGradingSystemPrompt({
+      criteria: { criteria_summary: "정확성·논리·근거", per_question: [] },
+      studentSessionId: "sess-1",
+      answers: [{ qIdx: 0, questionPrompt: "문제", answer: "답안", chatSummary: "" }],
+      caseQuestions: [{ qIdx: 0, questionPrompt: "문제" }],
+    });
+
+  it("출력 예시 score에 구체 숫자(85)를 박지 않는다 — few-shot anchoring 회귀", () => {
+    const prompt = build();
+    // 과거: {"q_idx":0,"score":85,...} 예시가 모델에 그대로 복사돼 전원 85가 나옴
+    expect(prompt).not.toContain('"score":85');
+    expect(prompt).toContain('"score":<0-100 정수>');
+  });
+
+  it("점수 변별 밴드와 전체 범위 사용 지시를 포함한다", () => {
+    const prompt = build();
+    expect(prompt).toContain("점수 변별 기준");
+    expect(prompt).toContain("0-100");
+    expect(prompt).toContain("같은 점수를 주지 마세요");
   });
 });
