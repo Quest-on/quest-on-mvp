@@ -14,6 +14,29 @@ import {
   type BulkGradeSubmittedSession,
 } from "@/lib/bulk-grade-identities";
 
+/**
+ * Parse the stored `grading_criteria` JSON and recover the instructor-facing
+ * criteria text. `/start` stores `criteria_summary` as
+ * `${criteriaText}\n\n${approvalHint}`, so we drop the trailing approval-hint
+ * paragraph by keeping only the first "\n\n"-separated block. Returns null when
+ * unparseable or empty, so the panel can fall back to its local echo.
+ */
+function parseCriteriaSummary(rawCriteria: unknown): string | null {
+  if (typeof rawCriteria !== "string" || !rawCriteria.trim()) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawCriteria);
+  } catch {
+    return null;
+  }
+  const summary =
+    parsed && typeof parsed === "object" && typeof (parsed as { criteria_summary?: unknown }).criteria_summary === "string"
+      ? (parsed as { criteria_summary: string }).criteria_summary
+      : "";
+  const firstParagraph = summary.split("\n\n")[0]?.trim() ?? "";
+  return firstParagraph || null;
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ examId: string }> },
@@ -50,7 +73,7 @@ export async function GET(
         .order("id", { ascending: true }),
       supabase
         .from("exam_grading_sessions")
-        .select("id, proposed_grades, processed_session_ids, status, committed_at, updated_at, grading_total, grading_completed, grading_failed_count, grading_scope")
+        .select("id, proposed_grades, processed_session_ids, status, committed_at, updated_at, grading_total, grading_completed, grading_failed_count, grading_scope, grading_criteria")
         .eq("exam_id", examId)
         .eq("instructor_id", access.ctx.user.id)
         .maybeSingle(),
@@ -114,6 +137,9 @@ export async function GET(
             status: session.status as string,
             committed_at: session.committed_at as string | null,
             updated_at: session.updated_at as string,
+            // Instructor's submitted criteria (approval-hint paragraph stripped),
+            // so the panel can echo it as a thread bubble that survives reload.
+            criteriaSummary: parseCriteriaSummary(session.grading_criteria),
             progress: {
               total: (session.grading_total as number) ?? 0,
               completed: (session.grading_completed as number) ?? 0,
