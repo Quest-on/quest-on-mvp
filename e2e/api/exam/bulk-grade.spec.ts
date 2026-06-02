@@ -13,16 +13,22 @@ import { getTestSupabase } from "../../helpers/supabase-test-client";
 const supabase = getTestSupabase();
 const APP_USER_STUDENT_ID = "11111111-1111-4111-8111-111111111111";
 
+async function cleanupAppUserFallback() {
+  await supabase.from("profiles").delete().eq("id", APP_USER_STUDENT_ID);
+  await supabase.auth.admin.deleteUser(APP_USER_STUDENT_ID);
+}
+
 test.describe("GET /api/exam/[examId]/bulk-grade", () => {
   test.afterEach(async () => {
     await cleanupTestData();
-    await supabase.from("profiles").delete().eq("id", APP_USER_STUDENT_ID);
-    await supabase.auth.admin.deleteUser(APP_USER_STUDENT_ID);
+    await cleanupAppUserFallback();
   });
 
   test("returns submitted student identities with stable session mapping", async ({
     instructorRequest,
   }) => {
+    await cleanupAppUserFallback();
+
     const exam = await seedExam({
       status: "closed",
       questions: [{ id: "q0", type: "essay", text: "Case", idx: 0 }],

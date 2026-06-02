@@ -28,6 +28,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { extractErrorMessage } from "@/lib/error-messages";
 import type { ProposedGradesMap } from "@/lib/bulk-grading";
+import {
+  dashboardStatus,
+  dashboardStatusLabel,
+  overallScoreLabel,
+  type ExamStudentSummary,
+} from "@/lib/types/student-summary";
 
 type PermissionKey = "review_before_commit" | "no_precheck" | "ai_default";
 
@@ -100,6 +106,14 @@ type GradeRow = {
   qIdx: number;
   score: number;
   comment: string;
+};
+
+type FinalResultRow = {
+  sessionId: string;
+  studentName: string;
+  studentMeta: string;
+  scoreLabel: string;
+  statusLabel: string;
 };
 
 function BulkGradeChatSection({
@@ -283,6 +297,23 @@ export function BulkGradingPanel({
   const gradingDone = sessionStatus === "grading_done";
   const gradingFailed = sessionStatus === "grading_failed";
   const committed = sessionStatus === "committed";
+
+  const { data: finalSummaries = [], isLoading: finalSummariesLoading } = useQuery<
+    ExamStudentSummary[]
+  >({
+    queryKey: qk.instructor.studentSummaries(examId),
+    queryFn: async ({ signal }) => {
+      const res = await fetch(`/api/exam/${examId}/student-summaries`, { signal });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.message || "확정 결과를 불러오지 못했습니다");
+      }
+      return (payload.students ?? []) as ExamStudentSummary[];
+    },
+    enabled: open && committed && !!examId,
+    staleTime: 0,
+  });
+
   const progress = data?.session?.progress;
   const hasProgress = !!progress && progress.total > 0;
   const processedCount = progress
@@ -305,6 +336,47 @@ export function BulkGradingPanel({
       ]),
     );
   }, [data?.students]);
+  const finalSummariesBySessionId = useMemo(() => {
+    return new Map(finalSummaries.map((student) => [student.sessionId, student]));
+  }, [finalSummaries]);
+  const finalRows = useMemo<FinalResultRow[]>(() => {
+    const rows = (data?.students ?? []).map((identity) => {
+      const summary = finalSummariesBySessionId.get(identity.sessionId);
+      const studentMeta = [
+        identity.studentNumber ?? summary?.studentNumber,
+        identity.school ?? summary?.school,
+        identity.email ?? summary?.email,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      return {
+        sessionId: identity.sessionId,
+        studentName: identity.name ?? summary?.name ?? `Student ${identity.sessionId.slice(0, 8)}`,
+        studentMeta,
+        scoreLabel: overallScoreLabel({ overallScore: summary?.overallScore }),
+        statusLabel: summary
+          ? dashboardStatusLabel(dashboardStatus(summary))
+          : "확정됨",
+      };
+    });
+
+    for (const summary of finalSummaries) {
+      if (rows.some((row) => row.sessionId === summary.sessionId)) continue;
+      const studentMeta = [summary.studentNumber, summary.school, summary.email]
+        .filter(Boolean)
+        .join(" · ");
+      rows.push({
+        sessionId: summary.sessionId,
+        studentName: summary.name,
+        studentMeta,
+        scoreLabel: overallScoreLabel({ overallScore: summary.overallScore }),
+        statusLabel: dashboardStatusLabel(dashboardStatus(summary)),
+      });
+    }
+
+    return rows;
+  }, [data?.students, finalSummaries, finalSummariesBySessionId]);
 
   const startGradingMutation = useMutation({
     mutationFn: async () => {
@@ -560,8 +632,57 @@ export function BulkGradingPanel({
             <div className="space-y-5">
               {gradeRows.length === 0 ? (
                 committed ? (
-                  <div className="rounded-md border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
-                    확정된 총점은 학생 목록에서 확인하세요. 이 패널에서는 가채점 대화 기록을 계속 확인할 수 있습니다.
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-medium">확정된 CASE 결과</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        확정 총점은 학생 목록과 같은 final grade 기준으로 표시됩니다.
+                      </p>
+                    </div>
+
+                    {finalSummariesLoading ? (
+                      <div className="flex items-center justify-center rounded-md border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        확정 결과 불러오는 중...
+                      </div>
+                    ) : finalRows.length === 0 ? (
+                      <div className="rounded-md border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
+                        확정 결과가 없습니다. 학생 목록에서 최종 점수를 확인하세요.
+                      </div>
+                    ) : (
+                      <table className="w-full text-xs" data-testid="bulk-grade-final-results">
+                        <thead className="sticky top-0 bg-background">
+                          <tr className="border-b text-left text-muted-foreground">
+                            <th className="pb-1 pr-2 font-normal">학생</th>
+                            <th className="pb-1 pr-2 font-normal">총점</th>
+                            <th className="pb-1 font-normal">상태</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {finalRows.map((row) => (
+                            <tr key={row.sessionId} className="border-b last:border-0">
+                              <td className="py-1.5 pr-2">
+                                <div className="font-medium text-foreground">{row.studentName}</div>
+                                {row.studentMeta && (
+                                  <div
+                                    className="max-w-[180px] truncate text-[11px] text-muted-foreground"
+                                    title={row.studentMeta}
+                                  >
+                                    {row.studentMeta}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-1.5 pr-2 font-medium tabular-nums">
+                                {row.scoreLabel}
+                              </td>
+                              <td className="py-1.5 text-muted-foreground">
+                                {row.statusLabel}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-3">

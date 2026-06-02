@@ -3,6 +3,7 @@ import {
   caseStatusLabel,
   dashboardStatus,
   dashboardStatusLabel,
+  dashboardStatusSortRank,
   overallScoreLabel,
   type ExamStudentSummary,
 } from "@/lib/types/student-summary";
@@ -105,5 +106,17 @@ describe("student summary display helpers", () => {
         ),
       ),
     ).toBe("채점완료");
+  });
+
+  it("sorts by the same unified status used by the dashboard badge", () => {
+    expect(dashboardStatusSortRank("in-progress")).toBeLessThan(
+      dashboardStatusSortRank("pending"),
+    );
+    expect(dashboardStatusSortRank("grading")).toBeLessThan(
+      dashboardStatusSortRank("proposed-ready"),
+    );
+    expect(dashboardStatusSortRank("proposed-ready")).toBeLessThan(
+      dashboardStatusSortRank("graded"),
+    );
   });
 });

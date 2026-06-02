@@ -149,6 +149,21 @@ export function dashboardStatusLabel(status: ExamStudentDashboardStatus): string
   }
 }
 
+const DASHBOARD_STATUS_SORT_RANK: Record<ExamStudentDashboardStatus, number> = {
+  "not-started": 0,
+  "in-progress": 1,
+  pending: 2,
+  grading: 3,
+  "proposed-ready": 4,
+  graded: 5,
+  failed: 6,
+};
+
+/** 채점 상태순 정렬에서 화면에 보이는 통합 배지와 같은 상태 기준을 사용한다. */
+export function dashboardStatusSortRank(status: ExamStudentDashboardStatus): number {
+  return DASHBOARD_STATUS_SORT_RANK[status];
+}
+
 /** 채점 현황 카드/행의 "서술" 칸에 표시할 상태 텍스트. */
 export function caseStatusLabel(
   status: ExamStudentSessionStatus,
