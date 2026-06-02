@@ -10,8 +10,9 @@ import { ClipboardCheck } from "@/components/animate-ui/icons/clipboard-check";
 import { AnimateIcon } from "@/components/animate-ui/icons/icon";
 import {
   caseStatusLabel,
-  type ExamStudentOverallStatus,
-  type ExamStudentSessionStatus,
+  dashboardStatus,
+  dashboardStatusLabel,
+  overallScoreLabel,
   type ExamStudentSummary,
 } from "@/lib/types/student-summary";
 
@@ -26,52 +27,11 @@ function formatProgress(correct: number, total: number): string {
   return `${correct}/${total}`;
 }
 
-function sessionStatusLabel(status: ExamStudentSessionStatus): string {
+function dashboardStatusClass(status: ReturnType<typeof dashboardStatus>): string {
   switch (status) {
-    case "submitted":
-      return "제출완료";
-    case "in-progress":
-      return "진행중";
-    default:
-      return "미시작";
-  }
-}
-
-function sessionStatusClass(status: ExamStudentSessionStatus): string {
-  switch (status) {
-    case "submitted":
-      return "bg-green-100 text-green-800";
-    case "in-progress":
-      return "bg-yellow-100 text-yellow-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-}
-
-function overallStatusLabel(status: ExamStudentOverallStatus): string {
-  switch (status) {
-    case "manually_graded":
-      return "채점완료";
-    case "ai_graded":
-      return "AI채점완료";
-    case "grading":
-      return "채점중";
-    case "failed":
-      return "채점실패";
-    case "pending":
-      return "채점대기";
-    case "in-progress":
-      return "응시중";
-    default:
-      return "미시작";
-  }
-}
-
-function overallStatusClass(status: ExamStudentOverallStatus): string {
-  switch (status) {
-    case "manually_graded":
+    case "graded":
       return "bg-blue-100 text-blue-800";
-    case "ai_graded":
+    case "proposed-ready":
       return "bg-indigo-100 text-indigo-800";
     case "grading":
       return "bg-amber-100 text-amber-800";
@@ -92,6 +52,7 @@ export function ExamStudentCard({
   onLiveMonitoring,
 }: ExamStudentCardProps) {
   const subInfo = [student.studentNumber, student.school].filter(Boolean).join(" · ");
+  const status = dashboardStatus(student);
 
   return (
     <Card
@@ -110,15 +71,15 @@ export function ExamStudentCard({
               <h3 className="font-medium text-sm truncate">{student.name}</h3>
               <Badge
                 variant="secondary"
-                className={`text-[11px] font-normal px-1.5 py-0 ${sessionStatusClass(student.status)}`}
+                className={`text-[11px] font-normal px-1.5 py-0 ${dashboardStatusClass(status)}`}
               >
-                {student.status === "in-progress" && (
+                {status === "in-progress" && (
                   <span className="relative flex h-1.5 w-1.5 mr-1">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-600 opacity-75" />
                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-yellow-600" />
                   </span>
                 )}
-                {sessionStatusLabel(student.status)}
+                {dashboardStatusLabel(status)}
               </Badge>
             </div>
             {subInfo ? (
@@ -141,14 +102,7 @@ export function ExamStudentCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-2 pt-0">
-        <Badge
-          variant="outline"
-          className={`text-[11px] font-normal ${overallStatusClass(student.overallStatus)}`}
-        >
-          {overallStatusLabel(student.overallStatus)}
-        </Badge>
-
-        <dl className="grid grid-cols-3 gap-2 text-xs">
+        <dl className="grid grid-cols-2 gap-2 text-xs">
           <div>
             <dt className="text-muted-foreground">객관식</dt>
             <dd className="font-medium tabular-nums">
@@ -165,6 +119,12 @@ export function ExamStudentCard({
             <dt className="text-muted-foreground">서술</dt>
             <dd className="font-medium tabular-nums">
               {caseStatusLabel(student.status, student.caseProgress)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">총점</dt>
+            <dd className="font-medium tabular-nums">
+              {overallScoreLabel(student)}
             </dd>
           </div>
         </dl>

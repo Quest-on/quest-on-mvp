@@ -144,6 +144,8 @@ export async function seedSession(
 interface SeedSubmissionOverrides {
   id?: string;
   answer?: string;
+  compressed_answer_data?: string | null;
+  compression_metadata?: unknown;
 }
 
 export async function seedSubmission(
@@ -157,6 +159,8 @@ export async function seedSubmission(
     session_id: sessionId,
     q_idx: qIdx,
     answer: overrides.answer ?? `Sample answer for question ${qIdx}`,
+    compressed_answer_data: overrides.compressed_answer_data ?? null,
+    compression_metadata: overrides.compression_metadata ?? {},
   };
 
   const { error } = await supabase.from("submissions").insert(data);
@@ -233,6 +237,102 @@ export async function seedStudentProfile(
   return data;
 }
 
+interface SeedBulkGradingSessionOverrides {
+  id?: string;
+  instructor_id?: string;
+  proposed_grades?: unknown;
+  status?: string;
+  committed_at?: string | null;
+  grading_total?: number;
+  grading_completed?: number;
+  grading_failed_count?: number;
+  grading_scope?: string;
+  grading_criteria?: string | null;
+  expected_session_ids?: unknown;
+  calibration_status?: string;
+  calibration_sample_session_ids?: unknown;
+  calibration_sample_grades?: unknown;
+  calibration_attempt?: number;
+  current_attempt_id?: string | null;
+  processed_session_ids?: unknown;
+}
+
+export async function seedBulkGradingSession(
+  examId: string,
+  overrides: SeedBulkGradingSessionOverrides = {}
+) {
+  const id = overrides.id ?? uuid();
+  const data = {
+    id,
+    exam_id: examId,
+    instructor_id: overrides.instructor_id ?? "test-instructor-id",
+    proposed_grades: overrides.proposed_grades ?? {},
+    status: overrides.status ?? "draft",
+    committed_at: overrides.committed_at ?? null,
+    grading_total: overrides.grading_total ?? 0,
+    grading_completed: overrides.grading_completed ?? 0,
+    grading_failed_count: overrides.grading_failed_count ?? 0,
+    grading_scope: overrides.grading_scope ?? "full",
+    grading_criteria: overrides.grading_criteria ?? null,
+    expected_session_ids: overrides.expected_session_ids ?? [],
+    calibration_status: overrides.calibration_status ?? "draft",
+    calibration_sample_session_ids: overrides.calibration_sample_session_ids ?? [],
+    calibration_sample_grades: overrides.calibration_sample_grades ?? {},
+    calibration_attempt: overrides.calibration_attempt ?? 0,
+    current_attempt_id: overrides.current_attempt_id ?? null,
+    processed_session_ids: overrides.processed_session_ids ?? {},
+  };
+
+  const { error } = await supabase.from("exam_grading_sessions").insert(data);
+  if (error) throw new Error(`seedBulkGradingSession failed: ${error.message}`);
+  return data;
+}
+
+interface SeedBulkGradingMessageOverrides {
+  id?: string;
+  role?: "user" | "assistant";
+  content?: string;
+  created_by?: string | null;
+}
+
+export async function seedBulkGradingMessage(
+  gradingSessionId: string,
+  overrides: SeedBulkGradingMessageOverrides = {}
+) {
+  const id = overrides.id ?? uuid();
+  const data = {
+    id,
+    session_id: gradingSessionId,
+    role: overrides.role ?? "assistant",
+    content: overrides.content ?? "기존 CASE 가채점 대화입니다.",
+    created_by: overrides.created_by ?? "test-instructor-id",
+  };
+
+  const { error } = await supabase.from("bulk_grading_messages").insert(data);
+  if (error) throw new Error(`seedBulkGradingMessage failed: ${error.message}`);
+  return data;
+}
+
+export async function getBulkGradingSession(examId: string) {
+  const { data, error } = await supabase
+    .from("exam_grading_sessions")
+    .select("*")
+    .eq("exam_id", examId)
+    .single();
+  if (error) throw new Error(`getBulkGradingSession failed: ${error.message}`);
+  return data;
+}
+
+export async function getBulkGradingMessages(gradingSessionId: string) {
+  const { data, error } = await supabase
+    .from("bulk_grading_messages")
+    .select("*")
+    .eq("session_id", gradingSessionId)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`getBulkGradingMessages failed: ${error.message}`);
+  return data ?? [];
+}
+
 interface SeedExamNodeOverrides {
   id?: string;
   kind?: "folder" | "exam";
@@ -271,6 +371,8 @@ export async function cleanupTestData() {
 
   // Delete in FK dependency order
   const tables = [
+    "bulk_grading_messages",
+    "exam_grading_sessions",
     "grades",
     "messages",
     "submissions",

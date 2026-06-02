@@ -6,6 +6,7 @@ import { validateUUID } from "@/lib/validate-params";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { batchGetUserInfo } from "@/lib/app-users";
 import {
+  decompressSubmissions,
   gradeObjectiveAnswer,
   normalizeQuestions,
   selectBestSubmission,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/grade-utils";
 import { logError } from "@/lib/logger";
 import type {
+  BulkGradeStatus,
   ExamStudentOverallStatus,
   ExamStudentSessionStatus,
   ExamStudentSummary,
@@ -60,6 +62,21 @@ type SessionRow = {
   status: string | null;
   grading_progress: GradingProgress | null;
 };
+
+type GradingSessionRow = {
+  proposed_grades: unknown;
+  status: string | null;
+  committed_at: string | null;
+  grading_failed_count: number | null;
+  calibration_status?: string | null;
+};
+
+type ProposedGrade = {
+  score: number;
+  comment?: string;
+};
+
+type ProposedGradesMap = Record<string, Record<string, ProposedGrade>>;
 
 function pickSessionForStudent(sessions: SessionRow[]): SessionRow | null {
   if (sessions.length === 0) return null;
@@ -107,6 +124,59 @@ function isVisibleSession(session: SessionRow): boolean {
   if (VISIBLE_SESSION_STATUSES.has(status)) return true;
   // Legacy rows with empty status but an existing session row
   return status === "";
+}
+
+function hasNonEmptySubmission(submission: Record<string, unknown> | undefined): boolean {
+  const answer = submission?.answer;
+  if (typeof answer === "string") return answer.trim().length > 0;
+  return answer != null;
+}
+
+function hasNonEmptyAnswer(answer: string | undefined): boolean {
+  return typeof answer === "string" && answer.trim().length > 0;
+}
+
+function isValidProposedGrade(value: unknown): value is ProposedGrade {
+  if (!value || typeof value !== "object") return false;
+  const score = (value as { score?: unknown }).score;
+  return typeof score === "number" && Number.isFinite(score) && score >= 0 && score <= 100;
+}
+
+function getProposedGrade(
+  proposedGrades: ProposedGradesMap,
+  sessionId: string,
+  qIdx: number,
+): ProposedGrade | undefined {
+  const grade = proposedGrades[sessionId]?.[String(qIdx)];
+  return isValidProposedGrade(grade) ? grade : undefined;
+}
+
+function normalizeProposedGrades(value: unknown): ProposedGradesMap {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as ProposedGradesMap;
+}
+
+function deriveBulkGradeStatus(session: GradingSessionRow | null): BulkGradeStatus {
+  if (!session) return "none";
+  if (session.status === "committed" || session.committed_at) return "committed";
+  if (session.status === "grading" || session.status === "committing") return "grading";
+  if (session.calibration_status === "sample_grading") return "grading";
+  if (session.status === "grading_failed") return "failed";
+  if (session.status === "grading_done") return "proposed_ready";
+  return "none";
+}
+
+function deriveStudentBulkGradeStatus(
+  globalStatus: BulkGradeStatus,
+  hasCompleteCaseSubmissions: boolean,
+  hasCompleteProposedCaseGrades: boolean,
+): BulkGradeStatus {
+  if (globalStatus === "proposed_ready") {
+    return hasCompleteCaseSubmissions && hasCompleteProposedCaseGrades
+      ? "proposed_ready"
+      : "failed";
+  }
+  return globalStatus;
 }
 
 function deriveOverallStatus(params: {
@@ -256,11 +326,11 @@ export async function GET(
 
     const studentIds = [...new Set(selectedSessions.map((s) => s.student_id))];
 
-    const [submissionsResult, gradesResult, profilesResult, clerkMap] =
+    const [submissionsResult, gradesResult, profilesResult, clerkMap, gradingSessionResult] =
       await Promise.all([
         supabase
           .from("submissions")
-          .select("session_id, q_idx, answer, created_at")
+          .select("id, session_id, q_idx, answer, compressed_answer_data, created_at")
           .in("session_id", sessionIds),
         supabase
           .from("grades")
@@ -271,6 +341,12 @@ export async function GET(
           .select("student_id, name, student_number, school")
           .in("student_id", studentIds),
         batchGetUserInfo(studentIds),
+        supabase
+          .from("exam_grading_sessions")
+          .select("proposed_grades, status, committed_at, grading_failed_count, calibration_status")
+          .eq("exam_id", examId)
+          .eq("instructor_id", user.id)
+          .maybeSingle(),
       ]);
 
     if (submissionsResult.error) {
@@ -279,6 +355,13 @@ export async function GET(
     if (gradesResult.error) {
       return errorJson("INTERNAL_ERROR", "Failed to fetch grades", 500);
     }
+    if (gradingSessionResult.error) {
+      return errorJson("INTERNAL_ERROR", "Failed to fetch bulk grading session", 500);
+    }
+
+    const gradingSession = (gradingSessionResult.data ?? null) as GradingSessionRow | null;
+    const bulkGradeStatus = deriveBulkGradeStatus(gradingSession);
+    const proposedGrades = normalizeProposedGrades(gradingSession?.proposed_grades);
 
     const profileMap = new Map<
       string,
@@ -293,7 +376,13 @@ export async function GET(
     }
 
     const submissionsBySession = new Map<string, Map<number, Record<string, unknown>>>();
+    const rawSubmissionsBySession = new Map<string, Array<Record<string, unknown>>>();
     for (const sub of submissionsResult.data ?? []) {
+      if (!rawSubmissionsBySession.has(sub.session_id)) {
+        rawSubmissionsBySession.set(sub.session_id, []);
+      }
+      rawSubmissionsBySession.get(sub.session_id)!.push(sub as Record<string, unknown>);
+
       if (!submissionsBySession.has(sub.session_id)) {
         submissionsBySession.set(sub.session_id, new Map());
       }
@@ -306,6 +395,17 @@ export async function GET(
         byQ.set(qIdx, selectBestSubmission([existing, sub]));
       }
     }
+
+    const decompressedSubmissionsBySession = new Map<
+      string,
+      ReturnType<typeof decompressSubmissions>
+    >();
+    rawSubmissionsBySession.forEach((submissions, sessionId) => {
+      decompressedSubmissionsBySession.set(
+        sessionId,
+        decompressSubmissions(submissions),
+      );
+    });
 
     const gradesBySession = new Map<string, ReturnType<typeof deduplicateGrades>>();
     const rawGradesBySesTemp = new Map<string, typeof gradesResult.data>();
@@ -331,6 +431,7 @@ export async function GET(
       const dedupedGrades = gradesBySession.get(session.id) ?? [];
       const gradeByQ = new Map(dedupedGrades.map((g) => [g.q_idx, g]));
       const subsByQ = submissionsBySession.get(session.id) ?? new Map();
+      const decompressedSubsByQ = decompressedSubmissionsBySession.get(session.id) ?? {};
 
       let mcqCorrect = 0;
       const mcqScores: number[] = [];
@@ -379,12 +480,20 @@ export async function GET(
       }
 
       let caseGraded = 0;
+      let caseSubmitted = 0;
       let hasManualCase = false;
       let hasFailed = false;
       const caseScores: number[] = [];
 
       // dedupedGrades(gradeByQ)는 이미 manual>auto>ai_failed 우선순위로 중복 제거됨
       for (const qIdx of caseIndices) {
+        if (
+          hasNonEmptyAnswer(decompressedSubsByQ[qIdx]?.answer) ||
+          hasNonEmptySubmission(subsByQ.get(qIdx))
+        ) {
+          caseSubmitted += 1;
+        }
+
         const best = gradeByQ.get(qIdx);
 
         if (best?.grade_type === "ai_failed") {
@@ -443,6 +552,56 @@ export async function GET(
         (scoreResult.mode === "weighted" || scoreResult.gradedCount > 0)
           ? scoreResult.overallScore
           : undefined;
+      const canShowProposedScores =
+        canShowFinalScores &&
+        bulkGradeStatus === "proposed_ready" &&
+        caseIndices.length > 0;
+      const hasCompleteCaseSubmissions =
+        caseIndices.length > 0 && caseSubmitted === caseIndices.length;
+      const hasCompleteProposedCaseGrades =
+        caseIndices.length > 0 &&
+        caseIndices.every((qIdx) => getProposedGrade(proposedGrades, session.id, qIdx));
+      const studentBulkGradeStatus = deriveStudentBulkGradeStatus(
+        bulkGradeStatus,
+        hasCompleteCaseSubmissions,
+        hasCompleteProposedCaseGrades,
+      );
+      const proposedScoreItems: ScoreItem[] = questions.map((q) => {
+        if (q.type === "multiple-choice" || q.type === "true-false") {
+          const sub = subsByQ.get(q.idx);
+          return {
+            qIdx: q.idx,
+            type: q.type,
+            score: objectiveScoreFromRawAnswer({
+              rawAnswer: (sub?.answer as string) ?? "",
+              options: q.options,
+              correctOptionIndex: q.correctOptionIndex,
+            }),
+          };
+        }
+
+        if (isCaseQuestion(q.type)) {
+          return {
+            qIdx: q.idx,
+            type: q.type,
+            score: getProposedGrade(proposedGrades, session.id, q.idx)?.score,
+          };
+        }
+
+        return { qIdx: q.idx, type: q.type, score: undefined };
+      });
+      const proposedScoreResult =
+        canShowProposedScores &&
+        hasCompleteCaseSubmissions &&
+        hasCompleteProposedCaseGrades
+          ? calculateScoreFromItems(proposedScoreItems, scoreWeights)
+          : null;
+      const proposedOverallScore =
+        proposedScoreResult?.overallScore !== null &&
+        proposedScoreResult !== null &&
+        (proposedScoreResult.mode === "weighted" || proposedScoreResult.gradedCount > 0)
+          ? proposedScoreResult.overallScore
+          : undefined;
       const canShowSessionFinalScores =
         canShowFinalScores &&
         (session.submitted_at != null || session.status === "auto_submitted");
@@ -458,10 +617,12 @@ export async function GET(
         submittedAt: session.submitted_at ?? undefined,
         mcq: { correct: mcqCorrect, total: mcqIndices.length },
         ox: { correct: oxCorrect, total: oxIndices.length },
-        caseProgress: { graded: caseGraded, total: caseIndices.length },
+        caseProgress: { submitted: caseSubmitted, graded: caseGraded, total: caseIndices.length },
         overallStatus,
         caseScore: canShowSessionFinalScores ? caseScore : undefined,
         overallScore: canShowSessionFinalScores ? overallScore : undefined,
+        proposedOverallScore: canShowSessionFinalScores ? proposedOverallScore : undefined,
+        bulkGradeStatus: studentBulkGradeStatus,
       };
     });
 
