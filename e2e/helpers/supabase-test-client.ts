@@ -1,9 +1,10 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import path from "path";
 import dotenv from "dotenv";
+import { assertSafeTestSupabaseUrl } from "./supabase-test-safety";
 
 // Load test env
-dotenv.config({ path: path.resolve(__dirname, "../../.env.test") });
+dotenv.config({ path: path.resolve(__dirname, "../../.env.test"), override: true });
 
 let _client: SupabaseClient | null = null;
 const FETCH_RETRY_DELAYS_MS = [200, 400, 800, 1200];
@@ -51,6 +52,7 @@ export function createTestSupabaseClient(): SupabaseClient {
       "Missing test Supabase env vars. Run `supabase start` and check .env.test"
     );
   }
+  assertSafeTestSupabaseUrl(url);
 
   return createClient(url, key, {
     auth: {

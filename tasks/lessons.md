@@ -45,6 +45,8 @@
 
 - 사용자가 다른 도구(예: Claude Code)의 미푸시 작업 가능성을 언급하면 원인 추정 전에 `git status`, `git diff`, 로컬/원격 HEAD를 먼저 확인한다.
 - 운영 500은 최근 커밋만 탓하지 말고 배포된 SHA, DB 마이그레이션 상태, 서버 로그, 로컬 미커밋 변경 가능성을 분리해서 본다.
+- `.env.local`을 로드한 E2E/API 테스트는 실제 Supabase를 건드릴 수 있으므로 실행 전 대상 프로젝트와 cleanup 범위를 확인한다. `cleanupTestData()`가 전체 테이블 삭제를 포함하면 절대 production/shared DB에서 실행하지 않는다.
+- 운영 데이터 이상이 의심되면 코드 변경 전 live DB row count, missing FK/profile count, 최근 auth user와 app profile 매칭을 먼저 dry-run으로 확인하고, 복구 write는 사용자 승인 후에만 한다.
 
 ## 2026-05-28 — Case AI 가채점 플로우
 

@@ -1,4 +1,5 @@
 import { getTestSupabase, waitForTestSupabaseReady } from "./supabase-test-client";
+import { assertSafeTestSupabaseUrl } from "./supabase-test-safety";
 import crypto from "crypto";
 
 const supabase = getTestSupabase();
@@ -268,6 +269,7 @@ export async function seedExamNode(overrides: SeedExamNodeOverrides = {}) {
  */
 export async function cleanupTestData() {
   await waitForTestSupabaseReady();
+  assertSafeTestSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
   // Delete in FK dependency order
   const tables = [
