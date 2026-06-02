@@ -61,7 +61,7 @@ export function GradeHeader({
           </div>
           {overallScore !== null && (
             <p className="text-lg font-semibold mt-2">
-              전체 평균 점수: {overallScore}점
+              총점: {overallScore}점
             </p>
           )}
           <div className="mt-4">{questionNavigation}</div>

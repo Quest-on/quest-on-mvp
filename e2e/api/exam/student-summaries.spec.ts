@@ -4,8 +4,10 @@ import {
   seedSession,
   seedSubmission,
   seedGrade,
+  seedBulkGradingSession,
   cleanupTestData,
 } from "../../helpers/seed";
+import { compressData } from "../../../lib/compression";
 
 test.describe("GET /api/exam/[examId]/student-summaries", () => {
   test.afterEach(async () => {
@@ -53,7 +55,7 @@ test.describe("GET /api/exam/[examId]/student-summaries", () => {
     expect(body.students[0].sessionId).toBe(session.id);
     expect(body.students[0].status).toBe("submitted");
     expect(body.students[0].mcq).toEqual({ correct: 1, total: 1 });
-    expect(body.students[0].caseProgress).toEqual({ graded: 1, total: 1 });
+    expect(body.students[0].caseProgress).toEqual({ submitted: 0, graded: 1, total: 1 });
     expect(body.students[0].overallStatus).toBe("manually_graded");
   });
 
@@ -252,7 +254,7 @@ test.describe("GET /api/exam/[examId]/student-summaries", () => {
     expect(body.students).toHaveLength(1);
     expect(body.students[0].mcq).toEqual({ correct: 1, total: 2 });
     expect(body.students[0].ox).toEqual({ correct: 1, total: 1 });
-    expect(body.students[0].caseProgress).toEqual({ graded: 1, total: 1 });
+    expect(body.students[0].caseProgress).toEqual({ submitted: 0, graded: 1, total: 1 });
     expect(body.students[0].overallScore).toBe(70);
   });
 
@@ -350,7 +352,7 @@ test.describe("GET /api/exam/[examId]/student-summaries", () => {
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.students).toHaveLength(1);
-    expect(body.students[0].caseProgress).toEqual({ graded: 1, total: 1 });
+    expect(body.students[0].caseProgress).toEqual({ submitted: 0, graded: 1, total: 1 });
     expect(body.students[0].overallScore).toBe(90);
     expect(body.students[0].overallStatus).toBe("ai_graded");
   });
@@ -382,8 +384,314 @@ test.describe("GET /api/exam/[examId]/student-summaries", () => {
     const body = await res.json();
     expect(body.students).toHaveLength(1);
     expect(body.students[0].sessionId).toBe(session.id);
-    expect(body.students[0].caseProgress).toEqual({ graded: 0, total: 1 });
+    expect(body.students[0].caseProgress).toEqual({ submitted: 0, graded: 0, total: 1 });
     expect(body.students[0].overallStatus).toBe("grading");
+  });
+
+  test("submitted case without final or proposed grade does not synthesize score", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({
+      status: "closed",
+      questions: [
+        {
+          id: "q0",
+          type: "essay",
+          text: "Essay",
+          idx: 0,
+        },
+      ],
+    });
+    const session = await seedSession(exam.id, "student-case-ungraded", {
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    });
+    await seedSubmission(session.id, 0, { answer: "Non-empty essay answer" });
+
+    const res = await instructorRequest.get(
+      `/api/exam/${exam.id}/student-summaries`
+    );
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.students).toHaveLength(1);
+    expect(body.students[0].caseProgress).toEqual({ submitted: 1, graded: 0, total: 1 });
+    expect(body.students[0].overallScore).toBeUndefined();
+    expect(body.students[0].proposedOverallScore).toBeUndefined();
+    expect(body.students[0].bulkGradeStatus).toBe("none");
+  });
+
+  test("complete proposed case grades produce display-only proposed overall score", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({
+      status: "closed",
+      questions: [
+        {
+          id: "q0",
+          type: "multiple-choice",
+          text: "MCQ",
+          options: ["A", "B", "C", "D"],
+          correctOptionIndex: 1,
+          idx: 0,
+        },
+        {
+          id: "q1",
+          type: "essay",
+          text: "Essay",
+          idx: 1,
+        },
+      ],
+    });
+    const session = await seedSession(exam.id, "student-proposed-complete", {
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    });
+    await seedSubmission(session.id, 0, { answer: "1" });
+    await seedSubmission(session.id, 1, { answer: "Case answer" });
+    await seedBulkGradingSession(exam.id, {
+      status: "grading_done",
+      proposed_grades: {
+        [session.id]: { 1: { score: 80, comment: "가채점 결과" } },
+      },
+      grading_total: 1,
+      grading_completed: 1,
+    });
+
+    const res = await instructorRequest.get(
+      `/api/exam/${exam.id}/student-summaries`
+    );
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.students).toHaveLength(1);
+    expect(body.students[0].caseProgress).toEqual({ submitted: 1, graded: 0, total: 1 });
+    expect(body.students[0].overallScore).toBeUndefined();
+    expect(body.students[0].proposedOverallScore).toBe(90);
+    expect(body.students[0].overallStatus).toBe("grading");
+    expect(body.students[0].bulkGradeStatus).toBe("proposed_ready");
+  });
+
+  test("missing case submission hides proposed overall score instead of treating it as zero", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({
+      status: "closed",
+      questions: [
+        {
+          id: "q0",
+          type: "essay",
+          text: "Essay",
+          idx: 0,
+        },
+      ],
+    });
+    const session = await seedSession(exam.id, "student-proposed-unsubmitted", {
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    });
+    await seedBulkGradingSession(exam.id, {
+      status: "grading_done",
+      proposed_grades: {
+        [session.id]: { 0: { score: 100, comment: "Should not count" } },
+      },
+      grading_total: 1,
+      grading_completed: 1,
+    });
+
+    const res = await instructorRequest.get(
+      `/api/exam/${exam.id}/student-summaries`
+    );
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.students).toHaveLength(1);
+    expect(body.students[0].caseProgress).toEqual({ submitted: 0, graded: 0, total: 1 });
+    expect(body.students[0].overallScore).toBeUndefined();
+    expect(body.students[0].proposedOverallScore).toBeUndefined();
+    expect(body.students[0].bulkGradeStatus).toBe("failed");
+  });
+
+  test("partial proposed case grades hide proposed overall score", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({
+      status: "closed",
+      questions: [
+        { id: "q0", type: "essay", text: "Essay 1", idx: 0 },
+        { id: "q1", type: "short-answer", text: "Essay 2", idx: 1 },
+      ],
+    });
+    const session = await seedSession(exam.id, "student-proposed-partial", {
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    });
+    await seedSubmission(session.id, 0, { answer: "First answer" });
+    await seedSubmission(session.id, 1, { answer: "Second answer" });
+    await seedBulkGradingSession(exam.id, {
+      status: "grading_done",
+      proposed_grades: {
+        [session.id]: { 0: { score: 75, comment: "Only first question" } },
+      },
+      grading_total: 1,
+      grading_completed: 1,
+    });
+
+    const res = await instructorRequest.get(
+      `/api/exam/${exam.id}/student-summaries`
+    );
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.students).toHaveLength(1);
+    expect(body.students[0].caseProgress).toEqual({ submitted: 2, graded: 0, total: 2 });
+    expect(body.students[0].proposedOverallScore).toBeUndefined();
+    expect(body.students[0].bulkGradeStatus).toBe("failed");
+  });
+
+  test("proposed overall score follows configured score weights", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({
+      status: "closed",
+      score_weights: {
+        version: 1,
+        distribution: "equal_by_type",
+        typeWeights: {
+          "multiple-choice": 20,
+          case: 80,
+        },
+      },
+      questions: [
+        {
+          id: "q0",
+          type: "multiple-choice",
+          text: "MCQ",
+          options: ["A", "B", "C", "D"],
+          correctOptionIndex: 0,
+          idx: 0,
+        },
+        {
+          id: "q1",
+          type: "case",
+          text: "Case",
+          idx: 1,
+        },
+      ],
+    });
+    const session = await seedSession(exam.id, "student-proposed-weighted", {
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    });
+    await seedSubmission(session.id, 0, { answer: "0" });
+    await seedSubmission(session.id, 1, { answer: "Weighted case answer" });
+    await seedBulkGradingSession(exam.id, {
+      status: "grading_done",
+      proposed_grades: {
+        [session.id]: { 1: { score: 50, comment: "가채점 결과" } },
+      },
+      grading_total: 1,
+      grading_completed: 1,
+    });
+
+    const res = await instructorRequest.get(
+      `/api/exam/${exam.id}/student-summaries`
+    );
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.students).toHaveLength(1);
+    expect(body.students[0].overallScore).toBeUndefined();
+    expect(body.students[0].proposedOverallScore).toBe(60);
+    expect(body.students[0].caseProgress).toEqual({ submitted: 1, graded: 0, total: 1 });
+  });
+
+  test("compressed case answers count as submitted for proposed completeness", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({
+      status: "closed",
+      questions: [
+        {
+          id: "q0",
+          type: "essay",
+          text: "Essay",
+          idx: 0,
+        },
+      ],
+    });
+    const session = await seedSession(exam.id, "student-compressed-case", {
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    });
+    const compressed = compressData({ answer: "Compressed essay answer" });
+    await seedSubmission(session.id, 0, {
+      answer: "",
+      compressed_answer_data: compressed.data,
+      compression_metadata: compressed.metadata,
+    });
+    await seedBulkGradingSession(exam.id, {
+      status: "grading_done",
+      proposed_grades: {
+        [session.id]: { 0: { score: 85, comment: "Compressed answer grade" } },
+      },
+      grading_total: 1,
+      grading_completed: 1,
+    });
+
+    const res = await instructorRequest.get(
+      `/api/exam/${exam.id}/student-summaries`
+    );
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.students).toHaveLength(1);
+    expect(body.students[0].caseProgress).toEqual({ submitted: 1, graded: 0, total: 1 });
+    expect(body.students[0].proposedOverallScore).toBe(85);
+    expect(body.students[0].bulkGradeStatus).toBe("proposed_ready");
+  });
+
+  test("committed grading session hides stale proposed scores and keeps final score", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({
+      status: "closed",
+      questions: [
+        {
+          id: "q0",
+          type: "essay",
+          text: "Essay",
+          idx: 0,
+        },
+      ],
+    });
+    const session = await seedSession(exam.id, "student-committed-stale-proposed", {
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    });
+    await seedSubmission(session.id, 0, { answer: "Case answer" });
+    await seedGrade(session.id, 0, 70, "Final committed grade", "manual");
+    await seedBulkGradingSession(exam.id, {
+      status: "committed",
+      committed_at: new Date().toISOString(),
+      proposed_grades: {
+        [session.id]: { 0: { score: 100, comment: "Stale proposal" } },
+      },
+      grading_total: 1,
+      grading_completed: 1,
+    });
+
+    const res = await instructorRequest.get(
+      `/api/exam/${exam.id}/student-summaries`
+    );
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.students).toHaveLength(1);
+    expect(body.students[0].caseProgress).toEqual({ submitted: 1, graded: 1, total: 1 });
+    expect(body.students[0].overallScore).toBe(70);
+    expect(body.students[0].proposedOverallScore).toBeUndefined();
+    expect(body.students[0].bulkGradeStatus).toBe("committed");
   });
 
   test("returns empty students when no sessions", async ({

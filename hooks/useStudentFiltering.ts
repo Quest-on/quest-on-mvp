@@ -3,9 +3,12 @@
 import { useState, useMemo } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
 import type { InstructorStudent } from "@/lib/types/exam";
-import type {
-  ExamStudentSummary,
-  ExamStudentSummarySortOption,
+import {
+  dashboardStatus,
+  dashboardStatusSortRank,
+  type ExamStudentDashboardStatus,
+  type ExamStudentSummary,
+  type ExamStudentSummarySortOption,
 } from "@/lib/types/student-summary";
 
 export type StudentFilterSortOption =
@@ -40,8 +43,8 @@ function getSubmittedAt(student: FilterableStudent): string | undefined {
   return student.submittedAt;
 }
 
-function getOverallStatus(student: FilterableStudent): string | undefined {
-  if ("overallStatus" in student) return student.overallStatus;
+function getDashboardStatus(student: FilterableStudent): ExamStudentDashboardStatus | undefined {
+  if ("overallStatus" in student) return dashboardStatus(student);
   return undefined;
 }
 
@@ -93,9 +96,18 @@ export function useStudentFiltering({
           return bTime - aTime;
         }
         case "overallStatus": {
-          const aStatus = getOverallStatus(a) ?? "";
-          const bStatus = getOverallStatus(b) ?? "";
-          return aStatus.localeCompare(bStatus, "ko");
+          const aStatus = getDashboardStatus(a);
+          const bStatus = getDashboardStatus(b);
+          if (aStatus && !bStatus) return -1;
+          if (!aStatus && bStatus) return 1;
+          if (aStatus && bStatus) {
+            return (
+              dashboardStatusSortRank(aStatus) -
+                dashboardStatusSortRank(bStatus) ||
+              getName(a).localeCompare(getName(b), "ko")
+            );
+          }
+          return getName(a).localeCompare(getName(b), "ko");
         }
         case "score": {
           if (!isInstructorStudent(a) || !isInstructorStudent(b)) return 0;

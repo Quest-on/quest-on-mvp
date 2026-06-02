@@ -196,15 +196,6 @@ export default function ExamDetail({
     setMonitoringStudent(null);
   };
 
-  const hasIncompleteGrading = useMemo(() => {
-    return students.some(
-      (s) =>
-        s.status === "submitted" &&
-        s.caseProgress.total > 0 &&
-        s.caseProgress.graded < s.caseProgress.total
-    );
-  }, [students]);
-
   // 제출한 학생 전원의 채점 확정 여부
   // - manually_graded: 강사 직접 확정 (Case 있는 시험)
   // - ai_graded: 자동 채점 완료 (MCQ/OX 전용 시험 또는 전원 AI 일괄채점 확정)
@@ -226,12 +217,30 @@ export default function ExamDetail({
     );
   }, [examDetailData, students]);
 
-  const showBulkCaseGradingCta = useMemo(
-    () => exam?.status === "closed" && hasCaseQuestions && hasIncompleteGrading,
-    [exam?.status, hasCaseQuestions, hasIncompleteGrading],
-  );
+  const hasSubmittedCaseStudents = useMemo(() => {
+    return students.some(
+      (s) => s.status === "submitted" && s.caseProgress.total > 0,
+    );
+  }, [students]);
 
   const bulkGradeSessionStatus = bulkGradeStatus?.session?.status ?? null;
+
+  const showBulkCaseGradingCta = useMemo(
+    () =>
+      exam?.status === "closed" &&
+      hasCaseQuestions &&
+      (hasSubmittedCaseStudents ||
+        (bulkGradeStatus?.studentCount ?? 0) > 0 ||
+        !!bulkGradeSessionStatus),
+    [
+      exam?.status,
+      hasCaseQuestions,
+      hasSubmittedCaseStudents,
+      bulkGradeStatus?.studentCount,
+      bulkGradeSessionStatus,
+    ],
+  );
+
   const bulkGradeProgress = bulkGradeStatus?.session?.progress;
   const bulkGradeProcessed =
     bulkGradeProgress
@@ -240,27 +249,34 @@ export default function ExamDetail({
   const isBulkGrading = bulkGradeSessionStatus === "grading";
   const bulkGradingFailed = bulkGradeSessionStatus === "grading_failed";
   const bulkGradingDone = bulkGradeSessionStatus === "grading_done";
+  const bulkGradingCommitted = bulkGradeSessionStatus === "committed";
   const bulkCtaTitle = isBulkGrading
     ? "CASE AI 가채점 진행 중"
     : bulkGradingFailed
       ? "CASE AI 가채점 실패"
-      : bulkGradingDone
-        ? "CASE 제안 점수 생성 완료"
-        : "CASE AI 가채점하기";
+      : bulkGradingCommitted
+        ? "CASE 채점 결과"
+        : bulkGradingDone
+          ? "CASE 제안 점수 생성 완료"
+          : "CASE AI 가채점하기";
   const bulkCtaDescription = isBulkGrading && bulkGradeProgress && bulkGradeProgress.total > 0
     ? `백그라운드 가채점 중 · ${bulkGradeProcessed}/${bulkGradeProgress.total}명 처리`
     : bulkGradingFailed
       ? "실패 원인을 확인하고 다시 채점을 시작할 수 있습니다"
-      : bulkGradingDone
-        ? "제안 점수를 검토한 뒤 확정해주세요"
-        : "강사의 자연어 기준으로 CASE 답안을 일괄 가채점합니다";
+      : bulkGradingCommitted
+        ? "확정된 결과와 가채점 대화 기록을 확인합니다"
+        : bulkGradingDone
+          ? "제안 점수를 검토한 뒤 확정해주세요"
+          : "강사의 자연어 기준으로 CASE 답안을 일괄 가채점합니다";
   const bulkCtaButtonLabel = isBulkGrading
     ? "진행 상황 보기"
-    : bulkGradingDone
-      ? "검토/확정"
-      : bulkGradingFailed
-        ? "다시 보기"
-        : "가채점 시작";
+    : bulkGradingCommitted
+      ? "결과/채팅 보기"
+      : bulkGradingDone
+        ? "검토/확정"
+        : bulkGradingFailed
+          ? "다시 보기"
+          : "가채점 시작";
 
   const handleExcelDownload = useCallback(() => {
     if (!exam || !allStudentsManuallyGraded) return;
@@ -582,12 +598,13 @@ export default function ExamDetail({
             ) : (
               <div className="border rounded-lg overflow-hidden">
                 <div className="bg-muted/50 border-b px-4 py-3 hidden md:block">
-                  <div className="grid grid-cols-[40px_1fr_72px_72px_72px_140px_100px_80px] gap-3 items-center text-sm font-medium text-muted-foreground">
+                  <div className="grid grid-cols-[40px_minmax(160px,1fr)_72px_72px_96px_108px_140px_104px_80px] gap-3 items-center text-sm font-medium text-muted-foreground">
                     <span className="text-center">#</span>
                     <span>학생</span>
                     <span className="text-center">객관식</span>
                     <span className="text-center">O/X</span>
                     <span className="text-center">서술</span>
+                    <span className="text-center">총점</span>
                     <span>제출일시</span>
                     <span>상태</span>
                     <span className="text-center">액션</span>
