@@ -509,11 +509,63 @@ export function SimpleExamAuthoringForm({
     return `${files.length}개 준비됨`;
   }, [extractionStatus, files.length]);
 
-  const handleDurationTextChange = (value: string) => {
-    const next = Number.parseInt(value.replace(/[^0-9]/g, ""), 10);
-    if (Number.isNaN(next)) return;
-    onDurationChange(Math.min(1440, Math.max(1, next)));
+  const [durationInput, setDurationInput] = useState<string>(
+    duration === 0 ? "" : duration.toString(),
+  );
+
+  const handleDurationInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const value = e.target.value;
+    setDurationInput(value);
+
+    if (value === "") {
+      return;
+    }
+
+    const numValue = Number.parseInt(value.replace(/[^0-9]/g, ""), 10);
+    if (Number.isNaN(numValue) || numValue < 0) {
+      return;
+    }
+
+    if (numValue >= 1 && numValue <= 1440) {
+      onDurationChange(numValue);
+    } else if (numValue > 1440) {
+      setDurationInput("1440");
+      onDurationChange(1440);
+    }
   };
+
+  const handleDurationInputBlur = () => {
+    if (durationInput === "") {
+      setDurationInput(duration === 0 ? "" : duration.toString());
+      return;
+    }
+
+    const numValue = Number.parseInt(
+      durationInput.replace(/[^0-9]/g, ""),
+      10,
+    );
+
+    if (Number.isNaN(numValue) || numValue < 1) {
+      setDurationInput("1");
+      onDurationChange(1);
+    } else if (numValue > 1440) {
+      setDurationInput("1440");
+      onDurationChange(1440);
+    } else {
+      setDurationInput(numValue.toString());
+      onDurationChange(numValue);
+    }
+  };
+
+  useEffect(() => {
+    if (duration === 0) {
+      setDurationInput("");
+    } else if (durationInput !== duration.toString()) {
+      setDurationInput(duration.toString());
+    }
+  }, [duration]);
 
   // 문제별 AI 다듬기 — 각 문제 카드의 "AI 다듬기" 버튼이 이 시트를 연다.
   const [sheetQuestionId, setSheetQuestionId] = useState<string | null>(null);
@@ -683,12 +735,13 @@ export function SimpleExamAuthoringForm({
           <div className="flex flex-wrap items-center gap-2">
             <Input
               id="simple-duration"
-              type="number"
-              min={1}
-              max={1440}
-              value={isUnlimited ? "" : duration.toString()}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={isUnlimited ? "" : durationInput}
               disabled={isUnlimited}
-              onChange={(e) => handleDurationTextChange(e.target.value)}
+              onChange={handleDurationInputChange}
+              onBlur={handleDurationInputBlur}
               placeholder={isUnlimited ? "무제한" : "60"}
               className="h-11 w-28 text-center bg-white"
             />
@@ -711,9 +764,15 @@ export function SimpleExamAuthoringForm({
               <Switch
                 id="simple-unlimited"
                 checked={isUnlimited}
-                onCheckedChange={(checked) =>
-                  onDurationChange(checked ? 0 : 60)
-                }
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    onDurationChange(0);
+                    setDurationInput("");
+                  } else {
+                    onDurationChange(60);
+                    setDurationInput("60");
+                  }
+                }}
               />
               <Label
                 htmlFor="simple-unlimited"
