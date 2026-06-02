@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { computeMissingBulkGradeStudents } from "@/lib/bulk-grade-roster";
 import toast from "react-hot-toast";
 import {
   AlertTriangle,
@@ -58,6 +59,8 @@ type BulkGradeProgress = {
 type BulkGradeSession = {
   id: string;
   proposed_grades: ProposedGradesMap;
+  /** Submitted sessions the worker already attempted (success OR failure). */
+  processed_session_ids?: Record<string, boolean>;
   status: string;
   committed_at: string | null;
   updated_at: string;
@@ -475,6 +478,31 @@ export function BulkGradingPanel({
 
   const totalGrades = gradeRows.length;
 
+  // Students that were part of this grading attempt but have NO proposed grade.
+  // Previously these were silently dropped (the table only iterated proposed_grades),
+  // so a worker failure made a student vanish. Surface them explicitly:
+  //  - failed:  worker already processed them but produced no grade (AI error/parse) → "채점 실패"
+  //  - pending: not yet processed (still running) → "대기 중"
+  const gradingAttempted = isGrading || gradingDone || gradingFailed;
+  const missingStudents = useMemo(
+    () =>
+      computeMissingBulkGradeStudents({
+        students: data?.students ?? [],
+        reviewGrades: reviewGrades ?? null,
+        processedSessionIds: data?.session?.processed_session_ids ?? {},
+        committed,
+        gradingAttempted,
+      }),
+    [
+      committed,
+      gradingAttempted,
+      reviewGrades,
+      data?.students,
+      data?.session?.processed_session_ids,
+    ],
+  );
+  const failedCount = missingStudents.filter((s) => s.failed).length;
+
   const handleCommit = () => {
     if (
       progress?.failed &&
@@ -630,6 +658,68 @@ export function BulkGradingPanel({
             </div>
           ) : (
             <div className="space-y-5">
+              {missingStudents.length > 0 && (
+                <div
+                  className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30"
+                  data-testid="bulk-grade-missing-students"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-200">
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      <span>
+                        {failedCount > 0
+                          ? `채점되지 않은 학생 ${missingStudents.length}명 (실패 ${failedCount}명)`
+                          : `처리 대기 중 ${missingStudents.length}명`}
+                      </span>
+                    </div>
+                    {!isGrading && !committed && failedCount > 0 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => startGradingMutation.mutate()}
+                        disabled={startDisabled}
+                        className="h-7 shrink-0 px-2 text-xs"
+                      >
+                        {startGradingMutation.isPending && (
+                          <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                        )}
+                        다시 가채점
+                      </Button>
+                    )}
+                  </div>
+                  <ul className="space-y-1" data-testid="bulk-grade-missing-list">
+                    {missingStudents.map((s) => (
+                      <li
+                        key={s.sessionId}
+                        className="flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="min-w-0 truncate">
+                          <span className="font-medium text-foreground">{s.studentName}</span>
+                          {s.studentMeta && (
+                            <span className="ml-1 text-muted-foreground">· {s.studentMeta}</span>
+                          )}
+                        </div>
+                        <span
+                          className={cn(
+                            "shrink-0 rounded px-1.5 py-0.5 text-[11px]",
+                            s.failed
+                              ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                              : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {s.failed ? "채점 실패" : "대기 중"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {failedCount > 0 && (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                      실패한 학생은 “다시 가채점”으로 새로 시도합니다. (이전 제안 점수는 초기화됩니다)
+                    </p>
+                  )}
+                </div>
+              )}
               {gradeRows.length === 0 ? (
                 committed ? (
                   <div className="space-y-3">
@@ -684,7 +774,7 @@ export function BulkGradingPanel({
                       </table>
                     )}
                   </div>
-                ) : (
+                ) : gradingAttempted ? null : (
                   <div className="space-y-3">
                     <label className="text-sm font-medium">채점 기준</label>
                     <div className="rounded-xl border bg-background px-3 pb-2 pt-3 shadow-sm focus-within:ring-1 focus-within:ring-ring">

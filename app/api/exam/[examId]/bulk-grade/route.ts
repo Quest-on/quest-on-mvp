@@ -50,7 +50,7 @@ export async function GET(
         .order("id", { ascending: true }),
       supabase
         .from("exam_grading_sessions")
-        .select("id, proposed_grades, status, committed_at, updated_at, grading_total, grading_completed, grading_failed_count, grading_scope")
+        .select("id, proposed_grades, processed_session_ids, status, committed_at, updated_at, grading_total, grading_completed, grading_failed_count, grading_scope")
         .eq("exam_id", examId)
         .eq("instructor_id", access.ctx.user.id)
         .maybeSingle(),
@@ -105,6 +105,11 @@ export async function GET(
         ? {
             id: session.id as string,
             proposed_grades: session.proposed_grades as Record<string, unknown>,
+            // Which submitted sessions the worker has already attempted (success OR
+            // failure). Lets the panel mark processed-but-ungraded students as
+            // "채점 실패" instead of silently dropping them.
+            processed_session_ids:
+              (session.processed_session_ids as Record<string, boolean>) ?? {},
             grading_scope: session.grading_scope as string,
             status: session.status as string,
             committed_at: session.committed_at as string | null,
