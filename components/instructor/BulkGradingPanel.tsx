@@ -667,12 +667,14 @@ export function BulkGradingPanel({
                     <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-200">
                       <AlertTriangle className="h-4 w-4 shrink-0" />
                       <span>
-                        {failedCount > 0
-                          ? `채점되지 않은 학생 ${missingStudents.length}명 (실패 ${failedCount}명)`
-                          : `처리 대기 중 ${missingStudents.length}명`}
+                        {isGrading
+                          ? `처리 대기 중 ${missingStudents.length}명`
+                          : `채점되지 않은 학생 ${missingStudents.length}명${
+                              failedCount > 0 ? ` (실패 ${failedCount}명)` : ""
+                            }`}
                       </span>
                     </div>
-                    {!isGrading && !committed && failedCount > 0 && (
+                    {!isGrading && !committed && (
                       <Button
                         type="button"
                         size="sm"
@@ -713,9 +715,9 @@ export function BulkGradingPanel({
                       </li>
                     ))}
                   </ul>
-                  {failedCount > 0 && (
+                  {!isGrading && !committed && (
                     <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                      실패한 학생은 “다시 가채점”으로 새로 시도합니다. (이전 제안 점수는 초기화됩니다)
+                      채점되지 않은 학생은 “다시 가채점”으로 새로 시도합니다. (이전 제안 점수는 초기화됩니다)
                     </p>
                   )}
                 </div>
