@@ -21,6 +21,7 @@ import {
   deleteNodeSchema,
   copyExamSchema,
   createAssignmentSchema,
+  updateAssignmentSchema,
   saveCanvasSchema,
   submitAssignmentSchema,
   saveFinalAnswerSchema,
@@ -66,6 +67,7 @@ import {
 
 import {
   createAssignment,
+  updateAssignment,
   saveCanvas,
   submitAssignment,
   saveFinalAnswer,
@@ -102,6 +104,7 @@ export async function POST(request: NextRequest) {
     // Rate limit sensitive actions at handler level
     const rateLimitedActions: Record<string, { limit: number; windowSec: number }> = {
       create_assignment: RATE_LIMITS.examControl,
+      update_assignment: RATE_LIMITS.examControl,
       submit_assignment: RATE_LIMITS.examControl,
       save_canvas: RATE_LIMITS.general,
       save_final_answer: RATE_LIMITS.finalAnswerSave,
@@ -128,6 +131,7 @@ export async function POST(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const actionSchemas: Record<string, z.ZodSchema<any>> = {
       create_assignment: createAssignmentSchema,
+      update_assignment: updateAssignmentSchema,
       save_canvas: saveCanvasSchema,
       submit_assignment: submitAssignmentSchema,
       save_final_answer: saveFinalAnswerSchema,
@@ -160,6 +164,8 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case "create_assignment":
         return await createAssignment(data);
+      case "update_assignment":
+        return await updateAssignment(data);
       case "save_canvas":
         return await saveCanvas(data);
       case "submit_assignment":

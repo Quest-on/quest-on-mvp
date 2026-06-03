@@ -29,7 +29,13 @@ import {
   ChevronUp,
   RefreshCw,
   FileText,
+  Pencil,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useExamDetail } from "@/hooks/useExamDetail";
 import { useStudentFiltering } from "@/hooks/useStudentFiltering";
@@ -220,6 +226,31 @@ export default function AssignmentDashboard({
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 {assignmentStatusBadge}
+                {/* 편집 게이트: exam.students(in_progress/submitted/auto_submitted)는 best-effort UX 신호.
+                    실제 권위 잠금은 편집 페이지 self-guard + 서버 update_assignment의 has_sessions(모든 세션) 검사다.
+                    이 버튼을 has_sessions 기준으로 "통일"하지 말 것 — students⊂has_sessions라 의미가 어긋남. */}
+                {exam.students.length > 0 ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button variant="outline" size="sm" disabled>
+                          <Pencil className="h-4 w-4 mr-1" />
+                          편집
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      참여한 학생이 있어 편집할 수 없습니다
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <Link href={`/instructor/assignment/${resolvedParams.assignmentId}/edit`}>
+                    <Button variant="outline" size="sm">
+                      <Pencil className="h-4 w-4 mr-1" />
+                      편집
+                    </Button>
+                  </Link>
+                )}
                 <Link href="/instructor">
                   <Button variant="outline" size="sm">
                     <span className="sm:hidden">대시보드</span>

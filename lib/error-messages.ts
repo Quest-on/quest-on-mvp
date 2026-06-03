@@ -76,6 +76,7 @@ function translateErrorMessage(message: string): string {
     "not found": "요청한 리소스를 찾을 수 없습니다",
     "unknown error": "알 수 없는 오류가 발생했습니다",
     "operation failed": "작업에 실패했습니다",
+    "questions_locked": "참여한 학생이 있어 문항을 수정할 수 없습니다",
     
     // Supabase 관련 에러
     "jwt": "인증 토큰 오류",
