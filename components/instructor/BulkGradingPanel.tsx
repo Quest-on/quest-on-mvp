@@ -1299,9 +1299,9 @@ export function BulkGradingPanel({
               </div>
             ) : (
               <div className="flex flex-wrap gap-1.5">
-                {displayedOptions.map((opt) => (
+                {displayedOptions.map((opt, optIdx) => (
                   <button
-                    key={opt.label}
+                    key={`${opt.action}-${optIdx}-${opt.label}`}
                     type="button"
                     onClick={() => handleOptionPick(opt)}
                     disabled={chatMutation.isPending || startGradingMutation.isPending}

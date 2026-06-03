@@ -80,7 +80,7 @@ export async function POST(
             response_format: { type: "json_object" },
           }),
         {
-          feature: "bulk_grading_chat",
+          feature: "bulk_grading_chat_options",
           route: `/api/exam/${examId}/bulk-grade/chat-options`,
           model: AI_MODEL_BULK_GRADING_WORKER,
           userId: access.ctx.user.id,
