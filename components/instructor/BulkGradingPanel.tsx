@@ -13,6 +13,8 @@ import {
   isNearBottom,
   orderThreadItems,
   resolveSendMode,
+  countInterviewQuestions,
+  formatPickedQACriteria,
 } from "@/lib/bulk-grade-thread";
 import toast from "react-hot-toast";
 import {
@@ -180,11 +182,18 @@ export function BulkGradingPanel({
   /** When armed, the next Send re-runs grading with new criteria. */
   const [regradeArmed, setRegradeArmed] = useState(false);
 
+  /** Quick-reply chips offered by the AI during the interviewing phase. */
+  const [chatOptions, setChatOptions] = useState<string[]>([]);
+  /** Q&A pairs accumulated via quick-reply chip selection. */
+  const [pickedQA, setPickedQA] = useState<{ q: string; a: string }[]>([]);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const wasNearBottomRef = useRef(true);
   const sendInFlightRef = useRef(false);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+  /** Guards against re-fetching options for the same assistant message. */
+  const lastFetchedMsgIdRef = useRef<string | null>(null);
 
   const releaseSendLock = () => {
     sendInFlightRef.current = false;
@@ -221,6 +230,31 @@ export function BulkGradingPanel({
     staleTime: 0,
   });
 
+  /** Fetches quick-reply options for the latest AI question (silent degradation). */
+  const chatOptionsMutation = useMutation({
+    mutationFn: async ({
+      questionText,
+      gradingSessionId,
+    }: {
+      questionText: string;
+      gradingSessionId: string;
+    }) => {
+      const res = await fetch(`/api/exam/${examId}/bulk-grade/chat-options`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionText, gradingSessionId }),
+      });
+      if (!res.ok) return { success: false, options: [] as string[] };
+      return res.json() as Promise<{ success: boolean; options: string[] }>;
+    },
+    onSuccess: (result) => {
+      setChatOptions(result.options ?? []);
+    },
+    onError: () => {
+      setChatOptions([]);
+    },
+  });
+
   const chatMutation = useMutation({
     mutationFn: async ({
       message,
@@ -244,6 +278,24 @@ export function BulkGradingPanel({
       setDraft("");
       queryClient.setQueryData(qk.instructor.bulkGradeChat(examId), result);
       queryClient.invalidateQueries({ queryKey: qk.instructor.bulkGradeSession(examId) });
+
+      // Fetch quick-reply options for the new AI question (interviewing phase only).
+      if (result.session?.calibration_status === "interviewing") {
+        const msgs = result.messages ?? [];
+        const latestAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
+        const sessionId = result.session?.id ?? chatData?.session?.id;
+        if (latestAssistant && sessionId) {
+          setChatOptions([]); // clear while fetching
+          lastFetchedMsgIdRef.current = latestAssistant.id;
+          chatOptionsMutation.mutate({
+            questionText: latestAssistant.content,
+            gradingSessionId: sessionId,
+          });
+        }
+      } else {
+        // Left interviewing phase (e.g. approved) — clear chips.
+        setChatOptions([]);
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -336,13 +388,17 @@ export function BulkGradingPanel({
 
   const startGradingMutation = useMutation({
     mutationFn: async () => {
-      const criteria = criteriaMode === "ai_default" ? "" : draft.trim();
+      // NOTE: formatPickedQACriteria is called EXACTLY ONCE here at send time.
+      // The re-grade arm path keeps draft = base only (no pre-baked Q&A) to
+      // prevent double-appending. Truncated to 8000 chars total.
+      const base = criteriaMode === "ai_default" ? "" : draft.trim();
+      const enriched = (base + formatPickedQACriteria(pickedQA)).slice(0, 8000);
       const res = await fetch(`/api/exam/${examId}/bulk-grade/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           scope: "full",
-          criteriaText: criteria,
+          criteriaText: enriched,
           criteriaMode,
           approvalMode,
         }),
@@ -358,6 +414,8 @@ export function BulkGradingPanel({
       setEditedGrades(null);
       setRegradeArmed(false);
       setDraft("");
+      setPickedQA([]);
+      setChatOptions([]);
       queryClient.invalidateQueries({ queryKey: qk.instructor.bulkGradeSession(examId) });
       queryClient.invalidateQueries({ queryKey: qk.instructor.bulkGradeChat(examId) });
     },
@@ -504,6 +562,49 @@ export function BulkGradingPanel({
     setDraft("");
   };
 
+  // ─── Interview phase chip logic ─────────────────────────────────────────────
+  const isInterviewing = chatData?.session?.calibration_status === "interviewing";
+
+  /** Number of AI questions posed AFTER the first user reply (cap = 3). */
+  const aiQuestionCount = countInterviewQuestions(chatData?.messages ?? []);
+  const AI_QUESTION_CAP = 3;
+
+  /**
+   * Structured option list displayed as quick-reply chips.
+   * When the cap is reached, only the regrade option is shown (forces commit).
+   * The regrade chip is always last; its action distinguishes it from pick chips.
+   */
+  const displayedOptions: { label: string; action: "pick" | "regrade" }[] =
+    isInterviewing
+      ? aiQuestionCount >= AI_QUESTION_CAP
+        ? [{ label: "이 기준으로 다시 가채점", action: "regrade" }]
+        : [
+            ...chatOptions.map((o) => ({ label: o, action: "pick" as const })),
+            { label: "이 기준으로 다시 가채점", action: "regrade" },
+          ]
+      : [];
+
+  const handleOptionPick = (opt: { label: string; action: "pick" | "regrade" }) => {
+    if (opt.action === "regrade") {
+      // Arm re-grade with base criteria only.
+      // formatPickedQACriteria will be appended exactly once in startGradingMutation.
+      const base =
+        lastSubmittedCriteria?.text ?? data?.session?.criteriaSummary ?? draft ?? "";
+      setDraft(base);
+      setRegradeArmed(true);
+      setCriteriaMode("custom");
+      setChatOptions([]);
+      focusComposer();
+    } else {
+      // Pick a quick-reply answer: record the Q&A pair and send it as a chat message.
+      const msgs = chatData?.messages ?? [];
+      const latestQ = [...msgs].reverse().find((m) => m.role === "assistant")?.content ?? "";
+      setPickedQA((prev) => [...prev, { q: latestQ, a: opt.label }]);
+      setChatOptions([]);
+      chatMutation.mutate({ message: opt.label, clientMessageId: createClientMessageId() });
+    }
+  };
+
   // ─── Send routing ──────────────────────────────────────────────────────────
   const sendMode = resolveSendMode({
     committed,
@@ -562,6 +663,31 @@ export function BulkGradingPanel({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onOpenChange]);
+
+  // ─── Init/welcome question options fetch ────────────────────────────────────
+  // Covers the case where the panel opens with an existing "interviewing" session
+  // and there's already an assistant message we haven't fetched options for yet.
+  useEffect(() => {
+    if (!open) return;
+    if (chatData?.session?.calibration_status !== "interviewing") return;
+    const sessionId = chatData.session.id;
+    if (!sessionId) return;
+
+    const msgs = chatData.messages ?? [];
+    const lastMsg = msgs[msgs.length - 1];
+    if (!lastMsg || lastMsg.role !== "assistant") return;
+    // Guard: don't re-fetch for the same message.
+    if (lastFetchedMsgIdRef.current === lastMsg.id) return;
+
+    lastFetchedMsgIdRef.current = lastMsg.id;
+    setChatOptions([]); // clear while fetching
+    chatOptionsMutation.mutate({
+      questionText: lastMsg.content,
+      gradingSessionId: sessionId,
+    });
+    // chatOptionsMutation is stable; we only re-run when messages change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, chatData?.messages, chatData?.session?.calibration_status, chatData?.session?.id]);
 
   // ─── Thread items (single ordered timeline) ──────────────────────────────────
   const gradingStartTs = useMemo(() => {
@@ -1056,7 +1182,7 @@ export function BulkGradingPanel({
       aria-hidden={!open}
       inert={!open}
       className={cn(
-        "fixed inset-y-0 right-0 z-40 flex h-full w-[480px] max-w-full flex-col overflow-hidden border-l bg-background shadow-lg",
+        "fixed inset-y-0 right-0 z-40 flex h-full w-[528px] max-w-full flex-col overflow-hidden border-l bg-background shadow-lg",
         "transition-transform duration-300 ease-in-out",
         open ? "translate-x-0" : "translate-x-full",
       )}
@@ -1160,6 +1286,37 @@ export function BulkGradingPanel({
             >
               취소
             </button>
+          </div>
+        )}
+
+        {/* Quick-reply chips — shown during the interviewing phase */}
+        {isInterviewing && (aiQuestionCount > 0 || chatOptions.length > 0) && (
+          <div className="mb-2">
+            {chatOptionsMutation.isPending ? (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                보기 생성 중...
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {displayedOptions.map((opt) => (
+                  <button
+                    key={opt.label}
+                    type="button"
+                    onClick={() => handleOptionPick(opt)}
+                    disabled={chatMutation.isPending || startGradingMutation.isPending}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs transition-colors",
+                      opt.action === "regrade"
+                        ? "border-primary bg-primary/10 text-primary hover:bg-primary/20 font-medium"
+                        : "border-border bg-muted hover:bg-muted/70 text-foreground",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
