@@ -22,6 +22,7 @@ import {
   type ExtractedCriteria,
 } from "@/lib/prompts";
 import { normalizeQuestions, isCaseQuestion } from "@/lib/grading-helpers";
+import { stripEmoji } from "@/lib/sanitize";
 
 async function handler(request: NextRequest): Promise<NextResponse> {
   try {
@@ -46,6 +47,8 @@ async function handler(request: NextRequest): Promise<NextResponse> {
         id,
         instructor_id,
         grading_criteria,
+        status,
+        current_attempt_id,
         exams!inner ( id, questions, language ),
         expected_session_ids
       `)
@@ -59,6 +62,17 @@ async function handler(request: NextRequest): Promise<NextResponse> {
         additionalData: { gradingSessionId, examId },
       });
       return NextResponse.json({ ok: false, reason: "session_not_found" }, { status: 200 });
+    }
+
+    if (
+      attemptId &&
+      (ownershipCheck.current_attempt_id as string | null) !== attemptId
+    ) {
+      return NextResponse.json({ ok: false, reason: "stale_attempt" }, { status: 200 });
+    }
+
+    if ((ownershipCheck.status as string | null) !== "grading") {
+      return NextResponse.json({ ok: false, reason: "not_grading" }, { status: 200 });
     }
 
     const expectedSessionIds = asStringArray(ownershipCheck.expected_session_ids);
@@ -168,7 +182,10 @@ async function handler(request: NextRequest): Promise<NextResponse> {
 
       if (parsed && hasGradesForEveryExpectedQuestion(parsed, caseQIdxes)) {
         for (const g of parsed) {
-          gradesMap[g.q_idx] = { score: g.score, comment: g.comment };
+          gradesMap[g.q_idx] = {
+            score: g.score,
+            comment: stripEmoji(g.comment).trim(),
+          };
         }
         success = true;
       }

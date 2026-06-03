@@ -333,6 +333,17 @@ export async function getBulkGradingMessages(gradingSessionId: string) {
   return data ?? [];
 }
 
+export async function getCaseGradingChats(sessionId: string, qIdx: number) {
+  const { data, error } = await supabase
+    .from("grading_chats")
+    .select("*")
+    .eq("session_id", sessionId)
+    .eq("q_idx", qIdx)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`getCaseGradingChats failed: ${error.message}`);
+  return data ?? [];
+}
+
 interface SeedExamNodeOverrides {
   id?: string;
   kind?: "folder" | "exam";

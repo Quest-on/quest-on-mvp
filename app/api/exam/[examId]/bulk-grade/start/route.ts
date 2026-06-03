@@ -18,9 +18,12 @@ import {
   loadExamMetaOnly,
 } from "@/lib/bulk-grading";
 import type { ExtractedCriteria } from "@/lib/prompts";
+import { isUniqueViolation } from "@/lib/chat-idempotency";
 
 const BULK_GRADE_START_RATE_LIMIT = { limit: 3, windowSec: 60 };
 const STALE_GRADING_MS = 10 * 60 * 1000;
+const GRADING_SESSION_SELECT =
+  "id, status, updated_at, calibration_status, calibration_sample_session_ids, calibration_sample_grades, calibration_attempt";
 
 function parseScope(body: unknown): BulkGradingScope {
   void body;
@@ -90,25 +93,10 @@ export async function POST(
     // Check for existing grading session
     const { data: existingSession } = await supabase
       .from("exam_grading_sessions")
-      .select("id, status, updated_at, calibration_status, calibration_sample_session_ids, calibration_sample_grades, calibration_attempt")
+      .select(GRADING_SESSION_SELECT)
       .eq("exam_id", examId)
       .eq("instructor_id", access.ctx.user.id)
       .maybeSingle();
-
-    const hasActiveFullGrading = existingSession?.status === "grading";
-    const hasActiveSampleGrading = existingSession?.calibration_status === "sample_grading";
-    if (existingSession?.status === "committed" || existingSession?.status === "committing") {
-      return errorJson("CONFLICT", "이미 확정 중이거나 확정된 채점입니다.", 409);
-    }
-    if (hasActiveFullGrading || hasActiveSampleGrading) {
-      const updatedAt = existingSession.updated_at
-        ? new Date(existingSession.updated_at as string).getTime()
-        : 0;
-      const isStale = Date.now() - updatedAt > STALE_GRADING_MS;
-      if (!isStale) {
-        return errorJson("CONFLICT", "채점이 이미 진행 중입니다. 잠시 후 확인해주세요.", 409);
-      }
-    }
 
     // Load exam meta + submitted sessions
     const [examMeta, sessionsResult] = await Promise.all([
@@ -139,25 +127,60 @@ export async function POST(
       );
     }
 
-    const sessionUpsertResult = await supabase
-      .from("exam_grading_sessions")
-      .upsert(
-        {
+    let startSession = existingSession;
+    if (!startSession) {
+      const insertResult = await supabase
+        .from("exam_grading_sessions")
+        .insert({
           exam_id: examId,
           instructor_id: access.ctx.user.id,
           status: "draft",
           updated_at: new Date().toISOString(),
-        },
-        { onConflict: "exam_id,instructor_id" },
-      )
-      .select("id")
-      .single();
+        })
+        .select(GRADING_SESSION_SELECT)
+        .single();
 
-    if (sessionUpsertResult.error || !sessionUpsertResult.data) {
+      if (insertResult.error) {
+        if (!isUniqueViolation(insertResult.error)) {
+          return errorJson("INTERNAL_ERROR", "Failed to initialize grading session", 500);
+        }
+
+        const { data: racedSession, error: racedSessionError } = await supabase
+          .from("exam_grading_sessions")
+          .select(GRADING_SESSION_SELECT)
+          .eq("exam_id", examId)
+          .eq("instructor_id", access.ctx.user.id)
+          .maybeSingle();
+
+        if (racedSessionError || !racedSession) {
+          return errorJson("INTERNAL_ERROR", "Failed to initialize grading session", 500);
+        }
+        startSession = racedSession;
+      } else {
+        startSession = insertResult.data;
+      }
+    }
+
+    if (!startSession) {
       return errorJson("INTERNAL_ERROR", "Failed to initialize grading session", 500);
     }
 
-    const gradingSessionId = sessionUpsertResult.data.id as string;
+    const hasActiveFullGrading = startSession.status === "grading";
+    const hasActiveSampleGrading = startSession.calibration_status === "sample_grading";
+    if (startSession.status === "committed" || startSession.status === "committing") {
+      return errorJson("CONFLICT", "이미 확정 중이거나 확정된 채점입니다.", 409);
+    }
+    const activeUpdatedAt = startSession.updated_at
+      ? new Date(startSession.updated_at as string).getTime()
+      : 0;
+    const canReplaceActive =
+      (hasActiveFullGrading || hasActiveSampleGrading) &&
+      Date.now() - activeUpdatedAt > STALE_GRADING_MS;
+    if ((hasActiveFullGrading || hasActiveSampleGrading) && !canReplaceActive) {
+      return errorJson("CONFLICT", "채점이 이미 진행 중입니다. 잠시 후 확인해주세요.", 409);
+    }
+
+    const gradingSessionId = startSession.id as string;
     const criteria = parseCriteria(body);
 
     const attemptId = globalThis.crypto.randomUUID();
@@ -177,17 +200,36 @@ export async function POST(
 
     updatePayload.proposed_grades = {};
 
-    // Update session: criteria + progress tracking
-    const { error: updateError } = await supabase
+    // Update session: criteria + progress tracking. The filters make concurrent
+    // start requests converge on a single attempt.
+    let updateQuery = supabase
       .from("exam_grading_sessions")
       .update(updatePayload)
       .eq("id", gradingSessionId);
+
+    if (canReplaceActive) {
+      updateQuery = updateQuery.lt(
+        "updated_at",
+        new Date(Date.now() - STALE_GRADING_MS).toISOString(),
+      );
+    } else {
+      updateQuery = updateQuery
+        .in("status", ["draft", "grading_done", "grading_failed"])
+        .neq("calibration_status", "sample_grading");
+    }
+
+    const { data: startedSession, error: updateError } = await updateQuery
+      .select("id")
+      .maybeSingle();
 
     if (updateError) {
       logError("bulk-grade start: session update failed", updateError, {
         path: `/api/exam/${examId}/bulk-grade/start`,
       });
       return errorJson("INTERNAL_ERROR", "Failed to start grading session", 500);
+    }
+    if (!startedSession) {
+      return errorJson("CONFLICT", "채점이 이미 진행 중입니다. 잠시 후 확인해주세요.", 409);
     }
 
     // Dev fallback: no QStash → inline sequential (non-Vercel only)

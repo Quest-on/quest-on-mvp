@@ -204,6 +204,7 @@ export const singleGradeUpdateSchema = z.object({
 export const caseGradeChatPostSchema = z.object({
   qIdx: z.number().int().min(0),
   message: sanitizedString(z.string().min(1, "Message is required").max(10000)),
+  clientMessageId: z.string().uuid("Invalid clientMessageId"),
 });
 
 export const caseGradeCommitSchema = z.object({
@@ -220,6 +221,7 @@ export const bulkGradeChatPostSchema = z.union([
   z.object({
     init: z.undefined().optional(),
     message: sanitizedString(z.string().min(1, "Message is required").max(10000)),
+    clientMessageId: z.string().uuid("Invalid clientMessageId"),
   }),
 ]);
 

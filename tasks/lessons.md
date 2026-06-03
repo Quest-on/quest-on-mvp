@@ -52,3 +52,9 @@
 - CASE 가채점 입력에는 채점 승인 권한 설정을 함께 둔다. 단, 제안 점수와 최종 확정 저장은 분리해서 강사 확정 전에는 최종 점수로 저장하지 않는다.
 - 채점 worker는 `scope`와 `attemptId`를 받아 stale retry, 중복 처리, 샘플/전체 결과 혼입을 방지한다.
 - 사용자가 “thinking” 공개를 요청해도 숨은 추론은 공개하지 않는다. 대신 결정 로그, 검증 로그, 에이전트 검토 요약을 제공한다.
+
+## 2026-06-03 — DB 안전 경계
+
+- 사용자가 DB 사고나 데이터 삭제를 언급하면 즉시 모든 DB 연결 작업을 중단한다. E2E, Playwright API, Supabase CLI, Docker Supabase, `prisma db push`, migration 적용, seed/cleanup helper 실행은 명시 재승인 전까지 금지한다.
+- 기능 검증이 필요해도 운영/공유 Supabase에 닿을 수 있는 명령은 실행하지 않는다. 로컬 정적 검증(`tsc`, `lint`, pure Vitest)만 사용하고, DB가 필요한 검증은 “미실행”으로 보고한다.
+- 테스트/CI 보정 중에도 `.env.local`의 `DATABASE_URL` 또는 Supabase 키를 source해서 실행하지 않는다. DB URL이 로컬 테스트 DB인지 사용자가 확인해주기 전에는 어떤 schema/data 명령도 금지한다.

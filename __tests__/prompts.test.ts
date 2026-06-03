@@ -10,6 +10,8 @@ import {
   buildAssignmentQuizGenerationPrompt,
   buildCaseQuestionGenerationPrompt,
   buildPerStudentGradingSystemPrompt,
+  buildCriteriaDiscussionSystemPrompt,
+  buildCaseGradingChatSystemPrompt,
 } from "@/lib/prompts";
 
 describe("sanitizeForPrompt", () => {
@@ -75,6 +77,34 @@ describe("sanitizeForPrompt", () => {
     const result = sanitizeForPrompt(input);
     // Not at line start, so should remain
     expect(result).toContain("**[일반 볼드]**");
+  });
+});
+
+describe("grading chat prompt style", () => {
+  it("keeps bulk criteria discussion compact and emoji-free", () => {
+    const prompt = buildCriteriaDiscussionSystemPrompt({
+      examTitle: "Case Exam",
+      caseQuestions: [{ qIdx: 0, questionPrompt: "시장 진입 전략을 평가하세요." }],
+      sampleStudents: [],
+      language: "ko",
+    });
+
+    expect(prompt).toContain("이모지를 사용하지 마세요");
+    expect(prompt).toContain("후속 질문 1개만");
+    expect(prompt).toContain("300자 이내");
+    expect(prompt).not.toContain("샘플 가채점 시작");
+  });
+
+  it("keeps individual case grading chat compact and emoji-free", () => {
+    const prompt = buildCaseGradingChatSystemPrompt({
+      questionPrompt: "문제",
+      studentAnswer: "답안",
+      studentChatSummary: "대화",
+      language: "ko",
+    });
+
+    expect(prompt).toContain("이모지를 사용하지 마세요");
+    expect(prompt).toContain("질문 1개만");
   });
 });
 

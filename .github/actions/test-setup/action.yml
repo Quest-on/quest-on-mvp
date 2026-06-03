@@ -106,6 +106,7 @@ runs:
     - name: Apply SQL functions (RPCs)
       run: |
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -f database/016_chat_message_idempotency.sql \
           -f sql/006_submit_exam_atomic.sql \
           -f sql/007_index_optimization.sql \
           -f sql/012_create_exam_with_node.sql

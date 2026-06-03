@@ -42,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { extractErrorMessage } from "@/lib/error-messages";
+import { createClientMessageId } from "@/lib/client-message-id";
 import type { ProposedGradesMap } from "@/lib/bulk-grading";
 import {
   dashboardStatus,
@@ -53,21 +54,21 @@ import {
 type PermissionKey = "review_before_commit" | "no_precheck" | "ai_default";
 
 const PERMISSION_LABELS: Record<PermissionKey, string> = {
-  review_before_commit: "채점 전 승인",
-  no_precheck: "채점 승인",
+  review_before_commit: "검토 후 확정",
+  no_precheck: "바로 가채점",
   ai_default: "AI한테 다 맡기기",
 };
 
 const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
-  review_before_commit: "입력한 기준으로 가채점 후 검토하고 확정합니다",
-  no_precheck: "사전 확인 없이 바로 가채점을 진행합니다",
-  ai_default: "기준 없이 AI 기본 기준으로 가채점합니다",
+  review_before_commit: "검토 후 최종 확정",
+  no_precheck: "추가 질문 없이 시작",
+  ai_default: "AI 기본 기준으로 시작",
 };
 
 const EXAMPLE_CRITERIA = [
-  "논리적 근거 40%, 답변 완성도 30%, 핵심 개념 활용 30%. 부분 점수 허용.",
-  "핵심 개념을 정확히 사용했는지 위주로 보고, 사소한 표현 실수는 감점하지 않음.",
-  "문제 요구사항 충족 여부를 가장 중요하게 평가.",
+  "논리 40 · 완성도 30 · 개념 30",
+  "핵심 개념 중심, 표현 실수는 관대하게",
+  "요구사항 충족을 최우선",
 ];
 
 type BulkGradeProgress = {
@@ -182,7 +183,12 @@ export function BulkGradingPanel({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const wasNearBottomRef = useRef(true);
+  const sendInFlightRef = useRef(false);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+
+  const releaseSendLock = () => {
+    sendInFlightRef.current = false;
+  };
 
   const { data, isLoading } = useQuery<SessionData>({
     queryKey: qk.instructor.bulkGradeSession(examId),
@@ -216,11 +222,17 @@ export function BulkGradingPanel({
   });
 
   const chatMutation = useMutation({
-    mutationFn: async (message: string) => {
+    mutationFn: async ({
+      message,
+      clientMessageId,
+    }: {
+      message: string;
+      clientMessageId: string;
+    }) => {
       const res = await fetch(`/api/exam/${examId}/bulk-grade/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, clientMessageId }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -236,6 +248,7 @@ export function BulkGradingPanel({
     onError: (error: Error) => {
       toast.error(error.message);
     },
+    onSettled: releaseSendLock,
   });
 
   const sessionStatus = data?.session?.status ?? null;
@@ -351,6 +364,7 @@ export function BulkGradingPanel({
     onError: (error: Error) => {
       toast.error(error.message);
     },
+    onSettled: releaseSendLock,
   });
 
   const commitMutation = useMutation({
@@ -509,7 +523,9 @@ export function BulkGradingPanel({
   const sendBusy = sendMode === "start" ? startPending || isGrading : chatPending;
 
   const send = () => {
+    if (sendInFlightRef.current) return;
     if (sendDisabled) return;
+    sendInFlightRef.current = true;
     if (sendMode === "start") {
       setLastSubmittedCriteria({
         text: criteriaMode === "ai_default" ? "" : trimmedDraft,
@@ -518,8 +534,11 @@ export function BulkGradingPanel({
       startGradingMutation.mutate();
     } else {
       const message = trimmedDraft;
-      if (!message) return;
-      chatMutation.mutate(message);
+      if (!message) {
+        releaseSendLock();
+        return;
+      }
+      chatMutation.mutate({ message, clientMessageId: createClientMessageId() });
     }
   };
 
@@ -645,8 +664,8 @@ export function BulkGradingPanel({
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>
               {gradingFailed
-                ? "일부 CASE 가채점이 완료되지 않았습니다. 다시 채점하면 이전 제안 점수를 초기화하고 새로 생성합니다."
-                : `${progress?.failed ?? 0}명 가채점에 실패했습니다. 성공한 제안 점수만 확정할 수 있습니다.`}
+                ? "일부 실패. 다시 채점하면 제안 점수가 초기화됩니다."
+                : `${progress?.failed ?? 0}명 실패. 성공분만 확정할 수 있습니다.`}
             </span>
           </p>
         ),
@@ -811,7 +830,11 @@ export function BulkGradingPanel({
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => startGradingMutation.mutate()}
+                      onClick={() => {
+                        if (sendInFlightRef.current || startDisabledForCard) return;
+                        sendInFlightRef.current = true;
+                        startGradingMutation.mutate();
+                      }}
                       disabled={startDisabledForCard}
                       className="h-7 shrink-0 px-2 text-xs"
                     >
@@ -849,7 +872,7 @@ export function BulkGradingPanel({
                 </ul>
                 {!isGrading && !committed && (
                   <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                    채점되지 않은 학생은 “다시 가채점”으로 새로 시도합니다. (이전 제안 점수는 초기화됩니다)
+                    다시 가채점하면 제안 점수가 초기화됩니다.
                   </p>
                 )}
               </div>
@@ -858,9 +881,7 @@ export function BulkGradingPanel({
             {/* (b) editable grade table OR (c) committed final summary. */}
             {committed ? (
               <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  확정 총점은 학생 목록과 같은 final grade 기준으로 표시됩니다.
-                </p>
+                <p className="text-xs text-muted-foreground">학생 목록 기준 최종 점수입니다.</p>
                 {finalSummariesLoading ? (
                   <div className="flex items-center justify-center rounded-md border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1019,7 +1040,7 @@ export function BulkGradingPanel({
             )}
             {committed && (
               <div className="border-t pt-3 text-xs text-muted-foreground">
-                확정된 채점입니다. 총점은 학생 목록에서 확인하고, 아래 입력란에서 결과를 계속 논의할 수 있습니다.
+                확정된 채점입니다. 아래에서 결과만 논의할 수 있습니다.
               </div>
             )}
           </div>
@@ -1073,7 +1094,7 @@ export function BulkGradingPanel({
           ) : !hasThreadContent ? (
             <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
               <p className="text-sm text-muted-foreground">
-                채점 기준을 입력하면 채점을 시작합니다
+                채점 기준을 알려주세요
               </p>
               <div className="flex flex-wrap justify-center gap-2">
                 {EXAMPLE_CRITERIA.map((example) => (
@@ -1130,7 +1151,7 @@ export function BulkGradingPanel({
         {regradeArmed && (
           <div className="mb-2 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
             <span className="flex-1">
-              새 기준으로 다시 채점 — 전송 시 이전 제안 점수 초기화
+              전송하면 제안 점수를 새로 만듭니다
             </span>
             <button
               type="button"
@@ -1155,8 +1176,8 @@ export function BulkGradingPanel({
             onKeyDown={handleComposerKeyDown}
             placeholder={
               sendMode === "start"
-                ? "채점 기준을 입력하고 Enter로 채점을 시작하세요. (Shift+Enter 줄바꿈)"
-                : "가채점 기준, 결과 해석, 검토 관점을 질문하세요. (Enter 전송 · Shift+Enter 줄바꿈)"
+                ? "예: 핵심 개념 중심으로 봐줘"
+                : "질문 입력"
             }
             data-testid="bulk-grade-composer-input"
             className="max-h-48 min-h-[44px] resize-none border-0 p-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"

@@ -11,6 +11,8 @@ import {
   gradeUpdateSchema,
   saveFinalAnswerSchema,
   adjustCaseQuestionSchema,
+  caseGradeChatPostSchema,
+  bulkGradeChatPostSchema,
 } from "@/lib/validations";
 
 describe("validateRequest helper", () => {
@@ -65,6 +67,50 @@ describe("chatRequestSchema", () => {
       sessionId: "abc-123",
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("grading chat clientMessageId schemas", () => {
+  it("requires clientMessageId for case grading chat", () => {
+    const missing = caseGradeChatPostSchema.safeParse({
+      qIdx: 0,
+      message: "평가해 주세요.",
+    });
+    expect(missing.success).toBe(false);
+
+    const result = caseGradeChatPostSchema.safeParse({
+      qIdx: 0,
+      message: "평가해 주세요.",
+      clientMessageId: "33333333-3333-4333-8333-333333333333",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid clientMessageId for case grading chat", () => {
+    const result = caseGradeChatPostSchema.safeParse({
+      qIdx: 0,
+      message: "평가해 주세요.",
+      clientMessageId: "not-a-uuid",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("requires clientMessageId for bulk grading chat messages", () => {
+    const missing = bulkGradeChatPostSchema.safeParse({
+      message: "기준을 확인해 주세요.",
+    });
+    expect(missing.success).toBe(false);
+
+    const result = bulkGradeChatPostSchema.safeParse({
+      message: "기준을 확인해 주세요.",
+      clientMessageId: "44444444-4444-4444-8444-444444444444",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("keeps bulk grading init payload valid without clientMessageId", () => {
+    const result = bulkGradeChatPostSchema.safeParse({ init: true });
+    expect(result.success).toBe(true);
   });
 });
 

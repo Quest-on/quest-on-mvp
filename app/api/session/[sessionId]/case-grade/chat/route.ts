@@ -18,9 +18,14 @@ import {
   callTrackedChatCompletion,
 } from "@/lib/ai-tracking";
 import {
+  assistantMessageIdFromClientMessageId,
+  isUniqueViolation,
+} from "@/lib/chat-idempotency";
+import {
   questionPromptByQIdx,
   requireCaseGradeAccess,
 } from "@/lib/case-grade-access";
+import { stripEmoji } from "@/lib/sanitize";
 
 type GradingChatRow = {
   id: string;
@@ -28,6 +33,36 @@ type GradingChatRow = {
   content: string;
   created_at: string;
 };
+
+const IDEMPOTENT_RESPONSE_WAIT_MS = 250;
+const IDEMPOTENT_RESPONSE_ATTEMPTS = 200;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForCaseAssistantMessage(
+  supabase: ReturnType<typeof import("@/lib/supabase-server").getSupabaseServer>,
+  sessionId: string,
+  qIdx: number,
+  clientMessageId: string,
+): Promise<Pick<GradingChatRow, "id" | "role" | "content"> | null> {
+  for (let attempt = 0; attempt < IDEMPOTENT_RESPONSE_ATTEMPTS; attempt += 1) {
+    const { data, error } = await supabase
+      .from("grading_chats")
+      .select("id, role, content")
+      .eq("session_id", sessionId)
+      .eq("q_idx", qIdx)
+      .eq("role", "assistant")
+      .eq("client_message_id", clientMessageId)
+      .maybeSingle();
+
+    if (!error && data) return data as Pick<GradingChatRow, "id" | "role" | "content">;
+    await sleep(IDEMPOTENT_RESPONSE_WAIT_MS);
+  }
+
+  return null;
+}
 
 function parseQIdx(searchParams: URLSearchParams): number | null {
   const raw = searchParams.get("qIdx");
@@ -172,7 +207,7 @@ export async function POST(
       return errorJson("VALIDATION_ERROR", validation.error, 400);
     }
 
-    const { qIdx, message } = validation.data;
+    const { qIdx, message, clientMessageId } = validation.data;
 
     const access = await requireCaseGradeAccess(sessionId, user, qIdx, {
       requireClosed: true,
@@ -189,19 +224,38 @@ export async function POST(
 
     const { supabase, session, exam } = access.ctx;
 
-    const { error: insertUserError } = await supabase.from("grading_chats").insert({
+    const userMessagePayload: Record<string, unknown> = {
       session_id: sessionId,
       q_idx: qIdx,
       role: "user",
       content: message,
       created_by: access.ctx.user.id,
-    });
+      client_message_id: clientMessageId,
+    };
+
+    const { error: insertUserError } = await supabase
+      .from("grading_chats")
+      .insert(userMessagePayload);
 
     if (insertUserError) {
-      logError("case-grade chat: save user message failed", insertUserError, {
-        path: `/api/session/${sessionId}/case-grade/chat`,
-      });
-      return errorJson("INTERNAL_ERROR", "Failed to save message", 500);
+      if (isUniqueViolation(insertUserError)) {
+        const existingAssistant = await waitForCaseAssistantMessage(
+          supabase,
+          sessionId,
+          qIdx,
+          clientMessageId,
+        );
+
+        if (existingAssistant) {
+          return successJson({ assistantMessage: existingAssistant });
+        }
+        return errorJson("CONFLICT", "Message is already being processed", 409);
+      } else {
+        logError("case-grade chat: save user message failed", insertUserError, {
+          path: `/api/session/${sessionId}/case-grade/chat`,
+        });
+        return errorJson("INTERNAL_ERROR", "Failed to save message", 500);
+      }
     }
 
     const [historyResult, studentAnswer, studentChatSummary] = await Promise.all([
@@ -248,7 +302,7 @@ export async function POST(
         getOpenAI().chat.completions.create({
           model: AI_MODEL,
           messages: openAiMessages,
-          max_completion_tokens: 1500,
+          max_completion_tokens: 700,
         }),
       {
         feature: "case_grading_chat",
@@ -276,26 +330,45 @@ export async function POST(
       },
     );
 
-    const assistantContent =
-      tracked.data.choices[0]?.message?.content?.trim() || "";
+    const assistantContent = stripEmoji(
+      tracked.data.choices[0]?.message?.content?.trim() || "",
+    ).trim();
 
     if (!assistantContent) {
       return errorJson("INTERNAL_ERROR", "Failed to generate AI response", 500);
     }
 
+    const assistantPayload: Record<string, unknown> = {
+      session_id: sessionId,
+      q_idx: qIdx,
+      role: "assistant",
+      content: assistantContent,
+      created_by: access.ctx.user.id,
+      client_message_id: clientMessageId,
+    };
+    assistantPayload.id = assistantMessageIdFromClientMessageId(
+      `case-grade-chat:${sessionId}:${qIdx}`,
+      clientMessageId,
+    );
+
     const { data: assistantRow, error: insertAssistantError } = await supabase
       .from("grading_chats")
-      .insert({
-        session_id: sessionId,
-        q_idx: qIdx,
-        role: "assistant",
-        content: assistantContent,
-        created_by: access.ctx.user.id,
-      })
+      .insert(assistantPayload)
       .select("id, role, content")
       .single();
 
     if (insertAssistantError || !assistantRow) {
+      if (isUniqueViolation(insertAssistantError)) {
+        const { data: existingAssistant, error: existingAssistantError } = await supabase
+          .from("grading_chats")
+          .select("id, role, content")
+          .eq("id", assistantPayload.id as string)
+          .maybeSingle();
+
+        if (!existingAssistantError && existingAssistant) {
+          return successJson({ assistantMessage: existingAssistant });
+        }
+      }
       logError("case-grade chat: save assistant message failed", insertAssistantError, {
         path: `/api/session/${sessionId}/case-grade/chat`,
       });

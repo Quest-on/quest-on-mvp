@@ -4,6 +4,7 @@ import {
   seedSession,
   seedSubmission,
   cleanupTestData,
+  getCaseGradingChats,
 } from "../../helpers/seed";
 
 const essayQuestion = {
@@ -81,7 +82,11 @@ test.describe("Case grading chat API", () => {
     const res = await instructorRequest.post(
       `/api/session/${session.id}/case-grade/chat`,
       {
-        data: { qIdx: 0, message: "이 답안을 평가해 주세요." },
+        data: {
+          qIdx: 0,
+          message: "이 답안을 평가해 주세요.",
+          clientMessageId: "22222222-2222-4222-8222-222222222201",
+        },
       },
     );
 
@@ -96,6 +101,40 @@ test.describe("Case grading chat API", () => {
     );
     const historyBody = await history.json();
     expect(historyBody.messages?.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("POST chat is idempotent for the same client message id", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({
+      status: "closed",
+      questions: [essayQuestion],
+    });
+    const session = await seedSession(exam.id, "test-student-id", {
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    });
+    await seedSubmission(session.id, 0, { answer: "Student answer" });
+
+    const clientMessageId = "22222222-2222-4222-8222-222222222222";
+    const payload = {
+      qIdx: 0,
+      message: "이 답안의 점수를 제안해 주세요.",
+      clientMessageId,
+    };
+
+    const [firstRes, secondRes] = await Promise.all([
+      instructorRequest.post(`/api/session/${session.id}/case-grade/chat`, { data: payload }),
+      instructorRequest.post(`/api/session/${session.id}/case-grade/chat`, { data: payload }),
+    ]);
+
+    expect(firstRes.status()).toBe(200);
+    expect(secondRes.status()).toBe(200);
+
+    const messages = await getCaseGradingChats(session.id, 0);
+    expect(messages.filter((m) => m.role === "user")).toHaveLength(1);
+    expect(messages.filter((m) => m.role === "assistant")).toHaveLength(1);
+    expect(messages.every((m) => m.client_message_id === clientMessageId)).toBe(true);
   });
 
   test("POST commit upserts manual grade", async ({ instructorRequest }) => {
