@@ -58,3 +58,5 @@
 - 사용자가 DB 사고나 데이터 삭제를 언급하면 즉시 모든 DB 연결 작업을 중단한다. E2E, Playwright API, Supabase CLI, Docker Supabase, `prisma db push`, migration 적용, seed/cleanup helper 실행은 명시 재승인 전까지 금지한다.
 - 기능 검증이 필요해도 운영/공유 Supabase에 닿을 수 있는 명령은 실행하지 않는다. 로컬 정적 검증(`tsc`, `lint`, pure Vitest)만 사용하고, DB가 필요한 검증은 “미실행”으로 보고한다.
 - 테스트/CI 보정 중에도 `.env.local`의 `DATABASE_URL` 또는 Supabase 키를 source해서 실행하지 않는다. DB URL이 로컬 테스트 DB인지 사용자가 확인해주기 전에는 어떤 schema/data 명령도 금지한다.
+- `e2e/helpers/seed.ts::cleanupTestData()`는 `exam_nodes`, `exams` 전체 row를 지울 수 있으므로 절대 수동 실행하지 않는다. 이 helper를 import하는 Playwright/API/E2E 테스트도 DB-backed로 간주하고, `docs/CODEX_DB_SAFETY.md`의 preflight 없이 실행하지 않는다.
+- Codex 세션에서 검증 계획을 세울 때 DB-backed 테스트는 기본 제외한다. 허용 기본값은 `npx tsc --noEmit`, `npm run lint`, DB helper를 import하지 않는 pure Vitest, `git diff --check`뿐이다.
