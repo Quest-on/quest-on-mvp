@@ -93,7 +93,7 @@ export default function EditExam({
         const exam = result.exam;
         setExamData({
           title: exam.title || "",
-          duration: exam.duration || 60,
+          duration: exam.duration ?? 60,
           code: exam.code || "",
           materials: [],
           language: (exam.language === "en" ? "en" : "ko") as "ko" | "en",

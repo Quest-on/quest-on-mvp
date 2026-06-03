@@ -432,7 +432,6 @@ export function SimpleExamAuthoringForm({
   }, [pickedPrompt, pickedType, pickedCount, onQuestionAdd, generateAll, title, language, materialsText]);
 
   const isUnlimited = duration === 0;
-  const ready = submitReasons.length === 0;
   const effectiveWeight = chatWeight ?? 50;
   const isCustomWeight = chatWeight !== null;
   const presentScoreBuckets = useMemo(
@@ -512,18 +511,44 @@ export function SimpleExamAuthoringForm({
   const [durationInput, setDurationInput] = useState<string>(
     duration === 0 ? "" : duration.toString(),
   );
+  const parsedDurationInput =
+    durationInput === "" ? null : Number.parseInt(durationInput, 10);
+  const durationSubmitReason =
+    !isUnlimited && durationInput === ""
+      ? "시험 시간을 입력해주세요"
+      : !isUnlimited &&
+          parsedDurationInput !== null &&
+          parsedDurationInput < 15
+        ? "시험 시간은 15분 이상이거나 무제한이어야 합니다"
+        : null;
+  const visibleSubmitReasons = durationSubmitReason
+    ? [
+        ...submitReasons.filter((reason) => !reason.includes("시험 시간")),
+        durationSubmitReason,
+      ]
+    : submitReasons;
+  const formReady = visibleSubmitReasons.length === 0;
+  const showDurationWarning =
+    !isUnlimited &&
+    parsedDurationInput !== null &&
+    parsedDurationInput < 15;
+  const durationBadgeLabel = isUnlimited
+    ? "무제한"
+    : durationInput === ""
+      ? "시간 미입력"
+      : `${parsedDurationInput ?? duration}분`;
 
   const handleDurationInputChange = (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    const value = e.target.value;
+    const value = e.target.value.replace(/[^0-9]/g, "");
     setDurationInput(value);
 
     if (value === "") {
       return;
     }
 
-    const numValue = Number.parseInt(value.replace(/[^0-9]/g, ""), 10);
+    const numValue = Number.parseInt(value, 10);
     if (Number.isNaN(numValue) || numValue < 0) {
       return;
     }
@@ -560,11 +585,8 @@ export function SimpleExamAuthoringForm({
   };
 
   useEffect(() => {
-    if (duration === 0) {
-      setDurationInput("");
-    } else if (durationInput !== duration.toString()) {
-      setDurationInput(duration.toString());
-    }
+    const next = duration === 0 ? "" : duration.toString();
+    setDurationInput((current) => (current === next ? current : next));
   }, [duration]);
 
   // 문제별 AI 다듬기 — 각 문제 카드의 "AI 다듬기" 버튼이 이 시트를 연다.
@@ -754,7 +776,10 @@ export function SimpleExamAuthoringForm({
                   !isUnlimited && duration === value ? "default" : "outline"
                 }
                 size="sm"
-                onClick={() => onDurationChange(value)}
+                onClick={() => {
+                  onDurationChange(value);
+                  setDurationInput(value.toString());
+                }}
                 disabled={isUnlimited}
               >
                 {value}
@@ -781,7 +806,7 @@ export function SimpleExamAuthoringForm({
                 무제한
               </Label>
             </div>
-            {!isUnlimited && duration > 0 && duration < 15 && (
+            {showDurationWarning && (
               <p className="flex basis-full items-center gap-1.5 text-sm text-amber-600 dark:text-amber-400">
                 <AlertTriangle className="h-4 w-4" />
                 출제하려면 15분 이상으로 설정하세요.
@@ -1220,21 +1245,19 @@ export function SimpleExamAuthoringForm({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap gap-2">
-              <Badge variant={ready ? "default" : "outline"}>
-                {ready ? "출제 가능" : "확인 필요"}
+              <Badge variant={formReady ? "default" : "outline"}>
+                {formReady ? "출제 가능" : "확인 필요"}
               </Badge>
-              <Badge variant="outline">
-                {duration === 0 ? "무제한" : `${duration}분`}
-              </Badge>
+              <Badge variant="outline">{durationBadgeLabel}</Badge>
               <Badge variant="outline">문제 {questions.length}개</Badge>
               <Badge variant="outline">{materialSummary}</Badge>
             </div>
-            {submitReasons.length > 0 && (
+            {visibleSubmitReasons.length > 0 && (
               <div
                 className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"
                 data-testid="create-exam-submit-reasons"
               >
-                {submitReasons.map((reason) => (
+                {visibleSubmitReasons.map((reason) => (
                   <span key={reason}>• {reason}</span>
                 ))}
               </div>
@@ -1244,7 +1267,7 @@ export function SimpleExamAuthoringForm({
             <Button type="button" variant="outline" onClick={onCancel}>
               취소
             </Button>
-            <Button type="submit" disabled={isSubmitting || !ready}>
+            <Button type="submit" disabled={isSubmitting || !formReady}>
               {isSubmitting
                 ? (submitButtonText ? "저장 중..." : "출제 중...")
                 : (submitButtonText ?? "출제하기")}
