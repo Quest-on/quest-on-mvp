@@ -14,7 +14,6 @@ const supabase = getTestSupabase();
 const APP_USER_STUDENT_ID = "11111111-1111-4111-8111-111111111111";
 
 async function cleanupAppUserFallback() {
-  await supabase.from("profiles").delete().eq("id", APP_USER_STUDENT_ID);
   await supabase.auth.admin.deleteUser(APP_USER_STUDENT_ID);
 }
 
@@ -55,15 +54,11 @@ test.describe("GET /api/exam/[examId]/bulk-grade", () => {
       email: "app-fallback-student@example.com",
       email_confirm: true,
       password: "Temp-pass-123456!",
+      user_metadata: {
+        display_name: "App Fallback Student",
+      },
     });
     expect(appUserError).toBeNull();
-    const { error: appProfileError } = await supabase.from("profiles").upsert({
-      id: APP_USER_STUDENT_ID,
-      display_name: "App Fallback Student",
-      role: "student",
-      status: "approved",
-    });
-    expect(appProfileError).toBeNull();
 
     const proposedGrades = {
       [firstSession.id]: { 0: { score: 92, comment: "좋은 분석" } },
