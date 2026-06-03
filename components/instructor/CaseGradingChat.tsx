@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Bot, Loader2, Send, User } from "lucide-react";
 import toast from "react-hot-toast";
 import { extractErrorMessage } from "@/lib/error-messages";
+import { createClientMessageId } from "@/lib/client-message-id";
 import AIMessageRenderer from "@/components/chat/AIMessageRenderer";
 
 export type CaseGradingChatMessage = {
@@ -62,6 +63,7 @@ export function CaseGradingChat({
 }: CaseGradingChatProps) {
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sendInFlightRef = useRef(false);
   const [input, setInput] = useState("");
   const [score, setScore] = useState<string>(
     initialScore !== undefined ? String(initialScore) : "",
@@ -92,11 +94,17 @@ export function CaseGradingChat({
   }, [messages]);
 
   const chatMutation = useMutation({
-    mutationFn: async (message: string) => {
+    mutationFn: async ({
+      message,
+      clientMessageId,
+    }: {
+      message: string;
+      clientMessageId: string;
+    }) => {
       const res = await fetch(`/api/session/${sessionId}/case-grade/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ qIdx, message }),
+        body: JSON.stringify({ qIdx, message, clientMessageId }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -122,6 +130,9 @@ export function CaseGradingChat({
     },
     onError: (error: Error) => {
       toast.error(error.message);
+    },
+    onSettled: () => {
+      sendInFlightRef.current = false;
     },
   });
 
@@ -165,12 +176,16 @@ export function CaseGradingChat({
 
   const handleSend = () => {
     const trimmed = input.trim();
-    if (!trimmed || chatMutation.isPending) return;
-    chatMutation.mutate(trimmed);
+    if (!trimmed || chatMutation.isPending || sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
+    chatMutation.mutate({
+      message: trimmed,
+      clientMessageId: createClientMessageId(),
+    });
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleSend();
     }

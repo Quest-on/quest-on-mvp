@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeUserInput } from "@/lib/sanitize";
+import { sanitizeUserInput, stripEmoji } from "@/lib/sanitize";
 
 describe("sanitizeUserInput", () => {
   it("returns plain text unchanged", () => {
@@ -77,5 +77,15 @@ describe("sanitizeUserInput", () => {
     // DOMPurify handles mutation-based XSS that regex cannot
     const result = sanitizeUserInput('<noscript><p title="</noscript><img src=x onerror=alert(1)>">');
     expect(result).not.toContain("onerror");
+  });
+});
+
+describe("stripEmoji", () => {
+  it("removes emoji while keeping text", () => {
+    expect(stripEmoji("좋아요 ✅ 핵심만 봅니다 🎯")).toBe("좋아요  핵심만 봅니다 ");
+  });
+
+  it("removes keycap emoji sequences", () => {
+    expect(stripEmoji("1️⃣ 먼저 확인")).toBe(" 먼저 확인");
   });
 });

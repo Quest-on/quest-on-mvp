@@ -143,8 +143,8 @@ test.describe("Instructor — Exam & Grading Flow", () => {
       name: "CASE AI 가채점",
     });
     await expect(draftPanel).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
-    await expect(draftPanel.getByText("채점 기준", { exact: true })).toBeVisible();
-    await expect(draftPanel.getByTestId("bulk-grade-chat-input")).toBeVisible();
+    await expect(draftPanel.getByText("채점 기준을 알려주세요")).toBeVisible();
+    await expect(draftPanel.getByTestId("bulk-grade-composer-input")).toBeVisible();
     await expect(draftPanel).not.toContainText("전체 CASE 제안 점수");
     await draftPanel.getByRole("button", { name: "닫기" }).click();
 
@@ -166,14 +166,12 @@ test.describe("Instructor — Exam & Grading Flow", () => {
       name: "CASE AI 가채점",
     });
     await expect(gradingPanel).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
-    await expect(
-      gradingPanel.getByText("전체 CASE 답안을 백그라운드에서 가채점 중입니다."),
-    ).toBeVisible();
+    await expect(gradingPanel.getByText(/전체 CASE 가채점 중/)).toBeVisible();
     await expect(gradingPanel.getByText(/처리 0\/1명/)).toBeVisible();
     await expect(
-      gradingPanel.getByRole("button", { name: "전체 CASE 가채점 중" }),
+      gradingPanel.getByRole("button", { name: "가채점 대화 전송" }),
     ).toBeDisabled();
-    await expect(gradingPanel.getByTestId("bulk-grade-chat-input")).toBeVisible();
+    await expect(gradingPanel.getByTestId("bulk-grade-composer-input")).toBeVisible();
   });
 
   test("bulk grading panel uses student identities and persisted chat", async ({
@@ -216,7 +214,7 @@ test.describe("Instructor — Exam & Grading Flow", () => {
     await expect(panel.getByText("Test Student 1", { exact: true })).toBeVisible();
     await expect(panel).not.toContainText("학생 1");
     await expect(panel.getByText("기존 CASE 가채점 대화입니다.")).toBeVisible();
-    await expect(panel.getByTestId("bulk-grade-chat-input")).toBeVisible();
+    await expect(panel.getByTestId("bulk-grade-composer-input")).toBeVisible();
   });
 
   test("committed bulk grading panel is review and chat only", async ({
@@ -254,14 +252,14 @@ test.describe("Instructor — Exam & Grading Flow", () => {
       name: "CASE AI 가채점",
     });
     await expect(panel).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
-    await expect(panel.getByText("CASE 채점이 확정되었습니다.")).toBeVisible();
+    await expect(panel.getByText("확정된 CASE 채점")).toBeVisible();
     const finalResults = panel.getByTestId("bulk-grade-final-results");
     await expect(finalResults).toBeVisible();
     await expect(finalResults).toContainText("Test Student 0");
     await expect(finalResults).toContainText("90점");
     await expect(finalResults).toContainText("채점완료");
     await expect(panel.getByText("확정 후에도 남아 있는 대화입니다.")).toBeVisible();
-    await expect(panel.getByTestId("bulk-grade-chat-input")).toBeVisible();
+    await expect(panel.getByTestId("bulk-grade-composer-input")).toBeVisible();
     await expect(panel).not.toContainText("확정된 CASE 채점 기록");
     await expect(panel).not.toContainText("stale proposed grade");
     await expect(panel).not.toContainText("전체 CASE 다시 가채점");

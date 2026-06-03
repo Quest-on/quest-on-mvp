@@ -182,7 +182,10 @@ test.describe("GET/POST /api/exam/[examId]/bulk-grade/chat", () => {
     });
 
     const res = await instructorRequest.post(`/api/exam/${exam.id}/bulk-grade/chat`, {
-      data: { message: "이 가채점 결과의 근거를 설명해줘." },
+      data: {
+        message: "이 가채점 결과의 근거를 설명해줘.",
+        clientMessageId: "11111111-1111-4111-8111-111111111201",
+      },
     });
     const body = await res.json();
     const after = await getBulkGradingSession(exam.id);
@@ -197,6 +200,40 @@ test.describe("GET/POST /api/exam/[examId]/bulk-grade/chat", () => {
     expect(after.proposed_grades).toEqual(proposedGrades);
     expect(after.current_attempt_id).toBe("attempt-before-chat");
     expect(after.processed_session_ids).toEqual({ [studentSession.id]: true });
+  });
+
+  test("POST discussion is idempotent for the same client message id", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({
+      status: "closed",
+      questions: [{ id: "q0", type: "essay", text: "Case", idx: 0 }],
+    });
+    const studentSession = await seedSession(exam.id, "student-bulk-chat-idempotent", {
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    });
+    await seedSubmission(studentSession.id, 0, { answer: "학생 답안" });
+
+    const clientMessageId = "11111111-1111-4111-8111-111111111111";
+    const payload = {
+      message: "이 결과를 어떻게 봐야 하나요?",
+      clientMessageId,
+    };
+
+    const [firstRes, secondRes] = await Promise.all([
+      instructorRequest.post(`/api/exam/${exam.id}/bulk-grade/chat`, { data: payload }),
+      instructorRequest.post(`/api/exam/${exam.id}/bulk-grade/chat`, { data: payload }),
+    ]);
+
+    expect(firstRes.status()).toBe(200);
+    expect(secondRes.status()).toBe(200);
+
+    const gradingSession = await getBulkGradingSession(exam.id);
+    const messages = await getBulkGradingMessages(gradingSession.id);
+    expect(messages.filter((m) => m.role === "user")).toHaveLength(1);
+    expect(messages.filter((m) => m.role === "assistant")).toHaveLength(1);
+    expect(messages.every((m) => m.client_message_id === clientMessageId)).toBe(true);
   });
 
   test("POST discussion during active grading states only appends messages", async ({
@@ -241,7 +278,12 @@ test.describe("GET/POST /api/exam/[examId]/bulk-grade/chat", () => {
 
       const res = await instructorRequest.post(
         `/api/exam/${exam.id}/bulk-grade/chat`,
-        { data: { message: "현재 진행 상태를 설명해줘." } },
+        {
+          data: {
+            message: "현재 진행 상태를 설명해줘.",
+            clientMessageId: `11111111-1111-4111-8111-11111111130${index}`,
+          },
+        },
       );
       const after = await getBulkGradingSession(exam.id);
       const messages = await getBulkGradingMessages(after.id);
@@ -283,7 +325,10 @@ test.describe("GET/POST /api/exam/[examId]/bulk-grade/chat", () => {
     });
 
     const res = await instructorRequest.post(`/api/exam/${exam.id}/bulk-grade/chat`, {
-      data: { message: "확정된 결과를 다시 설명해줘." },
+      data: {
+        message: "확정된 결과를 다시 설명해줘.",
+        clientMessageId: "11111111-1111-4111-8111-111111111401",
+      },
     });
     const after = await getBulkGradingSession(exam.id);
 

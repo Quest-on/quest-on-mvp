@@ -22,6 +22,9 @@ const HTML_ENTITIES: Record<string, string> = {
 };
 
 const ENTITY_RE = /&(?:amp|lt|gt|quot|#39|#x27|#x2F|#47);/g;
+const EMOJI_KEYCAP_RE = /[#*0-9]\uFE0F?\u20E3/gu;
+const EMOJI_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu;
+const EMOJI_JOINER_RE = /[\uFE0E\uFE0F\u200D]/g;
 
 /** Strips all HTML tags, returning plain text only */
 export function sanitizeUserInput(input: string): string {
@@ -39,4 +42,12 @@ export function sanitizeUserInput(input: string): string {
   // 4. Decode common HTML entities
   result = result.replace(ENTITY_RE, (match) => HTML_ENTITIES[match] || match);
   return result;
+}
+
+/** Removes emoji glyphs from AI-authored text while preserving regular words and punctuation. */
+export function stripEmoji(input: string): string {
+  return input
+    .replace(EMOJI_KEYCAP_RE, "")
+    .replace(EMOJI_RE, "")
+    .replace(EMOJI_JOINER_RE, "");
 }

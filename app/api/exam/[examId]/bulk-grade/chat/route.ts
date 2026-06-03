@@ -1,7 +1,6 @@
 export const maxDuration = 60;
 
 import { NextRequest } from "next/server";
-import { createHash } from "crypto";
 import { currentUser } from "@/lib/get-current-user";
 import { getOpenAI, AI_MODEL } from "@/lib/openai";
 import { successJson, errorJson } from "@/lib/api-response";
@@ -20,12 +19,20 @@ import {
   loadExamMetaOnly,
   selectCalibrationSampleSessionIds,
 } from "@/lib/bulk-grading";
+import {
+  assistantMessageIdFromClientMessageId,
+  isUniqueViolation,
+  uuidFromSeed,
+} from "@/lib/chat-idempotency";
 import { buildCriteriaDiscussionSystemPrompt } from "@/lib/prompts";
+import { stripEmoji } from "@/lib/sanitize";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 const BULK_GRADE_CHAT_RATE_LIMIT = { limit: 10, windowSec: 60 };
 const BULK_GRADING_SESSION_SELECT =
   "id, status, calibration_status, calibration_sample_session_ids";
+const IDEMPOTENT_RESPONSE_WAIT_MS = 250;
+const IDEMPOTENT_RESPONSE_ATTEMPTS = 200;
 
 type BulkGradingMessageRow = {
   id: string;
@@ -41,32 +48,12 @@ type BulkGradingSessionRow = {
   calibration_sample_session_ids?: unknown;
 };
 
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "23505"
-  );
-}
-
-function uuidFromSeed(seed: string): string {
-  const hex = createHash("sha256").update(seed).digest("hex").slice(0, 32);
-  const chars = hex.split("");
-  chars[12] = "5";
-  chars[16] = ((parseInt(chars[16] ?? "0", 16) & 0x3) | 0x8).toString(16);
-  const normalized = chars.join("");
-  return [
-    normalized.slice(0, 8),
-    normalized.slice(8, 12),
-    normalized.slice(12, 16),
-    normalized.slice(16, 20),
-    normalized.slice(20),
-  ].join("-");
-}
-
 function initAssistantMessageId(gradingSessionId: string): string {
   return uuidFromSeed(`bulk-grade-chat:init-assistant:${gradingSessionId}`);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function canStartFromMessages(
@@ -93,6 +80,8 @@ function buildDiscussionOnlyPhaseInstructions(
 **Bulk grading discussion contract — highest priority:**
 - This chat is always discussion-only. Never claim that you directly changed a score, grading status, proposed grade, final grade, progress counter, or commit state.
 - If the instructor wants score changes, direct them to use the result table controls, rerun grading, or commit controls shown in the UI.
+- Do not use emoji.
+- Keep replies compact: 1-2 short sentences, and ask only one interview question when collecting criteria.
 - Keep the response aligned with the current phase:
   - draft/interviewing: discuss grading criteria and expectations before bulk grading starts.
   - grading/sample_grading/committing: explain what is happening and what can be reviewed while processing continues.
@@ -107,6 +96,8 @@ Current phase: status=${session.status}, calibration_status=${session.calibratio
 **일괄 가채점 대화 계약 — 최우선 규칙:**
 - 이 채팅은 항상 토론 전용입니다. 점수, 채점 상태, 가채점 결과, 최종 점수, 진행률, 확정 상태를 직접 변경했다고 말하지 마세요.
 - 강사가 점수 변경을 원하면 화면의 결과 표 입력, 재가채점, 확정 버튼을 사용해야 한다고 안내하세요.
+- 이모지를 사용하지 마세요.
+- 답변은 1~2개의 짧은 문장으로 유지하고, 기준 수집 단계에서는 인터뷰 질문 1개만 하세요.
 - 현재 단계에 맞춰 답하세요:
   - draft/interviewing: 가채점 시작 전 채점 기준과 기대 수준을 논의합니다.
   - grading/sample_grading/committing: 처리 중인 상태를 설명하고, 진행 중 검토 가능한 내용을 안내합니다.
@@ -151,6 +142,27 @@ async function loadBulkGradingSession(
     session: data ? (data as BulkGradingSessionRow) : null,
     error,
   };
+}
+
+async function waitForBulkAssistantMessage(
+  supabase: ReturnType<typeof getSupabaseServer>,
+  gradingSessionId: string,
+  clientMessageId: string,
+): Promise<BulkGradingMessageRow | null> {
+  for (let attempt = 0; attempt < IDEMPOTENT_RESPONSE_ATTEMPTS; attempt += 1) {
+    const { data, error } = await supabase
+      .from("bulk_grading_messages")
+      .select("id, role, content, created_at")
+      .eq("session_id", gradingSessionId)
+      .eq("role", "assistant")
+      .eq("client_message_id", clientMessageId)
+      .maybeSingle();
+
+    if (!error && data) return data as BulkGradingMessageRow;
+    await sleep(IDEMPOTENT_RESPONSE_WAIT_MS);
+  }
+
+  return null;
 }
 
 async function insertOrLoadBulkGradingSession(
@@ -286,6 +298,10 @@ export async function POST(
 
     const isInit = "init" in validation.data && validation.data.init === true;
     const message = isInit ? "" : (validation.data as { message: string }).message;
+    const clientMessageId =
+      !isInit && "clientMessageId" in validation.data
+        ? validation.data.clientMessageId
+        : undefined;
 
     const supabase = getSupabaseServer();
 
@@ -370,17 +386,47 @@ export async function POST(
 
     // init 모드가 아닐 때만 강사 메시지 저장
     if (!isInit) {
+      const userMessagePayload: Record<string, unknown> = {
+        session_id: gradingSessionId,
+        role: "user",
+        content: message,
+        created_by: access.ctx.user.id,
+        client_message_id: clientMessageId,
+      };
+
       const { error: userMsgError } = await supabase
         .from("bulk_grading_messages")
-        .insert({
-          session_id: gradingSessionId,
-          role: "user",
-          content: message,
-          created_by: access.ctx.user.id,
-        });
+        .insert(userMessagePayload);
 
       if (userMsgError) {
-        return errorJson("INTERNAL_ERROR", "Failed to save message", 500);
+        if (isUniqueViolation(userMsgError)) {
+          const existingAssistant = await waitForBulkAssistantMessage(
+            supabase,
+            gradingSessionId,
+            clientMessageId!,
+          );
+
+          if (existingAssistant) {
+            const { messages: existingMessages, error: existingMessagesError } =
+              await loadBulkChatMessages(supabase, gradingSessionId);
+            if (existingMessagesError) {
+              return errorJson("INTERNAL_ERROR", "Failed to load messages", 500);
+            }
+            return successJson({
+              session: {
+                id: gradingSession.id,
+                status: gradingSession.status,
+                calibration_status: gradingSession.calibration_status,
+              },
+              assistantMessage: existingAssistant,
+              messages: existingMessages,
+              canStartGrading: canStartFromMessages(existingMessages, gradingSession),
+            });
+          }
+          return errorJson("CONFLICT", "Message is already being processed", 409);
+        } else {
+          return errorJson("INTERNAL_ERROR", "Failed to save message", 500);
+        }
       }
     }
 
@@ -436,7 +482,7 @@ export async function POST(
         getOpenAI().chat.completions.create({
           model: AI_MODEL,
           messages: openAiMessages,
-          max_completion_tokens: 2000,
+          max_completion_tokens: 500,
         }),
       {
         feature: "bulk_grading_chat",
@@ -456,7 +502,9 @@ export async function POST(
       },
     );
 
-    const aiContent = tracked.data.choices[0]?.message?.content?.trim() ?? "";
+    const aiContent = stripEmoji(
+      tracked.data.choices[0]?.message?.content?.trim() ?? "",
+    ).trim();
     if (!aiContent) {
       return errorJson("INTERNAL_ERROR", "AI 응답을 받지 못했습니다.", 500);
     }
@@ -470,6 +518,12 @@ export async function POST(
     };
     if (isInit) {
       assistantPayload.id = initAssistantMessageId(gradingSessionId);
+    } else {
+      assistantPayload.id = assistantMessageIdFromClientMessageId(
+        `bulk-grade-chat:${gradingSessionId}`,
+        clientMessageId!,
+      );
+      assistantPayload.client_message_id = clientMessageId;
     }
 
     const { data: assistantRow, error: assistantError } = await supabase
@@ -479,18 +533,22 @@ export async function POST(
       .single();
 
     if (assistantError || !assistantRow) {
-      if (isInit && isUniqueViolation(assistantError)) {
+      if (isUniqueViolation(assistantError)) {
         const { messages: existingMessages, error: existingMessagesError } =
           await loadBulkChatMessages(supabase, gradingSessionId);
         if (existingMessagesError) {
           return errorJson("INTERNAL_ERROR", "Failed to load messages", 500);
         }
+        const existingAssistant = existingMessages.find(
+          (m) => m.id === assistantPayload.id,
+        );
         return successJson({
           session: {
             id: gradingSession.id,
             status: gradingSession.status,
             calibration_status: gradingSession.calibration_status,
           },
+          assistantMessage: existingAssistant,
           messages: existingMessages,
           canStartGrading: canStartFromMessages(existingMessages, gradingSession),
         });

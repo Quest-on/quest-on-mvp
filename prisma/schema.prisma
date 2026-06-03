@@ -104,14 +104,15 @@ model grades {
 
 /// Instructor–AI chat during case-question grading (per session + q_idx)
 model grading_chats {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  session_id String   @db.Uuid
-  q_idx      Int
-  role       String
-  content    String
-  created_by String?
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-  sessions   sessions @relation(fields: [session_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  session_id        String   @db.Uuid
+  q_idx             Int
+  role              String
+  content           String
+  created_by        String?
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  client_message_id String?  @db.Uuid
+  sessions          sessions @relation(fields: [session_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([session_id, q_idx, created_at], map: "idx_grading_chats_session_q_idx_created")
 }
@@ -367,12 +368,13 @@ model exam_grading_sessions {
 
 /// AI 일괄 채점 대화 메시지 (row-per-message, race condition 방지)
 model bulk_grading_messages {
-  id         String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  session_id String                @db.Uuid
-  role       String
-  content    String
-  created_by String?
-  created_at DateTime              @default(now()) @db.Timestamptz(6)
+  id                String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  session_id        String                @db.Uuid
+  role              String
+  content           String
+  created_by        String?
+  created_at        DateTime              @default(now()) @db.Timestamptz(6)
+  client_message_id String?               @db.Uuid
   exam_grading_sessions exam_grading_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([session_id, created_at], map: "idx_bulk_grading_messages_session_created")

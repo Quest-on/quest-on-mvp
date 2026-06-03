@@ -58,6 +58,17 @@ async function applyMigrations() {
   await waitForTestSupabaseReady();
   const supabase = createTestSupabaseClient();
 
+  const reloadPostgrestSchema = () => {
+    for (const container of ["supabase_rest_quest-on-mvp", "supabase_rest_quest-on"]) {
+      try {
+        execSync(`docker kill --signal=SIGUSR1 ${container}`, { stdio: "pipe" });
+        return;
+      } catch {
+        // Try the next known local Supabase container name.
+      }
+    }
+  };
+
   // Migration: add chat_weight column if missing (sql/005_add_chat_weight.sql)
   try {
     const { error } = await supabase
@@ -125,6 +136,25 @@ async function applyMigrations() {
     }
   } catch (err) {
     console.warn("[global-setup] grades.updated_at migration failed:", err);
+  }
+
+  // Migration: idempotent instructor grading chat messages.
+  // Always apply when Docker is available: Prisma can create the columns but
+  // cannot represent the partial unique indexes this migration needs.
+  try {
+    console.log("[global-setup] Applying grading chat idempotency migration...");
+    if (!process.env.CI) {
+      execSync(
+        `docker exec -i supabase_db_quest-on-mvp psql -U postgres -d postgres < ${path.resolve(__dirname, "../database/016_chat_message_idempotency.sql")}`,
+        { stdio: "pipe" },
+      );
+      reloadPostgrestSchema();
+      console.log("[global-setup] grading chat idempotency migration applied.");
+    } else {
+      console.log("[global-setup] CI: migration is applied by the test setup action.");
+    }
+  } catch (err) {
+    console.warn("[global-setup] grading chat idempotency migration failed:", err);
   }
 
   // Migration: ensure submit_exam_atomic RPC exists (sql/006_submit_exam_atomic.sql)
