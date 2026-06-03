@@ -238,6 +238,88 @@ export async function createAssignment(data: {
   }
 }
 
+export async function updateAssignment(data: {
+  id: string;
+  update: {
+    title?: string;
+    questions?: unknown;
+    language?: "ko" | "en";
+    deadline?: string | null;
+    close_at?: string | null;
+    updated_at?: string;
+  };
+}) {
+  try {
+    const user = await currentUser();
+    if (!user) {
+      return errorJson("UNAUTHORIZED", "Unauthorized", 401);
+    }
+
+    const userRole = user.role;
+    if (userRole !== "instructor") {
+      return errorJson("INSTRUCTOR_REQUIRED", "Instructor access required", 403);
+    }
+
+    // Ownership + type check
+    const { data: examRow, error: fetchError } = await getSupabase()
+      .from("exams")
+      .select("id, instructor_id, type")
+      .eq("id", data.id)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+    if (!examRow) {
+      return errorJson("NOT_FOUND", "Assignment not found", 404);
+    }
+    if (examRow.instructor_id !== user.id) {
+      return errorJson("FORBIDDEN", "Access denied", 403);
+    }
+
+    // Defense-in-depth: block question edits when any session exists
+    if (data.update.questions !== undefined) {
+      const { data: sessions } = await getSupabase()
+        .from("sessions")
+        .select("id")
+        .eq("exam_id", data.id)
+        .limit(1);
+
+      if (sessions && sessions.length > 0) {
+        return errorJson(
+          "QUESTIONS_LOCKED",
+          "참여한 학생이 있어 문항을 수정할 수 없습니다",
+          409
+        );
+      }
+    }
+
+    // Whitelist — never touch code, type, score_weights
+    const { title, questions, language, deadline, close_at, updated_at } = data.update;
+    const updatePayload: Record<string, unknown> = {
+      updated_at: updated_at ?? new Date().toISOString(),
+    };
+    if (title !== undefined) updatePayload.title = title;
+    if (questions !== undefined) updatePayload.questions = questions;
+    if (language !== undefined) updatePayload.language = language;
+    if (deadline !== undefined) updatePayload.deadline = deadline;
+    if (close_at !== undefined) updatePayload.close_at = close_at;
+
+    const { error: updateError } = await getSupabase()
+      .from("exams")
+      .update(updatePayload)
+      .eq("id", data.id);
+
+    if (updateError) {
+      logError("[updateAssignment] DB error", updateError, { path: "/api/supa/assignment-handlers" });
+      return errorJson("UPDATE_ASSIGNMENT_FAILED", "Failed to update assignment", 500);
+    }
+
+    return successJson({ updated: true });
+  } catch (error) {
+    logError("[updateAssignment] Failed", error, { path: "/api/supa/assignment-handlers" });
+    return errorJson("UPDATE_ASSIGNMENT_FAILED", "Failed to update assignment", 500);
+  }
+}
+
 export async function saveCanvas(data: {
   sessionId: string;
   content: string;

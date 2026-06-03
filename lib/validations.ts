@@ -473,6 +473,18 @@ export const saveFinalAnswerSchema = z.object({
   finalAnswer: z.string().max(50000, "Final answer too long"),
 });
 
+export const updateAssignmentSchema = z.object({
+  id: z.string().uuid("Invalid assignment ID"),
+  update: z.object({
+    title: z.string().min(1).max(500).optional(),
+    questions: z.unknown().optional(),
+    language: z.enum(["ko", "en"]).optional(),
+    deadline: z.string().nullable().optional(),
+    close_at: z.string().nullable().optional(),
+    updated_at: z.string().optional(),
+  }).strict(),
+});
+
 // Drive operations
 export const createFolderSchema = z.object({
   name: z.string().min(1, "Folder name is required").max(255),
