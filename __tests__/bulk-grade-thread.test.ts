@@ -3,6 +3,8 @@ import {
   resolveSendMode,
   orderThreadItems,
   isNearBottom,
+  countInterviewQuestions,
+  formatPickedQACriteria,
   type SendModeState,
 } from "@/lib/bulk-grade-thread";
 
@@ -109,5 +111,92 @@ describe("isNearBottom", () => {
         100,
       ),
     ).toBe(true);
+  });
+});
+
+describe("countInterviewQuestions", () => {
+  it("no messages → 0", () => {
+    expect(countInterviewQuestions([])).toBe(0);
+  });
+
+  it("only an assistant welcome message, no user message → 0", () => {
+    expect(
+      countInterviewQuestions([{ role: "assistant", content: "안녕하세요! 채점 기준을 알려주세요." }]),
+    ).toBe(0);
+  });
+
+  it("welcome + user answer + 1 AI question → 1 (excludes welcome)", () => {
+    const messages = [
+      { role: "assistant" as const, content: "안녕하세요! 채점 기준을 알려주세요." },
+      { role: "user" as const, content: "논리 40·완성도 30·개념 30" },
+      { role: "assistant" as const, content: "문항 길이에 따라 점수 차등을 두나요?" },
+    ];
+    expect(countInterviewQuestions(messages)).toBe(1);
+  });
+
+  it("welcome + user + Q1 + user + Q2 → 2", () => {
+    const messages = [
+      { role: "assistant" as const, content: "채점 기준을 알려주세요." },
+      { role: "user" as const, content: "핵심 개념 중심" },
+      { role: "assistant" as const, content: "표현 실수는 얼마나 감점하나요?" },
+      { role: "user" as const, content: "관대하게 봐주세요" },
+      { role: "assistant" as const, content: "부분 점수는 어떻게 처리할까요?" },
+    ];
+    expect(countInterviewQuestions(messages)).toBe(2);
+  });
+
+  it("messages starting with user (no welcome assistant) → counts assistant msgs after first user", () => {
+    const messages = [
+      { role: "user" as const, content: "채점 시작" },
+      { role: "assistant" as const, content: "첫 번째 질문" },
+      { role: "assistant" as const, content: "두 번째 질문" },
+    ];
+    expect(countInterviewQuestions(messages)).toBe(2);
+  });
+
+  it("no user message at all (only assistant messages) → 0", () => {
+    const messages = [
+      { role: "assistant" as const, content: "welcome" },
+      { role: "assistant" as const, content: "follow-up" },
+    ];
+    expect(countInterviewQuestions(messages)).toBe(0);
+  });
+});
+
+describe("formatPickedQACriteria", () => {
+  it("empty picks → empty string", () => {
+    expect(formatPickedQACriteria([])).toBe("");
+  });
+
+  it("single pick → correct format with header", () => {
+    const result = formatPickedQACriteria([{ q: "부분 점수를 줄까요?", a: "네" }]);
+    expect(result).toContain("---");
+    expect(result).toContain("추가 기준 (채팅 Q&A에서 도출):");
+    expect(result).toContain("Q: 부분 점수를 줄까요?");
+    expect(result).toContain("A: 네");
+  });
+
+  it("multiple picks → all Q&A pairs included", () => {
+    const result = formatPickedQACriteria([
+      { q: "Q1", a: "A1" },
+      { q: "Q2", a: "A2" },
+    ]);
+    expect(result).toContain("Q: Q1\nA: A1");
+    expect(result).toContain("Q: Q2\nA: A2");
+  });
+
+  it("preserves exact question and answer text", () => {
+    const q = "핵심 개념 정확성을 가장 중요하게 볼까요?";
+    const a = "아니요, 논리 구조가 더 중요합니다";
+    const result = formatPickedQACriteria([{ q, a }]);
+    expect(result).toContain(q);
+    expect(result).toContain(a);
+  });
+
+  it("concatenation with base text works without double-separator", () => {
+    const base = "논리 40·완성도 30·개념 30";
+    const result = base + formatPickedQACriteria([{ q: "Q", a: "A" }]);
+    expect(result.startsWith(base)).toBe(true);
+    expect(result).toContain("---");
   });
 });

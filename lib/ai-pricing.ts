@@ -18,6 +18,7 @@ export type AiFeature =
   | "instructor_agent"
   | "case_grading_chat"
   | "bulk_grading_chat"
+  | "bulk_grading_chat_options"
   | "embedding";
 
 export const AI_FEATURES: AiFeature[] = [
@@ -36,6 +37,7 @@ export const AI_FEATURES: AiFeature[] = [
   "instructor_agent",
   "case_grading_chat",
   "bulk_grading_chat",
+  "bulk_grading_chat_options",
   "embedding",
 ];
 

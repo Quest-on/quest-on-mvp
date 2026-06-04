@@ -52,7 +52,9 @@ import { SubmissionOverlay } from "@/components/exam/ExamLoading";
 import { PreflightModal } from "@/components/exam/PreflightModal";
 import { WaitingRoom } from "@/components/exam/WaitingRoom";
 import { LateEntryWaiting } from "@/components/exam/LateEntryWaiting";
+import { ObjectiveNavBar } from "@/components/exam/ObjectiveNavBar";
 import { seededOptionOrder } from "@/lib/shuffle";
+import { useObjectiveKeyboardSelect } from "@/hooks/useObjectiveKeyboardSelect";
 
 interface Question {
   id: string;
@@ -254,6 +256,17 @@ export default function ExamPage() {
     }
     return seededOptionOrder(sessionId + currentQuestionId, currentOptionCount);
   }, [sessionId, currentQuestionId, currentQuestionType, currentOptionCount]);
+
+  // 객관식/OX 문제에서 숫자 키(1~N)로 선택지를 선택할 수 있도록 키보드 리스너를 등록한다.
+  useObjectiveKeyboardSelect({
+    enabled: isCurrentObjective && !!currentQuestionId,
+    type: currentQuestionType,
+    optionCount: currentOptionCount,
+    displayOrder: objectiveDisplayOrder,
+    onSelect: (value) => {
+      if (currentQuestionId) autoSave.updateAnswer(currentQuestionId, value);
+    },
+  });
 
   // --- Early returns ---
 
@@ -525,27 +538,35 @@ export default function ExamPage() {
               {/* Question & Answer */}
               {isCurrentObjective ? (
                 // 객관식/OX: 문제 + 선택지를 한 화면에 항상 동시 노출. Resizable / 접기 토글 / 채팅 없음.
-                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-                  <div className="shrink-0">
-                    <QuestionPanel
-                      question={exam.questions[currentQuestion]}
-                      questionNumber={currentQuestion + 1}
-                    />
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <div className="flex-1 min-h-0 overflow-y-auto">
+                    <div className="shrink-0">
+                      <QuestionPanel
+                        question={exam.questions[currentQuestion]}
+                        questionNumber={currentQuestion + 1}
+                      />
+                    </div>
+                    <div className="shrink-0">
+                      <ObjectiveAnswerPanel
+                        type={exam.questions[currentQuestion].type}
+                        options={exam.questions[currentQuestion].options}
+                        displayOrder={objectiveDisplayOrder}
+                        value={autoSave.draftAnswers[currentQuestion]?.text || ""}
+                        onChange={(value) => autoSave.updateAnswer(exam.questions[currentQuestion].id, value)}
+                        variant={
+                          exam.questions[currentQuestion].type === "true-false"
+                            ? "row-1x2"
+                            : "list"
+                        }
+                      />
+                    </div>
                   </div>
-                  <div className="shrink-0">
-                    <ObjectiveAnswerPanel
-                      type={exam.questions[currentQuestion].type}
-                      options={exam.questions[currentQuestion].options}
-                      displayOrder={objectiveDisplayOrder}
-                      value={autoSave.draftAnswers[currentQuestion]?.text || ""}
-                      onChange={(value) => autoSave.updateAnswer(exam.questions[currentQuestion].id, value)}
-                      variant={
-                        exam.questions[currentQuestion].type === "true-false"
-                          ? "row-1x2"
-                          : "list"
-                      }
-                    />
-                  </div>
+                  <ObjectiveNavBar
+                    currentIndex={currentQuestion}
+                    total={exam.questions.length}
+                    onNavigate={setCurrentQuestionWithReveal}
+                    className="shrink-0"
+                  />
                 </div>
               ) : isQuestionVisible ? (
                 <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">

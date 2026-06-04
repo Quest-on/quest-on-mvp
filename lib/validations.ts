@@ -605,6 +605,11 @@ export function validateRequest<T>(
   return { success: true, data: result.data };
 }
 
+export const bulkGradeChatOptionsSchema = z.object({
+  questionText: sanitizedString(z.string().min(1).max(2000)),
+  gradingSessionId: z.string().uuid("Invalid gradingSessionId"),
+});
+
 // ========== Bulk Approve Schema ==========
 
 export const bulkApproveSchema = z.object({

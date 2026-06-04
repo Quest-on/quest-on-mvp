@@ -9,6 +9,10 @@
  *  - orderThreadItems: timeline ordering so post-result discussion stays below
  *    the result card and the conversation reads as an honest timeline.
  *  - isNearBottom: stick-to-bottom detection for the single scroll area.
+ *  - countInterviewQuestions: counts AI questions posed AFTER the first user
+ *    turn (excludes the welcome/init assistant message).
+ *  - formatPickedQACriteria: formats Q&A pairs collected via quick-reply chips
+ *    into an appendable criteria block.
  */
 
 export type SendModeState = {
@@ -67,4 +71,50 @@ export function isNearBottom(
 ): boolean {
   const { scrollTop, scrollHeight, clientHeight } = metrics;
   return scrollHeight - (scrollTop + clientHeight) <= threshold;
+}
+
+/**
+ * Counts the number of assistant messages that appear AFTER the first user
+ * message in the conversation.
+ *
+ * This intentionally excludes the init/welcome assistant message (which
+ * precedes any user turn). The result is used to cap the interview at 3
+ * AI questions before forcing a re-grade.
+ */
+export function countInterviewQuestions(
+  messages: { role: "user" | "assistant"; content: string }[],
+): number {
+  let firstUserIdx = -1;
+  for (let i = 0; i < messages.length; i++) {
+    if (messages[i].role === "user") {
+      firstUserIdx = i;
+      break;
+    }
+  }
+  if (firstUserIdx === -1) return 0;
+
+  let count = 0;
+  for (let i = firstUserIdx + 1; i < messages.length; i++) {
+    if (messages[i].role === "assistant") count++;
+  }
+  return count;
+}
+
+/**
+ * Formats Q&A pairs collected via quick-reply chips into an appendable
+ * criteria block.
+ *
+ * NOTE: This is the SINGLE place where pickedQA is appended to criteria.
+ * The re-grade arm path keeps `draft = base only` so that startGradingMutation
+ * can call this function exactly once at send time — no double-appending.
+ *
+ * Returns "" when picks is empty so callers can do `base + formatPickedQACriteria(picks)`
+ * without conditionals.
+ */
+export function formatPickedQACriteria(
+  picks: { q: string; a: string }[],
+): string {
+  if (picks.length === 0) return "";
+  const body = picks.map((p) => `Q: ${p.q}\nA: ${p.a}`).join("\n\n");
+  return `\n\n---\n추가 기준 (채팅 Q&A에서 도출):\n${body}`;
 }
