@@ -25,6 +25,11 @@ import {
   type SummaryData,
 } from "@/components/instructor/AIOverallSummary";
 import { isObjectiveQuestion } from "@/lib/grading-helpers";
+import {
+  buildTypedQuestionEntries,
+  getSubmissionForQuestion,
+  getSubmittedAnswer,
+} from "@/lib/objective-grade-view";
 import { QuickActionsCard } from "@/components/instructor/QuickActionsCard";
 import toast from "react-hot-toast";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -165,49 +170,6 @@ function findFirstQuestionArrayIndexByType(
     if (questionType === "case") return isCaseNavigationQuestionType(q.type);
     return q.type === questionType;
   });
-}
-
-function getSubmissionForQuestion(
-  submissions: Record<string, Submission> | undefined,
-  question: Question,
-  arrayIndex: number,
-): Submission | undefined {
-  if (!submissions) return undefined;
-
-  const candidates = [
-    Number.isInteger(question.idx) ? question.idx : null,
-    arrayIndex,
-    Number.isInteger(Number(question.id)) ? Number(question.id) : null,
-  ].filter((value): value is number => value !== null);
-
-  const seen = new Set<number>();
-  for (const key of candidates) {
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    const submission = submissions[String(key)];
-    if (submission) return submission;
-  }
-
-  return undefined;
-}
-
-function getSubmittedAnswer(submission: Submission | undefined): string {
-  if (!submission) return "";
-
-  if (typeof submission.answer === "string" && submission.answer.trim() !== "") {
-    return submission.answer;
-  }
-
-  const answerData = submission.decompressed?.answerData;
-  if (!answerData) return "";
-
-  const fallback =
-    answerData.answer ?? answerData.text ?? answerData.selectedIndex ?? answerData.value;
-  if (typeof fallback === "number") return String(fallback);
-  if (typeof fallback === "string") return fallback;
-
-  return "";
 }
 
 export default function GradeStudentPage({
@@ -447,8 +409,8 @@ export default function GradeStudentPage({
     questionType === "multiple-choice" || questionType === "true-false"
       ? questionType
       : null;
-  const objectiveQuestions = objectiveQuestionType
-    ? sessionData.exam.questions.filter((q) => q.type === objectiveQuestionType)
+  const objectiveQuestionEntries = objectiveQuestionType
+    ? buildTypedQuestionEntries(sessionData.exam.questions, objectiveQuestionType)
     : [];
   const objectiveTitle =
     objectiveQuestionType === "multiple-choice" ? "사지선다 정답 확인" : "O/X 정답 확인";
@@ -517,26 +479,26 @@ export default function GradeStudentPage({
                 </CardHeader>
               </Card>
 
-              {objectiveQuestions.length === 0 ? (
+              {objectiveQuestionEntries.length === 0 ? (
                 <Card>
                   <CardContent className="py-8 text-center text-sm text-muted-foreground">
                     표시할 문제가 없습니다.
                   </CardContent>
                 </Card>
               ) : (
-                objectiveQuestions.map((question, index) => {
+                objectiveQuestionEntries.map(({ question, globalIndex }, displayIndex) => {
                   const submission = getSubmissionForQuestion(
                     sessionData.submissions,
                     question,
-                    index,
+                    globalIndex,
                   );
                   const studentAnswer = getSubmittedAnswer(submission);
                   return (
-                    <Card key={question.id || `${question.type}-${index}`}>
+                    <Card key={question.id || `${question.type}-${globalIndex}`}>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <FileText className="h-5 w-5 text-blue-600" />
-                          문제 {index + 1}
+                          문제 {displayIndex + 1}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4">
