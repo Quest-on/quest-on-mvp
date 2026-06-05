@@ -203,6 +203,11 @@ test.describe("Instructor — Exam & Grading Flow", () => {
       content: "기존 CASE 가채점 대화입니다.",
     });
 
+    // 마지막 메시지가 AI라 패널이 보기(quick-reply)를 요청한다 — 실 AI 호출 대신 mock.
+    await instructorPage.route("**/bulk-grade/chat-options", (route) =>
+      route.fulfill({ status: 200, json: { success: true, options: [] } }),
+    );
+
     await instructorPage.goto(`/instructor/${exam.id}`);
     await instructorPage.getByRole("button", { name: "검토/확정" }).click();
 
@@ -266,6 +271,51 @@ test.describe("Instructor — Exam & Grading Flow", () => {
     await expect(panel).not.toContainText("채점 확정");
     await expect(panel).not.toContainText("개별 채점");
     await expect(panel.locator('input[type="number"]')).toHaveCount(0);
+  });
+
+  test("bulk grading panel offers quick-reply chips and an always-visible re-grade button after grading", async ({
+    instructorPage,
+  }) => {
+    const { exam, students } = await seedInstructorGradingScenario({
+      questionCount: 1,
+      studentCount: 1,
+    });
+    const sessionId = students[0].session.id;
+    const gradingSession = await seedBulkGradingSession(exam.id, {
+      status: "grading_done",
+      proposed_grades: {
+        [sessionId]: { 0: { score: 80, comment: "제안 코멘트" } },
+      },
+      grading_total: 1,
+      grading_completed: 1,
+    });
+    // 가채점 후 AI 질문이 마지막 메시지로 남아 있는 상황 (이전엔 approved라 칩이 안 떴음)
+    await seedBulkGradingMessage(gradingSession.id, {
+      role: "assistant",
+      content: "부분 점수를 어떻게 처리할까요?",
+    });
+    // 선택지 생성은 고정 옵션으로 mock (실 AI 호출 제거 + 결정론적)
+    await instructorPage.route("**/bulk-grade/chat-options", (route) =>
+      route.fulfill({
+        status: 200,
+        json: { success: true, options: ["관대하게", "엄격하게"] },
+      }),
+    );
+
+    await instructorPage.goto(`/instructor/${exam.id}`);
+    await instructorPage.getByRole("button", { name: "검토/확정" }).click();
+
+    const panel = instructorPage.getByRole("complementary", {
+      name: "CASE AI 가채점",
+    });
+    await expect(panel).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
+    // 가채점 후에도 AI 질문에 클릭 선택지(칩)가 뜬다
+    await expect(panel.getByRole("button", { name: "관대하게" })).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_VISIBLE,
+    });
+    await expect(panel.getByRole("button", { name: "엄격하게" })).toBeVisible();
+    // 재가채점 버튼이 입력창 위에 상시 노출된다
+    await expect(panel.getByTestId("bulk-grade-regrade-arm")).toBeVisible();
   });
 
   test("grading page loads with question, answer, and grading panel", async ({
