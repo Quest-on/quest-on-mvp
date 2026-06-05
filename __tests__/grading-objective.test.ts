@@ -67,6 +67,7 @@ describe("gradeObjectiveAnswer", () => {
     expect(gradeObjectiveAnswer({ rawAnswer: "", options, correctOptionIndex: 1 })!.score).toBe(0);
     expect(gradeObjectiveAnswer({ rawAnswer: "  ", options, correctOptionIndex: 1 })!.score).toBe(0);
     expect(gradeObjectiveAnswer({ rawAnswer: "abc", options, correctOptionIndex: 1 })!.score).toBe(0);
+    expect(gradeObjectiveAnswer({ rawAnswer: "1abc", options, correctOptionIndex: 1 })!.score).toBe(0);
   });
 
   it("handles true-false (O/X) as a 2-option mcq", () => {

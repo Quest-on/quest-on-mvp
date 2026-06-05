@@ -9,6 +9,9 @@ import {
   buildAssignmentResearchSummarySystemPrompt,
   buildAssignmentQuizGenerationPrompt,
   buildCaseQuestionGenerationPrompt,
+  buildPerStudentGradingSystemPrompt,
+  buildCriteriaDiscussionSystemPrompt,
+  buildCaseGradingChatSystemPrompt,
 } from "@/lib/prompts";
 
 describe("sanitizeForPrompt", () => {
@@ -74,6 +77,34 @@ describe("sanitizeForPrompt", () => {
     const result = sanitizeForPrompt(input);
     // Not at line start, so should remain
     expect(result).toContain("**[일반 볼드]**");
+  });
+});
+
+describe("grading chat prompt style", () => {
+  it("keeps bulk criteria discussion compact and emoji-free", () => {
+    const prompt = buildCriteriaDiscussionSystemPrompt({
+      examTitle: "Case Exam",
+      caseQuestions: [{ qIdx: 0, questionPrompt: "시장 진입 전략을 평가하세요." }],
+      sampleStudents: [],
+      language: "ko",
+    });
+
+    expect(prompt).toContain("이모지를 사용하지 마세요");
+    expect(prompt).toContain("후속 질문 1개만");
+    expect(prompt).toContain("300자 이내");
+    expect(prompt).not.toContain("샘플 가채점 시작");
+  });
+
+  it("keeps individual case grading chat compact and emoji-free", () => {
+    const prompt = buildCaseGradingChatSystemPrompt({
+      questionPrompt: "문제",
+      studentAnswer: "답안",
+      studentChatSummary: "대화",
+      language: "ko",
+    });
+
+    expect(prompt).toContain("이모지를 사용하지 마세요");
+    expect(prompt).toContain("질문 1개만");
   });
 });
 
@@ -289,12 +320,14 @@ describe("buildAssignmentResearchSummarySystemPrompt", () => {
   it("frames assignment reports around research conversation behavior", () => {
     const prompt = buildAssignmentResearchSummarySystemPrompt();
 
-    expect(prompt).toContain("평가 대상은 학생이 AI와 대화하면서 리서치를 진행한 과정");
+    expect(prompt).toContain("전체 대화 흐름을 종합적으로 분석");
     expect(prompt).toContain("질문 흐름");
-    expect(prompt).toContain("출처 검증");
-    expect(prompt).toContain("교차검증");
-    expect(prompt).toContain("자료의 작성 주체");
-    expect(prompt).toContain("좋은 질문, 검증 시도, 방향 전환, 자료 판단");
+    expect(prompt).toContain("맥락 지속성");
+    expect(prompt).toContain("검증과 비판적 사고");
+    expect(prompt).toContain("최종 답안이 그 리서치 과정과 일관되는지");
+    // 출력 스키마 계약(요약 카드) 유지
+    expect(prompt).toContain("keyQuotes 정확히 2개");
+    // 채팅 기반 리서치 수행 방식 자체를 결함으로 해석하지 않는다
     expect(prompt).not.toContain("제출된 글이 부족하다");
     expect(prompt).not.toContain("정리된 산출물이 없다");
   });
@@ -315,5 +348,29 @@ describe("buildCaseQuestionGenerationPrompt research assignment mode", () => {
     expect(system).toContain("CASE");
     expect(user).toContain("국내 배달앱 3사의 최근 수익성 변화");
     expect(user).not.toContain("사례형 문제");
+  });
+});
+
+describe("buildPerStudentGradingSystemPrompt", () => {
+  const build = () =>
+    buildPerStudentGradingSystemPrompt({
+      criteria: { criteria_summary: "정확성·논리·근거", per_question: [] },
+      studentSessionId: "sess-1",
+      answers: [{ qIdx: 0, questionPrompt: "문제", answer: "답안", chatSummary: "" }],
+      caseQuestions: [{ qIdx: 0, questionPrompt: "문제" }],
+    });
+
+  it("출력 예시 score에 구체 숫자(85)를 박지 않는다 — few-shot anchoring 회귀", () => {
+    const prompt = build();
+    // 과거: {"q_idx":0,"score":85,...} 예시가 모델에 그대로 복사돼 전원 85가 나옴
+    expect(prompt).not.toContain('"score":85');
+    expect(prompt).toContain('"score":<0-100 정수>');
+  });
+
+  it("점수 변별 밴드와 전체 범위 사용 지시를 포함한다", () => {
+    const prompt = build();
+    expect(prompt).toContain("점수 변별 기준");
+    expect(prompt).toContain("0-100");
+    expect(prompt).toContain("같은 점수를 주지 마세요");
   });
 });

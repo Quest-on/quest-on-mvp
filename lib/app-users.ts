@@ -6,8 +6,7 @@ export interface UserInfo {
 }
 
 /**
- * profiles 테이블에서 유저 정보를 일괄 조회합니다.
- * (Clerk batchGetUserInfo 대체)
+ * Supabase Auth 유저 정보와, 있으면 legacy profiles 테이블을 함께 조회합니다.
  *
  * @param userIds - Supabase UUID 배열
  * @returns userId → { name, email } Map
@@ -23,30 +22,39 @@ export async function batchGetUserInfo(
 
   try {
     const supabase = getSupabaseServer();
-    const { data: profiles } = await supabase
+    const { data: authData } = await supabase.auth.admin.listUsers({
+      perPage: 1000,
+    });
+    const authUserMap = new Map(
+      (authData?.users ?? [])
+        .filter((user) => uniqueIds.includes(user.id))
+        .map((user) => [user.id, user]),
+    );
+
+    const profilesResult = await supabase
       .from("profiles")
       .select("id, display_name")
       .in("id", uniqueIds);
-
-    // auth.users에서 email 가져오기
-    const { data: authData } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-    const emailMap = new Map(authData?.users?.map((u) => [u.id, u.email ?? ""]) ?? []);
-
-    for (const profile of profiles ?? []) {
-      result.set(profile.id, {
-        name: profile.display_name || `User ${profile.id.slice(0, 8)}`,
-        email: emailMap.get(profile.id) || `${profile.id}@example.com`,
-      });
+    const profileNameMap = new Map<string, string>();
+    if (!profilesResult.error) {
+      for (const profile of profilesResult.data ?? []) {
+        profileNameMap.set(profile.id, profile.display_name ?? "");
+      }
     }
 
-    // 조회 실패한 ID에 fallback
     for (const id of uniqueIds) {
-      if (!result.has(id)) {
-        result.set(id, {
-          name: `User ${id.slice(0, 8)}`,
-          email: `${id}@example.com`,
-        });
-      }
+      const user = authUserMap.get(id);
+      const metadata = user?.user_metadata as Record<string, unknown> | undefined;
+      const metadataName =
+        stringMetadata(metadata?.display_name) ||
+        stringMetadata(metadata?.full_name) ||
+        stringMetadata(metadata?.name);
+      const profileName = profileNameMap.get(id)?.trim();
+
+      result.set(id, {
+        name: profileName || metadataName || `User ${id.slice(0, 8)}`,
+        email: user?.email || `${id}@example.com`,
+      });
     }
   } catch {
     for (const id of uniqueIds) {
@@ -58,4 +66,8 @@ export async function batchGetUserInfo(
   }
 
   return result;
+}
+
+function stringMetadata(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }

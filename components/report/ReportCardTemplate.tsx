@@ -395,7 +395,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                 margin: "0 0 16px 0",
               }}
             >
-              AI 종합 평가
+              CASE 종합 평가
             </h3>
             <div
               style={{
@@ -760,4 +760,3 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
 );
 
 ReportCardTemplate.displayName = "ReportCardTemplate";
-

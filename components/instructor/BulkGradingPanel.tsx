@@ -1,30 +1,77 @@
 "use client";
-
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { computeMissingBulkGradeStudents } from "@/lib/bulk-grade-roster";
+import {
+  isNearBottom,
+  orderThreadItems,
+  resolveSendMode,
+  countInterviewQuestions,
+  formatPickedQACriteria,
+} from "@/lib/bulk-grade-thread";
 import toast from "react-hot-toast";
-import { Bot, ExternalLink, Loader2, Send } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDown,
+  ChevronDown,
+  ExternalLink,
+  Loader2,
+  Send,
+  X,
+} from "lucide-react";
 import { qk } from "@/lib/query-keys";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from "@/components/ui/sheet";
-import AIMessageRenderer from "@/components/chat/AIMessageRenderer";
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { extractErrorMessage } from "@/lib/error-messages";
+import { createClientMessageId } from "@/lib/client-message-id";
 import type { ProposedGradesMap } from "@/lib/bulk-grading";
+import {
+  dashboardStatus,
+  dashboardStatusLabel,
+  overallScoreLabel,
+  type ExamStudentSummary,
+} from "@/lib/types/student-summary";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+type PermissionKey = "review_before_commit" | "no_precheck" | "ai_default";
 
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-  created_at?: string;
+const PERMISSION_LABELS: Record<PermissionKey, string> = {
+  review_before_commit: "검토 후 확정",
+  no_precheck: "바로 가채점",
+  ai_default: "AI한테 다 맡기기",
 };
+
+const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
+  review_before_commit: "검토 후 최종 확정",
+  no_precheck: "추가 질문 없이 시작",
+  ai_default: "AI 기본 기준으로 시작",
+};
+
+const EXAMPLE_CRITERIA = [
+  "논리 40 · 완성도 30 · 개념 30",
+  "핵심 개념 중심, 표현 실수는 관대하게",
+  "요구사항 충족을 최우선",
+];
 
 type BulkGradeProgress = {
   total: number;
@@ -34,27 +81,76 @@ type BulkGradeProgress = {
 
 type BulkGradeSession = {
   id: string;
-  proposed_grades: Record<string, Record<number, { score: number; comment: string }>>;
+  proposed_grades: ProposedGradesMap;
+  /** Submitted sessions the worker already attempted (success OR failure). */
+  processed_session_ids?: Record<string, boolean>;
   status: string;
   committed_at: string | null;
   updated_at: string;
-  messages: ChatMessage[];
+  grading_scope?: string;
+  /** Instructor's submitted criteria, approval-hint paragraph stripped. */
+  criteriaSummary?: string | null;
   progress?: BulkGradeProgress;
+};
+
+type BulkGradeStudentIdentity = {
+  sessionId: string;
+  studentId: string;
+  name: string;
+  studentNumber?: string;
+  school?: string;
+  email?: string;
+  submittedAt?: string | null;
 };
 
 type SessionData = {
   session: BulkGradeSession | null;
+  students: BulkGradeStudentIdentity[];
   studentCount: number;
   warning: string | null;
 };
 
-// Row in the proposed grades table, with student info for display
+type BulkGradeChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+};
+
+type BulkGradeChatData = {
+  session: {
+    id: string;
+    status: string;
+    calibration_status: string;
+  } | null;
+  messages: BulkGradeChatMessage[];
+  canStartGrading: boolean;
+};
+
 type GradeRow = {
   sessionId: string;
-  studentLabel: string;
+  studentName: string;
+  studentMeta: string;
   qIdx: number;
   score: number;
   comment: string;
+};
+
+type FinalResultRow = {
+  sessionId: string;
+  studentName: string;
+  studentMeta: string;
+  scoreLabel: string;
+  statusLabel: string;
+};
+
+/** A single renderable item in the single-scroll conversation thread. */
+type ThreadItem = {
+  key: string;
+  ts: number;
+  /** tie-break ordering for items sharing a timestamp. */
+  seq: number;
+  render: () => React.ReactNode;
 };
 
 export interface BulkGradingPanelProps {
@@ -64,8 +160,6 @@ export interface BulkGradingPanelProps {
   onCommitted?: () => void;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export function BulkGradingPanel({
   examId,
   open,
@@ -73,13 +167,37 @@ export function BulkGradingPanel({
   onCommitted,
 }: BulkGradingPanelProps) {
   const queryClient = useQueryClient();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [input, setInput] = useState("");
+  const [criteriaMode, setCriteriaMode] = useState<"custom" | "ai_default">("custom");
+  const [approvalMode, setApprovalMode] = useState<"review_before_commit" | "no_precheck">(
+    "review_before_commit",
+  );
   const [editedGrades, setEditedGrades] = useState<ProposedGradesMap | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
-  const [canStartGrading, setCanStartGrading] = useState(false);
-  // Track grading state for polling — initialized from server data
-  const [isGradingActive, setIsGradingActive] = useState(false);
+  /** Unified composer text — replaces the old criteriaText + chatDraft. */
+  const [draft, setDraft] = useState("");
+  /** Optimistic criteria echo right after a start (survives until GET refresh). */
+  const [lastSubmittedCriteria, setLastSubmittedCriteria] = useState<{
+    text: string;
+    ts: number;
+  } | null>(null);
+  /** When armed, the next Send re-runs grading with new criteria. */
+  const [regradeArmed, setRegradeArmed] = useState(false);
+
+  /** Quick-reply chips offered by the AI during the interviewing phase. */
+  const [chatOptions, setChatOptions] = useState<string[]>([]);
+  /** Q&A pairs accumulated via quick-reply chip selection. */
+  const [pickedQA, setPickedQA] = useState<{ q: string; a: string }[]>([]);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
+  const wasNearBottomRef = useRef(true);
+  const sendInFlightRef = useRef(false);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+  /** Guards against re-fetching options for the same assistant message. */
+  const lastFetchedMsgIdRef = useRef<string | null>(null);
+
+  const releaseSendLock = () => {
+    sendInFlightRef.current = false;
+  };
 
   const { data, isLoading } = useQuery<SessionData>({
     queryKey: qk.instructor.bulkGradeSession(examId),
@@ -93,73 +211,198 @@ export function BulkGradingPanel({
     },
     enabled: open && !!examId,
     staleTime: 0,
-    refetchInterval: isGradingActive ? 3000 : false,
+    refetchInterval: (query) => {
+      return query.state.data?.session?.status === "grading" ? 3000 : false;
+    },
+  });
+
+  const { data: chatData, isLoading: chatLoading } = useQuery<BulkGradeChatData>({
+    queryKey: qk.instructor.bulkGradeChat(examId),
+    queryFn: async ({ signal }) => {
+      const res = await fetch(`/api/exam/${examId}/bulk-grade/chat`, { signal });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "가채점 대화를 불러오지 못했습니다");
+      }
+      return res.json() as Promise<BulkGradeChatData>;
+    },
+    enabled: open && !!examId,
+    staleTime: 0,
+  });
+
+  /** Fetches quick-reply options for the latest AI question (silent degradation). */
+  const chatOptionsMutation = useMutation({
+    mutationFn: async ({
+      questionText,
+      gradingSessionId,
+    }: {
+      questionText: string;
+      gradingSessionId: string;
+    }) => {
+      const res = await fetch(`/api/exam/${examId}/bulk-grade/chat-options`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionText, gradingSessionId }),
+      });
+      if (!res.ok) return { success: false, options: [] as string[] };
+      return res.json() as Promise<{ success: boolean; options: string[] }>;
+    },
+    onSuccess: (result) => {
+      setChatOptions(result.options ?? []);
+    },
+    onError: () => {
+      setChatOptions([]);
+    },
+  });
+
+  const chatMutation = useMutation({
+    mutationFn: async ({
+      message,
+      clientMessageId,
+    }: {
+      message: string;
+      clientMessageId: string;
+    }) => {
+      const res = await fetch(`/api/exam/${examId}/bulk-grade/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, clientMessageId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(extractErrorMessage(err, "대화 전송에 실패했습니다", res.status));
+      }
+      return res.json() as Promise<BulkGradeChatData>;
+    },
+    onSuccess: (result) => {
+      setDraft("");
+      queryClient.setQueryData(qk.instructor.bulkGradeChat(examId), result);
+      queryClient.invalidateQueries({ queryKey: qk.instructor.bulkGradeSession(examId) });
+
+      // Fetch quick-reply options for the new AI question (interviewing phase only).
+      if (result.session?.calibration_status === "interviewing") {
+        const msgs = result.messages ?? [];
+        const latestAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
+        const sessionId = result.session?.id ?? chatData?.session?.id;
+        if (latestAssistant && sessionId) {
+          setChatOptions([]); // clear while fetching
+          lastFetchedMsgIdRef.current = latestAssistant.id;
+          chatOptionsMutation.mutate({
+            questionText: latestAssistant.content,
+            gradingSessionId: sessionId,
+          });
+        }
+      } else {
+        // Left interviewing phase (e.g. approved) — clear chips.
+        setChatOptions([]);
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+    onSettled: releaseSendLock,
   });
 
   const sessionStatus = data?.session?.status ?? null;
   const isGrading = sessionStatus === "grading";
   const gradingDone = sessionStatus === "grading_done";
-  const progress = data?.session?.progress;
+  const gradingFailed = sessionStatus === "grading_failed";
+  const committed = sessionStatus === "committed";
 
-  // Sync polling state with server status
-  useEffect(() => {
-    setIsGradingActive(isGrading);
-  }, [isGrading]);
-
-  const messages = useMemo<ChatMessage[]>(() => {
-    return data?.session?.messages ?? [];
-  }, [data]);
-
-  // Restore editedGrades from server on load
-  useEffect(() => {
-    if (data?.session?.proposed_grades && editedGrades === null) {
-      const serverGrades = data.session.proposed_grades as ProposedGradesMap;
-      if (Object.keys(serverGrades).length > 0) {
-        setEditedGrades(serverGrades);
-      }
-    }
-    if (data?.warning) {
-      setWarning(data.warning);
-    }
-  }, [data, editedGrades]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const chatMutation = useMutation({
-    mutationFn: async (message: string) => {
-      const res = await fetch(`/api/exam/${examId}/bulk-grade/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
-      });
+  const { data: finalSummaries = [], isLoading: finalSummariesLoading } = useQuery<
+    ExamStudentSummary[]
+  >({
+    queryKey: qk.instructor.studentSummaries(examId),
+    queryFn: async ({ signal }) => {
+      const res = await fetch(`/api/exam/${examId}/student-summaries`, { signal });
+      const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(extractErrorMessage(err, "AI 응답을 받지 못했습니다", res.status));
+        throw new Error(payload.message || "확정 결과를 불러오지 못했습니다");
       }
-      return res.json() as Promise<{
-        assistantMessage: { id: string; role: string; content: string };
-        canStartGrading: boolean;
-        warning?: string | null;
-      }>;
+      return (payload.students ?? []) as ExamStudentSummary[];
     },
-    onSuccess: (result) => {
-      setInput("");
-      if (result.canStartGrading) setCanStartGrading(true);
-      if (result.warning) setWarning(result.warning);
-      queryClient.invalidateQueries({
-        queryKey: qk.instructor.bulkGradeSession(examId),
-      });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
+    enabled: open && committed && !!examId,
+    staleTime: 0,
   });
+
+  const progress = data?.session?.progress;
+  const hasProgress = !!progress && progress.total > 0;
+  const processedCount = progress
+    ? Math.min(progress.total, progress.completed + progress.failed)
+    : 0;
+  const progressPercent = hasProgress
+    ? Math.round((processedCount / Math.max(progress.total, 1)) * 100)
+    : 0;
+  const hasPartialFailure = gradingDone && (progress?.failed ?? 0) > 0;
+  const serverGrades = data?.session?.proposed_grades;
+  const currentGrades = editedGrades ?? serverGrades ?? null;
+  const reviewGrades = committed ? null : currentGrades;
+  const studentsBySessionId = useMemo(() => {
+    return new Map(
+      (data?.students ?? []).map((student, index) => [
+        student.sessionId,
+        { student, index },
+      ]),
+    );
+  }, [data?.students]);
+  const finalSummariesBySessionId = useMemo(() => {
+    return new Map(finalSummaries.map((student) => [student.sessionId, student]));
+  }, [finalSummaries]);
+  const finalRows = useMemo<FinalResultRow[]>(() => {
+    const rows = (data?.students ?? []).map((identity) => {
+      const summary = finalSummariesBySessionId.get(identity.sessionId);
+      const studentMeta = [
+        identity.studentNumber ?? summary?.studentNumber,
+        identity.email ?? summary?.email,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      return {
+        sessionId: identity.sessionId,
+        studentName: identity.name ?? summary?.name ?? `Student ${identity.sessionId.slice(0, 8)}`,
+        studentMeta,
+        scoreLabel: overallScoreLabel({ overallScore: summary?.overallScore }),
+        statusLabel: summary
+          ? dashboardStatusLabel(dashboardStatus(summary))
+          : "확정됨",
+      };
+    });
+
+    for (const summary of finalSummaries) {
+      if (rows.some((row) => row.sessionId === summary.sessionId)) continue;
+      const studentMeta = [summary.studentNumber, summary.email]
+        .filter(Boolean)
+        .join(" · ");
+      rows.push({
+        sessionId: summary.sessionId,
+        studentName: summary.name,
+        studentMeta,
+        scoreLabel: overallScoreLabel({ overallScore: summary.overallScore }),
+        statusLabel: dashboardStatusLabel(dashboardStatus(summary)),
+      });
+    }
+
+    return rows;
+  }, [data?.students, finalSummaries, finalSummariesBySessionId]);
 
   const startGradingMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/exam/${examId}/bulk-grade/start`, { method: "POST" });
+      // NOTE: formatPickedQACriteria is called EXACTLY ONCE here at send time.
+      // The re-grade arm path keeps draft = base only (no pre-baked Q&A) to
+      // prevent double-appending. Truncated to 8000 chars total.
+      const base = criteriaMode === "ai_default" ? "" : draft.trim();
+      const enriched = (base + formatPickedQACriteria(pickedQA)).slice(0, 8000);
+      const res = await fetch(`/api/exam/${examId}/bulk-grade/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scope: "full",
+          criteriaText: enriched,
+          criteriaMode,
+          approvalMode,
+        }),
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(extractErrorMessage(err, "채점 시작에 실패했습니다.", res.status));
@@ -167,21 +410,27 @@ export function BulkGradingPanel({
       return res.json() as Promise<{ ok: boolean; total: number }>;
     },
     onSuccess: (result) => {
-      toast.success(`${result.total}명 학생 채점을 시작했습니다.`);
-      setIsGradingActive(true);
+      toast.success(`${result.total}명 전체 CASE 가채점을 시작했습니다.`);
+      setEditedGrades(null);
+      setRegradeArmed(false);
+      setDraft("");
+      setPickedQA([]);
+      setChatOptions([]);
       queryClient.invalidateQueries({ queryKey: qk.instructor.bulkGradeSession(examId) });
+      queryClient.invalidateQueries({ queryKey: qk.instructor.bulkGradeChat(examId) });
     },
     onError: (error: Error) => {
       toast.error(error.message);
     },
+    onSettled: releaseSendLock,
   });
 
   const commitMutation = useMutation({
     mutationFn: async () => {
-      if (!editedGrades || Object.keys(editedGrades).length === 0) {
+      if (!currentGrades || Object.keys(currentGrades).length === 0) {
         throw new Error("확정할 채점 결과가 없습니다.");
       }
-      const grades = Object.entries(editedGrades).flatMap(([sessionId, qMap]) =>
+      const grades = Object.entries(currentGrades).flatMap(([sessionId, qMap]) =>
         Object.entries(qMap).map(([qIdxStr, { score, comment }]) => ({
           session_id: sessionId,
           q_idx: Number(qIdxStr),
@@ -205,7 +454,7 @@ export function BulkGradingPanel({
       setEditedGrades(null);
       queryClient.invalidateQueries({ queryKey: qk.instructor.bulkGradeSession(examId) });
       queryClient.invalidateQueries({ queryKey: qk.instructor.studentSummaries(examId) });
-      onOpenChange(false);
+      queryClient.invalidateQueries({ queryKey: qk.instructor.bulkGradeChat(examId) });
       onCommitted?.();
     },
     onError: (error: Error) => {
@@ -213,323 +462,936 @@ export function BulkGradingPanel({
     },
   });
 
-  const handleSend = () => {
-    const trimmed = input.trim();
-    if (!trimmed || chatMutation.isPending) return;
-    chatMutation.mutate(trimmed);
-  };
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
-  // Build sorted grade rows for the table
   const gradeRows = useMemo<GradeRow[]>(() => {
-    if (!editedGrades) return [];
+    if (!reviewGrades) return [];
     const rows: GradeRow[] = [];
-    let studentIdx = 1;
-    for (const [sessionId, qMap] of Object.entries(editedGrades)) {
+    for (const [sessionId, qMap] of Object.entries(reviewGrades)) {
+      const studentEntry = studentsBySessionId.get(sessionId);
+      const student = studentEntry?.student;
+      const studentMeta = [student?.studentNumber, student?.email]
+        .filter(Boolean)
+        .join(" · ");
       for (const [qIdxStr, { score, comment }] of Object.entries(qMap)) {
         rows.push({
           sessionId,
-          studentLabel: `학생 ${studentIdx}`,
+          studentName: student?.name ?? `Student ${sessionId.slice(0, 8)}`,
+          studentMeta,
           qIdx: Number(qIdxStr),
           score,
           comment,
         });
       }
-      studentIdx++;
     }
-    rows.sort((a, b) => a.sessionId.localeCompare(b.sessionId) || a.qIdx - b.qIdx);
+    rows.sort((a, b) => {
+      const orderA = studentsBySessionId.get(a.sessionId)?.index ?? Number.MAX_SAFE_INTEGER;
+      const orderB = studentsBySessionId.get(b.sessionId)?.index ?? Number.MAX_SAFE_INTEGER;
+      return orderA - orderB || a.sessionId.localeCompare(b.sessionId) || a.qIdx - b.qIdx;
+    });
     return rows;
-  }, [editedGrades]);
+  }, [reviewGrades, studentsBySessionId]);
 
   const totalGrades = gradeRows.length;
 
-  const displayMessages = useMemo(
-    () => messages.filter((m) => m.role === "user" || m.role === "assistant"),
-    [messages],
+  // Students that were part of this grading attempt but have NO proposed grade.
+  // Previously these were silently dropped (the table only iterated proposed_grades),
+  // so a worker failure made a student vanish. Surface them explicitly:
+  //  - failed:  worker already processed them but produced no grade (AI error/parse) → "채점 실패"
+  //  - pending: not yet processed (still running) → "대기 중"
+  const gradingAttempted = isGrading || gradingDone || gradingFailed;
+  const missingStudents = useMemo(
+    () =>
+      computeMissingBulkGradeStudents({
+        students: data?.students ?? [],
+        reviewGrades: reviewGrades ?? null,
+        processedSessionIds: data?.session?.processed_session_ids ?? {},
+        committed,
+        gradingAttempted,
+      }),
+    [
+      committed,
+      gradingAttempted,
+      reviewGrades,
+      data?.students,
+      data?.session?.processed_session_ids,
+    ],
   );
+  const failedCount = missingStudents.filter((s) => s.failed).length;
 
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="flex w-[700px] max-w-full flex-col gap-0 p-0 sm:max-w-[700px]"
-      >
-        <SheetHeader className="shrink-0 border-b px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Bot className="h-5 w-5 text-primary" />
-            <SheetTitle>AI 일괄 채점</SheetTitle>
-            {data?.studentCount != null && (
-              <span className="text-sm text-muted-foreground font-normal">
-                (대상: {data.studentCount}명)
+  const handleCommit = () => {
+    if (
+      progress?.failed &&
+      progress.failed > 0 &&
+      !window.confirm(`${progress.failed}명 채점에 실패했습니다. 성공한 제안 점수만 확정하시겠습니까?`)
+    ) {
+      return;
+    }
+    commitMutation.mutate();
+  };
+
+  const permissionKey: PermissionKey =
+    criteriaMode === "ai_default" ? "ai_default" : approvalMode;
+
+  const handlePermissionSelect = (value: string) => {
+    if (value === "ai_default") {
+      setCriteriaMode("ai_default");
+      setApprovalMode("review_before_commit");
+    } else if (value === "no_precheck") {
+      setCriteriaMode("custom");
+      setApprovalMode("no_precheck");
+    } else {
+      setCriteriaMode("custom");
+      setApprovalMode("review_before_commit");
+    }
+  };
+
+  const focusComposer = () => {
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  };
+
+  const armRegrade = () => {
+    setRegradeArmed(true);
+    const lastCriteria =
+      data?.session?.criteriaSummary ?? lastSubmittedCriteria?.text ?? "";
+    setDraft(lastCriteria);
+    if (criteriaMode === "ai_default") setCriteriaMode("custom");
+    focusComposer();
+  };
+
+  const cancelRegrade = () => {
+    setRegradeArmed(false);
+    setDraft("");
+  };
+
+  // ─── Interview phase chip logic ─────────────────────────────────────────────
+  const isInterviewing = chatData?.session?.calibration_status === "interviewing";
+
+  /** Number of AI questions posed AFTER the first user reply (cap = 3). */
+  const aiQuestionCount = countInterviewQuestions(chatData?.messages ?? []);
+  const AI_QUESTION_CAP = 3;
+
+  /**
+   * Structured option list displayed as quick-reply chips.
+   * When the cap is reached, only the regrade option is shown (forces commit).
+   * The regrade chip is always last; its action distinguishes it from pick chips.
+   */
+  const displayedOptions: { label: string; action: "pick" | "regrade" }[] =
+    isInterviewing
+      ? aiQuestionCount >= AI_QUESTION_CAP
+        ? [{ label: "이 기준으로 다시 가채점", action: "regrade" }]
+        : [
+            ...chatOptions.map((o) => ({ label: o, action: "pick" as const })),
+            { label: "이 기준으로 다시 가채점", action: "regrade" },
+          ]
+      : [];
+
+  const handleOptionPick = (opt: { label: string; action: "pick" | "regrade" }) => {
+    if (opt.action === "regrade") {
+      // Arm re-grade with base criteria only.
+      // formatPickedQACriteria will be appended exactly once in startGradingMutation.
+      const base =
+        lastSubmittedCriteria?.text ?? data?.session?.criteriaSummary ?? draft ?? "";
+      setDraft(base);
+      setRegradeArmed(true);
+      setCriteriaMode("custom");
+      setChatOptions([]);
+      focusComposer();
+    } else {
+      // Pick a quick-reply answer: record the Q&A pair and send it as a chat message.
+      const msgs = chatData?.messages ?? [];
+      const latestQ = [...msgs].reverse().find((m) => m.role === "assistant")?.content ?? "";
+      setPickedQA((prev) => [...prev, { q: latestQ, a: opt.label }]);
+      setChatOptions([]);
+      chatMutation.mutate({ message: opt.label, clientMessageId: createClientMessageId() });
+    }
+  };
+
+  // ─── Send routing ──────────────────────────────────────────────────────────
+  const sendMode = resolveSendMode({
+    committed,
+    isGrading,
+    gradingDone,
+    gradingFailed,
+    regradeArmed,
+  });
+  const startPending = startGradingMutation.isPending;
+  const chatPending = chatMutation.isPending;
+  const trimmedDraft = draft.trim();
+
+  const sendDisabled =
+    (sendMode === "start" && !trimmedDraft && criteriaMode !== "ai_default") ||
+    (sendMode === "discuss" && !trimmedDraft) ||
+    (sendMode === "start" ? startPending || isGrading : chatPending);
+  const sendBusy = sendMode === "start" ? startPending || isGrading : chatPending;
+
+  const send = () => {
+    if (sendInFlightRef.current) return;
+    if (sendDisabled) return;
+    sendInFlightRef.current = true;
+    if (sendMode === "start") {
+      setLastSubmittedCriteria({
+        text: criteriaMode === "ai_default" ? "" : trimmedDraft,
+        ts: Date.now(),
+      });
+      startGradingMutation.mutate();
+    } else {
+      const message = trimmedDraft;
+      if (!message) {
+        releaseSendLock();
+        return;
+      }
+      chatMutation.mutate({ message, clientMessageId: createClientMessageId() });
+    }
+  };
+
+  const handleComposerKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing
+    ) {
+      event.preventDefault();
+      send();
+    }
+  };
+
+  // ─── Escape to close ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onOpenChange(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onOpenChange]);
+
+  // ─── Init/welcome question options fetch ────────────────────────────────────
+  // Covers the case where the panel opens with an existing "interviewing" session
+  // and there's already an assistant message we haven't fetched options for yet.
+  useEffect(() => {
+    if (!open) return;
+    if (chatData?.session?.calibration_status !== "interviewing") return;
+    const sessionId = chatData.session.id;
+    if (!sessionId) return;
+
+    const msgs = chatData.messages ?? [];
+    const lastMsg = msgs[msgs.length - 1];
+    if (!lastMsg || lastMsg.role !== "assistant") return;
+    // Guard: don't re-fetch for the same message.
+    if (lastFetchedMsgIdRef.current === lastMsg.id) return;
+
+    lastFetchedMsgIdRef.current = lastMsg.id;
+    setChatOptions([]); // clear while fetching
+    chatOptionsMutation.mutate({
+      questionText: lastMsg.content,
+      gradingSessionId: sessionId,
+    });
+    // chatOptionsMutation is stable; we only re-run when messages change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, chatData?.messages, chatData?.session?.calibration_status, chatData?.session?.id]);
+
+  // ─── Thread items (single ordered timeline) ──────────────────────────────────
+  const gradingStartTs = useMemo(() => {
+    const sessionTs = data?.session?.updated_at
+      ? Date.parse(data.session.updated_at)
+      : NaN;
+    if (Number.isFinite(sessionTs)) return sessionTs;
+    if (lastSubmittedCriteria) return lastSubmittedCriteria.ts;
+    return Date.now();
+  }, [data?.session?.updated_at, lastSubmittedCriteria]);
+
+  const resultCardTs = useMemo(() => {
+    const sessionTs = data?.session?.updated_at
+      ? Date.parse(data.session.updated_at)
+      : NaN;
+    return Number.isFinite(sessionTs) ? sessionTs : gradingStartTs;
+  }, [data?.session?.updated_at, gradingStartTs]);
+
+  const criteriaEchoText =
+    data?.session?.criteriaSummary ||
+    lastSubmittedCriteria?.text ||
+    "가채점을 시작했습니다";
+
+  const threadItems = useMemo<ThreadItem[]>(() => {
+    const items: ThreadItem[] = [];
+
+    // Persisted chat messages.
+    for (const message of chatData?.messages ?? []) {
+      const ts = Date.parse(message.created_at);
+      items.push({
+        key: `msg-${message.id}`,
+        ts: Number.isFinite(ts) ? ts : 0,
+        seq: 5,
+        render: () =>
+          message.role === "user" ? (
+            <div
+              key={`msg-${message.id}`}
+              className="ml-auto max-w-[85%] rounded-2xl bg-muted px-3 py-2 text-sm"
+            >
+              <p className="whitespace-pre-wrap">{message.content}</p>
+            </div>
+          ) : (
+            <div
+              key={`msg-${message.id}`}
+              className="text-sm leading-relaxed text-foreground"
+            >
+              <p className="whitespace-pre-wrap">{message.content}</p>
+            </div>
+          ),
+      });
+    }
+
+    // Criteria echo bubble (only once a run exists / started).
+    if (gradingAttempted || committed) {
+      items.push({
+        key: "criteria-echo",
+        ts: gradingStartTs,
+        seq: 0,
+        render: () => (
+          <div
+            key="criteria-echo"
+            className="ml-auto max-w-[85%] rounded-2xl bg-muted px-3 py-2 text-sm"
+            data-testid="bulk-grade-criteria-echo"
+          >
+            <p className="whitespace-pre-wrap">{criteriaEchoText}</p>
+          </div>
+        ),
+      });
+    }
+
+    // Live progress / failure micro-rows.
+    if (isGrading) {
+      items.push({
+        key: "status-grading",
+        ts: gradingStartTs,
+        seq: 1,
+        render: () => (
+          <p
+            key="status-grading"
+            className="text-xs text-muted-foreground"
+            aria-live="polite"
+          >
+            전체 CASE 가채점 중 · 처리 {processedCount}/{progress?.total ?? 0}
+            {progress && progress.failed > 0 ? ` · 실패 ${progress.failed}명` : ""}
+          </p>
+        ),
+      });
+    }
+
+    if (gradingFailed || hasPartialFailure) {
+      items.push({
+        key: "status-failure",
+        ts: gradingStartTs,
+        seq: 2,
+        render: () => (
+          <p
+            key="status-failure"
+            className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-300"
+          >
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>
+              {gradingFailed
+                ? "일부 실패. 다시 채점하면 제안 점수가 초기화됩니다."
+                : `${progress?.failed ?? 0}명 실패. 성공분만 확정할 수 있습니다.`}
+            </span>
+          </p>
+        ),
+      });
+    }
+
+    // Result card (only after a run starts).
+    if (gradingAttempted || committed) {
+      items.push({
+        key: "result-card",
+        ts: resultCardTs,
+        seq: 3,
+        render: () => <div key="result-card">{renderResultCard()}</div>,
+      });
+    }
+
+    return orderThreadItems(items);
+    // renderResultCard intentionally recreated each render; deps below cover its inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    chatData?.messages,
+    gradingAttempted,
+    committed,
+    isGrading,
+    gradingFailed,
+    hasPartialFailure,
+    gradingStartTs,
+    resultCardTs,
+    criteriaEchoText,
+    processedCount,
+    progress,
+    // result card inputs:
+    gradeRows,
+    missingStudents,
+    finalRows,
+    finalSummariesLoading,
+    currentGrades,
+    editedGrades,
+    commitMutation.isPending,
+    startGradingMutation.isPending,
+  ]);
+
+  const chatMessageCount = chatData?.messages?.length ?? 0;
+  const hasThreadContent =
+    chatMessageCount > 0 || gradingAttempted || committed;
+
+  // ─── Stick-to-bottom ─────────────────────────────────────────────────────────
+  const handleThreadScroll = () => {
+    const el = threadRef.current;
+    if (!el) return;
+    const near = isNearBottom({
+      scrollTop: el.scrollTop,
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+    });
+    wasNearBottomRef.current = near;
+    setShowJumpToBottom(!near);
+  };
+
+  const scrollToBottom = () => {
+    const el = threadRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    wasNearBottomRef.current = true;
+    setShowJumpToBottom(false);
+  };
+
+  // After items change, stick to bottom if the user was near it.
+  useLayoutEffect(() => {
+    if (!open) return;
+    if (wasNearBottomRef.current) {
+      const el = threadRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+      setShowJumpToBottom(false);
+    } else {
+      setShowJumpToBottom(true);
+    }
+  }, [threadItems, open]);
+
+  // Scroll to bottom on open.
+  useEffect(() => {
+    if (!open) return;
+    wasNearBottomRef.current = true;
+    requestAnimationFrame(() => {
+      const el = threadRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }, [open]);
+
+  const startDisabledForCard = isGrading || committed || startGradingMutation.isPending;
+  const canRegradeArm =
+    (gradingDone || gradingFailed) && !committed && !isGrading;
+  const showCommit =
+    gradingDone && !!currentGrades && Object.keys(currentGrades).length > 0 && !committed;
+
+  // ─── Result card ─────────────────────────────────────────────────────────────
+  function renderResultCard(): React.ReactNode {
+    const statusBadge = committed ? (
+      <Badge variant="secondary">반영됨</Badge>
+    ) : isGrading ? (
+      <Badge variant="outline" className="gap-1">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        채점 중
+      </Badge>
+    ) : (
+      <Badge variant="outline">가채점 완료</Badge>
+    );
+
+    const title = committed ? "확정된 CASE 채점" : "AI 제안 점수";
+    const count = committed ? finalRows.length : totalGrades;
+
+    return (
+      <Collapsible defaultOpen className="rounded-xl border bg-card text-card-foreground shadow-sm">
+        <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-3 text-left">
+          <span className="text-sm font-medium">{title}</span>
+          <span className="text-xs text-muted-foreground">({count}개)</span>
+          {statusBadge}
+          <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground transition-transform [[data-state=open]_&]:rotate-180" />
+        </CollapsibleTrigger>
+
+        {isGrading && hasProgress && (
+          <div className="px-4 pb-3">
+            <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+              <span>
+                처리 {processedCount}/{progress.total}명
+                {progress.failed > 0
+                  ? ` · 성공 ${progress.completed}명 · 실패 ${progress.failed}명`
+                  : ""}
               </span>
+              <span>{progressPercent}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full bg-primary transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        <CollapsibleContent>
+          <div className="space-y-4 border-t px-4 py-3">
+            {/* (a) Missing students first — no-silent-drop behavior preserved. */}
+            {missingStudents.length > 0 && (
+              <div
+                className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30"
+                data-testid="bulk-grade-missing-students"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-200">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>
+                      {isGrading
+                        ? `처리 대기 중 ${missingStudents.length}명`
+                        : `채점되지 않은 학생 ${missingStudents.length}명${
+                            failedCount > 0 ? ` (실패 ${failedCount}명)` : ""
+                          }`}
+                    </span>
+                  </div>
+                  {!isGrading && !committed && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (sendInFlightRef.current || startDisabledForCard) return;
+                        sendInFlightRef.current = true;
+                        startGradingMutation.mutate();
+                      }}
+                      disabled={startDisabledForCard}
+                      className="h-7 shrink-0 px-2 text-xs"
+                    >
+                      {startGradingMutation.isPending && (
+                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                      )}
+                      다시 가채점
+                    </Button>
+                  )}
+                </div>
+                <ul className="space-y-1" data-testid="bulk-grade-missing-list">
+                  {missingStudents.map((s) => (
+                    <li
+                      key={s.sessionId}
+                      className="flex items-center justify-between gap-2 text-xs"
+                    >
+                      <div className="min-w-0 truncate">
+                        <span className="font-medium text-foreground">{s.studentName}</span>
+                        {s.studentMeta && (
+                          <span className="ml-1 text-muted-foreground">· {s.studentMeta}</span>
+                        )}
+                      </div>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded px-1.5 py-0.5 text-[11px]",
+                          s.failed
+                            ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                            : "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {s.failed ? "채점 실패" : "대기 중"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {!isGrading && !committed && (
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                    다시 가채점하면 제안 점수가 초기화됩니다.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* (b) editable grade table OR (c) committed final summary. */}
+            {committed ? (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">학생 목록 기준 최종 점수입니다.</p>
+                {finalSummariesLoading ? (
+                  <div className="flex items-center justify-center rounded-md border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    확정 결과 불러오는 중...
+                  </div>
+                ) : finalRows.length === 0 ? (
+                  <div className="rounded-md border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
+                    확정 결과가 없습니다. 학생 목록에서 최종 점수를 확인하세요.
+                  </div>
+                ) : (
+                  <table className="w-full text-xs" data-testid="bulk-grade-final-results">
+                    <thead className="bg-background">
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-1 pr-2 font-normal">학생</th>
+                        <th className="pb-1 pr-2 font-normal">총점</th>
+                        <th className="pb-1 font-normal">상태</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {finalRows.map((row) => (
+                        <tr key={row.sessionId} className="border-b last:border-0">
+                          <td className="py-1.5 pr-2">
+                            <div className="font-medium text-foreground">{row.studentName}</div>
+                            {row.studentMeta && (
+                              <div
+                                className="max-w-[180px] truncate text-[11px] text-muted-foreground"
+                                title={row.studentMeta}
+                              >
+                                {row.studentMeta}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-1.5 pr-2 font-medium tabular-nums">
+                            {row.scoreLabel}
+                          </td>
+                          <td className="py-1.5 text-muted-foreground">{row.statusLabel}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            ) : gradeRows.length > 0 ? (
+              <table className="w-full text-xs">
+                <thead className="bg-background">
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="pb-1 pr-2 font-normal">학생</th>
+                    <th className="pb-1 pr-2 font-normal">문제</th>
+                    <th className="pb-1 pr-2 font-normal">점수</th>
+                    <th className="pb-1 pr-2 font-normal">코멘트</th>
+                    <th className="pb-1 font-normal"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gradeRows.map((row) => (
+                    <tr key={`${row.sessionId}-${row.qIdx}`} className="border-b last:border-0">
+                      <td className="py-1.5 pr-2">
+                        <div className="font-medium text-foreground">{row.studentName}</div>
+                        {row.studentMeta && (
+                          <div
+                            className="max-w-[140px] truncate text-[11px] text-muted-foreground"
+                            title={row.studentMeta}
+                          >
+                            {row.studentMeta}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-1.5 pr-2 text-muted-foreground">Q{row.qIdx + 1}</td>
+                      <td className="py-1.5 pr-2">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={row.score}
+                          onChange={(e) => {
+                            const v = Math.min(100, Math.max(0, Number(e.target.value)));
+                            setEditedGrades((prev) => {
+                              const base = prev ?? currentGrades;
+                              if (!base) return prev;
+                              return {
+                                ...base,
+                                [row.sessionId]: {
+                                  ...base[row.sessionId],
+                                  [row.qIdx]: {
+                                    ...base[row.sessionId]?.[row.qIdx],
+                                    score: v,
+                                  },
+                                },
+                              };
+                            });
+                          }}
+                          className="w-14 rounded border px-1 py-0.5 text-right"
+                        />
+                      </td>
+                      <td
+                        className="max-w-[220px] truncate py-1.5 pr-2 text-muted-foreground"
+                        title={row.comment}
+                      >
+                        {row.comment}
+                      </td>
+                      <td className="py-1.5">
+                        <a
+                          href={`/instructor/${examId}/grade/${row.sessionId}?questionType=case&qIdx=${row.qIdx}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${row.studentName} Q${row.qIdx + 1} 개별 채점 새 탭에서 열기`}
+                          data-testid={`bulk-grade-row-link-${row.sessionId}-${row.qIdx}`}
+                          className="inline-flex items-center gap-0.5 whitespace-nowrap text-blue-600 hover:underline"
+                        >
+                          개별 채점
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              !isGrading && (
+                <p className="text-sm text-muted-foreground">
+                  제안 점수가 아직 없습니다.
+                </p>
+              )
+            )}
+
+            {/* Footer: commit + re-grade arm. */}
+            {(showCommit || canRegradeArm) && (
+              <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+                {showCommit && (
+                  <Button
+                    type="button"
+                    onClick={handleCommit}
+                    disabled={commitMutation.isPending}
+                  >
+                    {commitMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        저장 중...
+                      </>
+                    ) : (
+                      `채점 확정 (${totalGrades}개)`
+                    )}
+                  </Button>
+                )}
+                {canRegradeArm && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={armRegrade}
+                    disabled={regradeArmed}
+                  >
+                    다시 채점
+                  </Button>
+                )}
+              </div>
+            )}
+            {committed && (
+              <div className="border-t pt-3 text-xs text-muted-foreground">
+                확정된 채점입니다. 아래에서 결과만 논의할 수 있습니다.
+              </div>
             )}
           </div>
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  }
 
-          {/* 단계 인디케이터 */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className={!isGrading && !gradingDone ? "text-primary font-medium" : ""}>
-              ① 기준 논의
-            </span>
-            <span>→</span>
-            <span className={isGrading ? "text-primary font-medium" : gradingDone ? "text-green-600 font-medium" : ""}>
-              {isGrading ? "② 채점 진행 중" : gradingDone ? "② 채점 완료" : "② 채점"}
-            </span>
-            <span>→</span>
-            <span className={sessionStatus === "committed" ? "text-green-600 font-medium" : ""}>
-              ③ 확정
-            </span>
-          </div>
+  return (
+    <aside
+      role="complementary"
+      aria-label="CASE AI 가채점"
+      aria-hidden={!open}
+      inert={!open}
+      className={cn(
+        "fixed inset-y-0 right-0 z-40 flex h-full w-[528px] max-w-full flex-col overflow-hidden border-l bg-background shadow-lg",
+        "transition-transform duration-300 ease-in-out",
+        open ? "translate-x-0" : "translate-x-full",
+      )}
+    >
+      {/* Header */}
+      <div className="flex shrink-0 items-center gap-2 border-b px-5 py-3">
+        <h2 className="text-sm font-semibold text-foreground">CASE AI 가채점</h2>
+        {data?.studentCount != null && (
+          <span className="text-xs font-normal text-muted-foreground">
+            (대상 {data.studentCount}명)
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => onOpenChange(false)}
+          aria-label="닫기"
+          className="ml-auto rounded-sm p-1 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
 
-          {/* 진행률 bar */}
-          {isGrading && progress && progress.total > 0 && (
-            <div className="space-y-1 pt-1">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>채점 진행 중…</span>
-                <span>{progress.completed}/{progress.total} 학생</span>
-              </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-500"
-                  style={{
-                    width: `${Math.round((progress.completed / Math.max(progress.total, 1)) * 100)}%`,
-                  }}
-                />
-              </div>
-              {progress.failed > 0 && (
-                <p className="text-xs text-amber-600">{progress.failed}명 채점 실패 (재시도 중)</p>
-              )}
-            </div>
-          )}
-
-          {gradingDone && progress && progress.failed > 0 && (
-            <p className="text-xs text-amber-600">
-              ⚠️ {progress.failed}명 채점 실패 — 해당 학생 점수가 빠져 있습니다.
-            </p>
-          )}
-
-          {warning && (
-            <p className="text-sm text-amber-600">⚠️ {warning}</p>
-          )}
-        </SheetHeader>
-
-        {/* Chat area */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+      {/* Thread — the only scroll area */}
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={threadRef}
+          onScroll={handleThreadScroll}
+          className="h-full overflow-y-auto px-5 py-4"
+        >
           {isLoading ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              불러오는 중…
+              불러오는 중...
             </div>
-          ) : displayMessages.length === 0 ? (
-            <div className="space-y-3 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">어떻게 채점할까요?</p>
-              <p>
-                이 시험의 채점 기준과 중요하게 볼 포인트를 알려주세요.
-                AI가 기준에 맞게 모든 학생의 Case 문제를 일괄 채점합니다.
+          ) : !hasThreadContent ? (
+            <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                채점 기준을 알려주세요
               </p>
-              <p className="text-xs">
-                예시: &quot;논리적 근거 제시 여부 40%, 답변 완성도 30%, 핵심 개념 활용 30%. 부분 점수 허용.&quot;
-              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {EXAMPLE_CRITERIA.map((example) => (
+                  <Button
+                    key={example}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-auto max-w-[260px] whitespace-normal py-1.5 text-left text-xs"
+                    onClick={() => {
+                      setCriteriaMode("custom");
+                      setDraft(example);
+                      focusComposer();
+                    }}
+                  >
+                    {example}
+                  </Button>
+                ))}
+              </div>
             </div>
           ) : (
-            <div className="space-y-3 pr-2">
-              {displayMessages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-                >
-                  <div
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-                      msg.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    }`}
-                  >
-                    {msg.role === "user" ? (
-                      <span className="text-xs font-medium">나</span>
-                    ) : (
-                      <Bot className="h-3.5 w-3.5" />
-                    )}
-                  </div>
-                  <div
-                    className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                      msg.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    }`}
-                  >
-                    {msg.role === "assistant" ? (
-                      <AIMessageRenderer
-                        content={msg.content}
-                        timestamp={msg.created_at ?? new Date().toISOString()}
-                        variant="plain"
-                      />
-                    ) : (
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {chatMutation.isPending && (
-                <div className="flex gap-2">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
-                    <Bot className="h-3.5 w-3.5" />
-                  </div>
-                  <div className="flex items-center gap-1 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>채점 중…</span>
-                  </div>
+            <div className="space-y-3" data-testid="bulk-grade-thread">
+              {chatLoading && chatMessageCount === 0 && (
+                <div className="flex items-center justify-center py-2 text-xs text-muted-foreground">
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  대화 불러오는 중...
                 </div>
               )}
-              <div ref={messagesEndRef} />
+              {threadItems.map((item) => (
+                <div key={item.key}>{item.render()}</div>
+              ))}
+              {data?.warning && (
+                <p className="text-xs text-amber-600">{data.warning}</p>
+              )}
             </div>
           )}
         </div>
 
-        {/* Proposed grades table */}
-        {gradeRows.length > 0 && (
-          <div className="max-h-[280px] shrink-0 overflow-y-auto border-t px-6 py-3">
-            <p className="mb-2 text-sm font-medium">제안 점수 ({totalGrades}개)</p>
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-background">
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-1 pr-2 font-normal">학생</th>
-                  <th className="pb-1 pr-2 font-normal">문제</th>
-                  <th className="pb-1 pr-2 font-normal">점수</th>
-                  <th className="pb-1 pr-2 font-normal">코멘트</th>
-                  <th className="pb-1 font-normal"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {gradeRows.map((row) => (
-                  <tr
-                    key={`${row.sessionId}-${row.qIdx}`}
-                    className="border-b last:border-0"
-                  >
-                    <td className="py-1.5 pr-2 font-mono text-muted-foreground">
-                      {row.studentLabel}
-                    </td>
-                    <td className="py-1.5 pr-2 text-muted-foreground">Q{row.qIdx + 1}</td>
-                    <td className="py-1.5 pr-2">
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={row.score}
-                        onChange={(e) => {
-                          const v = Math.min(100, Math.max(0, Number(e.target.value)));
-                          setEditedGrades((prev) => {
-                            if (!prev) return prev;
-                            return {
-                              ...prev,
-                              [row.sessionId]: {
-                                ...prev[row.sessionId],
-                                [row.qIdx]: {
-                                  ...prev[row.sessionId]?.[row.qIdx],
-                                  score: v,
-                                },
-                              },
-                            };
-                          });
-                        }}
-                        className="w-14 rounded border px-1 py-0.5 text-right"
-                      />
-                    </td>
-                    <td className="py-1.5 pr-2 max-w-[200px] truncate text-muted-foreground" title={row.comment}>
-                      {row.comment}
-                    </td>
-                    <td className="py-1.5">
-                      <a
-                        href={`/instructor/${examId}/grade/${row.sessionId}?questionType=case&qIdx=${row.qIdx}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`${row.studentLabel} Q${row.qIdx + 1} 개별 채점 새 탭에서 열기`}
-                        data-testid={`bulk-grade-row-link-${row.sessionId}-${row.qIdx}`}
-                        className="inline-flex items-center gap-0.5 text-blue-600 hover:underline whitespace-nowrap"
-                      >
-                        개별 채점
-                        <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {showJumpToBottom && (
+          <button
+            type="button"
+            aria-label="맨 아래로 이동"
+            onClick={scrollToBottom}
+            className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border bg-background px-3 py-1.5 text-xs shadow-md hover:bg-muted"
+          >
+            <ArrowDown className="h-3.5 w-3.5" />
+            맨 아래로
+          </button>
+        )}
+      </div>
+
+      {/* Composer */}
+      <div className="shrink-0 border-t px-5 py-3">
+        {regradeArmed && (
+          <div className="mb-2 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+            <span className="flex-1">
+              전송하면 제안 점수를 새로 만듭니다
+            </span>
+            <button
+              type="button"
+              onClick={cancelRegrade}
+              className="font-medium underline-offset-2 hover:underline"
+            >
+              취소
+            </button>
           </div>
         )}
 
-        {/* Footer: input + send + commit */}
-        <SheetFooter className="shrink-0 flex-col gap-2 border-t px-6 py-4">
-          <div className="flex gap-2">
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder='예: "논리적 근거 제시 40%, 답변 완성도 30%, 핵심 개념 활용 30%"'
-              rows={2}
-              disabled={chatMutation.isPending}
-              className="min-h-0 flex-1 resize-none"
-            />
+        {/* Quick-reply chips — shown during the interviewing phase */}
+        {isInterviewing && (aiQuestionCount > 0 || chatOptions.length > 0) && (
+          <div className="mb-2">
+            {chatOptionsMutation.isPending ? (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                보기 생성 중...
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {displayedOptions.map((opt, optIdx) => (
+                  <button
+                    key={`${opt.action}-${optIdx}-${opt.label}`}
+                    type="button"
+                    onClick={() => handleOptionPick(opt)}
+                    disabled={chatMutation.isPending || startGradingMutation.isPending}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs transition-colors",
+                      opt.action === "regrade"
+                        ? "border-primary bg-primary/10 text-primary hover:bg-primary/20 font-medium"
+                        : "border-border bg-muted hover:bg-muted/70 text-foreground",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="rounded-xl border bg-background px-3 pb-2 pt-2.5 shadow-sm focus-within:ring-1 focus-within:ring-ring">
+          <Textarea
+            ref={textareaRef}
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              if (e.target.value.trim() && criteriaMode === "ai_default") {
+                setCriteriaMode("custom");
+              }
+            }}
+            onKeyDown={handleComposerKeyDown}
+            placeholder={
+              sendMode === "start"
+                ? "예: 핵심 개념 중심으로 봐줘"
+                : "질문 입력"
+            }
+            data-testid="bulk-grade-composer-input"
+            className="max-h-48 min-h-[44px] resize-none border-0 p-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+
+          <div className="flex items-center justify-between gap-2 pt-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={isGrading || startPending}
+                  className="h-8 gap-1 px-2 text-muted-foreground"
+                  data-testid="bulk-grade-mode-picker"
+                >
+                  {PERMISSION_LABELS[permissionKey]}
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-72">
+                <DropdownMenuRadioGroup
+                  value={permissionKey}
+                  onValueChange={handlePermissionSelect}
+                >
+                  {(Object.keys(PERMISSION_LABELS) as PermissionKey[]).map((key) => (
+                    <DropdownMenuRadioItem key={key} value={key} className="items-start">
+                      <div className="flex flex-col">
+                        <span className="text-sm">{PERMISSION_LABELS[key]}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {PERMISSION_DESCRIPTIONS[key]}
+                        </span>
+                      </div>
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button
               type="button"
               size="icon"
-              onClick={handleSend}
-              disabled={!input.trim() || chatMutation.isPending}
-              aria-label="메시지 보내기"
+              aria-label={sendMode === "start" ? "전체 CASE 가채점 시작" : "가채점 대화 전송"}
+              onClick={send}
+              disabled={sendDisabled}
+              data-testid="bulk-grade-send"
+              className="h-8 w-8 rounded-lg"
             >
-              {chatMutation.isPending ? (
+              {sendBusy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Send className="h-4 w-4" />
               )}
             </Button>
           </div>
-
-          {/* 채점 시작 버튼: 기준 논의 후 draft 상태에서만 */}
-          {canStartGrading && !isGrading && !gradingDone && sessionStatus !== "committed" && (
-            <Button
-              type="button"
-              variant="default"
-              className="w-full"
-              onClick={() => startGradingMutation.mutate()}
-              disabled={startGradingMutation.isPending || chatMutation.isPending}
-            >
-              {startGradingMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  채점 준비 중…
-                </>
-              ) : (
-                `채점 시작 (${data?.studentCount ?? 0}명)`
-              )}
-            </Button>
-          )}
-
-          {/* 채점 확정: grading_done이거나 레거시 draft+proposed_grades */}
-          {editedGrades && Object.keys(editedGrades).length > 0 && !isGrading && (
-            <Button
-              type="button"
-              className="w-full"
-              onClick={() => commitMutation.mutate()}
-              disabled={commitMutation.isPending || chatMutation.isPending}
-            >
-              {commitMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  저장 중…
-                </>
-              ) : (
-                `채점 확정 (${totalGrades}개)`
-              )}
-            </Button>
-          )}
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </div>
+      </div>
+    </aside>
   );
 }

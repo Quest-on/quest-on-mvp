@@ -18,6 +18,7 @@ export type AiFeature =
   | "instructor_agent"
   | "case_grading_chat"
   | "bulk_grading_chat"
+  | "bulk_grading_chat_options"
   | "embedding";
 
 export const AI_FEATURES: AiFeature[] = [
@@ -36,6 +37,7 @@ export const AI_FEATURES: AiFeature[] = [
   "instructor_agent",
   "case_grading_chat",
   "bulk_grading_chat",
+  "bulk_grading_chat_options",
   "embedding",
 ];
 
@@ -73,6 +75,11 @@ const OPENAI_MODEL_PRICING: Record<string, ModelPricing> = {
     inputUsdPer1M: 1.25,
     outputUsdPer1M: 10,
     cachedInputUsdPer1M: 0.125,
+  },
+  "gpt-4o-mini": {
+    inputUsdPer1M: 0.15,
+    outputUsdPer1M: 0.60,
+    cachedInputUsdPer1M: 0.075,
   },
   "text-embedding-3-small": {
     inputUsdPer1M: 0.02,

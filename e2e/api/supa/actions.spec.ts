@@ -425,6 +425,183 @@ test.describe("Supa — POST /api/supa (core actions)", () => {
     expect(body.error).toBe("CODE_LOCKED");
   });
 
+  test("cannot change score weights when sessions exist → 409", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({
+      status: "draft",
+      questions: [
+        {
+          id: "q-0",
+          idx: 0,
+          type: "multiple-choice",
+          text: "Pick A",
+          options: ["A", "B", "C", "D"],
+          correctOptionIndex: 0,
+        },
+        {
+          id: "q-1",
+          idx: 1,
+          type: "true-false",
+          text: "True?",
+          correctOptionIndex: 0,
+        },
+      ],
+      score_weights: {
+        version: 1,
+        distribution: "equal_by_type",
+        typeWeights: { "multiple-choice": 50, "true-false": 50 },
+      },
+    });
+    await seedSession(exam.id, "test-student-id", { status: "waiting" });
+
+    const res = await instructorRequest.post("/api/supa", {
+      data: {
+        action: "update_exam",
+        data: {
+          id: exam.id,
+          update: {
+            score_weights: {
+              version: 1,
+              distribution: "equal_by_type",
+              typeWeights: { "multiple-choice": 60, "true-false": 40 },
+            },
+          },
+        },
+      },
+    });
+
+    expect(res.status()).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe("SCORE_WEIGHTS_LOCKED");
+  });
+
+  test("validates score weights against existing questions on score-only update → 400", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({
+      status: "draft",
+      questions: [
+        {
+          id: "q-0",
+          idx: 0,
+          type: "multiple-choice",
+          text: "Pick A",
+          options: ["A", "B", "C", "D"],
+          correctOptionIndex: 0,
+        },
+      ],
+      score_weights: {
+        version: 1,
+        distribution: "equal_by_type",
+        typeWeights: { "multiple-choice": 100 },
+      },
+    });
+
+    const res = await instructorRequest.post("/api/supa", {
+      data: {
+        action: "update_exam",
+        data: {
+          id: exam.id,
+          update: {
+            score_weights: {
+              version: 1,
+              distribution: "equal_by_type",
+              typeWeights: { case: 100 },
+            },
+          },
+        },
+      },
+    });
+
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("INVALID_SCORE_WEIGHTS");
+  });
+
+  test("rejects null score weights when questions exist → 400", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({
+      status: "draft",
+      questions: [
+        {
+          id: "q-0",
+          idx: 0,
+          type: "multiple-choice",
+          text: "Pick A",
+          options: ["A", "B", "C", "D"],
+          correctOptionIndex: 0,
+        },
+      ],
+      score_weights: {
+        version: 1,
+        distribution: "equal_by_type",
+        typeWeights: { "multiple-choice": 100 },
+      },
+    });
+
+    const res = await instructorRequest.post("/api/supa", {
+      data: {
+        action: "update_exam",
+        data: {
+          id: exam.id,
+          update: { score_weights: null },
+        },
+      },
+    });
+
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("INVALID_SCORE_WEIGHTS");
+  });
+
+  test("validates existing score weights when questions change → 400", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({
+      status: "draft",
+      questions: [
+        {
+          id: "q-0",
+          idx: 0,
+          type: "multiple-choice",
+          text: "Pick A",
+          options: ["A", "B", "C", "D"],
+          correctOptionIndex: 0,
+        },
+      ],
+      score_weights: {
+        version: 1,
+        distribution: "equal_by_type",
+        typeWeights: { "multiple-choice": 100 },
+      },
+    });
+
+    const res = await instructorRequest.post("/api/supa", {
+      data: {
+        action: "update_exam",
+        data: {
+          id: exam.id,
+          update: {
+            questions: [
+              {
+                id: "q-0",
+                idx: 0,
+                type: "essay",
+                text: "Explain the case.",
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("INVALID_SCORE_WEIGHTS");
+  });
+
   test("can change exam code when no sessions exist → 200", async ({
     instructorRequest,
   }) => {

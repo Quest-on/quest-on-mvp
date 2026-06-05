@@ -11,8 +11,15 @@ import { validateUUID } from "@/lib/validate-params";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { singleGradeUpdateSchema, validateRequest } from "@/lib/validations";
 import { upsertGradesBySessionQuestion } from "@/lib/grades-upsert";
-import { isScoringGrade, isSuccessfulGradeType } from "@/lib/grade-utils";
+import {
+  calculateScoreFromItems,
+  deduplicateGrades,
+  isSuccessfulGradeType,
+  normalizeScoreWeights,
+  type ScoreItem,
+} from "@/lib/grade-utils";
 import { hasQuestionWithQIdx } from "@/lib/case-grade-access";
+import { gradeObjectiveAnswer, isObjectiveQuestion } from "@/lib/grading-helpers";
 
 // Auto-grading (PUT) calls AI_MODEL_HEAVY multiple times — needs 300s
 export const maxDuration = 300;
@@ -66,7 +73,7 @@ export async function GET(
     // Get exam data
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("id, title, code, instructor_id, questions, rubric, status")
+      .select("id, title, code, instructor_id, questions, rubric, status, score_weights")
       .eq("id", session.exam_id)
       .single();
 
@@ -370,23 +377,37 @@ export async function GET(
 
     // Calculate overall score if grades exist
     let overallScore = null;
-    if (exam.status === "closed" && grades && grades.length > 0) {
-      const validGrades = (grades as Array<Record<string, unknown>>).filter(
-        (g) =>
-          isScoringGrade({
-            score: typeof g.score === "number" ? g.score : null,
-            grade_type:
-              typeof g.grade_type === "string" ? g.grade_type : null,
-          })
+    if (exam.status === "closed" && Array.isArray(exam.questions)) {
+      const scoreWeights = normalizeScoreWeights(exam.score_weights);
+      const gradeByQ = new Map(
+        deduplicateGrades(grades ?? [])
+          .filter((grade) => isSuccessfulGradeType(grade.grade_type))
+          .map((grade) => [grade.q_idx, grade])
       );
-      if (validGrades.length > 0) {
-        const totalScore = validGrades.reduce(
-          (sum: number, grade: Record<string, unknown>) =>
-            sum + ((grade.score as number) || 0),
-          0
-        );
-        overallScore = Math.round(totalScore / validGrades.length);
-      }
+      const scoreItems: ScoreItem[] = exam.questions.map(
+        (question: { idx?: number; type?: string; options?: string[]; correctOptionIndex?: number }, index: number) => {
+          const qIdx = typeof question.idx === "number" ? question.idx : index;
+          if (isObjectiveQuestion(question.type)) {
+            const submission = submissionsByQuestion[qIdx] as
+              | { answer?: string }
+              | undefined;
+            const objective = gradeObjectiveAnswer({
+              rawAnswer: submission?.answer ?? "",
+              options: question.options,
+              correctOptionIndex: question.correctOptionIndex,
+            });
+            return { qIdx, type: question.type, score: objective?.score };
+          }
+          const grade = gradeByQ.get(qIdx);
+          return { qIdx, type: question.type, score: grade?.score };
+        }
+      );
+      const scoreResult = calculateScoreFromItems(scoreItems, scoreWeights);
+      overallScore =
+        scoreResult.overallScore !== null &&
+        (scoreResult.mode === "weighted" || scoreResult.gradedCount > 0)
+          ? scoreResult.overallScore
+          : null;
     }
 
     const responseData = {

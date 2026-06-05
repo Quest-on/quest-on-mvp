@@ -1,5 +1,24 @@
 import type { InstructorExam } from "@/lib/types/exam";
 
+/**
+ * 강사 시험 대시보드 학생 목록의 로딩 스켈레톤 표시 여부.
+ *
+ * 스켈레톤은 "보여줄 데이터가 아직 없는 최초 로드"에서만 노출해야 한다.
+ * React Query의 `isFetching`(백그라운드 폴링 재요청)을 판정에 넣으면, closed 시험의
+ * 10초 폴링마다 목록이 스켈레톤으로 교체됐다 복귀하면서 스크롤 컨테이너가 리마운트되어
+ * 스크롤이 맨 위로 튀고 화면이 깜빡인다. 따라서 `isFetching`이 아니라
+ * `isLoading`(=캐시 데이터 없음 && 요청 중)만 사용한다.
+ *
+ * @param examLoading 시험 상세 최초 로딩 여부
+ * @param summariesLoading 학생 요약 React Query `isLoading` (백그라운드 `isFetching` 아님)
+ */
+export function shouldShowStudentListSkeleton(params: {
+  examLoading: boolean;
+  summariesLoading: boolean;
+}): boolean {
+  return params.examLoading || params.summariesLoading;
+}
+
 interface InstructorQuestion {
   id: string;
   text: string;

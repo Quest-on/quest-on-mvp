@@ -1,7 +1,7 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { errorJson } from "@/lib/api-response";
 import type { AppUser } from "@/lib/get-current-user";
-import { normalizeQuestions } from "@/lib/grading-helpers";
+import { isCaseQuestion, normalizeQuestions } from "@/lib/grading-helpers";
 
 export type CaseGradeAccessContext = {
   supabase: ReturnType<typeof getSupabaseServer>;
@@ -26,6 +26,11 @@ export function hasQuestionWithQIdx(questions: unknown, qIdx: number): boolean {
 export function questionPromptByQIdx(questions: unknown, qIdx: number): string {
   const question = normalizeQuestions(questions).find((q) => q.idx === qIdx);
   return question?.prompt ?? "";
+}
+
+export function isCaseQuestionQIdx(questions: unknown, qIdx: number): boolean {
+  const question = normalizeQuestions(questions).find((q) => q.idx === qIdx);
+  return !!question && isCaseQuestion(question.type);
 }
 
 /**
@@ -98,6 +103,16 @@ export async function requireCaseGradeAccess(
         response: errorJson(
           "VALIDATION_ERROR",
           `Invalid question index: ${qIdx}`,
+          400,
+        ),
+      };
+    }
+    if (Array.isArray(exam.questions) && !isCaseQuestionQIdx(exam.questions, qIdx)) {
+      return {
+        ok: false,
+        response: errorJson(
+          "VALIDATION_ERROR",
+          "Case 문제만 AI/수동 채점할 수 있습니다.",
           400,
         ),
       };

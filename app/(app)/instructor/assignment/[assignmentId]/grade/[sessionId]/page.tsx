@@ -23,7 +23,6 @@ import {
 } from "@/components/instructor/AIOverallSummary";
 import { AiDependencySummaryCard } from "@/components/grading/AiDependencySummaryCard";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { InstructorChatSidebar } from "@/components/instructor/InstructorChatSidebar";
 import {
   AlertTriangle,
   RefreshCw,
@@ -479,30 +478,6 @@ export default function AssignmentGradePage({
     }));
   };
 
-  const chatContext = useMemo(() => {
-    if (!sessionData) return "";
-    const currentQuestion = sessionData.exam?.questions?.[selectedQuestionIdx];
-    const currentSubmission = sessionData.submissions?.[selectedQuestionIdx] as
-      | Submission
-      | undefined;
-    return [
-      `과제 제목: ${sessionData.exam.title}`,
-      `과제 코드: ${sessionData.exam.code}`,
-      `선택된 문항 번호: ${selectedQuestionIdx + 1}`,
-      currentQuestion
-        ? `문항 프롬프트: ${currentQuestion.prompt}`
-        : "현재 문항 정보를 찾을 수 없습니다.",
-      currentSubmission?.answer
-        ? `학생의 채팅 기반 리서치 수행 기록:\n${currentSubmission.answer}`
-        : "학생의 채팅 기반 리서치 수행 기록이 비어 있습니다.",
-      sessionData.overallScore !== null
-        ? `현재 전체 등급: ${scoreToAssignmentLabel(sessionData.overallScore)}`
-        : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-  }, [sessionData, selectedQuestionIdx]);
-
   // Early returns
   if (!isLoaded) {
     return (
@@ -575,13 +550,6 @@ export default function AssignmentGradePage({
 
   return (
     <SidebarProvider defaultOpen={false} className="flex-row-reverse">
-      <InstructorChatSidebar
-        context={chatContext}
-        sessionIdSeed={`grade_${sessionData.session.id}`}
-        scopeDescription="문항/답안/채점 데이터"
-        title="채점 도우미"
-        subtitle="이 화면에 보이는 데이터 범위 안에서만 답변합니다."
-      />
       <SidebarInset>
         <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
           {/* Header */}

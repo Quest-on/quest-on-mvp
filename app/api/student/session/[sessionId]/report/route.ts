@@ -5,7 +5,14 @@ import { currentUser } from "@/lib/get-current-user";
 import { successJson, errorJson } from "@/lib/api-response";
 import { logError } from "@/lib/logger";
 import { validateUUID } from "@/lib/validate-params";
-import { deduplicateGrades, calculateOverallScore } from "@/lib/grade-utils";
+import {
+  calculateScoreFromItems,
+  deduplicateGrades,
+  isScoringGrade,
+  normalizeScoreWeights,
+  type ScoreItem,
+} from "@/lib/grade-utils";
+import { gradeObjectiveAnswer, isObjectiveQuestion } from "@/lib/grading-helpers";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 
 // P1-4: Lazy Supabase getter to avoid stale connections in serverless
@@ -64,7 +71,7 @@ export async function GET(
     // Get exam data
     const { data: exam, error: examError } = await getSupabase()
       .from("exams")
-      .select("id, title, code, description, duration, questions, grades_released")
+      .select("id, title, code, description, duration, questions, grades_released, score_weights")
       .eq("id", session.exam_id)
       .single();
 
@@ -80,6 +87,14 @@ export async function GET(
         type: q.type,
         prompt: q.prompt || q.text,
         ai_context: q.ai_context,
+        options: Array.isArray(q.options)
+          ? (q.options as unknown[]).filter((o): o is string => typeof o === "string")
+          : undefined,
+        correctOptionIndex:
+          typeof q.correctOptionIndex === "number" &&
+          Number.isInteger(q.correctOptionIndex)
+            ? q.correctOptionIndex
+            : undefined,
       }));
     }
 
@@ -270,8 +285,8 @@ export async function GET(
     let gradedCount = 0;
     const totalQuestionCount = exam.questions?.length || 0;
 
-    if (grades && grades.length > 0) {
-      const deduped = deduplicateGrades(grades);
+    const deduped = deduplicateGrades(grades ?? []);
+    if (deduped.length > 0) {
       deduped.forEach((grade) => {
         gradesByQuestion[grade.q_idx] = {
           id: grade.id,
@@ -279,14 +294,56 @@ export async function GET(
           score: grade.score,
         };
       });
-
-      const result = calculateOverallScore(grades, totalQuestionCount);
+    }
+    if (Array.isArray(exam.questions)) {
+      const gradeByQ = new Map(
+        deduped.filter(isScoringGrade).map((grade) => [grade.q_idx, grade])
+      );
+      const scoreWeights = normalizeScoreWeights(exam.score_weights);
+      const scoreItems: ScoreItem[] = exam.questions.map(
+        (question: { idx?: number; type?: string; options?: string[]; correctOptionIndex?: number }, index: number) => {
+          const qIdx = typeof question.idx === "number" ? question.idx : index;
+          if (isObjectiveQuestion(question.type)) {
+            const objective = gradeObjectiveAnswer({
+              rawAnswer: submissionsByQuestion[qIdx]?.answer ?? "",
+              options: question.options,
+              correctOptionIndex: question.correctOptionIndex,
+            });
+            if (objective) {
+              gradesByQuestion[qIdx] = {
+                id: gradeByQ.get(qIdx)?.id ?? `objective-${qIdx}`,
+                q_idx: qIdx,
+                score: objective.score,
+              };
+            }
+            return { qIdx, type: question.type, score: objective?.score };
+          }
+          return { qIdx, type: question.type, score: gradeByQ.get(qIdx)?.score };
+        }
+      );
+      const result = calculateScoreFromItems(scoreItems, scoreWeights);
       gradedCount = result.gradedCount;
-      // Only set overallScore when there are real grades (not just ai_failed)
-      overallScore = gradedCount > 0 ? result.overallScore : null;
+      overallScore =
+        result.overallScore !== null &&
+        (result.mode === "weighted" || result.gradedCount > 0)
+          ? result.overallScore
+          : null;
     }
 
     const gradesReleased = exam.grades_released === true;
+
+    // 정답 누출 방지: 점수 계산은 끝났으므로 응답에서 correctOptionIndex를 제거한다.
+    // 학생은 정오답을 문항별 점수(공개 후에만 노출)로 확인하고, 정답 선택지는 보지 않는다.
+    const examForClient = {
+      ...exam,
+      questions: Array.isArray(exam.questions)
+        ? exam.questions.map((q: Record<string, unknown>) => {
+            const rest = { ...q };
+            delete rest.correctOptionIndex;
+            return rest;
+          })
+        : exam.questions,
+    };
 
     return successJson({
       session: {
@@ -294,18 +351,16 @@ export async function GET(
         exam_id: session.exam_id,
         student_id: session.student_id,
         submitted_at: session.submitted_at,
-        used_clarifications: session.used_clarifications,
         created_at: session.created_at,
         decompressed: decompressedSessionData,
       },
-      exam: exam,
+      exam: examForClient,
       submissions: submissionsByQuestion,
       messages: messagesByQuestion,
       grades: gradesReleased ? gradesByQuestion : {},
       overallScore: gradesReleased ? overallScore : null,
       gradedCount: gradesReleased ? gradedCount : 0,
       totalQuestionCount,
-      aiSummary: session.ai_summary || null,
       assignmentQuiz: quizAttempt || null,
       gradesReleased,
       // Progress is safe to expose even before grades_released — it only contains counts/status,

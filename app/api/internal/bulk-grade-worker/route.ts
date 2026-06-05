@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifySignatureAppRouter } from "@upstash/qstash/nextjs";
-import { getOpenAI, AI_MODEL } from "@/lib/openai";
+import { getOpenAI, AI_MODEL_BULK_GRADING_WORKER } from "@/lib/openai";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { logError } from "@/lib/logger";
 import { bulkGradeWorkerSchema, validateRequest } from "@/lib/validations";
@@ -11,13 +11,18 @@ import {
   callTrackedChatCompletion,
   buildAiTextMetadata,
 } from "@/lib/ai-tracking";
-import { loadSingleStudentCaseData, parseGradesFromAiResponse } from "@/lib/bulk-grading";
+import {
+  asStringArray,
+  hasGradesForEveryExpectedQuestion,
+  loadSingleStudentCaseData,
+  parseGradesFromAiResponse,
+} from "@/lib/bulk-grading";
 import {
   buildPerStudentGradingSystemPrompt,
-  buildCriteriaExtractionSystemPrompt,
   type ExtractedCriteria,
 } from "@/lib/prompts";
-import { normalizeQuestions, isObjectiveQuestion } from "@/lib/grading-helpers";
+import { normalizeQuestions, isCaseQuestion } from "@/lib/grading-helpers";
+import { stripEmoji } from "@/lib/sanitize";
 
 async function handler(request: NextRequest): Promise<NextResponse> {
   try {
@@ -32,7 +37,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, reason: "invalid_payload" }, { status: 200 });
     }
 
-    const { gradingSessionId, studentSessionId, examId } = validation.data;
+    const { gradingSessionId, studentSessionId, examId, scope, attemptId } = validation.data;
     const supabase = getSupabaseServer();
 
     // [CRITICAL-1] 4-way join ownership check
@@ -42,6 +47,8 @@ async function handler(request: NextRequest): Promise<NextResponse> {
         id,
         instructor_id,
         grading_criteria,
+        status,
+        current_attempt_id,
         exams!inner ( id, questions, language ),
         expected_session_ids
       `)
@@ -55,6 +62,22 @@ async function handler(request: NextRequest): Promise<NextResponse> {
         additionalData: { gradingSessionId, examId },
       });
       return NextResponse.json({ ok: false, reason: "session_not_found" }, { status: 200 });
+    }
+
+    if (
+      attemptId &&
+      (ownershipCheck.current_attempt_id as string | null) !== attemptId
+    ) {
+      return NextResponse.json({ ok: false, reason: "stale_attempt" }, { status: 200 });
+    }
+
+    if ((ownershipCheck.status as string | null) !== "grading") {
+      return NextResponse.json({ ok: false, reason: "not_grading" }, { status: 200 });
+    }
+
+    const expectedSessionIds = asStringArray(ownershipCheck.expected_session_ids);
+    if (expectedSessionIds.length > 0 && !expectedSessionIds.includes(studentSessionId)) {
+      return NextResponse.json({ ok: false, reason: "unexpected_student_session" }, { status: 200 });
     }
 
     // Verify student session belongs to this exam and is submitted
@@ -88,7 +111,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     const examData = (ownershipCheck.exams as unknown as ExamRow);
     const questions = normalizeQuestions(examData.questions);
     const caseQuestions = questions
-      .filter((q) => !isObjectiveQuestion(q.type))
+      .filter((q) => isCaseQuestion(q.type))
       .map((q) => ({ qIdx: q.idx, questionPrompt: q.prompt ?? "" }));
 
     if (caseQuestions.length === 0) {
@@ -117,21 +140,20 @@ async function handler(request: NextRequest): Promise<NextResponse> {
 
     // [CRITICAL-3] Always 200 ack — AI failures recorded via RPC, not throw
     let success = false;
-    let gradesMap: Record<number, { score: number; comment: string }> = {};
+    const gradesMap: Record<number, { score: number; comment: string }> = {};
 
     try {
       const tracked = await callTrackedChatCompletion(
         () =>
           getOpenAI().chat.completions.create({
-            model: AI_MODEL,
-            temperature: 0,
+            model: AI_MODEL_BULK_GRADING_WORKER,
             messages: [{ role: "system", content: systemPrompt }],
             max_completion_tokens: 1500,
           }),
         {
           feature: "bulk_grading_chat",
           route: "/api/internal/bulk-grade-worker",
-          model: AI_MODEL,
+          model: AI_MODEL_BULK_GRADING_WORKER,
           examId,
           sessionId: studentSessionId,
           metadata: buildAiTextMetadata({
@@ -158,9 +180,12 @@ async function handler(request: NextRequest): Promise<NextResponse> {
         validQIdxes,
       );
 
-      if (parsed && parsed.length > 0) {
+      if (parsed && hasGradesForEveryExpectedQuestion(parsed, caseQIdxes)) {
         for (const g of parsed) {
-          gradesMap[g.q_idx] = { score: g.score, comment: g.comment };
+          gradesMap[g.q_idx] = {
+            score: g.score,
+            comment: stripEmoji(g.comment).trim(),
+          };
         }
         success = true;
       }
@@ -172,12 +197,14 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     }
 
     // [CRITICAL-2] Atomic update via RPC
-    await supabase.rpc("merge_bulk_grading_result", {
-      p_session_id: gradingSessionId,
-      p_student_sid: studentSessionId,
-      p_grades_json: gradesMap,
-      p_success: success,
-    });
+      await supabase.rpc("merge_bulk_grading_result", {
+        p_session_id: gradingSessionId,
+        p_student_sid: studentSessionId,
+        p_grades_json: gradesMap,
+        p_success: success,
+        p_scope: scope,
+        p_attempt_id: attemptId ?? null,
+      });
 
     return NextResponse.json({ ok: true, success, studentSessionId }, { status: 200 });
   } catch (error) {

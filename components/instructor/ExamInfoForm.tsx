@@ -50,6 +50,11 @@ interface ExamInfoFormProps {
   onLanguageChange?: (value: "ko" | "en") => void;
   /** AI 에이전트 체화 애니메이션이 가리킬 제목 입력 DOM 요소 ref. */
   titleRef?: React.Ref<HTMLInputElement>;
+  /**
+   * 과제 코드 재생성 버튼을 숨긴다. 편집 페이지에서 코드는 읽기전용이므로 true.
+   * 기본값 false — create 페이지 등 기존 호출은 영향받지 않는다.
+   */
+  codeReadOnly?: boolean;
 }
 
 export function ExamInfoForm({
@@ -68,6 +73,7 @@ export function ExamInfoForm({
   language = "ko",
   onLanguageChange,
   titleRef,
+  codeReadOnly = false,
 }: ExamInfoFormProps) {
   const [durationInput, setDurationInput] = useState<string>(
     duration === 0 ? "" : duration.toString()
@@ -210,9 +216,11 @@ export function ExamInfoForm({
                 required
                 disabled
               />
-              <Button type="button" variant="outline" onClick={onGenerateCode}>
-                재생성
-              </Button>
+              {!codeReadOnly && (
+                <Button type="button" variant="outline" onClick={onGenerateCode}>
+                  재생성
+                </Button>
+              )}
             </div>
           </div>
         </div>

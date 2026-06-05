@@ -199,6 +199,11 @@ export function isObjectiveQuestion(type?: string): boolean {
   return type === "multiple-choice" || type === "true-false";
 }
 
+/** True when a question belongs to the instructor/AI case-grading surface. */
+export function isCaseQuestion(type?: string): boolean {
+  return type === "case" || type === "essay" || type === "short-answer";
+}
+
 /**
  * Deterministically grade an objective (mcq/true-false) question.
  *
@@ -224,7 +229,7 @@ export function gradeObjectiveAnswer(params: {
   }
 
   const trimmed = (rawAnswer ?? "").trim();
-  const parsed = Number.parseInt(trimmed, 10);
+  const parsed = /^\d+$/.test(trimmed) ? Number.parseInt(trimmed, 10) : Number.NaN;
   const selectedIndex =
     trimmed !== "" && Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
 

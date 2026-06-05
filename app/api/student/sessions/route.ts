@@ -4,7 +4,15 @@ import { currentUser } from "@/lib/get-current-user";
 import { successJson, errorJson } from "@/lib/api-response";
 import { logError } from "@/lib/logger";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
-import { isScoringGrade } from "@/lib/grade-utils";
+import {
+  calculateScoreFromItems,
+  deduplicateGrades,
+  isScoringGrade,
+  normalizeScoreWeights,
+  type GradeRow,
+  type ScoreItem,
+} from "@/lib/grade-utils";
+import { gradeObjectiveAnswer, isObjectiveQuestion } from "@/lib/grading-helpers";
 
 // Initialize Supabase client
 const supabase = getSupabaseServer();
@@ -106,7 +114,7 @@ export async function GET(request: NextRequest) {
     // Fetch all exams in one query
     const { data: exams, error: examsError } = await supabase
       .from("exams")
-      .select("id, title, code, type, duration, deadline, instructor_id, grades_released")
+      .select("id, title, code, type, duration, deadline, instructor_id, grades_released, questions, score_weights")
       .in("id", examIds);
 
     if (examsError) {
@@ -122,7 +130,7 @@ export async function GET(request: NextRequest) {
     // Fetch all submissions for all sessions in one query
     const { data: allSubmissions, error: submissionsError } = await supabase
       .from("submissions")
-      .select("id, session_id, q_idx")
+      .select("id, session_id, q_idx, answer")
       .in("session_id", sessionIds);
 
     if (submissionsError) {
@@ -132,7 +140,7 @@ export async function GET(request: NextRequest) {
     // Fetch all grades for all sessions in one query
     const { data: allGrades, error: gradesError } = await supabase
       .from("grades")
-      .select("session_id, score, grade_type")
+      .select("session_id, q_idx, score, grade_type")
       .in("session_id", sessionIds);
 
     if (gradesError) {
@@ -164,23 +172,67 @@ export async function GET(request: NextRequest) {
     const sessionsWithDetails = sessions.map((session) => {
       const exam = examMap.get(session.exam_id);
       const submissions = submissionsBySession.get(session.id) || [];
-      const grades = (gradesBySession.get(session.id) || []).filter(isScoringGrade);
+      const grades = (gradesBySession.get(session.id) || []) as GradeRow[];
       const gradesReleased = exam?.grades_released === true;
 
-      // Calculate score - each grade is 0-100, calculate average
       let totalScore = null;
       let maxScore = null;
       let averageScore = null;
-      const isGraded = grades.length > 0;
+      let isGraded = false;
 
-      if (isGraded && gradesReleased) {
-        const totalPoints = grades.reduce(
-          (sum, grade) => sum + (grade.score || 0),
-          0
-        );
-        averageScore = Math.round(totalPoints / grades.length);
-        totalScore = totalPoints;
-        maxScore = grades.length * 100; // Each question is scored 0-100
+      if (gradesReleased) {
+        const dedupedGrades = deduplicateGrades(grades).filter(isScoringGrade);
+        if (exam && Array.isArray(exam.questions)) {
+          const submissionsByQuestion = new Map(
+            submissions.map((submission) => [submission.q_idx, submission])
+          );
+          const gradeByQuestion = new Map(
+            dedupedGrades.map((grade) => [grade.q_idx, grade])
+          );
+          const scoreItems: ScoreItem[] = exam.questions.map(
+            (
+              question: {
+                idx?: number;
+                type?: string;
+                options?: string[];
+                correctOptionIndex?: number;
+              },
+              index: number
+            ) => {
+              const qIdx = typeof question.idx === "number" ? question.idx : index;
+              if (isObjectiveQuestion(question.type)) {
+                const objective = gradeObjectiveAnswer({
+                  rawAnswer: submissionsByQuestion.get(qIdx)?.answer ?? "",
+                  options: question.options,
+                  correctOptionIndex: question.correctOptionIndex,
+                });
+                return { qIdx, type: question.type, score: objective?.score };
+              }
+              return { qIdx, type: question.type, score: gradeByQuestion.get(qIdx)?.score };
+            }
+          );
+          const scoreResult = calculateScoreFromItems(
+            scoreItems,
+            normalizeScoreWeights(exam.score_weights)
+          );
+          isGraded = scoreResult.overallScore !== null && (scoreResult.mode === "weighted" || scoreResult.gradedCount > 0);
+          if (isGraded) {
+            averageScore = scoreResult.overallScore;
+            totalScore = scoreResult.overallScore;
+            maxScore = 100;
+          }
+        } else {
+          isGraded = dedupedGrades.length > 0;
+          if (isGraded) {
+            const totalPoints = dedupedGrades.reduce(
+              (sum, grade) => sum + (grade.score || 0),
+              0
+            );
+            averageScore = Math.round(totalPoints / dedupedGrades.length);
+            totalScore = totalPoints;
+            maxScore = dedupedGrades.length * 100;
+          }
+        }
       }
 
       return {

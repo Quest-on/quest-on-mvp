@@ -16,7 +16,7 @@ import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { UserMenu } from "@/components/auth/UserMenu";
 import AgentPanel, { AgentPanelGap } from "@/components/agent/AgentPanel";
-import { AgentFab } from "@/components/agent/AgentFab";
+// import { AgentFab } from "@/components/agent/AgentFab"; // 임시 숨김 — 복구 시 주석 해제
 import { AgentRunControllerProvider } from "@/components/agent/AgentRunController";
 import { AgentPresenceProvider } from "@/components/agent/AgentPresenceProvider";
 import { AgentPanelProvider } from "@/components/agent/AgentPanelProvider";
@@ -195,7 +195,8 @@ export default function InstructorLayout({
             <AgentPanel />
 
             {/* 우측 하단 고정 플로팅 버튼 — 패널 열기 (데스크톱/태블릿) */}
-            <AgentFab />
+            {/* TODO: AI 에이전트 버튼 임시 숨김. 복구 시 아래 주석 해제 + 위 import 복원. */}
+            {/* <AgentFab /> */}
           </div>
         </AgentPanelProvider>
       </AgentPresenceProvider>

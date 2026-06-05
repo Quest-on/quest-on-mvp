@@ -3,6 +3,7 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import type { Question } from "@/components/instructor/QuestionEditor";
 import type { ChatMessage } from "@/hooks/useQuestionGeneration";
+import type { ScoreWeights } from "@/lib/grade-utils";
 
 const STORAGE_KEY = "quest-on:exam-draft";
 const RESTORE_ACK_KEY = "quest-on:exam-draft:restore-ack";
@@ -14,6 +15,7 @@ export interface ExamDraftData {
   code: string;
   questions: Question[];
   chatWeight: number | null;
+  scoreWeights: ScoreWeights | null;
   adjustHistory: Record<string, ChatMessage[]>;
   savedAt: string;
 }
@@ -24,6 +26,7 @@ interface UseExamDraftAutoSaveOptions {
   code: string;
   questions: Question[];
   chatWeight: number | null;
+  scoreWeights: ScoreWeights | null;
   adjustHistoryRef: React.RefObject<Map<string, ChatMessage[]>>;
 }
 
@@ -111,6 +114,7 @@ export function useExamDraftAutoSave(options: UseExamDraftAutoSaveOptions) {
       code: opts.code,
       questions: opts.questions,
       chatWeight: opts.chatWeight,
+      scoreWeights: opts.scoreWeights,
       adjustHistory: Object.fromEntries(opts.adjustHistoryRef.current ?? new Map()),
       savedAt: new Date().toISOString(),
     };

@@ -21,9 +21,9 @@ export function AIOverallSummary({
       <Card className="bg-muted/30 border-dashed">
         <CardContent className="flex flex-col items-center justify-center py-8 text-center">
           <Sparkles className="w-10 h-10 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">채팅/답안 요약문</h3>
+          <h3 className="text-lg font-semibold mb-2">CASE 종합 평가</h3>
           <p className="text-muted-foreground mb-6 max-w-sm">
-            학생 채팅 흐름과 답안을 분석해 요약합니다.
+            CASE 답안과 관련 채팅 흐름을 분석해 요약합니다.
           </p>
         </CardContent>
       </Card>
@@ -36,7 +36,7 @@ export function AIOverallSummary({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
-            채팅/답안 요약 분석 중
+            CASE 종합 평가 분석 중
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -64,7 +64,7 @@ export function AIOverallSummary({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Sparkles className="w-5 h-5 text-purple-600" />
-            채팅/답안 요약문
+            CASE 종합 평가
           </CardTitle>
         </div>
       </CardHeader>

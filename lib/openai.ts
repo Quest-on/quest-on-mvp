@@ -42,6 +42,8 @@ export function getOpenAI(): OpenAI {
 // AI 모델 상수 - 여기서 변경하면 전체 코드에 적용됨
 export const AI_MODEL = process.env.AI_MODEL || "gpt-5.3-chat-latest";
 export const AI_MODEL_HEAVY = process.env.AI_MODEL_HEAVY || "gpt-5.4";
+export const AI_MODEL_BULK_GRADING_WORKER =
+  process.env.AI_MODEL_BULK_GRADING_WORKER || "gpt-4o-mini";
 
 // ============================================================
 // Global concurrency limiter for OpenAI API calls
@@ -147,4 +149,3 @@ export async function callOpenAI<T>(
   const { data } = await callOpenAIWithTelemetry(fn, options);
   return data;
 }
-

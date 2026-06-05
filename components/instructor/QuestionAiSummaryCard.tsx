@@ -33,12 +33,12 @@ export function QuestionAiSummaryCard({
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
             <Sparkles className="h-4 w-4 text-indigo-600" />
-            채팅/답안 요약문 (문항)
+            CASE 문항 평가
           </CardTitle>
         </CardHeader>
         <CardContent className="flex items-center gap-2 text-sm text-muted-foreground py-6">
           <Loader2 className="h-4 w-4 animate-spin" />
-          채팅/답안 요약 생성 중…
+          CASE 문항 평가 생성 중…
         </CardContent>
       </Card>
     );
@@ -52,7 +52,7 @@ export function QuestionAiSummaryCard({
         <div className="flex items-center gap-2">
           <CardTitle className="flex items-center gap-2 text-base">
             <Sparkles className="h-4 w-4 text-indigo-600" />
-            채팅/답안 요약문 (문항)
+            CASE 문항 평가
           </CardTitle>
           <span
             className={`ml-auto rounded-full border px-2 py-0.5 text-xs font-medium ${SENTIMENT_STYLES[summary.sentiment].className}`}

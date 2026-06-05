@@ -15,6 +15,7 @@ import {
   analyzeAiDependency,
   formatAiDependencyForPrompt,
   summarizeAiDependencyAssessments,
+  isCaseQuestion,
   isObjectiveQuestion,
   gradeObjectiveAnswer,
   formatSummaryScoreLabel,
@@ -99,9 +100,6 @@ async function updateGradingProgress(
   }
 }
 
-/** Maximum time for the entire grading operation (240 seconds — must fit within Vercel maxDuration=300s with room for summary) */
-const GRADING_TIMEOUT_MS = 240_000;
-
 interface GradeResult {
   q_idx: number;
   score: number; // 0-100
@@ -110,11 +108,6 @@ interface GradeResult {
   ai_summary?: QuestionSummaryData | null;
   /** Case/essay question submitted but not manually graded yet. */
   ungraded?: boolean;
-}
-
-interface FailedGradeResult {
-  q_idx: number;
-  failureReason: string;
 }
 
 interface AutoGradeResult {
@@ -315,7 +308,7 @@ async function gradeSingleQuestion(params: {
 
     // Deadline-aware per-attempt timeout:
     // Distribute remaining time evenly across remaining attempts so retries
-    // never push past the overall GRADING_TIMEOUT_MS budget.
+    // never push past the caller-provided grading deadline.
     const remainingMs = deadline - Date.now() - DEADLINE_SAFETY_BUFFER_MS;
     if (remainingMs < MIN_ATTEMPT_TIMEOUT_MS) {
       logError("[AUTO_GRADE] Insufficient time remaining — skipping attempt", null, {
@@ -559,6 +552,7 @@ ${chatHistoryText}
 
 평가 등급: ${assignmentLabel}
 ${stageInfoText}
+${aiDependencyText}
 
 위 과제에 대한 학생의 채팅 기반 리서치 과정을 요약 평가해주세요.
 다음 항목을 반드시 포함해야 합니다:
@@ -588,6 +582,7 @@ ${chatHistoryText}
 
 점수: ${grade.score}점
 ${stageInfoText}
+${aiDependencyText}
 
 위 문제에 대한 학생의 수행을 상세하게 분석하여 요약 평가해주세요.
 다음 항목을 반드시 포함해야 합니다:
@@ -858,7 +853,7 @@ export async function listCaseQuestionsForSummary(
   const ctx = await loadPhaseContext(sessionId, supabase);
   return ctx.questionsToGrade
     .filter((q) => !!ctx.submissionsByQuestion[q.idx])
-    .filter((q) => !isObjectiveQuestion(q.type))
+    .filter((q) => isCaseQuestion(q.type))
     .map((q) => q.idx)
     .sort((a, b) => a - b);
 }
@@ -1234,6 +1229,10 @@ export async function generateSessionSummaryPhase(
   });
 
   const ctx = await loadPhaseContext(sessionId, supabase);
+  const summaryQuestions = ctx.isAssignment
+    ? ctx.questions
+    : ctx.questions.filter((q) => isCaseQuestion(q.type));
+  const summaryQIdxSet = new Set(summaryQuestions.map((q) => q.idx));
 
   const { data: gradesData, error: gradesErr } = await supabase
     .from("grades")
@@ -1263,10 +1262,11 @@ export async function generateSessionSummaryPhase(
         stage_grading: row.stage_grading || undefined,
         ai_summary: row.ai_summary || undefined,
       };
-    });
+    })
+    .filter((grade) => ctx.isAssignment || summaryQIdxSet.has(grade.q_idx));
 
   if (grades.length === 0) {
-    const caseIdxs = await listCaseQuestionsForSummary(sessionId);
+    const caseIdxs = ctx.isAssignment ? [] : summaryQuestions.map((q) => q.idx);
     if (caseIdxs.length > 0) {
       grades = caseIdxs.map((qIdx) => ({
         q_idx: qIdx,
@@ -1279,7 +1279,7 @@ export async function generateSessionSummaryPhase(
         grading_status: "failed" as const,
         grading_failed_questions: ctx.questionsToGrade.map((q) => q.idx),
         grading_completed_count: 0,
-        grading_total_count: ctx.questions.length,
+        grading_total_count: summaryQuestions.length,
         grading_timed_out: false,
       };
       await supabase
@@ -1299,7 +1299,7 @@ export async function generateSessionSummaryPhase(
     sessionId,
     ctx.session.student_id,
     ctx.exam,
-    ctx.questions,
+    summaryQuestions,
     ctx.submissionsByQuestion,
     ctx.messagesByQuestion,
     grades,
@@ -1635,7 +1635,7 @@ ${
 
       ${rubricText}
 
-      [학생의 답안, 채팅 대화 기록 및 점수]
+      [학생의 CASE 답안, CASE 관련 채팅 대화 기록 및 점수]
       ${questionsText}
 
       [범용 평가 엄격화 가이드]
@@ -1657,12 +1657,12 @@ ${
         학생이 이후에 스스로 '개념 선택 + 조건/가정 정리 + 중간 추론/검증'을 모두 보여주지 못했다면 sentiment는 절대 positive로 주지 마세요.
       - 행동 패턴이 반복되거나, 개념 역전형 또는 교정 미반영형이 확인되면 negative를 우선하세요(회복이 매우 강한 경우만 neutral).
 
-      위 내용을 바탕으로 학생의 전체적인 수행 능력을 상세하게 분석하여 요약 평가해주세요.
-      **중요**: 채팅 대화 기록이 있는 경우, 학생이 AI와의 대화에서 보여준 질문의 질, 문제 이해도, 개념 파악 수준, 학습 태도 등을 종합적으로 고려하여 평가하세요.
+      위 내용을 바탕으로 학생의 CASE 수행 능력을 상세하게 분석하여 요약 평가해주세요.
+      **중요**: CASE 관련 채팅 대화 기록이 있는 경우, 학생이 AI와의 대화에서 보여준 질문의 질, 문제 이해도, 개념 파악 수준, 학습 태도 등을 종합적으로 고려하세요. 사지선다와 O/X 문제는 이 종합 평가의 근거로 사용하지 마세요.
 
       다음 항목을 반드시 포함해야 합니다:
       1. 전체적인 평가 (긍정적/부정적/중립적)
-      2. 종합 의견: 학생의 답안과 채팅 대화 기록을 종합하여 전반에 대한 깊이 있는 분석. 답안의 논리성, 정확성, 창의성뿐만 아니라 채팅에서 보여준 학습 과정과 이해도도 함께 고려하세요.
+      2. 종합 의견: 학생의 CASE 답안과 CASE 관련 채팅 대화 기록을 종합하여 깊이 있게 분석. 답안의 논리성, 정확성, 창의성뿐만 아니라 채팅에서 보여준 학습 과정과 이해도도 함께 고려하세요.
       3. 주요 강점 (3가지 이내): 구체적인 예시를 들어 설명하세요. 채팅에서 보여준 질문의 질도 강점으로 포함할 수 있습니다.
       4. 개선이 필요한 점 (3가지 이내): 구체적인 개선 방안과 함께 제시하세요. 채팅에서 드러난 문제 이해 부족이나 개념 파악의 어려움을 포함하세요.
       5. 핵심 인용구 (2가지): 학생의 답안 또는 채팅 대화 중 평가에 결정적인 영향을 미친 문장이나 구절을 2개 뽑아주세요.

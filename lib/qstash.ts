@@ -93,13 +93,17 @@ export type BulkGradeJobPayload = {
   gradingSessionId: string;
   studentSessionId: string;
   examId: string;
+  scope?: "sample" | "full";
+  attemptId?: string;
 };
 
 export function bulkGradingDedupId(
   gradingSessionId: string,
   studentSessionId: string,
+  scope?: "sample" | "full",
+  attemptId?: string,
 ): string {
-  return `bulk-grade-${gradingSessionId}-${studentSessionId}`;
+  return `bulk-grade-${gradingSessionId}-${studentSessionId}-${scope ?? "full"}-${attemptId ?? "default"}`;
 }
 
 export type EnqueueBulkGradeJobsResult = {
@@ -126,6 +130,15 @@ export async function enqueueBulkGradeJobs(
   }
 
   const CHUNK_SIZE = 100;
+  // Cap how many bulk-grade workers QStash runs concurrently *per grading session*.
+  // Without this, every student's job is delivered at once → a large class slams the
+  // OpenAI rate limit → many workers 429 → those students get no proposed grade and
+  // silently drop out of the panel. Keyed per grading session so concurrent exams
+  // don't share a budget. Tune via BULK_GRADE_FLOW_PARALLELISM (default 5).
+  const flowParallelism = Math.max(
+    1,
+    Number(process.env.BULK_GRADE_FLOW_PARALLELISM) || 5,
+  );
   let published = 0;
   let failed = 0;
 
@@ -135,10 +148,16 @@ export async function enqueueBulkGradeJobs(
       url: `${baseUrl}/api/internal/bulk-grade-worker`,
       body: job,
       retries: 3,
+      flowControl: {
+        key: `bulk-grade-${job.gradingSessionId}`,
+        parallelism: flowParallelism,
+      },
       headers: {
         "Upstash-Deduplication-Id": bulkGradingDedupId(
           job.gradingSessionId,
           job.studentSessionId,
+          job.scope,
+          job.attemptId,
         ),
       },
     }));

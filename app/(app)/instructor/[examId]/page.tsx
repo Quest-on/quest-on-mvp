@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import React, { useState, useEffect, use, useMemo, useCallback } from "react";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ExamDetailHeader } from "@/components/instructor/ExamDetailHeader";
@@ -27,17 +27,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, ChevronDown, ChevronUp, RefreshCw, Loader2, Eye, EyeOff, Download, Bot } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { StudentLiveMonitoring } from "@/components/instructor/StudentLiveMonitoring";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { InstructorChatSidebar } from "@/components/instructor/InstructorChatSidebar";
 import { useExamDetail } from "@/hooks/useExamDetail";
 import { useExamStudentSummaries } from "@/hooks/useExamStudentSummaries";
 import {
   useStudentFiltering,
   type StudentFilterSortOption,
 } from "@/hooks/useStudentFiltering";
-import { buildInstructorExamContext } from "@/lib/instructor-utils";
 import { qk } from "@/lib/query-keys";
+import { shouldShowStudentListSkeleton } from "@/lib/instructor-utils";
+import { cn } from "@/lib/utils";
 import type { InstructorExam } from "@/lib/types/exam";
 import type { ExamStudentSummary } from "@/lib/types/student-summary";
 import { BulkGradingPanel } from "@/components/instructor/BulkGradingPanel";
@@ -45,6 +50,21 @@ import { BulkGradingPanel } from "@/components/instructor/BulkGradingPanel";
 function isCaseGradingQuestionType(type?: string): boolean {
   return type === "case" || type === "essay" || type === "short-answer";
 }
+
+type BulkGradeProgress = {
+  total: number;
+  completed: number;
+  failed: number;
+};
+
+type BulkGradeStatusData = {
+  session: {
+    status: string;
+    grading_scope?: string;
+    progress?: BulkGradeProgress;
+  } | null;
+  studentCount: number;
+};
 
 export default function ExamDetail({
   params,
@@ -104,6 +124,24 @@ export default function ExamDetail({
 
   const queryClient = useQueryClient();
 
+  const { data: bulkGradeStatus } = useQuery<BulkGradeStatusData>({
+    queryKey: qk.instructor.bulkGradeSession(resolvedParams.examId),
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`/api/exam/${resolvedParams.examId}/bulk-grade`, { signal });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "일괄 채점 상태를 불러오지 못했습니다.");
+      }
+      return response.json() as Promise<BulkGradeStatusData>;
+    },
+    enabled: !!exam && exam.status === "closed" && isLoaded && !!isSignedIn,
+    staleTime: 0,
+    refetchInterval: (query) => {
+      const status = query.state.data?.session?.status;
+      return status === "grading" ? 3000 : false;
+    },
+  });
+
   const releaseGradesMutation = useMutation({
     mutationFn: async (release: boolean) => {
       const url = `/api/exam/${resolvedParams.examId}/release-grades`;
@@ -158,12 +196,14 @@ export default function ExamDetail({
     setMonitoringStudent(null);
   };
 
-  const hasIncompleteGrading = useMemo(() => {
-    return students.some(
-      (s) =>
-        s.status === "submitted" &&
-        s.caseProgress.total > 0 &&
-        s.caseProgress.graded < s.caseProgress.total
+  // 제출한 학생 전원의 채점 확정 여부
+  // - manually_graded: 강사 직접 확정 (Case 있는 시험)
+  // - ai_graded: 자동 채점 완료 (MCQ/OX 전용 시험 또는 전원 AI 일괄채점 확정)
+  const allStudentsManuallyGraded = useMemo(() => {
+    const submitted = students.filter((s) => s.status === "submitted");
+    if (submitted.length === 0) return false;
+    return submitted.every(
+      (s) => s.overallStatus === "manually_graded" || s.overallStatus === "ai_graded"
     );
   }, [students]);
 
@@ -177,30 +217,78 @@ export default function ExamDetail({
     );
   }, [examDetailData, students]);
 
+  const hasSubmittedCaseStudents = useMemo(() => {
+    return students.some(
+      (s) => s.status === "submitted" && s.caseProgress.total > 0,
+    );
+  }, [students]);
+
+  const bulkGradeSessionStatus = bulkGradeStatus?.session?.status ?? null;
+
   const showBulkCaseGradingCta = useMemo(
-    () => exam?.status === "closed" && hasCaseQuestions && hasIncompleteGrading,
-    [exam?.status, hasCaseQuestions, hasIncompleteGrading],
+    () =>
+      exam?.status === "closed" &&
+      hasCaseQuestions &&
+      (hasSubmittedCaseStudents ||
+        (bulkGradeStatus?.studentCount ?? 0) > 0 ||
+        !!bulkGradeSessionStatus),
+    [
+      exam?.status,
+      hasCaseQuestions,
+      hasSubmittedCaseStudents,
+      bulkGradeStatus?.studentCount,
+      bulkGradeSessionStatus,
+    ],
   );
 
+  const bulkGradeProgress = bulkGradeStatus?.session?.progress;
+  const bulkGradeProcessed =
+    bulkGradeProgress
+      ? Math.min(bulkGradeProgress.total, bulkGradeProgress.completed + bulkGradeProgress.failed)
+      : 0;
+  const isBulkGrading = bulkGradeSessionStatus === "grading";
+  const bulkGradingFailed = bulkGradeSessionStatus === "grading_failed";
+  const bulkGradingDone = bulkGradeSessionStatus === "grading_done";
+  const bulkGradingCommitted = bulkGradeSessionStatus === "committed";
+  const bulkCtaTitle = isBulkGrading
+    ? "CASE AI 가채점 진행 중"
+    : bulkGradingFailed
+      ? "CASE AI 가채점 실패"
+      : bulkGradingCommitted
+        ? "CASE 채점 결과"
+        : bulkGradingDone
+          ? "CASE 제안 점수 생성 완료"
+          : "CASE AI 가채점하기";
+  const bulkCtaDescription = isBulkGrading && bulkGradeProgress && bulkGradeProgress.total > 0
+    ? `백그라운드 가채점 중 · ${bulkGradeProcessed}/${bulkGradeProgress.total}명 처리`
+    : bulkGradingFailed
+      ? "실패 원인을 확인하고 다시 채점을 시작할 수 있습니다"
+      : bulkGradingCommitted
+        ? "확정된 결과와 가채점 대화 기록을 확인합니다"
+        : bulkGradingDone
+          ? "제안 점수를 검토한 뒤 확정해주세요"
+          : "강사의 자연어 기준으로 CASE 답안을 일괄 가채점합니다";
+  const bulkCtaButtonLabel = isBulkGrading
+    ? "진행 상황 보기"
+    : bulkGradingCommitted
+      ? "결과/채팅 보기"
+      : bulkGradingDone
+        ? "검토/확정"
+        : bulkGradingFailed
+          ? "다시 보기"
+          : "가채점 시작";
+
   const handleExcelDownload = useCallback(() => {
-    if (!exam) return;
-    if (exam.status !== "closed") {
-      window.alert("시험 종료 후에 이용해주세요");
-      return;
-    }
-    if (hasIncompleteGrading) {
-      window.alert("채점이 완료돼지 않았습니다. 채점을 완료한 후에 이용해주세요");
-      return;
-    }
+    if (!exam || !allStudentsManuallyGraded) return;
     window.location.href = `/api/exam/${exam.id}/export/excel`;
-  }, [exam, hasIncompleteGrading]);
+  }, [exam, allStudentsManuallyGraded]);
 
-  const examContext = useMemo(() => {
-    if (!exam) return "";
-    return buildInstructorExamContext(exam, questions);
-  }, [exam, questions]);
-
-  const studentsLoading = loading || summariesLoading || summariesFetching;
+  // 스켈레톤은 최초 로드에서만. summariesFetching(10초 폴링 재요청)을 넣으면
+  // 매 폴링마다 목록이 스켈레톤으로 교체돼 스크롤이 맨 위로 튀고 깜빡인다.
+  const studentsLoading = shouldShowStudentListSkeleton({
+    examLoading: loading,
+    summariesLoading,
+  });
 
   if (!isLoaded || loading) {
     return <PageSpinner />;
@@ -228,15 +316,12 @@ export default function ExamDetail({
 
   return (
     <SidebarProvider defaultOpen={false} className="flex-row-reverse">
-      <InstructorChatSidebar
-        context={examContext}
-        sessionIdSeed={`exam_${exam.id}`}
-        scopeDescription="시험/문항/학생 데이터"
-        title="시험 도우미"
-        subtitle="이 화면에 보이는 데이터 범위 안에서만 답변합니다."
-      />
-
-      <SidebarInset>
+      <SidebarInset
+        className={cn(
+          "transition-[padding] duration-300 ease-in-out",
+          bulkGradingOpen && "lg:pr-[500px]",
+        )}
+      >
         <div className="container mx-auto p-4 sm:p-6">
           <ExamDetailHeader
             title={exam.title}
@@ -250,14 +335,26 @@ export default function ExamDetail({
                     Gate: {!!(exam.open_at || exam.close_at) ? "true" : "false"}
                   </div>
                 )}
-                <Button
-                  size="sm"
-                  className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 focus-visible:ring-emerald-500"
-                  onClick={handleExcelDownload}
-                >
-                  <Download className="h-4 w-4 mr-1.5" />
-                  Excel 다운로드
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={!allStudentsManuallyGraded ? "cursor-not-allowed" : undefined}>
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 focus-visible:ring-emerald-500"
+                        onClick={handleExcelDownload}
+                        disabled={!allStudentsManuallyGraded}
+                      >
+                        <Download className="h-4 w-4 mr-1.5" />
+                        Excel 다운로드
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!allStudentsManuallyGraded && (
+                    <TooltipContent side="bottom">
+                      모든 학생 채점을 완료해주세요
+                    </TooltipContent>
+                  )}
+                </Tooltip>
                 <ExamControlButtons
                   examId={exam.id}
                   examStatus={exam.status || "draft"}
@@ -395,13 +492,17 @@ export default function ExamDetail({
             {showBulkCaseGradingCta && (
               <div className="flex items-center justify-between p-3 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50 dark:bg-blue-950/30">
                 <div className="flex items-center gap-2">
-                  <Bot className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" aria-hidden="true" />
+                  {isBulkGrading ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400 shrink-0" aria-hidden="true" />
+                  ) : (
+                    <Bot className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" aria-hidden="true" />
+                  )}
                   <div>
                     <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                      Case AI 자동 채점하기
+                      {bulkCtaTitle}
                     </span>
                     <span className="text-xs text-blue-600 dark:text-blue-400 hidden sm:inline ml-2">
-                      강사 인터뷰 후 AI가 서술형 문제를 일괄 채점합니다
+                      {bulkCtaDescription}
                     </span>
                   </div>
                 </div>
@@ -410,7 +511,7 @@ export default function ExamDetail({
                   className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white shrink-0"
                   onClick={() => setBulkGradingOpen(true)}
                 >
-                  채점 시작
+                  {bulkCtaButtonLabel}
                 </Button>
               </div>
             )}
@@ -454,7 +555,7 @@ export default function ExamDetail({
                 }}
                 title="새로고침"
               >
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className={cn("h-4 w-4", summariesFetching && "animate-spin")} />
               </Button>
             </div>
 
@@ -497,22 +598,25 @@ export default function ExamDetail({
             ) : (
               <div className="border rounded-lg overflow-hidden">
                 <div className="bg-muted/50 border-b px-4 py-3 hidden md:block">
-                  <div className="grid grid-cols-[1fr_72px_72px_72px_140px_100px_80px] gap-3 items-center text-sm font-medium text-muted-foreground">
+                  <div className="grid grid-cols-[40px_minmax(160px,1fr)_72px_72px_96px_108px_140px_104px_80px] gap-3 items-center text-sm font-medium text-muted-foreground">
+                    <span className="text-center">#</span>
                     <span>학생</span>
                     <span className="text-center">객관식</span>
                     <span className="text-center">O/X</span>
                     <span className="text-center">서술</span>
+                    <span className="text-center">총점</span>
                     <span>제출일시</span>
                     <span>상태</span>
                     <span className="text-center">액션</span>
                   </div>
                 </div>
-                <div className="divide-y max-h-[calc(100vh-400px)] min-h-[320px] overflow-y-auto">
+                <div className="divide-y">
                   {(filteredAndSortedStudents as ExamStudentSummary[]).map(
-                    (student) => (
+                    (student, index) => (
                       <ExamStudentRow
                         key={student.sessionId}
                         student={student}
+                        rowNumber={index + 1}
                         examId={exam.id}
                         canOpenGrading={exam.status === "closed"}
                         onLiveMonitoring={handleLiveMonitoring}

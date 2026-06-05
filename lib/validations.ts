@@ -2,7 +2,6 @@ import { z } from "zod";
 import { sanitizeUserInput } from "@/lib/sanitize";
 
 // Reusable field schemas
-const uuid = z.string().uuid();
 const sessionId = z.string().uuid("Invalid session ID format");
 
 // Sanitized string: strips XSS vectors at validation time
@@ -96,6 +95,20 @@ export const questionTypeEnum = z.enum([
 export const examQuestionsSchema = z.array(examQuestionItemSchema);
 
 export const examMaterialsSchema = z.array(z.string());
+
+export const scoreWeightsSchema = z
+  .object({
+    version: z.literal(1).default(1),
+    typeWeights: z
+      .object({
+        "multiple-choice": z.number().int().min(1).max(100).optional(),
+        "true-false": z.number().int().min(1).max(100).optional(),
+        case: z.number().int().min(1).max(100).optional(),
+      })
+      .strict(),
+    distribution: z.literal("equal_by_type").default("equal_by_type"),
+  })
+  .strict();
 
 /** Safely parse JSON column with Zod schema, returning fallback on failure */
 export function safeParseJson<T>(
@@ -191,6 +204,7 @@ export const singleGradeUpdateSchema = z.object({
 export const caseGradeChatPostSchema = z.object({
   qIdx: z.number().int().min(0),
   message: sanitizedString(z.string().min(1, "Message is required").max(10000)),
+  clientMessageId: z.string().uuid("Invalid clientMessageId"),
 });
 
 export const caseGradeCommitSchema = z.object({
@@ -199,14 +213,24 @@ export const caseGradeCommitSchema = z.object({
   comment: z.string().max(5000).optional().transform((v) => (v ? sanitizeUserInput(v) : v)),
 });
 
-export const bulkGradeChatPostSchema = z.object({
-  message: sanitizedString(z.string().min(1, "Message is required").max(10000)),
-});
+export const bulkGradeChatPostSchema = z.union([
+  z.object({
+    init: z.literal(true),
+    message: z.undefined().optional(),
+  }),
+  z.object({
+    init: z.undefined().optional(),
+    message: sanitizedString(z.string().min(1, "Message is required").max(10000)),
+    clientMessageId: z.string().uuid("Invalid clientMessageId"),
+  }),
+]);
 
 export const bulkGradeWorkerSchema = z.object({
   gradingSessionId: z.string().uuid("Invalid gradingSessionId"),
   studentSessionId: z.string().uuid("Invalid studentSessionId"),
   examId: z.string().uuid("Invalid examId"),
+  scope: z.enum(["sample", "full"]).default("full"),
+  attemptId: z.string().uuid("Invalid attemptId").optional(),
 });
 
 export const bulkGradeCommitSchema = z.object({
@@ -240,6 +264,7 @@ export const createExamSchema = z.object({
   code: z.string().min(1).max(20),
   duration: z.number().int().min(0),
   chat_weight: z.number().min(0).max(100).nullable().optional(),
+  score_weights: scoreWeightsSchema.nullable().optional(),
   questions: z.array(z.object({
     id: z.string(),
     text: z.string(),
@@ -321,6 +346,7 @@ export const updateExamSchema = z.object({
     status: z.string().optional(),
     code: z.string().min(1).max(20).optional(),
     chat_weight: z.number().min(0).max(100).nullable().optional(),
+    score_weights: scoreWeightsSchema.nullable().optional(),
     open_at: z.string().nullable().optional(),
     close_at: z.string().nullable().optional(),
     started_at: z.string().nullable().optional(),
@@ -449,6 +475,18 @@ export const saveFinalAnswerSchema = z.object({
   finalAnswer: z.string().max(50000, "Final answer too long"),
 });
 
+export const updateAssignmentSchema = z.object({
+  id: z.string().uuid("Invalid assignment ID"),
+  update: z.object({
+    title: z.string().min(1).max(500).optional(),
+    questions: z.unknown().optional(),
+    language: z.enum(["ko", "en"]).optional(),
+    deadline: z.string().nullable().optional(),
+    close_at: z.string().nullable().optional(),
+    updated_at: z.string().optional(),
+  }).strict(),
+});
+
 // Drive operations
 export const createFolderSchema = z.object({
   name: z.string().min(1, "Folder name is required").max(255),
@@ -566,6 +604,11 @@ export function validateRequest<T>(
   }
   return { success: true, data: result.data };
 }
+
+export const bulkGradeChatOptionsSchema = z.object({
+  questionText: sanitizedString(z.string().min(1).max(2000)),
+  gradingSessionId: z.string().uuid("Invalid gradingSessionId"),
+});
 
 // ========== Bulk Approve Schema ==========
 

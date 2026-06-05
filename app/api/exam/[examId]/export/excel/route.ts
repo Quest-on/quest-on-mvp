@@ -4,7 +4,12 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { currentUser } from "@/lib/get-current-user";
 import { errorJson } from "@/lib/api-response";
 import { batchGetUserInfo } from "@/lib/app-users";
-import { deduplicateGrades, isScoringGrade } from "@/lib/grade-utils";
+import {
+  calculateScoreFromItems,
+  deduplicateGrades,
+  isScoringGrade,
+  normalizeScoreWeights,
+} from "@/lib/grade-utils";
 import {
   gradeObjectiveAnswer,
   isObjectiveQuestion,
@@ -42,7 +47,7 @@ type StudentExportRow = {
   name: string;
   studentNumber: string;
   scores: Array<number | undefined>;
-  finalScore: number;
+  finalScore: number | null;
 };
 
 function getSupabase() {
@@ -55,7 +60,8 @@ function sanitizeWorksheetName(name: string) {
 
 function buildFileName(title: string) {
   const normalized = title.replace(/[\\/:*?"<>|]/g, " ").trim() || "시험";
-  return `${normalized}_시험결과.xlsx`;
+  const date = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul" }).format(new Date());
+  return `${normalized}_${date}.xlsx`;
 }
 
 function stripHtml(value: string | null) {
@@ -109,7 +115,7 @@ export async function GET(
     const supabase = getSupabase();
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("id, title, code, description, duration, instructor_id, questions, status")
+      .select("id, title, code, description, duration, instructor_id, questions, status, score_weights")
       .eq("id", examId)
       .single();
 
@@ -149,6 +155,7 @@ export async function GET(
         qIdx: typeof question.idx === "number" ? question.idx : index,
       }))
       .sort((a, b) => a.qIdx - b.qIdx);
+    const scoreWeights = normalizeScoreWeights(exam.score_weights);
 
     const sessionIds = (sessions ?? []).map((session) => session.id);
     const studentIds = [
@@ -250,7 +257,8 @@ export async function GET(
       );
       const submissionsByQuestion =
         submissionsBySessionQuestion.get(session.id) ?? new Map();
-      const questionScores = orderedQuestions.map((question) => {
+      const hasSubmitted = session.submitted_at != null;
+      const questionScores = hasSubmitted ? orderedQuestions.map((question) => {
         if (isObjectiveQuestion(question.type)) {
           const submission = submissionsByQuestion.get(question.qIdx);
           const objective = gradeObjectiveAnswer({
@@ -258,25 +266,38 @@ export async function GET(
             options: question.options,
             correctOptionIndex: question.correctOptionIndex,
           });
-          return submission && objective ? objective.score : undefined;
+          return objective ? objective.score : undefined;
         }
         return scoreByQuestion.get(question.qIdx);
-      });
-      const gradedScores = questionScores.filter(
-        (score): score is number => typeof score === "number"
+      }) : orderedQuestions.map(() => undefined);
+      const scoreItems = orderedQuestions.map((question, index) => ({
+        qIdx: question.qIdx,
+        type: question.type,
+        score: questionScores[index],
+      }));
+      const scoreResult = calculateScoreFromItems(
+        scoreItems,
+        scoreWeights
       );
       return {
         name: studentName,
         studentNumber: profile?.student_number ?? "",
         scores: questionScores,
-        finalScore: average(gradedScores),
+        finalScore:
+          hasSubmitted &&
+          scoreResult.overallScore !== null &&
+          (scoreResult.mode === "weighted" || scoreResult.gradedCount > 0)
+            ? scoreResult.overallScore
+            : null,
       };
     });
 
     const gradedRows = studentRows.filter((row) =>
-      row.scores.some((score) => score !== undefined)
+      row.finalScore !== null
     );
-    const finalScores = gradedRows.map((row) => row.finalScore);
+    const finalScores = gradedRows
+      .map((row) => row.finalScore)
+      .filter((score): score is number => typeof score === "number");
     const questionAverages = orderedQuestions.map((_, questionIndex) =>
       average(
         studentRows
@@ -348,10 +369,22 @@ export async function GET(
     ];
     worksheet.addRow([]);
     worksheet.addRow([]);
+    // 유형별 카운터로 MCQ1, OX1, Case1 형식 헤더 생성
+    const typeCounters: Record<string, number> = {};
+    const questionHeaders = orderedQuestions.map((q) => {
+      const type = q.type ?? "essay";
+      const prefix =
+        type === "multiple-choice" ? "MCQ" :
+        type === "true-false" ? "OX" :
+        "Case";
+      typeCounters[prefix] = (typeCounters[prefix] ?? 0) + 1;
+      return `${prefix}${typeCounters[prefix]}`;
+    });
+
     const tableHeaderRow = worksheet.addRow([
       "이름",
       "학번",
-      ...orderedQuestions.map((_, index) => `문제${index + 1}점수`),
+      ...questionHeaders,
       "최종 점수",
     ]);
     const tableHeaderRowNumber = tableHeaderRow.number;
@@ -398,7 +431,7 @@ export async function GET(
         studentRow.name,
         studentRow.studentNumber,
         ...studentRow.scores.map((score) => score ?? ""),
-        studentRow.finalScore,
+        studentRow.finalScore ?? "",
       ]);
       excelRow.getCell(scoreTableColumns).font = { bold: true };
     });

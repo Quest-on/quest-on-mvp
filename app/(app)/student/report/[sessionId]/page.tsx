@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -10,13 +10,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RichTextViewer } from "@/components/ui/rich-text-viewer";
 import AIMessageRenderer from "@/components/chat/AIMessageRenderer";
+import { StudentObjectiveAnswer } from "@/components/report/StudentObjectiveAnswer";
 import {
   ArrowLeft,
   FileText,
   CheckCircle,
   MessageCircle,
   Award,
-  TrendingUp,
+  ListChecks,
   Loader2,
   Clock,
   ShieldQuestion,
@@ -29,6 +30,7 @@ interface Question {
   type: string;
   prompt: string;
   ai_context?: string;
+  options?: string[];
 }
 
 interface Submission {
@@ -64,27 +66,12 @@ interface AssignmentQuiz {
   status: string;
 }
 
-interface AiSummary {
-  sentiment?: "positive" | "negative" | "neutral";
-  summary?: string;
-  strengths?: string[];
-  weaknesses?: string[];
-  aiDependency?: {
-    overallRisk?: "low" | "medium" | "high";
-    recoveryObserved?: boolean;
-    summary?: string;
-    triggerEvidence?: string[];
-    recoveryEvidence?: string[];
-  } | null;
-}
-
 interface ReportData {
   session: {
     id: string;
     exam_id: string;
     student_id: string;
     submitted_at: string;
-    used_clarifications: number;
     created_at: string;
   };
   exam: {
@@ -103,7 +90,6 @@ interface ReportData {
   overallScore: number | null;
   gradesReleased?: boolean;
   gradingProgress?: GradingProgress | null;
-  aiSummary?: AiSummary | null;
   assignmentQuiz?: AssignmentQuiz | null;
 }
 
@@ -112,7 +98,6 @@ export default function StudentReportPage() {
   const router = useRouter();
   const { user, profile, isLoaded, isSignedIn } = useAppUser();
   const sessionId = params.sessionId as string;
-  const [selectedQuestionIdx, setSelectedQuestionIdx] = useState(0);
   const userRole = (profile?.role as string) || "student";
 
   const {
@@ -266,12 +251,24 @@ export default function StudentReportPage() {
     );
   }
 
-  const currentQuestion = reportData.exam?.questions?.[selectedQuestionIdx];
-  const currentSubmission = reportData.submissions?.[selectedQuestionIdx];
-  const currentGrade = gradesNotReleased ? undefined : reportData.grades?.[selectedQuestionIdx];
-  const currentMessages = reportData.messages?.[selectedQuestionIdx] || [];
   const assignmentQuiz = reportData.assignmentQuiz;
-  const aiDependency = reportData.aiSummary?.aiDependency;
+  const released = !gradesNotReleased;
+
+  const allQuestions = Array.isArray(reportData.exam?.questions)
+    ? reportData.exam.questions
+    : [];
+  const qIdxOf = (q: Question, fallback: number) =>
+    typeof q.idx === "number" ? q.idx : fallback;
+  const mcqQuestions = allQuestions.filter((q) => q.type === "multiple-choice");
+  const oxQuestions = allQuestions.filter((q) => q.type === "true-false");
+  const caseQuestions = allQuestions.filter(
+    (q) => q.type !== "multiple-choice" && q.type !== "true-false",
+  );
+
+  const scoreOf = (q: Question, fallback: number): number | undefined =>
+    released ? reportData.grades?.[qIdxOf(q, fallback)]?.score : undefined;
+  const correctCount = (group: Question[]) =>
+    group.filter((q) => scoreOf(q, allQuestions.indexOf(q)) === 100).length;
 
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
@@ -334,294 +331,281 @@ export default function StudentReportPage() {
         </div>
       </div>
 
-      {/* Question Navigation */}
-      <div className="mb-6">
-        <div className="flex gap-2 flex-wrap">
-          {reportData.exam?.questions &&
-          Array.isArray(reportData.exam.questions) ? (
-            reportData.exam.questions.map((question, idx) => {
-              const grade = gradesNotReleased ? undefined : reportData.grades[idx];
-              return (
-                <Button
-                  key={question.id || idx}
-                  variant={selectedQuestionIdx === idx ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedQuestionIdx(idx)}
-                >
-                  문제 {idx + 1}
-                  {grade && (
-                    <Badge
-                      variant="secondary"
-                      className="ml-2 text-foreground"
-                    >
-                      {grade.score}점
-                    </Badge>
-                  )}
-                </Button>
-              );
-            })
-          ) : (
-            <div className="text-red-600">문제를 불러올 수 없습니다.</div>
-          )}
-        </div>
-      </div>
+      {allQuestions.length === 0 && (
+        <div className="text-red-600">문제를 불러올 수 없습니다.</div>
+      )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Question */}
+      <div className="space-y-10">
+        {/* 객관식 그룹 */}
+        {mcqQuestions.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-2">
+              <ListChecks className="w-5 h-5 text-blue-600" />
+              <h2 className="text-lg font-semibold">객관식 {mcqQuestions.length}문항</h2>
+              {released && (
+                <Badge variant="secondary" className="text-foreground">
+                  {correctCount(mcqQuestions)}/{mcqQuestions.length} 정답
+                </Badge>
+              )}
+            </div>
+            <div className="space-y-4">
+              {mcqQuestions.map((question, i) => {
+                const idx = qIdxOf(question, allQuestions.indexOf(question));
+                return (
+                  <Card key={question.id || `mcq-${i}`}>
+                    <CardHeader>
+                      <CardTitle className="text-base">
+                        <span className="text-muted-foreground mr-2">Q{i + 1}.</span>
+                        <RichTextViewer
+                          content={question.prompt || ""}
+                          className="inline text-base font-semibold"
+                        />
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <StudentObjectiveAnswer
+                        type={question.type}
+                        options={question.options}
+                        selectedAnswer={reportData.submissions?.[idx]?.answer}
+                        released={released}
+                        score={reportData.grades?.[idx]?.score}
+                      />
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* OX 그룹 */}
+        {oxQuestions.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-emerald-600" />
+              <h2 className="text-lg font-semibold">OX {oxQuestions.length}문항</h2>
+              {released && (
+                <Badge variant="secondary" className="text-foreground">
+                  {correctCount(oxQuestions)}/{oxQuestions.length} 정답
+                </Badge>
+              )}
+            </div>
+            <div className="space-y-4">
+              {oxQuestions.map((question, i) => {
+                const idx = qIdxOf(question, allQuestions.indexOf(question));
+                return (
+                  <Card key={question.id || `ox-${i}`}>
+                    <CardHeader>
+                      <CardTitle className="text-base">
+                        <span className="text-muted-foreground mr-2">Q{i + 1}.</span>
+                        <RichTextViewer
+                          content={question.prompt || ""}
+                          className="inline text-base font-semibold"
+                        />
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <StudentObjectiveAnswer
+                        type={question.type}
+                        options={question.options}
+                        selectedAnswer={reportData.submissions?.[idx]?.answer}
+                        released={released}
+                        score={reportData.grades?.[idx]?.score}
+                      />
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* 서술형 그룹 */}
+        {caseQuestions.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-purple-600" />
+              <h2 className="text-lg font-semibold">서술형 {caseQuestions.length}문항</h2>
+            </div>
+            <div className="space-y-6">
+              {caseQuestions.map((question, i) => {
+                const idx = qIdxOf(question, allQuestions.indexOf(question));
+                const msgs = reportData.messages?.[idx] ?? [];
+                const submission = reportData.submissions?.[idx];
+                const score = scoreOf(question, allQuestions.indexOf(question));
+                return (
+                  <Card key={question.id || `case-${i}`}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-3">
+                        <CardTitle className="text-base">
+                          <span className="text-muted-foreground mr-2">Q{i + 1}.</span>
+                          <RichTextViewer
+                            content={question.prompt || ""}
+                            className="inline text-base font-semibold"
+                          />
+                        </CardTitle>
+                        {typeof score === "number" && (
+                          <Badge variant="secondary" className="shrink-0 text-foreground">
+                            {score}점
+                          </Badge>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {msgs.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3 text-sm font-medium text-muted-foreground">
+                            <MessageCircle className="w-4 h-4" />
+                            내 AI 채팅 기록
+                          </div>
+                          <div className="space-y-4">
+                            {msgs.map((msg, index) => (
+                              <div
+                                key={index}
+                                className={`flex ${
+                                  msg.role === "user" ? "justify-end" : "justify-start"
+                                }`}
+                              >
+                                {msg.role === "user" ? (
+                                  <div className="bg-primary text-primary-foreground rounded-2xl px-4 py-3 max-w-[85%] sm:max-w-[70%]">
+                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                                      {msg.content}
+                                    </p>
+                                    <p className="text-xs mt-2 opacity-70">
+                                      {new Date(msg.created_at).toLocaleTimeString(
+                                        "ko-KR",
+                                        { hour: "2-digit", minute: "2-digit" }
+                                      )}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <AIMessageRenderer
+                                    content={msg.content}
+                                    timestamp={msg.created_at}
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {!assignmentQuiz && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground mb-2">
+                            내 최종답변
+                          </p>
+                          {submission ? (
+                            <RichTextViewer
+                              content={submission.answer}
+                              className="text-base leading-relaxed whitespace-pre-wrap"
+                            />
+                          ) : (
+                            <p className="text-muted-foreground">제출된 답안이 없습니다.</p>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Assignment Quiz Result */}
+        {assignmentQuiz && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-600" />
-                문제 {selectedQuestionIdx + 1}
+                <ShieldQuestion className="w-5 h-5 text-amber-600" />
+                타임어택 퀴즈 결과
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <RichTextViewer
-                content={currentQuestion?.prompt || ""}
-                className="text-base leading-relaxed"
-              />
-            </CardContent>
-          </Card>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                  점수 {assignmentQuiz.score ?? 0}/100
+                </Badge>
+                <Badge variant="secondary">
+                  {assignmentQuiz.total_questions}문항 · {assignmentQuiz.time_limit_seconds}초
+                </Badge>
+                {assignmentQuiz.submitted_at && (
+                  <span className="text-sm text-muted-foreground">
+                    완료: {new Date(assignmentQuiz.submitted_at).toLocaleString("ko-KR")}
+                  </span>
+                )}
+              </div>
+              <div className="space-y-3">
+                {assignmentQuiz.questions.map((question, index) => {
+                  const selectedIndex = assignmentQuiz.answers?.[question.id];
+                  const correctIndex = question.correctOptionIndex;
+                  const isCorrect =
+                    typeof correctIndex === "number" && selectedIndex === correctIndex;
 
-          {/* Chat History */}
-          {currentMessages.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageCircle className="w-5 h-5 text-purple-600" />
-                  AI와 나눈 대화
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {currentMessages.map((msg, index) => (
-                    <div
-                      key={index}
-                      className={`flex ${
-                        msg.role === "user" ? "justify-end" : "justify-start"
-                      }`}
-                    >
-                      {msg.role === "user" ? (
-                        <div className="bg-primary text-primary-foreground rounded-2xl px-4 py-3 max-w-[85%] sm:max-w-[70%]">
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                            {msg.content}
-                          </p>
-                          <p className="text-xs mt-2 opacity-70">
-                            {new Date(msg.created_at).toLocaleTimeString(
-                              "ko-KR",
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              }
-                            )}
-                          </p>
-                        </div>
-                      ) : (
-                        <AIMessageRenderer
-                          content={msg.content}
-                          timestamp={msg.created_at}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Assignment Quiz Result */}
-          {assignmentQuiz && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShieldQuestion className="w-5 h-5 text-amber-600" />
-                  타임어택 퀴즈 결과
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap items-center gap-3">
-                  <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                    점수 {assignmentQuiz.score ?? 0}/100
-                  </Badge>
-                  <Badge variant="secondary">
-                    {assignmentQuiz.total_questions}문항 · {assignmentQuiz.time_limit_seconds}초
-                  </Badge>
-                  {assignmentQuiz.submitted_at && (
-                    <span className="text-sm text-muted-foreground">
-                      완료: {new Date(assignmentQuiz.submitted_at).toLocaleString("ko-KR")}
-                    </span>
-                  )}
-                </div>
-                <div className="space-y-3">
-                  {assignmentQuiz.questions.map((question, index) => {
-                    const selectedIndex = assignmentQuiz.answers?.[question.id];
-                    const correctIndex = question.correctOptionIndex;
-                    const isCorrect =
-                      typeof correctIndex === "number" && selectedIndex === correctIndex;
-
-                    return (
-                      <div key={question.id} className="rounded-lg border p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="font-medium text-sm">
-                            {index + 1}. {question.question}
-                          </p>
-                          {typeof correctIndex === "number" && (
-                            <Badge
-                              variant="outline"
-                              className={
-                                isCorrect
-                                  ? "bg-green-500/10 text-green-700 dark:text-green-400"
-                                  : "bg-red-500/10 text-red-700 dark:text-red-400"
-                              }
-                            >
-                              {isCorrect ? "정답" : "오답"}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          선택:{" "}
-                          {typeof selectedIndex === "number"
-                            ? question.options[selectedIndex] || "무응답"
-                            : "무응답"}
+                  return (
+                    <div key={question.id} className="rounded-lg border p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-medium text-sm">
+                          {index + 1}. {question.question}
                         </p>
                         {typeof correctIndex === "number" && (
-                          <p className="text-sm text-muted-foreground">
-                            정답: {question.options[correctIndex]}
-                          </p>
-                        )}
-                        {question.rationale && (
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            근거: {question.rationale}
-                          </p>
+                          <Badge
+                            variant="outline"
+                            className={
+                              isCorrect
+                                ? "bg-green-500/10 text-green-700 dark:text-green-400"
+                                : "bg-red-500/10 text-red-700 dark:text-red-400"
+                            }
+                          >
+                            {isCorrect ? "정답" : "오답"}
+                          </Badge>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Assignment research flow: final answer card intentionally hidden.
-              Re-enable this block for non-chat assignment/report flows that need a submitted answer view. */}
-          {!assignmentQuiz && (
-            <Card>
-              <CardHeader>
-                <CardTitle>내 답안</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {currentSubmission ? (
-                  <RichTextViewer
-                    content={currentSubmission.answer}
-                    className="text-base leading-relaxed whitespace-pre-wrap"
-                  />
-                ) : (
-                  <p className="text-muted-foreground">제출된 답안이 없습니다.</p>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Grade Card */}
-          {currentGrade && (
-            <Card className="border-2 border-primary/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                  평가 결과
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">점수</p>
-                  <p className="text-3xl font-bold text-foreground">
-                    {currentGrade.score}점
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {(reportData.aiSummary?.summary || aiDependency) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>AI 의존도 참고 지표</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                {aiDependency?.overallRisk && (
-                  <div>
-                    <p className="text-muted-foreground mb-1">의존도 위험</p>
-                    <Badge
-                      variant="outline"
-                      className={
-                        aiDependency.overallRisk === "high"
-                          ? "bg-red-500/10 text-red-700 dark:text-red-400"
-                          : aiDependency.overallRisk === "medium"
-                            ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                            : "bg-green-500/10 text-green-700 dark:text-green-400"
-                      }
-                    >
-                      {aiDependency.overallRisk === "high"
-                        ? "높음"
-                        : aiDependency.overallRisk === "medium"
-                          ? "보통"
-                          : "낮음"}
-                    </Badge>
-                  </div>
-                )}
-                {(aiDependency?.summary || reportData.aiSummary?.summary) && (
-                  <div>
-                    <p className="text-muted-foreground mb-1">요약</p>
-                    <p className="leading-relaxed">
-                      {aiDependency?.summary || reportData.aiSummary?.summary}
-                    </p>
-                  </div>
-                )}
-                {typeof aiDependency?.recoveryObserved === "boolean" && (
-                  <div>
-                    <p className="text-muted-foreground mb-1">독립 추론 회복</p>
-                    <p>{aiDependency.recoveryObserved ? "관찰됨" : "근거 약함"}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Exam Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle>시험 정보</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div>
-                <span className="text-muted-foreground">시험 코드:</span>
-                <span className="ml-2 exam-code">{reportData.exam.code}</span>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        선택:{" "}
+                        {typeof selectedIndex === "number"
+                          ? question.options[selectedIndex] || "무응답"
+                          : "무응답"}
+                      </p>
+                      {typeof correctIndex === "number" && (
+                        <p className="text-sm text-muted-foreground">
+                          정답: {question.options[correctIndex]}
+                        </p>
+                      )}
+                      {question.rationale && (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          근거: {question.rationale}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <div>
-                <span className="text-muted-foreground">제출 일시:</span>
-                <span className="ml-2">
-                  {new Date(reportData.session.submitted_at).toLocaleString(
-                    "ko-KR"
-                  )}
-                </span>
-              </div>
-              {reportData.session.used_clarifications > 0 && (
-                <div>
-                  <span className="text-muted-foreground">질문 횟수:</span>
-                  <span className="ml-2">
-                    {reportData.session.used_clarifications}회
-                  </span>
-                </div>
-              )}
             </CardContent>
           </Card>
-        </div>
+        )}
+
+        {/* Exam Info */}
+        <Card>
+          <CardHeader>
+            <CardTitle>시험 정보</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div>
+              <span className="text-muted-foreground">시험 코드:</span>
+              <span className="ml-2 exam-code">{reportData.exam.code}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">제출 일시:</span>
+              <span className="ml-2">
+                {new Date(reportData.session.submitted_at).toLocaleString(
+                  "ko-KR"
+                )}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

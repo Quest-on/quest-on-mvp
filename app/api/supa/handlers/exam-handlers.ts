@@ -3,6 +3,12 @@ import { currentUser } from "@/lib/get-current-user";
 import { successJson, errorJson } from "@/lib/api-response";
 import { auditLog } from "@/lib/audit";
 import { logError } from "@/lib/logger";
+import {
+  buildDefaultScoreWeightsForQuestionTypes,
+  normalizeScoreWeights,
+  validateScoreWeightsForQuestions,
+  type ScoreWeights,
+} from "@/lib/grade-utils";
 
 // Lazy Supabase client getter — creates a fresh client per invocation
 // to avoid stale connections in serverless environments
@@ -50,6 +56,7 @@ export async function createExam(data: {
     fileName: string;
   }>;
   chat_weight?: number | null;
+  score_weights?: ScoreWeights | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -115,11 +122,32 @@ export async function createExam(data: {
     // Create exam with the correct schema
     // NOTE: core_ability(핵심 역량) 필드는 제거되었으므로 저장 시 항상 제거한다.
     const sanitizedQuestions = (data.questions || []).map((q) => {
-      const { core_ability, ...rest } = q as QuestionData & {
-        core_ability?: unknown;
-      };
+      const rest = { ...q } as QuestionData & { core_ability?: unknown };
+      delete rest.core_ability;
       return rest;
     });
+    const normalizedScoreWeights = normalizeScoreWeights(data.score_weights);
+    if (data.score_weights !== null && data.score_weights !== undefined && !normalizedScoreWeights) {
+      return errorJson(
+        "INVALID_SCORE_WEIGHTS",
+        "유효하지 않은 점수 배점입니다.",
+        400
+      );
+    }
+    const scoreWeights =
+      normalizedScoreWeights ??
+      buildDefaultScoreWeightsForQuestionTypes(
+        sanitizedQuestions.map((q) => q.type)
+      );
+    const scoreWeightErrors = validateScoreWeightsForQuestions(
+      scoreWeights,
+      sanitizedQuestions.map((q) => q.type)
+    );
+    if (scoreWeightErrors.length > 0) {
+      return errorJson("INVALID_SCORE_WEIGHTS", scoreWeightErrors[0], 400, {
+        errors: scoreWeightErrors,
+      });
+    }
 
     const examData = {
       title: data.title,
@@ -130,6 +158,7 @@ export async function createExam(data: {
       materials: data.materials || [],
       materials_text: data.materials_text || [], // 추출된 텍스트 저장
       chat_weight: data.chat_weight ?? 50,
+      score_weights: scoreWeights,
       status: data.status,
       instructor_id: user.id, // Clerk user ID (e.g., "user_31ihNg56wMaE27ft10H4eApjc1J")
       created_at: data.created_at,
@@ -268,6 +297,35 @@ export async function updateExam(data: {
       return errorJson("INSTRUCTOR_REQUIRED", "Instructor access required", 403);
     }
 
+    const needsCurrentExam =
+      data.update.code !== undefined ||
+      "score_weights" in data.update ||
+      "questions" in data.update;
+    let currentExam: {
+      id: string;
+      questions: unknown;
+      score_weights: unknown;
+    } | null = null;
+
+    if (needsCurrentExam) {
+      const { data: foundExam, error: findError } = await getSupabase()
+        .from("exams")
+        .select("id, questions, score_weights")
+        .eq("id", data.id)
+        .eq("instructor_id", user.id)
+        .maybeSingle();
+
+      if (findError) throw findError;
+      if (!foundExam) {
+        return errorJson("EXAM_NOT_FOUND", "Exam not found or access denied", 404);
+      }
+      currentExam = foundExam as {
+        id: string;
+        questions: unknown;
+        score_weights: unknown;
+      };
+    }
+
     // If exam code is being changed, verify no sessions exist
     if (data.update.code !== undefined) {
       const { data: sessions } = await getSupabase()
@@ -288,6 +346,113 @@ export async function updateExam(data: {
     const updateWithoutRubric = { ...data.update };
     delete updateWithoutRubric.rubric;
     delete updateWithoutRubric.rubric_public;
+
+    if ("questions" in updateWithoutRubric) {
+      const currentQuestions = Array.isArray(currentExam?.questions)
+        ? currentExam.questions
+        : [];
+      const nextQuestions = Array.isArray(updateWithoutRubric.questions)
+        ? updateWithoutRubric.questions
+        : [];
+      const questionsChanged =
+        JSON.stringify(currentQuestions) !== JSON.stringify(nextQuestions);
+
+      if (questionsChanged) {
+        const { data: sessions } = await getSupabase()
+          .from("sessions")
+          .select("id")
+          .eq("exam_id", data.id)
+          .limit(1);
+
+        if (sessions && sessions.length > 0) {
+          return errorJson(
+            "QUESTIONS_LOCKED",
+            "학생이 이미 참여한 시험의 문항은 변경할 수 없습니다.",
+            409
+          );
+        }
+      }
+    }
+
+    if ("score_weights" in updateWithoutRubric || "questions" in updateWithoutRubric) {
+      const nextQuestions = Array.isArray(updateWithoutRubric.questions)
+        ? updateWithoutRubric.questions
+        : Array.isArray(currentExam?.questions)
+          ? currentExam.questions
+          : [];
+      const currentScoreWeights = normalizeScoreWeights(currentExam?.score_weights);
+      const hasScoreWeightsUpdate = "score_weights" in updateWithoutRubric;
+      let scoreWeights = hasScoreWeightsUpdate
+        ? normalizeScoreWeights(updateWithoutRubric.score_weights)
+        : currentScoreWeights;
+      if (
+        hasScoreWeightsUpdate &&
+        updateWithoutRubric.score_weights !== null &&
+        !scoreWeights
+      ) {
+        return errorJson(
+          "INVALID_SCORE_WEIGHTS",
+          "유효하지 않은 점수 배점입니다.",
+          400
+        );
+      }
+
+      const nextQuestionTypes = nextQuestions.map((q) => {
+        const type =
+          q && typeof q === "object" && "type" in q
+            ? (q as { type?: unknown }).type
+            : undefined;
+        return typeof type === "string" ? type : undefined;
+      });
+      const defaultScoreWeights =
+        buildDefaultScoreWeightsForQuestionTypes(nextQuestionTypes);
+      if (
+        hasScoreWeightsUpdate &&
+        updateWithoutRubric.score_weights === null &&
+        defaultScoreWeights
+      ) {
+        return errorJson(
+          "INVALID_SCORE_WEIGHTS",
+          "문항이 있는 시험에는 최종 점수 비중을 설정해야 합니다.",
+          400
+        );
+      }
+      if (nextQuestionTypes.length > 0 && !scoreWeights) {
+        // 기존 시험(score_weights null)을 편집할 때 기본 비중으로 자동 설정
+        scoreWeights = defaultScoreWeights;
+      }
+      const scoreWeightErrors = validateScoreWeightsForQuestions(
+        scoreWeights,
+        nextQuestionTypes
+      );
+      if (scoreWeightErrors.length > 0) {
+        return errorJson("INVALID_SCORE_WEIGHTS", scoreWeightErrors[0], 400, {
+          errors: scoreWeightErrors,
+        });
+      }
+
+      const scoreWeightsChanged =
+        hasScoreWeightsUpdate &&
+        JSON.stringify(currentScoreWeights) !== JSON.stringify(scoreWeights);
+      if (scoreWeightsChanged) {
+        const { data: sessions } = await getSupabase()
+          .from("sessions")
+          .select("id")
+          .eq("exam_id", data.id)
+          .limit(1);
+
+        if (sessions && sessions.length > 0) {
+          return errorJson(
+            "SCORE_WEIGHTS_LOCKED",
+            "학생이 이미 참여한 시험의 점수 비중은 변경할 수 없습니다.",
+            409
+          );
+        }
+      }
+      if (hasScoreWeightsUpdate) {
+        updateWithoutRubric.score_weights = scoreWeights;
+      }
+    }
 
     const { data: exam, error } = await getSupabase()
       .from("exams")
@@ -325,7 +490,7 @@ export async function getExam(data: { code: string }) {
   try {
     const { data: exam, error } = await getSupabase()
       .from("exams")
-      .select("id, title, code, description, duration, questions, rubric, rubric_public, chat_weight, status, instructor_id, materials, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, type, deadline, assignment_prompt")
+      .select("id, title, code, description, duration, questions, rubric, rubric_public, chat_weight, score_weights, status, instructor_id, materials, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, type, deadline, assignment_prompt")
       .eq("code", data.code)
       .single();
 
@@ -404,7 +569,7 @@ export async function getExamById(data: { id: string }) {
     const { data: exam, error } = await getSupabase()
       .from("exams")
       .select(
-        "id, title, code, description, duration, questions, materials, materials_text, rubric, rubric_public, chat_weight, status, instructor_id, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, type, deadline, assignment_prompt, grades_released, language"
+        "id, title, code, description, duration, questions, materials, materials_text, rubric, rubric_public, chat_weight, score_weights, status, instructor_id, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, type, deadline, assignment_prompt, grades_released, language"
       )
       .eq("id", data.id)
       .eq("instructor_id", user.id) // Only allow instructors to view their own exams
@@ -421,7 +586,18 @@ export async function getExamById(data: { id: string }) {
       return errorJson("EXAM_NOT_FOUND", "Exam not found", 404);
     }
 
-    return successJson({ exam });
+    const { data: sessions } = await getSupabase()
+      .from("sessions")
+      .select("id")
+      .eq("exam_id", data.id)
+      .limit(1);
+
+    return successJson({
+      exam: {
+        ...exam,
+        has_sessions: Boolean(sessions && sessions.length > 0),
+      },
+    });
   } catch (error) {
     logError("[getExamById] Failed to get exam", error, { path: "/api/supa/exam-handlers" });
     return errorJson("GET_EXAM_FAILED", "Failed to get exam", 500);
@@ -506,7 +682,7 @@ export async function copyExam(data: { exam_id: string }) {
     // Get the original exam
     const { data: originalExam, error: examError } = await getSupabase()
       .from("exams")
-      .select("id, title, code, description, duration, questions, materials, materials_text, rubric, rubric_public, chat_weight, status, instructor_id, created_at, updated_at, language")
+      .select("id, title, code, description, duration, questions, materials, materials_text, rubric, rubric_public, chat_weight, score_weights, status, instructor_id, created_at, updated_at, language")
       .eq("id", data.exam_id)
       .eq("instructor_id", user.id)
       .single();
@@ -565,7 +741,8 @@ export async function copyExam(data: { exam_id: string }) {
     // Sanitize questions (remove core_ability if present)
     const sanitizedQuestions = Array.isArray(originalExam.questions)
       ? originalExam.questions.map((q: QuestionData & { core_ability?: unknown }) => {
-          const { core_ability, ...rest } = q;
+          const rest = { ...q };
+          delete rest.core_ability;
           return rest;
         })
       : [];
@@ -581,6 +758,7 @@ export async function copyExam(data: { exam_id: string }) {
       rubric: originalExam.rubric || [],
       rubric_public: originalExam.rubric_public || false,
       chat_weight: originalExam.chat_weight ?? 50,
+      score_weights: normalizeScoreWeights(originalExam.score_weights),
       status: "draft", // 복사본은 초안 상태로 시작
       instructor_id: user.id,
       created_at: now,

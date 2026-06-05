@@ -8,6 +8,7 @@ import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { bulkGradeCommitSchema, validateRequest } from "@/lib/validations";
 import { upsertGradesBySessionQuestion } from "@/lib/grades-upsert";
 import { requireBulkGradeAccess } from "@/lib/bulk-grade-access";
+import { isCaseQuestion, normalizeQuestions } from "@/lib/grading-helpers";
 
 const COMMITTING_STALE_MS = 2 * 60 * 1000;
 
@@ -69,16 +70,31 @@ export async function POST(
       );
     }
 
+    const caseQIdxes = new Set(
+      normalizeQuestions(access.ctx.exam.questions)
+        .filter((q) => isCaseQuestion(q.type))
+        .map((q) => q.idx),
+    );
+    if (grades.some((g) => !caseQIdxes.has(g.q_idx))) {
+      return errorJson("VALIDATION_ERROR", "CASE 문제 점수만 확정할 수 있습니다.", 400);
+    }
+
     // [HIGH-1] Block commit while grading is in progress
     const { data: currentSession } = await supabase
       .from("exam_grading_sessions")
-      .select("status")
+      .select("status, calibration_status, grading_scope")
       .eq("exam_id", examId)
       .eq("instructor_id", access.ctx.user.id)
       .maybeSingle();
 
     if (currentSession?.status === "grading") {
       return errorJson("CONFLICT", "채점이 진행 중입니다. 완료 후 확정하세요.", 409);
+    }
+    if (currentSession?.calibration_status === "sample_grading") {
+      return errorJson("CONFLICT", "샘플 가채점이 진행 중입니다. 전체 가채점 완료 후 확정하세요.", 409);
+    }
+    if (currentSession?.status !== "grading_done" || currentSession?.grading_scope !== "full") {
+      return errorJson("VALIDATION_ERROR", "전체 가채점 완료 후 확정할 수 있습니다.", 400);
     }
 
     // Claim the commit before writing grades.

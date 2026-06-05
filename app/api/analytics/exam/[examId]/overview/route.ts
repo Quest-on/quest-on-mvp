@@ -1,10 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { currentUser } from "@/lib/get-current-user";
 import { decompressData } from "@/lib/compression";
 import { successJson, errorJson } from "@/lib/api-response";
 import { validateUUID } from "@/lib/validate-params";
-import { deduplicateGrades, calculateOverallScore } from "@/lib/grade-utils";
+import {
+  calculateScoreFromItems,
+  deduplicateGrades,
+  isScoringGrade,
+  normalizeScoreWeights,
+  type ScoreItem,
+} from "@/lib/grade-utils";
+import {
+  gradeObjectiveAnswer,
+  isObjectiveQuestion,
+  normalizeQuestions,
+  selectBestSubmission,
+} from "@/lib/grading-helpers";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 
 // P1-4: Lazy Supabase getter to avoid stale connections in serverless
@@ -41,7 +53,7 @@ export async function GET(
     // 1. 시험 정보 가져오기 (루브릭 정보 포함)
     const { data: exam, error: examError } = await getSupabase()
       .from("exams")
-      .select("id, title, code, rubric, questions, instructor_id")
+      .select("id, title, code, rubric, questions, instructor_id, score_weights")
       .eq("id", examId)
       .single();
 
@@ -60,6 +72,8 @@ export async function GET(
         ? (exam.questions as Array<{ type?: string }>)
         : []
       : [];
+    const normalizedQuestions = normalizeQuestions(exam.questions);
+    const scoreWeights = normalizeScoreWeights(exam.score_weights);
     const isEssayTypeOnly =
       questions.length > 0 &&
       questions.every((q) => q.type === "essay" || !q.type);
@@ -194,7 +208,7 @@ export async function GET(
           .eq("role", "user"),
         getSupabase()
           .from("submissions")
-          .select("session_id, answer, compressed_answer_data")
+          .select("id, session_id, q_idx, answer, compressed_answer_data, created_at")
           .in("session_id", sessionIds),
       ]
     );
@@ -225,12 +239,24 @@ export async function GET(
     }
 
     const submissionsBySession = new Map<string, typeof allSubmissions>();
+    const submissionsBySessionQuestion = new Map<string, Map<number, Record<string, unknown>>>();
     if (allSubmissions) {
       for (const submission of allSubmissions) {
         if (!submissionsBySession.has(submission.session_id)) {
           submissionsBySession.set(submission.session_id, []);
         }
         submissionsBySession.get(submission.session_id)!.push(submission);
+        if (!submissionsBySessionQuestion.has(submission.session_id)) {
+          submissionsBySessionQuestion.set(submission.session_id, new Map());
+        }
+        const byQuestion = submissionsBySessionQuestion.get(submission.session_id)!;
+        const existing = byQuestion.get(submission.q_idx);
+        byQuestion.set(
+          submission.q_idx,
+          existing
+            ? selectBestSubmission([existing, submission])
+            : (submission as Record<string, unknown>)
+        );
       }
     }
 
@@ -243,12 +269,37 @@ export async function GET(
       const messages = messagesBySession.get(sessionId) || [];
       const submissions = submissionsBySession.get(sessionId) || [];
 
-      // Use shared grade-utils for consistent scoring (dedup + ai_failed exclusion)
-      const { overallScore: averageScore, gradedCount: _gradedCount } =
-        grades.length > 0
-          ? calculateOverallScore(grades as Array<{ q_idx: number; score: number; grade_type?: string }>)
-          : { overallScore: 0, gradedCount: 0 };
-      const scoreForDisplay = grades.length > 0 && _gradedCount > 0 ? averageScore : null;
+      const dedupedGrades = deduplicateGrades(
+        grades as Array<{ q_idx: number; score: number; grade_type?: string }>
+      ).filter(isScoringGrade);
+      const gradeByQ = new Map(dedupedGrades.map((grade) => [grade.q_idx, grade]));
+      const submissionsByQuestion =
+        submissionsBySessionQuestion.get(sessionId) ?? new Map();
+      const scoreItems: ScoreItem[] = normalizedQuestions.map((question) => {
+        if (isObjectiveQuestion(question.type)) {
+          const submission = submissionsByQuestion.get(question.idx);
+          const objective = gradeObjectiveAnswer({
+            rawAnswer: (submission?.answer as string) ?? "",
+            options: question.options,
+            correctOptionIndex: question.correctOptionIndex,
+          });
+          return { qIdx: question.idx, type: question.type, score: objective?.score };
+        }
+        return {
+          qIdx: question.idx,
+          type: question.type,
+          score: gradeByQ.get(question.idx)?.score,
+        };
+      });
+      const scoreResult = calculateScoreFromItems(
+        scoreItems,
+        scoreWeights
+      );
+      const scoreForDisplay =
+        scoreResult.overallScore !== null &&
+        (scoreResult.mode === "weighted" || scoreResult.gradedCount > 0)
+          ? scoreResult.overallScore
+          : null;
 
       const questionCount = messages.length;
 
@@ -263,7 +314,7 @@ export async function GET(
               submission.compressed_answer_data as string
             );
             answer = (decompressed as { answer?: string })?.answer || answer;
-          } catch (e) {
+          } catch {
             // 압축 해제 실패 시 원본 사용
           }
         }
@@ -286,7 +337,7 @@ export async function GET(
           : null;
 
       // 단계별 점수 추출
-      let stageScores = {
+      const stageScores = {
         chat: null as number | null,
         answer: null as number | null,
         feedback: null as number | null,
@@ -771,7 +822,7 @@ export async function GET(
         headers: { "Cache-Control": "private, max-age=120, stale-while-revalidate=300" },
       }
     );
-  } catch (error) {
+  } catch {
     return errorJson("INTERNAL_SERVER_ERROR", "Internal server error", 500);
   }
 }

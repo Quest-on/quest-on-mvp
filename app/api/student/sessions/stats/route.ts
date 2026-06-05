@@ -2,10 +2,20 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { currentUser } from "@/lib/get-current-user";
 import { successJson, errorJson } from "@/lib/api-response";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
-import { isScoringGrade } from "@/lib/grade-utils";
+import {
+  calculateScoreFromItems,
+  deduplicateGrades,
+  isScoringGrade,
+  normalizeScoreWeights,
+  type GradeRow,
+  type ScoreItem,
+} from "@/lib/grade-utils";
+import { gradeObjectiveAnswer, isObjectiveQuestion } from "@/lib/grading-helpers";
 
 // Initialize Supabase client
 const supabase = getSupabaseServer();
+
+type SessionGradeRow = GradeRow & { session_id: string };
 
 export async function GET() {
   try {
@@ -125,14 +135,22 @@ export async function GET() {
     // Fetch grades_released status for all completed sessions' exams
     const completedExamIds = [...new Set(completedSessions.map((s) => s.exam_id).filter(Boolean))];
     const releasedExamIds = new Set<string>();
+    const examById = new Map<string, {
+      id: string;
+      questions: unknown;
+      score_weights: unknown;
+    }>();
     if (completedExamIds.length > 0) {
       const { data: releasedExams } = await supabase
         .from("exams")
-        .select("id")
+        .select("id, questions, score_weights")
         .in("id", completedExamIds)
         .eq("grades_released", true);
       if (releasedExams) {
-        releasedExams.forEach((e) => releasedExamIds.add(e.id));
+        releasedExams.forEach((e) => {
+          releasedExamIds.add(e.id);
+          examById.set(e.id, e);
+        });
       }
     }
 
@@ -144,37 +162,107 @@ export async function GET() {
     let overallAverageScore: number | null = null;
 
     if (releasedSessionIds.length > 0) {
-      const { data: allGrades, error: gradesError } = await supabase
-        .from("grades")
-        .select("session_id, score, grade_type")
-        .in("session_id", releasedSessionIds);
+      const [gradesResult, submissionsResult] = await Promise.all([
+        supabase
+          .from("grades")
+          .select("session_id, q_idx, score, grade_type")
+          .in("session_id", releasedSessionIds),
+        supabase
+          .from("submissions")
+          .select("session_id, q_idx, answer")
+          .in("session_id", releasedSessionIds),
+      ]);
+
+      const allGrades = gradesResult.data as SessionGradeRow[] | null;
+      const gradesError = gradesResult.error;
+      const allSubmissions = submissionsResult.data;
 
       if (gradesError) {
         // Non-critical: grades fetch failed
       }
 
-      if (allGrades && allGrades.length > 0) {
-        // Group grades by session_id
-        const gradesBySession = new Map<string, number[]>();
-        allGrades.filter(isScoringGrade).forEach((grade) => {
+      const gradesBySession = new Map<string, SessionGradeRow[]>();
+      if (allGrades) {
+        allGrades.forEach((grade) => {
           if (!gradesBySession.has(grade.session_id)) {
             gradesBySession.set(grade.session_id, []);
           }
-          gradesBySession.get(grade.session_id)!.push(grade.score);
+          gradesBySession.get(grade.session_id)!.push(grade);
         });
+      }
 
-        // Calculate average for each session, then overall average
-        const sessionAverages: number[] = [];
-        gradesBySession.forEach((scores) => {
-          const sessionAvg = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-          sessionAverages.push(sessionAvg);
+      const submissionsBySession = new Map<
+        string,
+        Array<{ q_idx: number; answer: string | null }>
+      >();
+      if (allSubmissions) {
+        allSubmissions.forEach((submission) => {
+          if (!submissionsBySession.has(submission.session_id)) {
+            submissionsBySession.set(submission.session_id, []);
+          }
+          submissionsBySession.get(submission.session_id)!.push(submission);
         });
+      }
 
-        if (sessionAverages.length > 0) {
-          overallAverageScore = Math.round(
-            sessionAverages.reduce((sum, avg) => sum + avg, 0) / sessionAverages.length
+      const sessionAverages: number[] = [];
+      for (const session of completedSessions) {
+        if (!releasedExamIds.has(session.exam_id)) continue;
+        const exam = examById.get(session.exam_id);
+        const dedupedGrades = deduplicateGrades(
+          gradesBySession.get(session.id) ?? []
+        ).filter(isScoringGrade);
+
+        if (exam && Array.isArray(exam.questions)) {
+          const submissionsByQuestion = new Map(
+            (submissionsBySession.get(session.id) ?? []).map((submission) => [
+              submission.q_idx,
+              submission,
+            ])
+          );
+          const gradeByQuestion = new Map(
+            dedupedGrades.map((grade) => [grade.q_idx, grade])
+          );
+          const scoreItems: ScoreItem[] = exam.questions.map(
+            (
+              question: {
+                idx?: number;
+                type?: string;
+                options?: string[];
+                correctOptionIndex?: number;
+              },
+              index: number
+            ) => {
+              const qIdx = typeof question.idx === "number" ? question.idx : index;
+              if (isObjectiveQuestion(question.type)) {
+                const objective = gradeObjectiveAnswer({
+                  rawAnswer: submissionsByQuestion.get(qIdx)?.answer ?? "",
+                  options: question.options,
+                  correctOptionIndex: question.correctOptionIndex,
+                });
+                return { qIdx, type: question.type, score: objective?.score };
+              }
+              return { qIdx, type: question.type, score: gradeByQuestion.get(qIdx)?.score };
+            }
+          );
+          const scoreResult = calculateScoreFromItems(
+            scoreItems,
+            normalizeScoreWeights(exam.score_weights)
+          );
+          if (scoreResult.overallScore !== null && scoreResult.gradedCount > 0) {
+            sessionAverages.push(scoreResult.overallScore);
+          }
+        } else if (dedupedGrades.length > 0) {
+          sessionAverages.push(
+            dedupedGrades.reduce((sum, grade) => sum + grade.score, 0) /
+              dedupedGrades.length
           );
         }
+      }
+
+      if (sessionAverages.length > 0) {
+        overallAverageScore = Math.round(
+          sessionAverages.reduce((sum, avg) => sum + avg, 0) / sessionAverages.length
+        );
       }
     }
 
