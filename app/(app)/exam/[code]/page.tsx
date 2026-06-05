@@ -266,6 +266,11 @@ export default function ExamPage() {
     onSelect: (value) => {
       if (currentQuestionId) autoSave.updateAnswer(currentQuestionId, value);
     },
+    onNext: () => {
+      if (exam && currentQuestion < exam.questions.length - 1) {
+        setCurrentQuestionWithReveal((prev) => prev + 1);
+      }
+    },
   });
 
   // --- Early returns ---
