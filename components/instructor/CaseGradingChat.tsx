@@ -63,6 +63,7 @@ export function CaseGradingChat({
 }: CaseGradingChatProps) {
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const sendInFlightRef = useRef(false);
   const [input, setInput] = useState("");
   const [score, setScore] = useState<string>(
@@ -88,10 +89,6 @@ export function CaseGradingChat({
   });
 
   const messages = useMemo(() => data ?? [], [data]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   const chatMutation = useMutation({
     mutationFn: async ({
@@ -127,6 +124,10 @@ export function CaseGradingChat({
       queryClient.invalidateQueries({
         queryKey: qk.instructor.caseGradeChat(sessionId, qIdx),
       });
+      // 연속 질문을 위해 전송 후 입력란으로 포커스를 되돌린다.
+      // onSuccess 시점엔 아직 isPending=true(=disabled)라, 리렌더로 disabled가
+      // 풀린 다음 프레임에 focus 해야 실제로 포커스가 들어간다.
+      requestAnimationFrame(() => chatInputRef.current?.focus());
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -174,6 +175,18 @@ export function CaseGradingChat({
     onCommitPendingChange?.(commitMutation.isPending);
   }, [commitMutation.isPending, onCommitPendingChange]);
 
+  // 메시지 영역 '내부'에서만 스크롤한다. block:"nearest"가 없으면 가장 가까운
+  // 스크롤 조상(=페이지 문서)까지 끌려가 답변 도착 시 화면 전체가 점프한다.
+  useEffect(() => {
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    messagesEndRef.current?.scrollIntoView({
+      behavior: prefersReduced ? "auto" : "smooth",
+      block: "nearest",
+    });
+  }, [messages, chatMutation.isPending]);
+
   const handleSend = () => {
     const trimmed = input.trim();
     if (!trimmed || chatMutation.isPending || sendInFlightRef.current) return;
@@ -205,16 +218,30 @@ export function CaseGradingChat({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="h-[280px] overflow-y-auto rounded-md border p-3">
+        <div
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions"
+          aria-busy={historyLoading}
+          className="h-[clamp(280px,42vh,460px)] overflow-y-auto rounded-md border bg-muted/30 p-3"
+        >
           {historyLoading ? (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
               대화 불러오는 중…
             </div>
-          ) : displayMessages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              채점에 대해 질문해 보세요. 예: &quot;이 답안의 핵심 강점과 약점은?&quot;
-            </p>
+          ) : displayMessages.length === 0 && !chatMutation.isPending ? (
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                <Bot className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium text-foreground">
+                AI와 채점을 논의해 보세요
+              </p>
+              <p className="text-xs text-muted-foreground">
+                예: &quot;이 답안의 핵심 강점과 약점은?&quot;
+              </p>
+            </div>
           ) : (
             <div className="space-y-3 pr-2">
               {displayMessages.map((msg) => (
@@ -254,37 +281,60 @@ export function CaseGradingChat({
                   </div>
                 </div>
               ))}
+              {chatMutation.isPending && (
+                <div className="flex gap-2">
+                  <div className="shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center">
+                    <Bot className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    AI가 답변을 작성 중…
+                  </div>
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </div>
           )}
         </div>
 
-        <div className="flex gap-2">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="채점 관련 질문을 입력하세요"
-            rows={2}
-            disabled={chatMutation.isPending}
-            className="min-h-0 resize-none"
-          />
-          <Button
-            type="button"
-            size="icon"
-            onClick={handleSend}
-            disabled={!input.trim() || chatMutation.isPending}
-            aria-label="메시지 보내기"
-          >
-            {chatMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
+        <div className="rounded-md border bg-muted/40 p-2">
+          <Label htmlFor={`case-grade-chat-${qIdx}`} className="sr-only">
+            AI에게 보낼 채점 질문
+          </Label>
+          <div className="flex items-end gap-2">
+            <Textarea
+              id={`case-grade-chat-${qIdx}`}
+              ref={chatInputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="AI에게 채점 질문하기…"
+              rows={2}
+              disabled={chatMutation.isPending}
+              className="min-h-0 resize-none bg-background"
+            />
+            <Button
+              type="button"
+              size="icon"
+              onClick={handleSend}
+              disabled={!input.trim() || chatMutation.isPending}
+              aria-busy={chatMutation.isPending}
+              aria-label="메시지 보내기"
+            >
+              {chatMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          <p className="mt-1.5 px-0.5 text-xs text-muted-foreground">
+            Enter 전송 · Shift+Enter 줄바꿈
+          </p>
         </div>
 
-        <div className="space-y-3 pt-2 border-t">
+        <div className="space-y-3 rounded-md border bg-card p-3">
+          <p className="text-xs font-semibold text-muted-foreground">채점 입력</p>
           <div className="space-y-2">
             <Label htmlFor={`case-grade-score-${qIdx}`}>점수 (0–100)</Label>
             <Input
