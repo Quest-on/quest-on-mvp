@@ -74,8 +74,10 @@ test.describe("GET /api/exam/[examId]/export/excel", () => {
       ?.find((row) => row.getCell(1).value === "Test Student");
 
     expect(studentRow).toBeTruthy();
-    expect(studentRow?.getCell(3).value).toBe(100);
-    expect(studentRow?.getCell(4).value).toBe(80);
-    expect(studentRow?.getCell(5).value).toBe(90);
+    // 레이아웃: [이름1, 학번2, 제출시각3, 지각4, MCQ5, essay6, 최종7]
+    // 객관식은 stale grade(0)가 아니라 raw 제출("2"=정답키 2)로 재채점 → "3번(정답)"
+    expect(studentRow?.getCell(5).value).toBe("3번(정답)");
+    expect(studentRow?.getCell(6).value).toBe(80);
+    expect(studentRow?.getCell(7).value).toBe(90);
   });
 });

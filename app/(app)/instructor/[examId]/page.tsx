@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, ChevronDown, ChevronUp, RefreshCw, Loader2, Eye, EyeOff, Download, Bot } from "lucide-react";
+import toast from "react-hot-toast";
 import {
   Tooltip,
   TooltipContent,
@@ -278,10 +279,46 @@ export default function ExamDetail({
           ? "다시 보기"
           : "가채점 시작";
 
-  const handleExcelDownload = useCallback(() => {
-    if (!exam || !allStudentsManuallyGraded) return;
-    window.location.href = `/api/exam/${exam.id}/export/excel`;
-  }, [exam, allStudentsManuallyGraded]);
+  const [isExporting, setIsExporting] = useState<"excel" | "csv" | null>(null);
+
+  const handleDownload = useCallback(
+    async (format: "excel" | "csv") => {
+      if (!exam || !allStudentsManuallyGraded || isExporting) return;
+      setIsExporting(format);
+      try {
+        const res = await fetch(`/api/exam/${exam.id}/export/${format}`);
+        if (!res.ok) {
+          let message = "내보내기에 실패했습니다.";
+          try {
+            const body = await res.json();
+            message = body.message || body.error || message;
+          } catch {
+            // 비-JSON(에러 외) 응답은 기본 메시지 사용
+          }
+          toast.error(message);
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        const disposition = res.headers.get("Content-Disposition") || "";
+        const match = disposition.match(/filename\*=UTF-8''([^;]+)/);
+        link.download = match
+          ? decodeURIComponent(match[1])
+          : `exam-results.${format === "excel" ? "xlsx" : "csv"}`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      } catch {
+        toast.error("내보내기 중 오류가 발생했습니다.");
+      } finally {
+        setIsExporting(null);
+      }
+    },
+    [exam, allStudentsManuallyGraded, isExporting]
+  );
 
   // 스켈레톤은 최초 로드에서만. summariesFetching(10초 폴링 재요청)을 넣으면
   // 매 폴링마다 목록이 스켈레톤으로 교체돼 스크롤이 맨 위로 튀고 깜빡인다.
@@ -341,11 +378,39 @@ export default function ExamDetail({
                       <Button
                         size="sm"
                         className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 focus-visible:ring-emerald-500"
-                        onClick={handleExcelDownload}
-                        disabled={!allStudentsManuallyGraded}
+                        onClick={() => handleDownload("excel")}
+                        disabled={!allStudentsManuallyGraded || isExporting !== null}
                       >
-                        <Download className="h-4 w-4 mr-1.5" />
-                        Excel 다운로드
+                        {isExporting === "excel" ? (
+                          <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-1.5" />
+                        )}
+                        Excel
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!allStudentsManuallyGraded && (
+                    <TooltipContent side="bottom">
+                      모든 학생 채점을 완료해주세요
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={!allStudentsManuallyGraded ? "cursor-not-allowed" : undefined}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDownload("csv")}
+                        disabled={!allStudentsManuallyGraded || isExporting !== null}
+                      >
+                        {isExporting === "csv" ? (
+                          <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-1.5" />
+                        )}
+                        CSV
                       </Button>
                     </span>
                   </TooltipTrigger>
