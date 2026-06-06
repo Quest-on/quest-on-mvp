@@ -80,17 +80,17 @@ next-env.d.ts
 skills-lock.json
 
 # ---- remotion video subproject: deps, rendered output, media, tooling ----
-remotion/node_modules/
-remotion/out/
-remotion/public/
-remotion/.cache/
-remotion/.agents/
-remotion/.claude/
-remotion/.factory/
-remotion/.kiro/
-remotion/.omx/
+marketing/video/remotion/node_modules/
+marketing/video/remotion/out/
+marketing/video/remotion/public/
+marketing/video/remotion/.cache/
+marketing/video/remotion/.agents/
+marketing/video/remotion/.claude/
+marketing/video/remotion/.factory/
+marketing/video/remotion/.kiro/
+marketing/video/remotion/.omx/
 
 # ---- demo-video: rendered output + media assets + fonts (code/docs only) ----
-demo-video/renders/
-demo-video/assets/
-demo-video/fonts/
+marketing/video/demo-video/renders/
+marketing/video/demo-video/assets/
+marketing/video/demo-video/fonts/

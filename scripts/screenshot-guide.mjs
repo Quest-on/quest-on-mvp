@@ -5,7 +5,7 @@ import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
-const htmlPath = path.resolve(projectRoot, 'student-exam-guide.html');
+const htmlPath = path.resolve(projectRoot, 'marketing', 'guides', 'student-exam-guide.html');
 const outDir = path.resolve(projectRoot, 'test-results', 'guide-slides');
 
 async function captureSlides() {

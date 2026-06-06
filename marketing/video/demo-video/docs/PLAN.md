@@ -143,7 +143,7 @@ For beats 3, 4, 5 (text on top of fal footage):
 ## Decisions Locked
 
 - F: 24 fps composition (matches fal native)
-- G: Project at `/Users/cigro/Yeongjun/quest-on/demo-video/`
+- G: Project at `/Users/cigro/Yeongjun/quest-on/marketing/video/demo-video/`
 - H: HappyHorse-1.0 via `queue.fal.run` (`alibaba/happy-horse/text-to-video`)
 - I: Phase 1 starts immediately
 
