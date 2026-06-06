@@ -14,6 +14,8 @@ interface UseObjectiveKeyboardSelectParams {
   displayOrder?: number[];
   /** Called with the ORIGINAL index string (e.g. "2") when a valid digit key is pressed. */
   onSelect: (value: string) => void;
+  /** Called when Enter is pressed (same guards as digit keys). Advance to next question. */
+  onNext?: () => void;
 }
 
 /**
@@ -41,7 +43,7 @@ export function useObjectiveKeyboardSelect(
     if (!params.enabled) return;
 
     const handler = (event: KeyboardEvent) => {
-      const { enabled, type, optionCount, displayOrder, onSelect } =
+      const { enabled, type, optionCount, displayOrder, onSelect, onNext } =
         paramsRef.current;
 
       if (!enabled) return;
@@ -84,6 +86,24 @@ export function useObjectiveKeyboardSelect(
       if (value !== null) {
         event.preventDefault();
         onSelect(value);
+        return;
+      }
+
+      // Enter → advance to next question, but only when focus is NOT on an
+      // interactive control. Otherwise let the browser run that control's
+      // native Enter activation (이전/다음/나가기 buttons, option radios) — a
+      // document-level preventDefault here would hijack their keyboard use.
+      // (Scoped to the Enter branch so digit-key selection is unaffected.)
+      if (event.key === "Enter") {
+        if (
+          target?.closest(
+            'button, a, [role="radio"], [role="button"], [href], [tabindex]:not([tabindex="-1"])',
+          )
+        ) {
+          return;
+        }
+        event.preventDefault();
+        onNext?.();
       }
     };
 

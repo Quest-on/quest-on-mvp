@@ -13,7 +13,6 @@ import {
   isNearBottom,
   orderThreadItems,
   resolveSendMode,
-  countInterviewQuestions,
   formatPickedQACriteria,
 } from "@/lib/bulk-grade-thread";
 import toast from "react-hot-toast";
@@ -279,21 +278,23 @@ export function BulkGradingPanel({
       queryClient.setQueryData(qk.instructor.bulkGradeChat(examId), result);
       queryClient.invalidateQueries({ queryKey: qk.instructor.bulkGradeSession(examId) });
 
-      // Fetch quick-reply options for the new AI question (interviewing phase only).
-      if (result.session?.calibration_status === "interviewing") {
-        const msgs = result.messages ?? [];
-        const latestAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
-        const sessionId = result.session?.id ?? chatData?.session?.id;
-        if (latestAssistant && sessionId) {
-          setChatOptions([]); // clear while fetching
-          lastFetchedMsgIdRef.current = latestAssistant.id;
-          chatOptionsMutation.mutate({
-            questionText: latestAssistant.content,
-            gradingSessionId: sessionId,
-          });
-        }
-      } else {
-        // Left interviewing phase (e.g. approved) — clear chips.
+      // 마지막 메시지가 AI(assistant)면 phase 무관하게 보기를 생성한다.
+      // lastFetchedMsgIdRef 동치 가드로 init useEffect와의 이중 fetch를 막는다.
+      const msgs = result.messages ?? [];
+      const lastMsg = msgs[msgs.length - 1];
+      const sessionId = result.session?.id ?? chatData?.session?.id;
+      if (
+        lastMsg?.role === "assistant" &&
+        sessionId &&
+        lastMsg.id !== lastFetchedMsgIdRef.current
+      ) {
+        setChatOptions([]); // clear while fetching
+        lastFetchedMsgIdRef.current = lastMsg.id;
+        chatOptionsMutation.mutate({
+          questionText: lastMsg.content,
+          gradingSessionId: sessionId,
+        });
+      } else if (lastMsg?.role !== "assistant") {
         setChatOptions([]);
       }
     },
@@ -562,47 +563,27 @@ export function BulkGradingPanel({
     setDraft("");
   };
 
-  // ─── Interview phase chip logic ─────────────────────────────────────────────
-  const isInterviewing = chatData?.session?.calibration_status === "interviewing";
+  // ─── Quick-reply chip logic (phase-agnostic) ────────────────────────────────
+  // 칩은 "마지막 메시지가 AI(assistant)"이고 "확정 전 · 채점 중 아님"일 때 표시한다.
+  // 가채점 전 인터뷰와 가채점 후 토론 모두에서 동일하게 동작한다.
+  const lastMessage =
+    chatData?.messages?.[(chatData?.messages.length ?? 0) - 1];
+  const canShowChips =
+    lastMessage?.role === "assistant" && !committed && !isGrading;
 
-  /** Number of AI questions posed AFTER the first user reply (cap = 3). */
-  const aiQuestionCount = countInterviewQuestions(chatData?.messages ?? []);
-  const AI_QUESTION_CAP = 3;
+  /** Quick-reply pick chips for the latest AI question. Re-grade lives in a button. */
+  const displayedOptions: string[] = canShowChips ? chatOptions : [];
 
-  /**
-   * Structured option list displayed as quick-reply chips.
-   * When the cap is reached, only the regrade option is shown (forces commit).
-   * The regrade chip is always last; its action distinguishes it from pick chips.
-   */
-  const displayedOptions: { label: string; action: "pick" | "regrade" }[] =
-    isInterviewing
-      ? aiQuestionCount >= AI_QUESTION_CAP
-        ? [{ label: "이 기준으로 다시 가채점", action: "regrade" }]
-        : [
-            ...chatOptions.map((o) => ({ label: o, action: "pick" as const })),
-            { label: "이 기준으로 다시 가채점", action: "regrade" },
-          ]
-      : [];
-
-  const handleOptionPick = (opt: { label: string; action: "pick" | "regrade" }) => {
-    if (opt.action === "regrade") {
-      // Arm re-grade with base criteria only.
-      // formatPickedQACriteria will be appended exactly once in startGradingMutation.
-      const base =
-        lastSubmittedCriteria?.text ?? data?.session?.criteriaSummary ?? draft ?? "";
-      setDraft(base);
-      setRegradeArmed(true);
-      setCriteriaMode("custom");
-      setChatOptions([]);
-      focusComposer();
-    } else {
-      // Pick a quick-reply answer: record the Q&A pair and send it as a chat message.
-      const msgs = chatData?.messages ?? [];
-      const latestQ = [...msgs].reverse().find((m) => m.role === "assistant")?.content ?? "";
-      setPickedQA((prev) => [...prev, { q: latestQ, a: opt.label }]);
-      setChatOptions([]);
-      chatMutation.mutate({ message: opt.label, clientMessageId: createClientMessageId() });
-    }
+  const handleOptionPick = (label: string) => {
+    // 답을 선택: Q&A 쌍을 기록하고 채팅 메시지로 전송한다. 이 누적(pickedQA)은
+    // 다음 재가채점 시 criteria에 반영된다(대화로 조정 → 재가채점 흐름).
+    // startGradingMutation.onSuccess가 매 재가채점마다 setPickedQA([])로 비운다.
+    const msgs = chatData?.messages ?? [];
+    const latestQ =
+      [...msgs].reverse().find((m) => m.role === "assistant")?.content ?? "";
+    setPickedQA((prev) => [...prev, { q: latestQ, a: label }]);
+    setChatOptions([]);
+    chatMutation.mutate({ message: label, clientMessageId: createClientMessageId() });
   };
 
   // ─── Send routing ──────────────────────────────────────────────────────────
@@ -664,16 +645,16 @@ export function BulkGradingPanel({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onOpenChange]);
 
-  // ─── Init/welcome question options fetch ────────────────────────────────────
-  // Covers the case where the panel opens with an existing "interviewing" session
-  // and there's already an assistant message we haven't fetched options for yet.
+  // ─── 보기(quick-reply) fetch — 패널 오픈/대화 갱신 시 ─────────────────────────
+  // 마지막 메시지가 AI 질문이고 확정 전·채점 중이 아니면, phase 무관하게 보기를
+  // 생성한다(가채점 후 토론 포함). onSuccess와 같은 lastFetchedMsgIdRef 가드 공유.
   useEffect(() => {
     if (!open) return;
-    if (chatData?.session?.calibration_status !== "interviewing") return;
-    const sessionId = chatData.session.id;
+    if (committed || isGrading) return; // 칩이 의미 없는 상태는 skip
+    const sessionId = chatData?.session?.id;
     if (!sessionId) return;
 
-    const msgs = chatData.messages ?? [];
+    const msgs = chatData?.messages ?? [];
     const lastMsg = msgs[msgs.length - 1];
     if (!lastMsg || lastMsg.role !== "assistant") return;
     // Guard: don't re-fetch for the same message.
@@ -687,7 +668,7 @@ export function BulkGradingPanel({
     });
     // chatOptionsMutation is stable; we only re-run when messages change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, chatData?.messages, chatData?.session?.calibration_status, chatData?.session?.id]);
+  }, [open, chatData?.messages, chatData?.session?.id, committed, isGrading]);
 
   // ─── Thread items (single ordered timeline) ──────────────────────────────────
   const gradingStartTs = useMemo(() => {
@@ -1133,35 +1114,23 @@ export function BulkGradingPanel({
               )
             )}
 
-            {/* Footer: commit + re-grade arm. */}
-            {(showCommit || canRegradeArm) && (
+            {/* Footer: 채점 확정 (재가채점은 입력창 위 버튼으로 일원화) */}
+            {showCommit && (
               <div className="flex flex-wrap items-center gap-2 border-t pt-3">
-                {showCommit && (
-                  <Button
-                    type="button"
-                    onClick={handleCommit}
-                    disabled={commitMutation.isPending}
-                  >
-                    {commitMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        저장 중...
-                      </>
-                    ) : (
-                      `채점 확정 (${totalGrades}개)`
-                    )}
-                  </Button>
-                )}
-                {canRegradeArm && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={armRegrade}
-                    disabled={regradeArmed}
-                  >
-                    다시 채점
-                  </Button>
-                )}
+                <Button
+                  type="button"
+                  onClick={handleCommit}
+                  disabled={commitMutation.isPending}
+                >
+                  {commitMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      저장 중...
+                    </>
+                  ) : (
+                    `채점 확정 (${totalGrades}개)`
+                  )}
+                </Button>
               </div>
             )}
             {committed && (
@@ -1274,6 +1243,22 @@ export function BulkGradingPanel({
 
       {/* Composer */}
       <div className="shrink-0 border-t px-5 py-3">
+        {/* 재가채점 — 가채점 완료 상태에서 입력창 바로 위에 상시 노출 */}
+        {canRegradeArm && !regradeArmed && (
+          <div className="mb-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={armRegrade}
+              data-testid="bulk-grade-regrade-arm"
+              className="w-full justify-center"
+            >
+              이 기준으로 다시 가채점
+            </Button>
+          </div>
+        )}
+
         {regradeArmed && (
           <div className="mb-2 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
             <span className="flex-1">
@@ -1289,36 +1274,44 @@ export function BulkGradingPanel({
           </div>
         )}
 
-        {/* Quick-reply chips — shown during the interviewing phase */}
-        {isInterviewing && (aiQuestionCount > 0 || chatOptions.length > 0) && (
-          <div className="mb-2">
-            {chatOptionsMutation.isPending ? (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                보기 생성 중...
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {displayedOptions.map((opt, optIdx) => (
-                  <button
-                    key={`${opt.action}-${optIdx}-${opt.label}`}
-                    type="button"
-                    onClick={() => handleOptionPick(opt)}
-                    disabled={chatMutation.isPending || startGradingMutation.isPending}
-                    className={cn(
-                      "rounded-full border px-3 py-1 text-xs transition-colors",
-                      opt.action === "regrade"
-                        ? "border-primary bg-primary/10 text-primary hover:bg-primary/20 font-medium"
-                        : "border-border bg-muted hover:bg-muted/70 text-foreground",
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {/* Quick-reply 보기 칩 — AI가 질문하면 phase 무관하게 표시 */}
+        {canShowChips &&
+          (chatOptionsMutation.isPending || displayedOptions.length > 0) && (
+            <div className="mb-2">
+              {chatOptionsMutation.isPending ? (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  보기 생성 중...
+                </div>
+              ) : (
+                <div
+                  className="flex flex-col gap-2"
+                  role="group"
+                  aria-label="답변 선택지"
+                >
+                  {displayedOptions.map((label, optIdx) => (
+                    <button
+                      key={`pick-${optIdx}-${label}`}
+                      type="button"
+                      onClick={() => handleOptionPick(label)}
+                      disabled={
+                        chatMutation.isPending || startGradingMutation.isPending
+                      }
+                      className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-background px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="flex size-6 shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 text-xs font-semibold text-muted-foreground"
+                      >
+                        {optIdx + 1}
+                      </span>
+                      <span className="flex-1">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
         <div className="rounded-xl border bg-background px-3 pb-2 pt-2.5 shadow-sm focus-within:ring-1 focus-within:ring-ring">
           <Textarea

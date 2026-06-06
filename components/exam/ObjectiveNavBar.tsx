@@ -23,7 +23,7 @@ export function ObjectiveNavBar({
   return (
     <div
       className={cn(
-        "flex items-center justify-between border-t border-border bg-background px-4 py-3",
+        "flex items-center justify-center gap-4 border-t border-border bg-background px-4 py-3",
         className,
       )}
     >
