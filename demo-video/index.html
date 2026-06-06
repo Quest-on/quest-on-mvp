@@ -1,0 +1,1567 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Pretendard";
+        font-weight: 100 900;
+        font-display: block;
+        src:
+          url("./fonts/PretendardVariable.woff2") format("woff2-variations"),
+          url("./fonts/PretendardVariable.woff2") format("woff2");
+      }
+
+      :root {
+        --bg: #05070f;
+        --bg-soft: #0a0f1f;
+        --primary: #3559c4;
+        --primary-light: #57cdff;
+        --primary-deep: #2f46b9;
+        --ink-inverse: #f8fafc;
+        --ink-muted: rgba(248, 250, 252, 0.62);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--bg);
+        font-family:
+          "Pretendard", "JetBrains Mono", "Geist Mono", -apple-system,
+          BlinkMacSystemFont, sans-serif;
+        color: var(--ink-inverse);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ============== Common layers ============== */
+
+      /* Persistent dark base behind everything (covers any video letterbox) */
+      .base-bg {
+        position: absolute;
+        inset: 0;
+        background: var(--bg);
+        z-index: 0;
+      }
+
+      /* Global subtle vignette over the whole composition */
+      .global-vignette {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(5, 7, 15, 0) 55%,
+          rgba(5, 7, 15, 0.55) 100%
+        );
+        pointer-events: none;
+      }
+
+      /* Video clips (full-bleed cinematic) */
+      video.bg-clip {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 2;
+      }
+
+      /* Lower-third dim ground for text-on-video readability */
+      .lt-ground {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse at 50% 88%,
+          rgba(5, 7, 15, 0.78) 0%,
+          rgba(5, 7, 15, 0) 60%
+        );
+        pointer-events: none;
+        z-index: 3;
+      }
+
+      /* Lower-third copy block */
+      .lt {
+        position: absolute;
+        bottom: 130px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        z-index: 4;
+        text-shadow:
+          0 2px 12px rgba(0, 0, 0, 0.7),
+          0 0 24px rgba(5, 7, 15, 0.45);
+      }
+      .lt .label {
+        font-size: 64px;
+        font-weight: 700;
+        letter-spacing: -0.024em;
+        line-height: 1.18;
+        color: var(--ink-inverse);
+      }
+      .lt .label .accent {
+        color: var(--primary-light);
+      }
+      .lt .meta {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 18px;
+        letter-spacing: 0.36em;
+        color: var(--primary-light);
+        text-transform: uppercase;
+        font-weight: 500;
+        margin-top: 16px;
+      }
+
+      /* ============== Hyperframes-only beat shells ============== */
+      .beat-scene {
+        position: absolute;
+        inset: 0;
+        background: var(--bg);
+        z-index: 2;
+        overflow: hidden;
+      }
+      .beat-content {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 120px 200px;
+        z-index: 4;
+      }
+
+      /* Kicker labels */
+      .kicker {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 22px;
+        letter-spacing: 0.32em;
+        font-weight: 500;
+        color: var(--primary-light);
+        text-transform: uppercase;
+        margin-bottom: 36px;
+      }
+
+      /* Hero copy */
+      .hero {
+        font-size: 88px;
+        font-weight: 700;
+        letter-spacing: -0.035em;
+        line-height: 1.18;
+        text-align: center;
+        max-width: 1700px;
+      }
+      .hero .accent {
+        color: var(--primary-light);
+      }
+      .hero .strike {
+        color: rgba(248, 250, 252, 0.5);
+        text-decoration: line-through;
+        text-decoration-thickness: 4px;
+        text-decoration-color: rgba(248, 250, 252, 0.45);
+      }
+
+      .sub {
+        font-size: 28px;
+        font-weight: 400;
+        letter-spacing: -0.012em;
+        line-height: 1.55;
+        color: var(--ink-muted);
+        text-align: center;
+        margin-top: 36px;
+        max-width: 1100px;
+      }
+
+      /* ============== Beat 2: Old Response (cinematic) ============== */
+      .b2-particles {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+      }
+      .b2-particle {
+        position: absolute;
+        border-radius: 50%;
+        background: #3559c4;
+        box-shadow: 0 0 6px rgba(53, 89, 196, 0.55);
+        opacity: 0.4;
+      }
+      .b2-particle.bright {
+        background: #57cdff;
+        box-shadow: 0 0 10px rgba(87, 205, 255, 0.75);
+        opacity: 0.7;
+      }
+      .b2-stack {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 48px;
+        position: relative;
+        z-index: 2;
+      }
+      .b2-prefix {
+        font-size: 56px;
+        font-weight: 500;
+        color: rgba(248, 250, 252, 0.72);
+        letter-spacing: -0.02em;
+      }
+      .b2-words {
+        display: flex;
+        align-items: baseline;
+        gap: 28px;
+        font-size: 128px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        line-height: 1;
+        color: var(--ink-inverse);
+      }
+      .b2-word {
+        position: relative;
+        display: inline-block;
+      }
+      .b2-slash {
+        position: absolute;
+        left: -10px;
+        right: -10px;
+        top: 56%;
+        height: 6px;
+        background: linear-gradient(
+          90deg,
+          rgba(87, 205, 255, 0) 0%,
+          #57cdff 14%,
+          #57cdff 86%,
+          rgba(87, 205, 255, 0) 100%
+        );
+        transform: scaleX(0);
+        transform-origin: left center;
+        box-shadow:
+          0 0 16px rgba(87, 205, 255, 0.6),
+          0 0 32px rgba(53, 89, 196, 0.35);
+        border-radius: 3px;
+      }
+      .b2-comma,
+      .b2-period {
+        color: rgba(248, 250, 252, 0.7);
+      }
+      /* Beat 2: news-clipping cards that slam in on "적발했습니다" */
+      #b2-scene .beat-content {
+        justify-content: flex-start;
+        padding-top: 160px;
+      }
+      .b2-stack {
+        gap: 34px;
+      }
+      .b2-words {
+        font-size: 98px;
+      }
+      .b2-news-row {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 54%;
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+        z-index: 3;
+        pointer-events: none;
+      }
+      .b2-news-card {
+        width: 560px;
+        background: #f4f1ea;
+        color: #1a1a1a;
+        border-radius: 4px;
+        padding: 20px 26px;
+        box-shadow: 0 22px 55px rgba(0, 0, 0, 0.55);
+        position: relative;
+      }
+      .b2-news-card.tilt-l {
+        transform: rotate(-1.8deg);
+      }
+      .b2-news-card.tilt-r {
+        transform: rotate(1.5deg);
+      }
+      .b2-news-card::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: #c0392b;
+      }
+      .b2-nc-kicker {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        color: #c0392b;
+        text-transform: uppercase;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .b2-nc-headline {
+        font-size: 22px;
+        font-weight: 800;
+        line-height: 1.3;
+        letter-spacing: -0.022em;
+        color: #1a1a1a;
+        font-family: "Pretendard", sans-serif;
+      }
+      .b2-nc-byline {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: #999;
+        margin-top: 11px;
+        padding-top: 8px;
+        border-top: 1px solid #ddd;
+      }
+
+      /* ============== Beat 5: Glassbox 4-label overlay ============== */
+      .glass-labels {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: 0;
+        z-index: 4;
+        padding: 220px 540px;
+      }
+      .glass-label {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        text-shadow:
+          0 2px 14px rgba(0, 0, 0, 0.85),
+          0 0 28px rgba(5, 7, 15, 0.6);
+      }
+      .glass-label .gl-tag {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 20px;
+        letter-spacing: 0.4em;
+        color: var(--primary-light);
+        text-transform: uppercase;
+        font-weight: 600;
+        margin-bottom: 12px;
+      }
+      .glass-label .gl-body {
+        font-size: 26px;
+        font-weight: 600;
+        letter-spacing: -0.012em;
+        color: var(--ink-inverse);
+        line-height: 1.35;
+      }
+
+      /* ============== Beat 6: Product Glimpse — Native UI (signature AI chat) ============== */
+      #b6-scene .beat-content {
+        padding: 64px 100px;
+        gap: 30px;
+        justify-content: center;
+      }
+      /* Caption sits pinned near the bottom so it does NOT push the
+         hero+mockup block off-center while it's still invisible. */
+      #b6-scene .b6-caption {
+        position: absolute;
+        left: 100px;
+        right: 100px;
+        bottom: 56px;
+      }
+      .b6-hero {
+        font-size: 50px;
+        font-weight: 700;
+        letter-spacing: -0.022em;
+        line-height: 1.22;
+        text-align: center;
+        max-width: 1700px;
+        color: var(--ink-inverse);
+      }
+      .b6-hero .accent {
+        color: var(--primary-light);
+      }
+      .b6-mockup {
+        display: flex;
+        gap: 24px;
+        width: 100%;
+        max-width: 1700px;
+        height: 700px;
+        margin-top: 18px;
+      }
+      .b6-pane {
+        background: rgba(248, 250, 252, 0.035);
+        border: 1px solid rgba(87, 205, 255, 0.2);
+        border-radius: 20px;
+        padding: 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+      }
+      .b6-exam-pane {
+        flex: 1.45;
+      }
+      .b6-ai-pane {
+        flex: 1;
+      }
+      /* Exam pane */
+      .b6-exam-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .b6-exam-tag {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 16px;
+        letter-spacing: 0.28em;
+        color: var(--primary-light);
+        text-transform: uppercase;
+        font-weight: 600;
+      }
+      .b6-timer {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 17px;
+        color: rgba(248, 250, 252, 0.62);
+        padding: 5px 14px;
+        background: rgba(248, 250, 252, 0.06);
+        border-radius: 999px;
+      }
+      .b6-question-card {
+        padding: 22px 24px;
+        background: rgba(87, 205, 255, 0.04);
+        border-radius: 12px;
+        border-left: 3px solid var(--primary-light);
+      }
+      .b6-question {
+        font-size: 22px;
+        line-height: 1.55;
+        color: rgba(248, 250, 252, 0.92);
+        letter-spacing: -0.012em;
+        font-weight: 500;
+      }
+      .b6-answer-label {
+        font-size: 13px;
+        letter-spacing: 0.3em;
+        color: rgba(248, 250, 252, 0.5);
+        text-transform: uppercase;
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 600;
+      }
+      .b6-answer {
+        flex: 1;
+        font-size: 20px;
+        line-height: 1.6;
+        color: rgba(248, 250, 252, 0.88);
+        padding: 22px;
+        background: rgba(248, 250, 252, 0.02);
+        border-radius: 12px;
+        border: 1px solid rgba(248, 250, 252, 0.08);
+        letter-spacing: -0.012em;
+        font-weight: 400;
+      }
+      .b6-cursor {
+        display: inline-block;
+        width: 2px;
+        height: 24px;
+        background: var(--primary-light);
+        margin-left: 3px;
+        vertical-align: middle;
+        box-shadow: 0 0 8px rgba(87, 205, 255, 0.6);
+      }
+      .b6-answer-new {
+        color: var(--primary-light);
+        font-weight: 500;
+      }
+      /* AI pane */
+      .b6-ai-header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid rgba(248, 250, 252, 0.08);
+      }
+      .b6-ai-icon {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, #57cdff 0%, #3559c4 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        color: #fff;
+        font-weight: 700;
+      }
+      .b6-ai-title {
+        font-size: 19px;
+        font-weight: 700;
+        color: var(--ink-inverse);
+        letter-spacing: -0.01em;
+      }
+      .b6-ai-tag {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        letter-spacing: 0.24em;
+        color: rgba(87, 205, 255, 0.75);
+        margin-left: auto;
+        text-transform: uppercase;
+        font-weight: 600;
+      }
+      .b6-ai-messages {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        overflow: hidden;
+      }
+      .b6-msg {
+        padding: 14px 20px;
+        border-radius: 16px;
+        font-size: 17px;
+        line-height: 1.5;
+        letter-spacing: -0.01em;
+      }
+      .b6-msg-student {
+        background: linear-gradient(
+          135deg,
+          rgba(53, 89, 196, 0.28),
+          rgba(47, 70, 185, 0.36)
+        );
+        border: 1px solid rgba(87, 205, 255, 0.35);
+        color: rgba(248, 250, 252, 0.95);
+        align-self: flex-end;
+        max-width: 85%;
+        border-bottom-right-radius: 6px;
+      }
+      .b6-msg-ai {
+        background: rgba(248, 250, 252, 0.05);
+        border: 1px solid rgba(248, 250, 252, 0.1);
+        color: rgba(248, 250, 252, 0.88);
+        align-self: flex-start;
+        max-width: 95%;
+        border-bottom-left-radius: 6px;
+      }
+      .b6-msg-ai .b6-msg-tag {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        letter-spacing: 0.3em;
+        color: var(--primary-light);
+        font-weight: 700;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+      .b6-caption {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 14px;
+        letter-spacing: 0.32em;
+        color: var(--primary-light);
+        text-transform: uppercase;
+        font-weight: 600;
+        text-align: center;
+      }
+
+      /* ============== Beat 7: Field Proof — logos + real photos ============== */
+      #b7-scene .beat-content {
+        padding: 64px 100px 72px;
+        gap: 26px;
+        justify-content: flex-start;
+      }
+      .uni-logo-row {
+        display: flex;
+        gap: 22px;
+        justify-content: center;
+        align-items: stretch;
+        margin-top: 8px;
+      }
+      .uni-logo-card {
+        width: 290px;
+        height: 104px;
+        background: rgba(248, 250, 252, 0.94);
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px 30px;
+        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.3);
+      }
+      .uni-logo-card img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+      }
+      .proof-photo-row {
+        display: flex;
+        gap: 22px;
+        width: 100%;
+        margin-top: 6px;
+      }
+      .proof-photo {
+        flex: 1;
+        height: 460px;
+        border-radius: 16px;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(87, 205, 255, 0.18);
+      }
+      .proof-photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center 35%;
+      }
+      .proof-photo::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          180deg,
+          rgba(5, 7, 15, 0) 55%,
+          rgba(5, 7, 15, 0.7) 100%
+        );
+      }
+      .proof-photo .photo-tag {
+        position: absolute;
+        bottom: 16px;
+        left: 20px;
+        right: 20px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 14px;
+        letter-spacing: 0.26em;
+        color: #ffffff;
+        text-transform: uppercase;
+        font-weight: 600;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+        z-index: 2;
+      }
+      .proof-verified-tag {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        letter-spacing: 0.24em;
+        color: #6ee7b7;
+        text-transform: uppercase;
+        font-weight: 700;
+        background: rgba(5, 7, 15, 0.55);
+        padding: 5px 10px;
+        border-radius: 999px;
+        z-index: 2;
+      }
+      .proof-verified-tag::before {
+        content: "✓ ";
+      }
+
+      /* ============== Beat 8: Why Claim ============== */
+      .why-eyebrow {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 22px;
+        letter-spacing: 0.4em;
+        color: var(--primary-light);
+        text-transform: uppercase;
+        margin-bottom: 44px;
+      }
+      .why-claim {
+        font-size: 110px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        line-height: 1.16;
+        text-align: center;
+        max-width: 1500px;
+      }
+      .why-claim .strike {
+        color: rgba(248, 250, 252, 0.5);
+        text-decoration: line-through;
+        text-decoration-thickness: 5px;
+        text-decoration-color: rgba(248, 250, 252, 0.4);
+      }
+      .why-claim .glow {
+        background: linear-gradient(
+          135deg,
+          #57cdff 0%,
+          #3559c4 60%,
+          #2f46b9 100%
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      /* ============== Beat 9: Brand Lock ============== */
+      .lock-stack {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 28px;
+      }
+      .logo-wordmark {
+        font-size: 168px;
+        font-weight: 800;
+        letter-spacing: -0.05em;
+        background: linear-gradient(
+          135deg,
+          #57cdff 0%,
+          #3559c4 50%,
+          #2f46b9 100%
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        line-height: 1;
+      }
+      .logo-rule {
+        width: 240px;
+        height: 2px;
+        background: linear-gradient(
+          90deg,
+          rgba(87, 205, 255, 0) 0%,
+          rgba(87, 205, 255, 0.85) 50%,
+          rgba(87, 205, 255, 0) 100%
+        );
+      }
+      .lock-tag {
+        font-size: 32px;
+        font-weight: 500;
+        color: var(--ink-muted);
+        letter-spacing: 0.04em;
+      }
+      .lock-meta {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 18px;
+        letter-spacing: 0.36em;
+        color: var(--primary-light);
+        text-transform: uppercase;
+        margin-top: 32px;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="63.0"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- Persistent base behind everything (z-0) -->
+      <div class="base-bg"></div>
+      <div class="global-vignette"></div>
+
+      <!-- ============== BEAT 1: Cheating Student → Blackbox (0:00-0:04.32) ============== -->
+      <!-- Student (faceless, from behind) typing into an AI chat during an
+           exam, then the scene dissolves into a graphite cube — the opaque
+           "black box" metaphor. Replaces the abstract particle-burst opener. -->
+      <video
+        id="vid-cheating"
+        class="clip bg-clip"
+        data-start="0"
+        data-duration="6.1"
+        data-track-index="1"
+        data-volume="0"
+        muted
+        playsinline
+        src="assets/video/00-cheating-student.silent.mp4"
+      ></video>
+
+      <!-- ============== BEAT 2: Old Response (0:04.32-0:13.24) — cinematic typography ============== -->
+      <div
+        id="b2-scene"
+        class="clip beat-scene"
+        data-start="5.0"
+        data-duration="8.0"
+        data-track-index="2"
+      >
+        <!-- Particle field carries the void aesthetic from Beat 1 -->
+        <div class="b2-particles" id="b2-particles"></div>
+        <div class="beat-content">
+          <div class="b2-stack">
+            <div class="b2-prefix" id="b2-prefix">지금까지 우리는,</div>
+            <div class="b2-words">
+              <span class="b2-word" id="b2-word-ban">
+                금지하거나
+                <span class="b2-slash" id="b2-slash-ban"></span>
+              </span>
+              <span class="b2-comma">,</span>
+              <span class="b2-word" id="b2-word-detect">
+                적발했습니다
+                <span class="b2-slash" id="b2-slash-detect"></span>
+              </span>
+              <span class="b2-period">.</span>
+            </div>
+          </div>
+        </div>
+        <!-- Stylized news-clipping cards (recreated headlines, not real
+             screenshots — see docs/news-headlines.md) slam in on "적발했습니다" -->
+        <div class="b2-news-row">
+          <div class="b2-news-card tilt-l" id="b2-news-1">
+            <div class="b2-nc-kicker">[ 사회 · 교육 ]</div>
+            <div class="b2-nc-headline">
+              대학 온라인 시험 부정행위 무더기 적발 — 수십 명 학사징계 · 시험
+              전면 무효
+            </div>
+            <div class="b2-nc-byline">○○일보 · 2021</div>
+          </div>
+          <div class="b2-news-card tilt-r" id="b2-news-2">
+            <div class="b2-nc-kicker">[ 단독 ]</div>
+            <div class="b2-nc-headline">
+              "챗GPT로 답안 작성"… 명문대 비대면 시험서 집단 부정행위, 전원
+              F학점 처분
+            </div>
+            <div class="b2-nc-byline">○○경제 · 2025</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== BEAT 3: Blackbox (0:13.24-0:22.30) ============== -->
+      <video
+        id="vid-blackbox"
+        class="clip bg-clip"
+        data-start="13.0"
+        data-duration="6.0"
+        data-track-index="3"
+        data-volume="0"
+        muted
+        playsinline
+        src="assets/video/01-blackbox-approach.silent.mp4"
+      ></video>
+      <div
+        id="b3-overlay"
+        class="clip"
+        data-start="13.0"
+        data-duration="6.5"
+        data-track-index="4"
+        style="position: absolute; inset: 0; z-index: 5; pointer-events: none"
+      >
+        <div class="lt-ground" id="b3-ground"></div>
+        <div class="lt" id="b3-lt">
+          <div class="label">
+            최종 답안 너머 — <span class="accent">문제 해결 과정의 불투명성</span>
+          </div>
+          <div class="meta">BLACKBOX · OPAQUE PROCESS</div>
+        </div>
+      </div>
+
+      <!-- ============== BEAT 3b: Blackbox Hold (extends blackbox until L7) ============== -->
+      <video
+        id="vid-blackbox-hold"
+        class="clip bg-clip"
+        data-start="19.0"
+        data-duration="6.0"
+        data-track-index="5"
+        data-volume="0"
+        muted
+        playsinline
+        src="assets/video/01b-blackbox-hold.silent.mp4"
+      ></video>
+
+      <!-- ============== BEAT 4: Blackbox → Glassbox Transition (L7 sync) ============== -->
+      <video
+        id="vid-transition"
+        class="clip bg-clip"
+        data-start="26.0"
+        data-duration="6.0"
+        data-track-index="6"
+        data-volume="0"
+        muted
+        playsinline
+        src="assets/video/02b-blackbox-to-glassbox.silent.mp4"
+      ></video>
+      <div
+        id="b4-overlay"
+        class="clip"
+        data-start="26.0"
+        data-duration="6.0"
+        data-track-index="14"
+        style="position: absolute; inset: 0; z-index: 5; pointer-events: none"
+      >
+        <div class="lt-ground" id="b4-ground"></div>
+        <div class="lt" id="b4-lt">
+          <div class="label">
+            Blackbox <span class="accent">→</span> Glassbox
+          </div>
+          <div class="meta">PROCESS · BECOMES · INSPECTABLE</div>
+        </div>
+      </div>
+
+      <!-- ============== BEAT 5: Glassbox Reveal (L7 end + L8) ============== -->
+      <!-- 5a: orbit -->
+      <video
+        id="vid-orbit"
+        class="clip bg-clip"
+        data-start="32.0"
+        data-duration="5.0"
+        data-track-index="7"
+        data-media-start="0"
+        data-volume="0"
+        muted
+        playsinline
+        src="assets/video/03-glassbox-orbit.silent.mp4"
+      ></video>
+      <!-- 5b: close -->
+      <video
+        id="vid-close"
+        class="clip bg-clip"
+        data-start="36.7"
+        data-duration="4.7"
+        data-track-index="8"
+        data-media-start="0"
+        data-volume="0"
+        muted
+        playsinline
+        src="assets/video/04-glassbox-close.silent.mp4"
+      ></video>
+      <!-- 5 overlay: 4-cell label stagger covers entire beat -->
+      <div
+        id="b5-overlay"
+        class="clip"
+        data-start="32.0"
+        data-duration="9.5"
+        data-track-index="9"
+        style="position: absolute; inset: 0; z-index: 5; pointer-events: none"
+      >
+        <div
+          class="lt-ground"
+          id="b5-ground"
+          style="background: radial-gradient(ellipse at center, rgba(5,7,15,0) 30%, rgba(5,7,15,0.55) 100%)"
+        ></div>
+        <div class="glass-labels">
+          <div class="glass-label" id="gl-1">
+            <div class="gl-tag">PROMPT</div>
+            <div class="gl-body">학생이 던진 질문</div>
+          </div>
+          <div class="glass-label" id="gl-2">
+            <div class="gl-tag">SOURCE</div>
+            <div class="gl-body">참조한 자료·근거</div>
+          </div>
+          <div class="glass-label" id="gl-3">
+            <div class="gl-tag">REVISION</div>
+            <div class="gl-body">답안의 변화 추적</div>
+          </div>
+          <div class="glass-label" id="gl-4">
+            <div class="gl-tag">RUBRIC</div>
+            <div class="gl-body">평가 기준 자동 매칭</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== BEAT 6: Product Glimpse (0:38.98-0:46.80) — Native UI mockup ============== -->
+      <div
+        id="b6-scene"
+        class="clip beat-scene"
+        data-start="36.0"
+        data-duration="7.6"
+        data-track-index="10"
+      >
+        <div class="beat-content">
+          <div class="b6-hero" id="b6-hero">
+            학생은 허용된 범위 안에서 <span class="accent">AI와 함께 사고</span>합니다.
+          </div>
+          <div class="b6-mockup">
+            <!-- Left: Exam question + answer area -->
+            <div class="b6-pane b6-exam-pane" id="b6-exam">
+              <div class="b6-exam-header">
+                <div class="b6-exam-tag">문제 1 · 서술형</div>
+                <div class="b6-timer">⏱ 59:11</div>
+              </div>
+              <div class="b6-question-card">
+                <div class="b6-question">
+                  디지털 전환(DX)이 기업 경쟁력에 미치는 영향을 설명하고, 성공적인
+                  전환의 핵심 요소 3가지를 논하시오.
+                </div>
+              </div>
+              <div class="b6-answer-label">답안 작성 · 자동 저장 중</div>
+              <div class="b6-answer">
+                디지털 전환은 기업이 디지털 기술을 활용하여 비즈니스 모델, 운영
+                프로세스, 고객 경험을 근본적으로 변화시키는 전략적 활동이다.<span
+                  class="b6-answer-new"
+                  id="b6-new-text"
+                  >
+                  핵심 요소는 (1) 데이터 기반 의사결정, (2) 고객 접점의
+                  디지털화…</span
+                ><span class="b6-cursor"></span>
+              </div>
+            </div>
+            <!-- Right: AI chat panel -->
+            <div class="b6-pane b6-ai-pane" id="b6-ai">
+              <div class="b6-ai-header">
+                <div class="b6-ai-icon">Q</div>
+                <div class="b6-ai-title">AI 도우미</div>
+                <div class="b6-ai-tag">문제 1 대화</div>
+              </div>
+              <div class="b6-ai-messages">
+                <div class="b6-msg b6-msg-student" id="b6-msg-1">
+                  이 case의 핵심 변수가 뭔지 분석해줘.
+                </div>
+                <div class="b6-msg b6-msg-ai" id="b6-msg-2">
+                  <div class="b6-msg-tag">AI · ANALYSIS</div>
+                  핵심 변수 3가지: (1) 데이터 기반 의사결정, (2) 고객 접점
+                  디지털화, (3) 조직 문화 변화. 강의자료 4-2 참고하세요.
+                </div>
+                <div class="b6-msg b6-msg-student" id="b6-msg-3">
+                  3번 조직 문화 변화는 답안에서 빼고 싶은데, 괜찮아?
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="b6-caption" id="b6-caption">
+            ALL QUESTIONS · SOURCES · REVISIONS LOGGED
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== BEAT 7: Field Proof (0:46.80-0:51.80) ============== -->
+      <div
+        id="b7-scene"
+        class="clip beat-scene"
+        data-start="43.0"
+        data-duration="8.6"
+        data-track-index="11"
+      >
+        <div class="beat-content">
+          <div class="kicker">VERIFIED IN THE FIELD</div>
+          <div class="hero" style="font-size: 56px; max-width: 1700px">
+            이미 <span class="accent">현장에서</span> 검증되고 있습니다.
+          </div>
+          <div class="uni-logo-row">
+            <div class="uni-logo-card" id="uni-1">
+              <img src="assets/proof/dongguk-logo.png" alt="동국대학교" />
+            </div>
+            <div class="uni-logo-card" id="uni-2">
+              <img src="assets/proof/hongik-logo.png" alt="홍익대학교" />
+            </div>
+            <div class="uni-logo-card" id="uni-3">
+              <img src="assets/proof/sookmyung-logo.png" alt="숙명여자대학교" />
+            </div>
+            <div class="uni-logo-card" id="uni-4">
+              <img src="assets/proof/korea-logo.svg" alt="고려대학교" />
+            </div>
+          </div>
+          <div class="proof-photo-row">
+            <div class="proof-photo" id="photo-1">
+              <img src="assets/proof/dongguk-classroom.jpg" alt="동국대 강의실" />
+              <div class="proof-verified-tag">DONGGUK</div>
+              <div class="photo-tag">동국대 · 조직행위 · 110명</div>
+            </div>
+            <div class="proof-photo" id="photo-2">
+              <img src="assets/proof/hongik-classroom.jpg" alt="홍익대 강의실" />
+              <div class="proof-verified-tag">HONGIK</div>
+              <div class="photo-tag">홍익대 · PoC · 그레이딩 80% 단축</div>
+            </div>
+            <div class="proof-photo" id="photo-3">
+              <img src="assets/proof/sookmyung-lecture.jpg" alt="숙명여대 강연" />
+              <div class="proof-verified-tag">SOOKMYUNG</div>
+              <div class="photo-tag">숙명여대 · 초청 강연</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== BEAT 8: Why Claim (0:51.80-0:57.96) ============== -->
+      <div
+        id="b8-scene"
+        class="clip beat-scene"
+        data-start="51.0"
+        data-duration="7.0"
+        data-track-index="12"
+      >
+        <div class="beat-content">
+          <div class="why-eyebrow" id="b8-eyebrow">WHY QUEST-ON</div>
+          <div class="why-claim" id="b8-claim">
+            <span class="strike">AI 사용을 막는</span> 대신,<br />
+            <span class="glow">활용 과정을 평가합니다.</span>
+          </div>
+          <div class="sub" id="b8-sub" style="margin-top: 56px">
+            교수자는 학생의 사고 과정을 보고, 학생은 책임 있게 AI를 활용합니다.
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== AUDIO LAYER: Music bed (Kevin MacLeod · Atlantean Twilight · CC BY 3.0) ============== -->
+      <audio
+        id="music-bed"
+        class="clip"
+        data-start="0"
+        data-duration="63.0"
+        data-track-index="19"
+        data-volume="1"
+        src="assets/audio/score-cinematic.mp3"
+      ></audio>
+
+      <!-- ============== AUDIO LAYER: Full narration v3 (Harry · Calm Narrator) ============== -->
+      <!-- Single continuous track to avoid clip-boundary glitches.
+           Beat timings are kept close to the original so narration flows naturally. -->
+      <audio id="vo-full" class="clip" data-start="0" data-duration="60.37" data-track-index="20" data-volume="1" src="assets/audio/vo/v3-full.mp3"></audio>
+
+      <!-- ============== BEAT 9: Brand Lock (0:57.96-1:03.00) ============== -->
+      <div
+        id="b9-scene"
+        class="clip beat-scene"
+        data-start="58.0"
+        data-duration="5.0"
+        data-track-index="13"
+      >
+        <div class="beat-content">
+          <div class="lock-stack">
+            <div class="logo-wordmark" id="b9-logo">Quest-On</div>
+            <div class="logo-rule" id="b9-rule"></div>
+            <div class="lock-tag" id="b9-tag">AI 시대 대학 시험의 새 기준</div>
+            <div class="lock-meta" id="b9-meta">QUEST-ON.APP</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Deterministic particle field for Beat 2 — carries the void
+      // aesthetic from Beat 1's fal video into the typography beat.
+      (function buildB2Particles() {
+        const field = document.getElementById("b2-particles");
+        if (!field) return;
+        function mulberry32(seed) {
+          return function () {
+            let t = (seed += 0x6d2b79f5);
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+        const rng = mulberry32(20260511);
+        for (let i = 0; i < 90; i++) {
+          const p = document.createElement("div");
+          p.className = "b2-particle" + (rng() < 0.18 ? " bright" : "");
+          p.style.left = rng() * 1920 + "px";
+          p.style.top = rng() * 1080 + "px";
+          const r = 1 + rng() * 2.4;
+          p.style.width = r + "px";
+          p.style.height = r + "px";
+          field.appendChild(p);
+        }
+      })();
+
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      // ─────────────────────────────────────────────────────────────
+      // Crossfade transitions between adjacent layers.
+      //
+      // Each beat's clip starts ~0.3s BEFORE the previous beat ends so
+      // crossfade overlap windows exist. GSAP fades opacity over those
+      // windows. Hard kills with visibility:hidden lock the off-state.
+      // ─────────────────────────────────────────────────────────────
+
+      // ── Timeline retimed for the trimmed-clip cut (~59.5s total) ──
+      // AI clips (Beats 1/3/4) play only their genuinely-generated ~6s;
+      // the old freeze/zoom pads were dropped, so every downstream beat
+      // moved earlier. Music is the 59.5s trimmed score, VO repositioned
+      // per beat (see <audio> data-start values above).
+
+      // BEAT 1 → 2 dissolve: 4.32 (1.0s overlap)
+      // The cheating clip's formed-cube tail bleeds into Beat 2's void.
+      tl.fromTo(
+        "#b2-scene",
+        { opacity: 0 },
+        { opacity: 1, duration: 1.0, ease: "power2.inOut" },
+        4.32,
+      );
+      tl.to(
+        "#vid-cheating",
+        { opacity: 0, duration: 1.0, ease: "power2.inOut", overwrite: "auto" },
+        4.32,
+      );
+      tl.set("#vid-cheating", { opacity: 0 }, 6.7);
+
+      // BEAT 2 entrance — Korean copy emerges, then cobalt strikes through each verb
+      tl.from(
+        "#b2-prefix",
+        { y: 28, opacity: 0, duration: 0.7, ease: "power3.out" },
+        6.00,
+      );
+      tl.from(
+        "#b2-word-ban",
+        { y: 40, opacity: 0, duration: 0.7, ease: "power3.out" },
+        6.55,
+      );
+      tl.to(
+        "#b2-slash-ban",
+        { scaleX: 1, duration: 0.45, ease: "power2.inOut" },
+        7.15,
+      );
+      tl.from(
+        "#b2-word-detect",
+        { y: 40, opacity: 0, duration: 0.7, ease: "power3.out" },
+        7.55,
+      );
+      tl.to(
+        "#b2-slash-detect",
+        { scaleX: 1, duration: 0.45, ease: "power2.inOut" },
+        8.15,
+      );
+      tl.from(
+        ".b2-comma, .b2-period",
+        { opacity: 0, duration: 0.5, ease: "power2.out" },
+        7.60,
+      );
+      // News-clipping cards slam in just after "적발했습니다" is struck.
+      tl.set("#b2-news-1", { opacity: 0 }, 0);
+      tl.set("#b2-news-2", { opacity: 0 }, 0);
+      tl.fromTo(
+        "#b2-news-1",
+        { y: 50, opacity: 0, rotation: -8, scale: 0.92 },
+        { y: 0, opacity: 1, rotation: -1.8, scale: 1, duration: 0.4, ease: "power3.out" },
+        8.30,
+      );
+      tl.fromTo(
+        "#b2-news-2",
+        { y: 50, opacity: 0, rotation: 8, scale: 0.92 },
+        { y: 0, opacity: 1, rotation: 1.5, scale: 1, duration: 0.4, ease: "power3.out" },
+        8.60,
+      );
+
+      // BEAT 2 → 3 crossfade: 13.0 (0.3s overlap with B2 end)
+      tl.fromTo(
+        "#vid-blackbox",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4, ease: "power2.inOut" },
+        12.70,
+      );
+      tl.to(
+        "#b2-scene",
+        { opacity: 0, duration: 0.4, ease: "power2.inOut", overwrite: "auto" },
+        12.70,
+      );
+      tl.fromTo(
+        "#b3-overlay",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4, ease: "power2.inOut" },
+        12.70,
+      );
+
+      // BEAT 3 lower-third bleeds across the cut into the crack moment.
+      tl.set("#b3-lt", { opacity: 0 }, 0);
+      tl.set("#b3-ground", { opacity: 0 }, 0);
+      tl.to("#b3-ground", { opacity: 1, duration: 0.6, ease: "sine.inOut" }, 13.00);
+      tl.fromTo(
+        "#b3-lt",
+        { y: 30, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.7, ease: "power3.out" },
+        14.30,
+      );
+
+      // BEAT 3 → 3b crossfade: 19.0 (blackbox → blackbox hold)
+      tl.fromTo(
+        "#vid-blackbox-hold",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4, ease: "power2.inOut" },
+        18.70,
+      );
+      tl.to(
+        "#vid-blackbox",
+        { opacity: 0, duration: 0.4, ease: "power2.inOut", overwrite: "auto" },
+        18.70,
+      );
+      // b3-overlay text fades out as hold begins
+      tl.to(
+        "#b3-overlay",
+        { opacity: 0, duration: 0.5, ease: "power2.in", overwrite: "auto" },
+        18.70,
+      );
+
+      // BEAT 3b → 4 crossfade: 26.0 (hold → transition)
+      tl.fromTo(
+        "#vid-transition",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4, ease: "power2.inOut" },
+        25.70,
+      );
+      tl.to(
+        "#vid-blackbox-hold",
+        { opacity: 0, duration: 0.4, ease: "power2.inOut", overwrite: "auto" },
+        25.70,
+      );
+      tl.fromTo(
+        "#b4-overlay",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4, ease: "power2.inOut" },
+        25.70,
+      );
+
+      // BEAT 4 lower-third appears as transition begins (timed to "블랙박스를")
+      tl.set("#b4-lt", { opacity: 0 }, 0);
+      tl.set("#b4-ground", { opacity: 0 }, 0);
+      tl.to("#b4-ground", { opacity: 1, duration: 0.5, ease: "sine.inOut" }, 28.00);
+      tl.fromTo(
+        "#b4-lt",
+        { y: 40, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.7, ease: "power3.out" },
+        28.50,
+      );
+
+      // BEAT 4 → 5 crossfade (transition → glassbox orbit): 32.0
+      tl.fromTo(
+        "#vid-orbit",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4, ease: "power2.inOut" },
+        31.70,
+      );
+      tl.to(
+        "#vid-transition",
+        { opacity: 0, duration: 0.4, ease: "power2.inOut", overwrite: "auto" },
+        31.70,
+      );
+      tl.to(
+        "#b4-overlay",
+        { opacity: 0, duration: 0.3, ease: "power2.in", overwrite: "auto" },
+        31.70,
+      );
+      tl.fromTo(
+        "#b5-overlay",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4, ease: "power2.inOut" },
+        31.70,
+      );
+
+      // BEAT 5a → 5b cross (orbit -> close): 36.7
+      tl.fromTo(
+        "#vid-close",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.35, ease: "power2.inOut" },
+        36.70,
+      );
+      tl.to(
+        "#vid-orbit",
+        { opacity: 0, duration: 0.35, ease: "power2.inOut", overwrite: "auto" },
+        36.70,
+      );
+
+      // BEAT 5: 4-label stagger entrance (timed to L8 start)
+      ["#gl-1", "#gl-2", "#gl-3", "#gl-4"].forEach((id, i) => {
+        tl.set(id, { opacity: 0 }, 0);
+        tl.fromTo(
+          id,
+          { y: 24, opacity: 0, scale: 0.96 },
+          { y: 0, opacity: 1, scale: 1, duration: 0.7, ease: "power3.out" },
+          33.00 + i * 0.5,
+        );
+      });
+
+      // BEAT 5 → 6 crossfade: 37.7 (video → hyperframes copy)
+      tl.fromTo(
+        "#b6-scene",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.55, ease: "power2.inOut" },
+        37.70,
+      );
+      tl.to(
+        "#vid-close",
+        { opacity: 0, duration: 0.55, ease: "power2.inOut", overwrite: "auto" },
+        37.70,
+      );
+      tl.to(
+        "#b5-overlay",
+        { opacity: 0, duration: 0.55, ease: "power2.inOut", overwrite: "auto" },
+        37.70,
+      );
+
+      // BEAT 6 entrance — hero, exam pane, AI pane, then chat conversation
+      tl.from(
+        "#b6-hero",
+        { y: 24, opacity: 0, duration: 0.7, ease: "power3.out" },
+        36.30,
+      );
+      tl.from(
+        "#b6-exam",
+        { x: -40, opacity: 0, duration: 0.7, ease: "power3.out" },
+        36.70,
+      );
+      tl.from(
+        "#b6-ai",
+        { x: 40, opacity: 0, duration: 0.7, ease: "power3.out" },
+        36.90,
+      );
+      // Chat conversation stagger — student asks, AI responds, student follows up
+      tl.set("#b6-msg-1", { opacity: 0 }, 0);
+      tl.set("#b6-msg-2", { opacity: 0 }, 0);
+      tl.set("#b6-msg-3", { opacity: 0 }, 0);
+      tl.set("#b6-new-text", { opacity: 0 }, 0);
+      tl.fromTo(
+        "#b6-msg-1",
+        { y: 14, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.45, ease: "power2.out" },
+        37.80,
+      );
+      tl.fromTo(
+        "#b6-msg-2",
+        { y: 14, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.55, ease: "power2.out" },
+        38.70,
+      );
+      // The student's answer updates with AI-derived content — cobalt highlight
+      tl.fromTo(
+        "#b6-new-text",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.6, ease: "power2.out" },
+        40.10,
+      );
+      tl.fromTo(
+        "#b6-msg-3",
+        { y: 14, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.45, ease: "power2.out" },
+        40.90,
+      );
+      tl.from(
+        "#b6-caption",
+        { y: 12, opacity: 0, duration: 0.5, ease: "power2.out" },
+        41.90,
+      );
+
+      // BEAT 6 → 7 crossfade: 42.5
+      tl.fromTo(
+        "#b7-scene",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5, ease: "power2.inOut" },
+        42.50,
+      );
+      tl.to(
+        "#b6-scene",
+        { opacity: 0, duration: 0.5, ease: "power2.inOut", overwrite: "auto" },
+        42.50,
+      );
+
+      // BEAT 7 entrance — kicker, hero, then 4 logos stagger, then 3 photos
+      tl.from(
+        "#b7-scene .kicker",
+        { y: -16, opacity: 0, duration: 0.5, ease: "power2.out" },
+        43.40,
+      );
+      tl.from(
+        "#b7-scene .hero",
+        { y: 40, opacity: 0, duration: 0.8, ease: "power3.out" },
+        43.60,
+      );
+      ["#uni-1", "#uni-2", "#uni-3", "#uni-4"].forEach((id, i) => {
+        tl.from(
+          id,
+          {
+            y: 20,
+            opacity: 0,
+            scale: 0.94,
+            duration: 0.5,
+            ease: "back.out(1.6)",
+          },
+          51.90 + i * 0.12,
+        );
+      });
+      ["#photo-1", "#photo-2", "#photo-3"].forEach((id, i) => {
+        tl.from(
+          id,
+          {
+            y: 30,
+            opacity: 0,
+            scale: 0.97,
+            duration: 0.6,
+            ease: "power3.out",
+          },
+          52.60 + i * 0.18,
+        );
+      });
+
+      // BEAT 7 → 8 crossfade with subtle zoom: 50.5
+      tl.fromTo(
+        "#b8-scene",
+        { opacity: 0, scale: 0.96 },
+        {
+          opacity: 1,
+          scale: 1,
+          duration: 0.55,
+          ease: "power3.out",
+        },
+        50.50,
+      );
+      tl.to(
+        "#b7-scene",
+        {
+          opacity: 0,
+          scale: 1.04,
+          duration: 0.5,
+          ease: "power3.in",
+          overwrite: "auto",
+        },
+        50.50,
+      );
+
+      // BEAT 8 entrance — Why claim
+      tl.from(
+        "#b8-eyebrow",
+        { y: -16, opacity: 0, duration: 0.55, ease: "power2.out" },
+        51.40,
+      );
+      tl.from(
+        "#b8-claim",
+        { y: 70, opacity: 0, duration: 1.0, ease: "expo.out" },
+        51.70,
+      );
+      tl.from(
+        "#b8-sub",
+        { y: 24, opacity: 0, duration: 0.7, ease: "power2.out" },
+        52.50,
+      );
+
+      // BEAT 8 → 9 crossfade: 57.5
+      tl.fromTo(
+        "#b9-scene",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5, ease: "sine.inOut" },
+        57.50,
+      );
+      tl.to(
+        "#b8-scene",
+        { opacity: 0, duration: 0.5, ease: "sine.inOut", overwrite: "auto" },
+        57.50,
+      );
+
+      // BEAT 9 entrance — Quest-On lockup
+      tl.from(
+        "#b9-logo",
+        { y: 50, opacity: 0, duration: 0.95, ease: "power3.out" },
+        58.40,
+      );
+      tl.from(
+        "#b9-rule",
+        { scaleX: 0, opacity: 0, duration: 0.7, ease: "power2.out" },
+        59.00,
+      );
+      tl.from(
+        "#b9-tag",
+        { y: 20, opacity: 0, duration: 0.6, ease: "power2.out" },
+        59.25,
+      );
+      tl.from(
+        "#b9-meta",
+        { y: 14, opacity: 0, duration: 0.5, ease: "power2.out" },
+        59.70,
+      );
+
+      // FINAL fade-out — wordmark holds, then fades over the music tail
+      tl.to(
+        "#b9-scene .lock-stack",
+        { opacity: 0, duration: 0.8, ease: "sine.inOut" },
+        62.00,
+      );
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

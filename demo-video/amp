@@ -1,0 +1,74 @@
+ffmpeg version 8.1 Copyright (c) 2000-2026 the FFmpeg developers
+  built with Apple clang version 21.0.0 (clang-2100.0.123.102)
+ffmpeg version 8.1 Copyright (c) 2000-2026 the FFmpeg developers
+  built with Apple clang version 21.0.0 (clang-2100.0.123.102)
+  configuration: --prefix=/opt/homebrew/Cellar/ffmpeg/8.1_1 --enable-shared --cc=clang --host-cflags= --host-ldflags= --enable-gpl --enable-libaom --enable-libdav1d --enable-libharfbuzz --enable-libmp3lame --enable-libopus --enable-libsnappy --enable-libsvtav1 --enable-libtheora --enable-libvorbis --enable-libvpx --enable-libx264 --enable-libx265 --enable-libfontconfig --enable-libfreetype --enable-frei0r --enable-libass --enable-demuxer=dash --enable-neon --enable-opencl --enable-audiotoolbox --enable-videotoolbox --disable-htmlpages --enable-libfdk-aac --enable-nonfree
+  libavutil      60. 26.100 / 60. 26.100
+  libavcodec     62. 28.100 / 62. 28.100
+  libavformat    62. 12.100 / 62. 12.100
+  libavdevice    62.  3.100 / 62.  3.100
+  libavfilter    11. 14.100 / 11. 14.100
+  libswscale      9.  5.100 /  9.  5.100
+  libswresample   6.  3.100 /  6.  3.100
+  configuration: --prefix=/opt/homebrew/Cellar/ffmpeg/8.1_1 --enable-shared --cc=clang --host-cflags= --host-ldflags= --enable-gpl --enable-libaom --enable-libdav1d --enable-libharfbuzz --enable-libmp3lame --enable-libopus --enable-libsnappy --enable-libsvtav1 --enable-libtheora --enable-libvorbis --enable-libvpx --enable-libx264 --enable-libx265 --enable-libfontconfig --enable-libfreetype --enable-frei0r --enable-libass --enable-demuxer=dash --enable-neon --enable-opencl --enable-audiotoolbox --enable-videotoolbox --disable-htmlpages --enable-libfdk-aac --enable-nonfree
+  libavutil      60. 26.100 / 60. 26.100
+  libavcodec     62. 28.100 / 62. 28.100
+  libavformat    62. 12.100 / 62. 12.100
+  libavdevice    62.  3.100 / 62.  3.100
+  libavfilter    11. 14.100 / 11. 14.100
+  libswscale      9.  5.100 /  9.  5.100
+  libswresample   6.  3.100 /  6.  3.100
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'assets/video/03-glassbox-orbit.silent.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512Input #0, mov,mp4,m4a,3gp,3g2,mj2, from 'assets/video/03-glassbox-orbit.silent.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    encoder         : Lavf62.12.100
+  Duration: 00:00:06.04, start: 0.000000, bitrate: 4961 kb/s
+
+    compatible_brands: isomiso2avc1mp41
+    encoder         : Lavf62.12.100
+  Duration: 00:00:06.04, start: 0.000000, bitrate: 4961 kb/s
+  Stream #0:0[0x1]  Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(progressive), 1920x1080, 4957 kb/s, 24 fps, 24 tbr, 12288 tbn(und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(progressive), 1920x1080, 4957 kb/s, 24 fps, 24 tbr, 12288 tbn (default)
+    Metadata:
+      handler_name    : VideoHandler
+ (default)
+    Metadata:
+      handler_name    : VideoHandler
+Stream mapping:
+  Stream #0:0 -> #0:0Stream mapping:
+  Stream #0:0 -> #0:0 (h264 (native) -> png (native))
+ (h264 (native) -> png (native))
+Press [q] to stop, [?] for help
+Press [q] to stop, [?] for help
+Output #0, image2, to 'assets/video/frames/sync-check/03-glassbox-orbit.last.png':
+  Metadata:
+    major_brand     : Output #0, image2, to 'assets/video/frames/sync-check/03-glassbox-orbit.last.png':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    encoder         : Lavf62.12.100
+  Stream #0:0(und): Video: png, rgb24(pc, gbr/unknown/unknown, progressive), 1920x1080, q=2-31, 200 kb/s, 24 fps, 24 tbn (default)
+    Metadata:
+      encoder         : Lavc62.28.100 png
+      handler_name    : VideoHandler
+isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    encoder         : Lavf62.12.100
+  Stream #0:0(und): Video: png, rgb24(pc, gbr/unknown/unknown, progressive), 1920x1080, q=2-31, 200 kb/s, 24 fps, 24 tbn (default)
+    Metadata:
+      encoder         : Lavc62.28.100 png
+      handler_name    : VideoHandler
+[image2 @ 0xba4c3c500] The specified filename 'assets/video/frames/sync-check/03-glassbox-orbit.last.png' does not contain an image sequence pattern or a pattern is invalid.
+[image2 @ 0xba4c3c500] Use a pattern such as %03d for an image sequence or use the -update option (with -frames:v 1 if needed) to write a single image.
+[image2 @ 0xba4c3c500] The specified filename 'assets/video/frames/sync-check/03-glassbox-orbit.last.png' does not contain an image sequence pattern or a pattern is invalid.
+[image2 @ 0xba4c3c500] Use a pattern such as %03d for an image sequence or use the -update option (with -frames:v 1 if needed) to write a single image.
+[out#0/image2 @ 0xba4c70180] video:535KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+[out#0/image2 @ 0xba4c70180] video:535KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+frame=    1 fps=0.0 q=-0.0 Lsize=N/A time=00:00:00.04 bitrate=N/A speed=0.103x elapsed=0:00:00.40    
+frame=    1 fps=0.0 q=-0.0 Lsize=N/A time=00:00:00.04 bitrate=N/A speed=0.103x elapsed=0:00:00.40    

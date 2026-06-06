@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quest-On Brand Identity — 3 Concepts</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #09090b;
+            --surface: #18181b;
+            --border: #27272a;
+            --text: #fafafa;
+            --text-dim: #a1a1aa;
+            --text-muted: #52525b;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ─── Cover ─── */
+        .cover {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 80px 40px;
+            border-bottom: 1px solid var(--border);
+        }
+        .cover-overline {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .cover h1 {
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            line-height: 1.08;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .cover p {
+            font-size: 1.0625rem;
+            color: var(--text-dim);
+            max-width: 500px;
+            line-height: 1.7;
+        }
+        .cover-date {
+            margin-top: 48px;
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+        }
+
+        /* ─── Section ─── */
+        .section {
+            padding: 100px 64px;
+            border-bottom: 1px solid var(--border);
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        @media (max-width: 768px) { .section { padding: 60px 24px; } }
+
+        .section-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+        .badge-rec { background: #D4A853; color: #1A2744; }
+
+        .section-title {
+            font-size: clamp(1.75rem, 3.5vw, 2.75rem);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1.15;
+            margin-bottom: 12px;
+        }
+        .section-desc {
+            font-size: 1rem;
+            color: var(--text-dim);
+            max-width: 580px;
+            line-height: 1.75;
+            margin-bottom: 64px;
+        }
+
+        /* ─── Sub-heading ─── */
+        .sub-heading {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        /* ─── Logo Grid ─── */
+        .logo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 56px;
+        }
+        @media (max-width: 800px) { .logo-grid { grid-template-columns: 1fr; } }
+
+        .logo-card {
+            border-radius: 20px;
+            padding: 64px 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: transform 0.2s ease;
+        }
+        .logo-card:hover { transform: scale(1.01); }
+        .logo-card.light { background: #ffffff; }
+        .logo-card.dark { background: #111113; border: 1px solid var(--border); }
+        .logo-card svg { width: 200px; height: 200px; }
+        .card-tag {
+            position: absolute;
+            top: 14px;
+            left: 18px;
+            font-size: 0.6875rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .logo-card.light .card-tag { color: #bbb; }
+        .logo-card.dark .card-tag { color: #444; }
+
+        /* ─── Lockup ─── */
+        .lockup-row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 56px;
+        }
+        .lockup-card {
+            border-radius: 16px;
+            padding: 36px 48px;
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            flex: 1;
+            min-width: 280px;
+        }
+        .lockup-card.light { background: #fff; }
+        .lockup-card.dark { background: #111113; border: 1px solid var(--border); }
+        .lockup-card svg { width: 44px; height: 44px; flex-shrink: 0; }
+
+        /* ─── Wordmark ─── */
+        .wordmark {
+            font-family: 'Inter', sans-serif;
+            font-size: 26px;
+            letter-spacing: -0.02em;
+            white-space: nowrap;
+        }
+
+        /* ─── Palette ─── */
+        .palette-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 56px;
+        }
+        .swatch {
+            width: 110px;
+            height: 100px;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 10px;
+        }
+        .swatch-name { font-size: 0.6875rem; font-weight: 600; }
+        .swatch-hex { font-size: 0.625rem; font-weight: 500; opacity: 0.7; font-family: 'SF Mono', 'Menlo', monospace; }
+
+        /* ─── Traits ─── */
+        .traits {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            margin-bottom: 56px;
+        }
+        .trait {
+            padding: 6px 16px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            font-size: 0.8125rem;
+            color: var(--text-dim);
+        }
+
+        /* ─── Comparison ─── */
+        .compare-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+        .compare-table th {
+            text-align: left;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .compare-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #1a1a1e;
+            color: var(--text-dim);
+        }
+        .compare-table tr:hover td { background: #0f0f12; }
+
+        .stars { color: #D4A853; letter-spacing: 2px; }
+        .stars-dim { color: #333; letter-spacing: 2px; }
+
+        /* ─── Footer ─── */
+        .footer {
+            text-align: center;
+            padding: 60px 40px;
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════ COVER ════════════════════════════════════════════ -->
+<section class="cover">
+    <div class="cover-overline">Brand Identity Redesign</div>
+    <h1>Quest-On</h1>
+    <p>AI 기반 시험 평가 플랫폼을 위한 3가지 BI 컨셉.<br>학술적 무게감과 모던 테크 감성의 교차점.</p>
+    <div class="cover-date">April 2026</div>
+</section>
+
+
+<!-- ════════════════════════════════════════ CONCEPT A ════════════════════════════════════════ -->
+<section class="section" id="concept-a">
+    <div class="section-label">Concept A</div>
+    <h2 class="section-title">Absolute Q</h2>
+    <p class="section-desc">
+        극도의 정제. 스파크, 그래디언트, 장식을 전부 버린다. 기하학적으로 완벽한 Q 하나만 남긴다.
+        네거티브 스페이스가 "아직 채워질 가능성"을 말한다.
+    </p>
+
+    <!-- Symbol -->
+    <div class="sub-heading">Symbol Mark</div>
+    <div class="logo-grid">
+        <!-- Light -->
+        <div class="logo-card light">
+            <span class="card-tag">Light</span>
+            <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="190" cy="190" r="135" fill="none" stroke="#2B3A8C" stroke-width="52"/>
+                <line x1="292" y1="292" x2="438" y2="438" stroke="#2B3A8C" stroke-width="52" stroke-linecap="round"/>
+            </svg>
+        </div>
+        <!-- Dark -->
+        <div class="logo-card dark">
+            <span class="card-tag">Dark</span>
+            <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="190" cy="190" r="135" fill="none" stroke="#ffffff" stroke-width="52"/>
+                <line x1="292" y1="292" x2="438" y2="438" stroke="#ffffff" stroke-width="52" stroke-linecap="round"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Lockup -->
+    <div class="sub-heading">Lockup</div>
+    <div class="lockup-row">
+        <div class="lockup-card light">
+            <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="190" cy="190" r="135" fill="none" stroke="#2B3A8C" stroke-width="52"/>
+                <line x1="292" y1="292" x2="438" y2="438" stroke="#2B3A8C" stroke-width="52" stroke-linecap="round"/>
+            </svg>
+            <span class="wordmark" style="font-weight:600; color:#2B3A8C;">Quest<span style="font-weight:300; opacity:0.5;">–</span>On</span>
+        </div>
+        <div class="lockup-card dark">
+            <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="190" cy="190" r="135" fill="none" stroke="#ffffff" stroke-width="52"/>
+                <line x1="292" y1="292" x2="438" y2="438" stroke="#ffffff" stroke-width="52" stroke-linecap="round"/>
+            </svg>
+            <span class="wordmark" style="font-weight:600; color:#ffffff;">Quest<span style="font-weight:300; opacity:0.5;">–</span>On</span>
+        </div>
+    </div>
+
+    <!-- Colors -->
+    <div class="sub-heading">Color System</div>
+    <div class="palette-row">
+        <div class="swatch" style="background:#2B3A8C;">
+            <span class="swatch-name" style="color:#fff;">Deep Indigo</span>
+            <span class="swatch-hex" style="color:#aab3e6;">#2B3A8C</span>
+        </div>
+        <div class="swatch" style="background:#ffffff; border:1px solid #e5e5e5;">
+            <span class="swatch-name" style="color:#333;">White</span>
+            <span class="swatch-hex" style="color:#999;">#FFFFFF</span>
+        </div>
+        <div class="swatch" style="background:#0a0a0f;">
+            <span class="swatch-name" style="color:#ccc;">Ink</span>
+            <span class="swatch-hex" style="color:#555;">#0A0A0F</span>
+        </div>
+        <div class="swatch" style="background:#E8EBF7;">
+            <span class="swatch-name" style="color:#2B3A8C;">Mist</span>
+            <span class="swatch-hex" style="color:#6672B0;">#E8EBF7</span>
+        </div>
+    </div>
+
+    <!-- Traits -->
+    <div class="sub-heading">Characteristics</div>
+    <div class="traits">
+        <span class="trait">Monochrome</span>
+        <span class="trait">Geometric Precision</span>
+        <span class="trait">Timeless</span>
+        <span class="trait">Maximum Scalability</span>
+        <span class="trait">Notion / Coursera Tone</span>
+    </div>
+</section>
+
+
+<!-- ════════════════════════════════════════ CONCEPT B ════════════════════════════════════════ -->
+<section class="section" id="concept-b">
+    <div class="section-label">Concept B <span class="badge badge-rec">Recommended</span></div>
+    <h2 class="section-title">The Gateway Q</h2>
+    <p class="section-desc">
+        Q는 포털이다. 닫힌 원(기존 평가)에서 열린 경로(새로운 평가)로의 관문.
+        네이비+골드는 대학 문장(紋章)의 DNA를 현대적으로 재해석한다.
+        끝의 앰버 포인트는 "도착점의 빛" — 새로운 평가 패러다임.
+    </p>
+
+    <!-- Symbol -->
+    <div class="sub-heading">Symbol Mark</div>
+    <div class="logo-grid">
+        <!-- Light -->
+        <div class="logo-card light">
+            <span class="card-tag">Light</span>
+            <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+                <!-- Open arc: gap at lower-right (22° to 68°) -->
+                <path d="M241,315 A135,135 0 1,1 315,241" fill="none" stroke="#1A2744" stroke-width="52" stroke-linecap="round"/>
+                <!-- Tail body -->
+                <line x1="278" y1="278" x2="406" y2="406" stroke="#1A2744" stroke-width="46" stroke-linecap="butt"/>
+                <circle cx="278" cy="278" r="23" fill="#1A2744"/>
+                <!-- Amber accent tip -->
+                <circle cx="420" cy="420" r="26" fill="#D4A853"/>
+            </svg>
+        </div>
+        <!-- Dark -->
+        <div class="logo-card dark">
+            <span class="card-tag">Dark</span>
+            <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+                <path d="M241,315 A135,135 0 1,1 315,241" fill="none" stroke="#E8EAF0" stroke-width="52" stroke-linecap="round"/>
+                <line x1="278" y1="278" x2="406" y2="406" stroke="#E8EAF0" stroke-width="46" stroke-linecap="butt"/>
+                <circle cx="278" cy="278" r="23" fill="#E8EAF0"/>
+                <circle cx="420" cy="420" r="26" fill="#D4A853"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Lockup -->
+    <div class="sub-heading">Lockup</div>
+    <div class="lockup-row">
+        <div class="lockup-card light">
+            <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+                <path d="M241,315 A135,135 0 1,1 315,241" fill="none" stroke="#1A2744" stroke-width="52" stroke-linecap="round"/>
+                <line x1="278" y1="278" x2="406" y2="406" stroke="#1A2744" stroke-width="46" stroke-linecap="butt"/>
+                <circle cx="278" cy="278" r="23" fill="#1A2744"/>
+                <circle cx="420" cy="420" r="26" fill="#D4A853"/>
+            </svg>
+            <span class="wordmark" style="font-weight:600; color:#1A2744;">Quest<span style="color:#D4A853; font-weight:400;">–</span><span style="color:#1A2744;">On</span></span>
+        </div>
+        <div class="lockup-card dark">
+            <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+                <path d="M241,315 A135,135 0 1,1 315,241" fill="none" stroke="#E8EAF0" stroke-width="52" stroke-linecap="round"/>
+                <line x1="278" y1="278" x2="406" y2="406" stroke="#E8EAF0" stroke-width="46" stroke-linecap="butt"/>
+                <circle cx="278" cy="278" r="23" fill="#E8EAF0"/>
+                <circle cx="420" cy="420" r="26" fill="#D4A853"/>
+            </svg>
+            <span class="wordmark" style="font-weight:600; color:#E8EAF0;">Quest<span style="color:#D4A853; font-weight:400;">–</span><span style="color:#E8EAF0;">On</span></span>
+        </div>
+    </div>
+
+    <!-- Colors -->
+    <div class="sub-heading">Color System</div>
+    <div class="palette-row">
+        <div class="swatch" style="background:#1A2744;">
+            <span class="swatch-name" style="color:#fff;">Navy</span>
+            <span class="swatch-hex" style="color:#7A8BA8;">#1A2744</span>
+        </div>
+        <div class="swatch" style="background:#D4A853;">
+            <span class="swatch-name" style="color:#1A2744;">Amber</span>
+            <span class="swatch-hex" style="color:#6B5429;">#D4A853</span>
+        </div>
+        <div class="swatch" style="background:#ffffff; border:1px solid #e5e5e5;">
+            <span class="swatch-name" style="color:#333;">White</span>
+            <span class="swatch-hex" style="color:#999;">#FFFFFF</span>
+        </div>
+        <div class="swatch" style="background:#F0EDE6;">
+            <span class="swatch-name" style="color:#1A2744;">Parchment</span>
+            <span class="swatch-hex" style="color:#8A8476;">#F0EDE6</span>
+        </div>
+        <div class="swatch" style="background:#0D1520;">
+            <span class="swatch-name" style="color:#ccc;">Deep</span>
+            <span class="swatch-hex" style="color:#555;">#0D1520</span>
+        </div>
+    </div>
+
+    <!-- Traits -->
+    <div class="sub-heading">Characteristics</div>
+    <div class="traits">
+        <span class="trait">Academic Heritage</span>
+        <span class="trait">Gateway Metaphor</span>
+        <span class="trait">Navy + Gold Tradition</span>
+        <span class="trait">Dual-Audience Appeal</span>
+        <span class="trait">Coursera / Linear Tone</span>
+    </div>
+</section>
+
+
+<!-- ════════════════════════════════════════ CONCEPT C ════════════════════════════════════════ -->
+<section class="section" id="concept-c">
+    <div class="section-label">Concept C</div>
+    <h2 class="section-title">Q Flow</h2>
+    <p class="section-desc">
+        학습은 순환이다. Q를 끊기지 않는 흐름으로 표현한다.
+        상단의 열림은 "시작점", 하단의 테이퍼는 "성장".
+        인디고에서 바이올렛으로의 스펙트럼은 교육과 AI의 자연스러운 교차.
+    </p>
+
+    <!-- Symbol -->
+    <div class="sub-heading">Symbol Mark</div>
+    <div class="logo-grid">
+        <!-- Light -->
+        <div class="logo-card light">
+            <span class="card-tag">Light</span>
+            <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="gc-l" x1="190" y1="55" x2="440" y2="440" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#3B4CC0"/>
+                        <stop offset="100%" stop-color="#6C5CE7"/>
+                    </linearGradient>
+                </defs>
+                <!-- Ring arc with gap at top (~50°) -->
+                <path d="M247,68 A135,135 0 1,1 133,68" fill="none" stroke="url(#gc-l)" stroke-width="48" stroke-linecap="round"/>
+                <!-- Tapered tail -->
+                <path d="M263,297 L428,436 A5,5 0 0,1 436,428 L297,263 Z" fill="url(#gc-l)"/>
+            </svg>
+        </div>
+        <!-- Dark -->
+        <div class="logo-card dark">
+            <span class="card-tag">Dark</span>
+            <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="gc-d" x1="190" y1="55" x2="440" y2="440" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#5B6CE0"/>
+                        <stop offset="100%" stop-color="#9B8CF7"/>
+                    </linearGradient>
+                </defs>
+                <path d="M247,68 A135,135 0 1,1 133,68" fill="none" stroke="url(#gc-d)" stroke-width="48" stroke-linecap="round"/>
+                <path d="M263,297 L428,436 A5,5 0 0,1 436,428 L297,263 Z" fill="url(#gc-d)"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Lockup -->
+    <div class="sub-heading">Lockup</div>
+    <div class="lockup-row">
+        <div class="lockup-card light">
+            <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="gc-l2" x1="190" y1="55" x2="440" y2="440" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#3B4CC0"/>
+                        <stop offset="100%" stop-color="#6C5CE7"/>
+                    </linearGradient>
+                </defs>
+                <path d="M247,68 A135,135 0 1,1 133,68" fill="none" stroke="url(#gc-l2)" stroke-width="48" stroke-linecap="round"/>
+                <path d="M263,297 L428,436 A5,5 0 0,1 436,428 L297,263 Z" fill="url(#gc-l2)"/>
+            </svg>
+            <span class="wordmark"><span style="font-weight:700; color:#3B4CC0;">Quest</span><span style="font-weight:300; color:#6C5CE7;">-On</span></span>
+        </div>
+        <div class="lockup-card dark">
+            <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="gc-d2" x1="190" y1="55" x2="440" y2="440" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stop-color="#5B6CE0"/>
+                        <stop offset="100%" stop-color="#9B8CF7"/>
+                    </linearGradient>
+                </defs>
+                <path d="M247,68 A135,135 0 1,1 133,68" fill="none" stroke="url(#gc-d2)" stroke-width="48" stroke-linecap="round"/>
+                <path d="M263,297 L428,436 A5,5 0 0,1 436,428 L297,263 Z" fill="url(#gc-d2)"/>
+            </svg>
+            <span class="wordmark"><span style="font-weight:700; color:#5B6CE0;">Quest</span><span style="font-weight:300; color:#9B8CF7;">-On</span></span>
+        </div>
+    </div>
+
+    <!-- Colors -->
+    <div class="sub-heading">Color System</div>
+    <div class="palette-row">
+        <div class="swatch" style="background:#3B4CC0;">
+            <span class="swatch-name" style="color:#fff;">Indigo</span>
+            <span class="swatch-hex" style="color:#b0b8f0;">#3B4CC0</span>
+        </div>
+        <div class="swatch" style="background:#6C5CE7;">
+            <span class="swatch-name" style="color:#fff;">Violet</span>
+            <span class="swatch-hex" style="color:#c4bcf7;">#6C5CE7</span>
+        </div>
+        <div class="swatch" style="background:linear-gradient(135deg, #3B4CC0, #6C5CE7);">
+            <span class="swatch-name" style="color:#fff;">Gradient</span>
+            <span class="swatch-hex" style="color:#c0c0f0;">Flow</span>
+        </div>
+        <div class="swatch" style="background:#F0F0FF;">
+            <span class="swatch-name" style="color:#3B4CC0;">Lavender</span>
+            <span class="swatch-hex" style="color:#8080B0;">#F0F0FF</span>
+        </div>
+        <div class="swatch" style="background:#0C0C1A;">
+            <span class="swatch-name" style="color:#ccc;">Void</span>
+            <span class="swatch-hex" style="color:#555;">#0C0C1A</span>
+        </div>
+    </div>
+
+    <!-- Traits -->
+    <div class="sub-heading">Characteristics</div>
+    <div class="traits">
+        <span class="trait">Continuous Flow</span>
+        <span class="trait">Tapered Stroke</span>
+        <span class="trait">Blue-Violet Spectrum</span>
+        <span class="trait">Motion-First</span>
+        <span class="trait">Linear / Quizlet Tone</span>
+    </div>
+</section>
+
+
+<!-- ════════════════════════════════════════ COMPARISON ════════════════════════════════════════ -->
+<section class="section" id="compare">
+    <div class="section-label">Comparison</div>
+    <h2 class="section-title" style="margin-bottom:48px;">Side by Side</h2>
+
+    <!-- Mini logo row -->
+    <div style="display:flex; gap:32px; margin-bottom:48px; justify-content:center; flex-wrap:wrap;">
+        <div style="text-align:center;">
+            <div style="width:140px; height:140px; background:#fff; border-radius:20px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;">
+                <svg viewBox="0 0 500 500" width="90" height="90" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="190" cy="190" r="135" fill="none" stroke="#2B3A8C" stroke-width="52"/>
+                    <line x1="292" y1="292" x2="438" y2="438" stroke="#2B3A8C" stroke-width="52" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div style="font-size:0.8125rem; color:var(--text-dim); font-weight:600;">A. Absolute Q</div>
+        </div>
+        <div style="text-align:center;">
+            <div style="width:140px; height:140px; background:#fff; border-radius:20px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;">
+                <svg viewBox="0 0 500 500" width="90" height="90" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M241,315 A135,135 0 1,1 315,241" fill="none" stroke="#1A2744" stroke-width="52" stroke-linecap="round"/>
+                    <line x1="278" y1="278" x2="406" y2="406" stroke="#1A2744" stroke-width="46" stroke-linecap="butt"/>
+                    <circle cx="278" cy="278" r="23" fill="#1A2744"/>
+                    <circle cx="420" cy="420" r="26" fill="#D4A853"/>
+                </svg>
+            </div>
+            <div style="font-size:0.8125rem; color:#D4A853; font-weight:600;">B. Gateway Q ★</div>
+        </div>
+        <div style="text-align:center;">
+            <div style="width:140px; height:140px; background:#fff; border-radius:20px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;">
+                <svg viewBox="0 0 500 500" width="90" height="90" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="gc-m" x1="190" y1="55" x2="440" y2="440" gradientUnits="userSpaceOnUse">
+                            <stop offset="0%" stop-color="#3B4CC0"/>
+                            <stop offset="100%" stop-color="#6C5CE7"/>
+                        </linearGradient>
+                    </defs>
+                    <path d="M247,68 A135,135 0 1,1 133,68" fill="none" stroke="url(#gc-m)" stroke-width="48" stroke-linecap="round"/>
+                    <path d="M263,297 L428,436 A5,5 0 0,1 436,428 L297,263 Z" fill="url(#gc-m)"/>
+                </svg>
+            </div>
+            <div style="font-size:0.8125rem; color:var(--text-dim); font-weight:600;">C. Q Flow</div>
+        </div>
+    </div>
+
+    <table class="compare-table">
+        <thead>
+            <tr>
+                <th style="width:25%;">Dimension</th>
+                <th style="width:25%;">A. Absolute Q</th>
+                <th style="width:25%;">B. Gateway Q</th>
+                <th style="width:25%;">C. Q Flow</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="color:var(--text);">Academic Trust</td>
+                <td><span class="stars">★★★★</span><span class="stars-dim">★</span></td>
+                <td><span class="stars">★★★★★</span></td>
+                <td><span class="stars">★★★</span><span class="stars-dim">★★</span></td>
+            </tr>
+            <tr>
+                <td style="color:var(--text);">Tech Innovation</td>
+                <td><span class="stars">★★★</span><span class="stars-dim">★★</span></td>
+                <td><span class="stars">★★★★</span><span class="stars-dim">★</span></td>
+                <td><span class="stars">★★★★★</span></td>
+            </tr>
+            <tr>
+                <td style="color:var(--text);">Uniqueness</td>
+                <td><span class="stars">★★★</span><span class="stars-dim">★★</span></td>
+                <td><span class="stars">★★★★★</span></td>
+                <td><span class="stars">★★★★</span><span class="stars-dim">★</span></td>
+            </tr>
+            <tr>
+                <td style="color:var(--text);">Scalability</td>
+                <td><span class="stars">★★★★★</span></td>
+                <td><span class="stars">★★★★</span><span class="stars-dim">★</span></td>
+                <td><span class="stars">★★★★</span><span class="stars-dim">★</span></td>
+            </tr>
+            <tr>
+                <td style="color:var(--text);">Timelessness</td>
+                <td><span class="stars">★★★★★</span></td>
+                <td><span class="stars">★★★★</span><span class="stars-dim">★</span></td>
+                <td><span class="stars">★★★</span><span class="stars-dim">★★</span></td>
+            </tr>
+            <tr>
+                <td style="color:var(--text);">Professor Appeal</td>
+                <td><span class="stars">★★★★</span><span class="stars-dim">★</span></td>
+                <td><span class="stars">★★★★★</span></td>
+                <td><span class="stars">★★★</span><span class="stars-dim">★★</span></td>
+            </tr>
+            <tr>
+                <td style="color:var(--text);">Student Appeal</td>
+                <td><span class="stars">★★★</span><span class="stars-dim">★★</span></td>
+                <td><span class="stars">★★★★</span><span class="stars-dim">★</span></td>
+                <td><span class="stars">★★★★★</span></td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+
+
+<!-- ═══════════════════════════════════════ FOOTER ═══════════════════════════════════════ -->
+<div class="footer">
+    Quest-On Brand Identity Concepts — April 2026<br>
+    <span style="opacity:0.6;">Current logo assets: qlogo_icon.png / qstn_logo_svg.svg</span>
+</div>
+
+</body>
+</html>

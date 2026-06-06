@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>Quest-On · 동국대학교 경영대학</title>
+<style>
+  @font-face{font-family:"Nanum";src:url("../../public/fonts/NanumGothic-Regular.ttf") format("truetype");font-weight:400;font-display:block;}
+  @font-face{font-family:"Nanum";src:url("../../public/fonts/NanumGothic-Bold.ttf") format("truetype");font-weight:700;font-display:block;}
+
+  :root{
+    --ink:#0A0A0A;
+    --text:#1F1F1F;
+    --muted:#5B6168;
+    --faint:#9CA3AF;
+    --line:#E5E7EB;
+    --line-2:#F3F4F6;
+    --bg:#FFFFFF;
+    --panel:#FAFAFA;
+    --chrome:#F8F9FB;
+    --accent:#2563EB;
+    --accent-d:#1D4ED8;
+    --accent-faint:#EFF4FF;
+    --mark:#C8102E;
+    --mark-soft:#FDECEF;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  html,body{background:#2E3138;}
+  body{font-family:"Nanum",sans-serif; color:var(--text); -webkit-font-smoothing:antialiased; letter-spacing:-.2px; line-height:1.55;}
+
+  .slide{position:relative; width:1280px; height:720px; background:var(--bg); overflow:hidden; display:block; page-break-after:always; break-after:page;}
+  .slide:last-child{page-break-after:auto; break-after:auto;}
+  .pad{position:absolute; inset:0; padding:54px 64px;}
+  .pad-wide{padding:80px 92px;}
+  @page { size: 13.3333in 7.5in; margin: 0; }
+  @media print { html,body{ width:1280px; background:#fff; } }
+
+  .display{font-weight:700; font-size:72px; line-height:1.16; color:var(--ink); letter-spacing:-2.4px;}
+  .h1{font-weight:700; font-size:44px; line-height:1.24; color:var(--ink); letter-spacing:-1.2px;}
+  .h1-big{font-weight:700; font-size:50px; line-height:1.22; color:var(--ink); letter-spacing:-1.4px;}
+  .h2{font-weight:700; font-size:34px; line-height:1.28; color:var(--ink); letter-spacing:-.8px;}
+  .h3{font-weight:700; font-size:20px; line-height:1.4; color:var(--ink); letter-spacing:-.3px;}
+  .lead{font-size:20px; line-height:1.6; color:var(--muted); font-weight:400;}
+  .body{font-size:17px; line-height:1.6; color:var(--text); font-weight:400;}
+  .small{font-size:14px; line-height:1.6; color:var(--muted); font-weight:400;}
+  .micro{font-size:12px; line-height:1.55; color:var(--muted); font-weight:400;}
+  .label{font-size:12px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase; color:var(--faint);}
+
+  .acc-line{width:36px; height:3px; background:var(--accent); border-radius:2px; display:block;}
+  .acc-line.red{background:var(--mark);}
+
+  .brand{display:flex; align-items:center; gap:9px;}
+  .brand svg{width:20px;height:21px;}
+  .brand span{font-weight:700; font-size:16px; color:var(--ink); letter-spacing:-.4px;}
+
+  .foot{position:absolute; left:64px; right:64px; bottom:26px; display:flex; align-items:center; justify-content:space-between; color:var(--faint); font-size:12px;}
+  .foot .pageno{font-feature-settings:"tnum"; font-variant-numeric:tabular-nums; letter-spacing:.3px;}
+
+  .dark{background:var(--ink);}
+  .dark .display, .dark .h1, .dark .h1-big, .dark .h2, .dark .h3{color:#fff;}
+  .dark .lead, .dark .body{color:#B8BDC4;}
+  .dark .small{color:#9CA0A7;}
+  .dark .label{color:#5C616B;}
+  .dark .foot{color:#5C616B;}
+  .dark .brand span{color:#fff;}
+  .dark .brand svg path:first-child{fill:#fff;} .dark .brand svg path:last-child{fill:#B8BDC4;}
+
+  /* === PRODUCT-LIKE MOCKS (richer than wireframe) === */
+  .mock{border:1px solid var(--line); border-radius:10px; background:#fff; overflow:hidden;
+        box-shadow:0 2px 4px rgba(15,23,42,.04), 0 22px 40px -28px rgba(15,23,42,.25);}
+  .mock__chrome{height:38px; background:var(--chrome); border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 14px; gap:10px;}
+  .mock__chrome .dots{display:flex; gap:5px;}
+  .mock__chrome .dots span{width:9px; height:9px; border-radius:50%; background:#D1D5DB;}
+  .mock__chrome .url{flex:1; height:22px; background:#fff; border:1px solid var(--line); border-radius:99px; font-size:11px; color:var(--faint); display:flex; align-items:center; padding:0 12px; font-feature-settings:"tnum"; max-width:340px; margin:0 auto;}
+  .mock__chrome .meta{font-size:11px; color:var(--muted); font-weight:700; font-feature-settings:"tnum";}
+  .mock__sidebar{width:148px; background:#FAFBFC; border-right:1px solid var(--line); padding:12px 10px;}
+  .mock__sidebar .nav{display:flex; flex-direction:column; gap:2px;}
+  .mock__sidebar .nav div{padding:7px 10px; font-size:12px; color:var(--muted); border-radius:6px; display:flex; align-items:center; gap:8px;}
+  .mock__sidebar .nav div.active{background:var(--accent-faint); color:var(--accent-d); font-weight:700;}
+  .mock__sidebar .nav div .dot{width:6px; height:6px; border-radius:50%; background:currentColor;}
+
+  .tabs{display:flex; gap:24px; border-bottom:1px solid var(--line); padding:0 18px;}
+  .tabs span{padding:10px 0; font-size:12px; color:var(--faint); font-weight:700; border-bottom:2px solid transparent; margin-bottom:-1px;}
+  .tabs span.active{color:var(--ink); border-bottom-color:var(--accent);}
+
+  .field{display:flex; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--line); border-radius:7px; font-size:13px;}
+  .field .ph{color:var(--faint);}
+  .field.active{border-color:var(--accent); background:var(--accent-faint);}
+
+  .btn{display:inline-flex; align-items:center; gap:6px; padding:7px 14px; font-size:12px; font-weight:700; border-radius:6px; line-height:1;}
+  .btn-primary{background:var(--accent); color:#fff;}
+  .btn-ghost{background:#fff; color:var(--muted); border:1px solid var(--line);}
+
+  .pill{display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:99px; font-size:11px; font-weight:700; letter-spacing:.2px;}
+  .pill-ok{background:#ECFDF5; color:#047857;}
+  .pill-pending{background:#FFFBEB; color:#B45309;}
+  .pill-warn{background:#FEF2F2; color:#B91C1C;}
+  .pill-blue{background:var(--accent-faint); color:var(--accent-d);}
+
+  .row{display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid var(--line); border-radius:7px; background:#fff;}
+  .row .icon{width:28px; height:28px; border-radius:6px; background:var(--line-2); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--muted); flex:none;}
+
+  .bub-u{padding:9px 13px; background:var(--accent); color:#fff; border-radius:14px 14px 4px 14px; font-size:13px; line-height:1.5; max-width:88%; margin-left:auto; box-shadow:0 1px 2px rgba(37,99,235,.2);}
+  .bub-a{padding:9px 13px; background:#fff; border:1px solid var(--line); color:var(--text); border-radius:14px 14px 14px 4px; font-size:13px; line-height:1.5; max-width:88%;}
+  .bub-a-soft{padding:9px 13px; background:var(--panel); color:var(--text); border-radius:14px 14px 14px 4px; font-size:13px; line-height:1.5; max-width:88%;}
+
+  .underline{position:relative; white-space:nowrap;}
+  .underline::after{content:""; position:absolute; left:-2px; right:-2px; bottom:5px; height:11px; background:var(--accent-faint); z-index:-1; border-radius:2px;}
+  .strike{position:relative; white-space:nowrap;}
+  .strike::after{content:""; position:absolute; left:-2px; right:-2px; top:48%; height:3px; background:var(--mark); transform:rotate(-2deg);}
+
+  hr.rule{border:none; border-top:1px solid var(--line); margin:0;}
+
+  .ql path:first-child{fill:var(--ink);} .ql path:last-child{fill:var(--muted);}
+</style>
+</head>
+<body>
+
+<!-- ===== SLIDE 1 — COVER ===== -->
+<section class="slide" id="s1">
+  <div class="pad pad-wide" style="display:flex; flex-direction:column; justify-content:space-between;">
+    <div class="brand">
+      <svg class="ql" viewBox="0 0 988 1040" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:23px">
+        <path d="M910.075 873.575L781.96 981.077L492.83 636.506L518 538.5L620.946 529.004L910.075 873.575ZM494 59C748.603 59 955 265.397 955 520C955 616.478 925.362 706.033 874.696 780.06L720.444 596.229C728.585 572.141 733 546.336 733 519.5C733 387.228 625.772 280 493.5 280C361.228 280 254 387.228 254 519.5C254 651.772 361.228 759 493.5 759C511.358 759 528.76 757.044 545.503 753.337L697.075 933.975C635.806 964.087 566.879 981 494 981C239.397 981 33 774.603 33 520C33 265.397 239.397 59 494 59Z"/>
+        <path d="M779.5 0C782.927 113.15 859.529 203.939 955 208C859.529 212.061 782.927 302.85 779.5 416C776.073 302.85 699.471 212.061 604 208C699.471 203.939 776.073 113.15 779.5 0Z"/>
+      </svg>
+      <span style="font-size:17px">Quest-On</span>
+    </div>
+
+    <div>
+      <span class="acc-line" style="margin-bottom:28px;"></span>
+      <h1 class="display">AI를 금지할 수 없다면,<br/>평가의 일부로.</h1>
+      <p class="lead" style="margin-top:28px; max-width:880px; font-size:22px">시험 중 AI 사용을 공식 허용하고, 학생의 사고 과정 전체를 평가하는 시험 플랫폼.</p>
+    </div>
+
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:48px;">
+      <div>
+        <div class="label" style="margin-bottom:6px">동료 교수 도입</div>
+        <div style="font-size:19px; font-weight:700; color:var(--ink)">동국대학교 경영대학 이중학 교수</div>
+        <div style="font-size:15px; color:var(--muted); margin-top:4px">고려대 · 홍익대 · 경기과학기술대 · 동국대 경영대 운영 중</div>
+      </div>
+      <div style="font-size:15px; text-align:right; color:var(--muted)">
+        questonkr@gmail.com<br/>010-5096-8981
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 2 — WHY NOW (PROBLEM) ===== -->
+<section class="slide" id="s2">
+  <div class="pad pad-wide">
+    <div class="label">왜 지금</div>
+    <h1 class="h1-big" style="margin-top:18px; max-width:1060px">학생은 5분이면 AI로 답안을 만듭니다.<br/>채점은 여전히 손으로 합니다.</h1>
+
+    <div style="margin-top:88px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:56px;">
+      <div>
+        <div class="h2">01</div>
+        <hr class="rule" style="margin:16px 0"/>
+        <p style="font-size:21px; font-weight:700; color:var(--ink); line-height:1.4">AI를 막을 수 없습니다.</p>
+        <p class="body" style="margin-top:10px; color:var(--muted)">적발은 어렵고, 실무는 이미 AI를 씁니다. 학생이 졸업 후에도 AI를 안 쓸 일은 없습니다.</p>
+      </div>
+      <div>
+        <div class="h2">02</div>
+        <hr class="rule" style="margin:16px 0"/>
+        <p style="font-size:21px; font-weight:700; color:var(--ink); line-height:1.4">누가 생각했는지 알 수 없습니다.</p>
+        <p class="body" style="margin-top:10px; color:var(--muted)">완성된 답안만 제출되면, 학생의 사고인지 AI의 출력인지 구분되지 않습니다.</p>
+      </div>
+      <div>
+        <div class="h2">03</div>
+        <hr class="rule" style="margin:16px 0"/>
+        <p style="font-size:21px; font-weight:700; color:var(--ink); line-height:1.4">채점 시간은 그대로입니다.</p>
+        <p class="body" style="margin-top:10px; color:var(--muted)">서술형 한 반 채점에 한나절. 강의 준비 시간은 그만큼 줄어듭니다.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot" style="left:92px; right:92px">
+    <div class="brand"><svg class="ql" viewBox="0 0 988 1040" xmlns="http://www.w3.org/2000/svg"><path d="M910.075 873.575L781.96 981.077L492.83 636.506L518 538.5L620.946 529.004L910.075 873.575ZM494 59C748.603 59 955 265.397 955 520C955 616.478 925.362 706.033 874.696 780.06L720.444 596.229C728.585 572.141 733 546.336 733 519.5C733 387.228 625.772 280 493.5 280C361.228 280 254 387.228 254 519.5C254 651.772 361.228 759 493.5 759C511.358 759 528.76 757.044 545.503 753.337L697.075 933.975C635.806 964.087 566.879 981 494 981C239.397 981 33 774.603 33 520C33 265.397 239.397 59 494 59Z"/><path d="M779.5 0C782.927 113.15 859.529 203.939 955 208C859.529 212.061 782.927 302.85 779.5 416C776.073 302.85 699.471 212.061 604 208C699.471 203.939 776.073 113.15 779.5 0Z"/></svg><span>Quest-On</span></div>
+    <div class="pageno">02 / 10</div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 3 — THE FLIP (DARK) ===== -->
+<section class="slide dark" id="s3">
+  <div class="pad pad-wide">
+    <div class="label">전환</div>
+    <h1 class="h1-big" style="margin-top:18px; max-width:1060px"><span class="strike">막을 수 없다면</span>,<br/>평가에 끌어들이세요.</h1>
+
+    <div style="margin-top:80px; display:grid; grid-template-columns:1fr 1fr; gap:72px;">
+      <div>
+        <div class="label" style="color:#5C616B">기존</div>
+        <div class="h2" style="margin-top:14px; color:#8A8F96; font-weight:400">AI를 금지한다</div>
+        <ul style="list-style:none; margin-top:28px; display:flex; flex-direction:column; gap:18px;">
+          <li style="font-size:18px; color:#8A8F96; line-height:1.55">적발은 가능하지 않습니다.</li>
+          <li style="font-size:18px; color:#8A8F96; line-height:1.55">완성된 결과물만 채점합니다.</li>
+          <li style="font-size:18px; color:#8A8F96; line-height:1.55">졸업하면 학생은 결국 AI를 씁니다.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="label" style="color:#5E94FF">Quest-On</div>
+        <div class="h2" style="margin-top:14px; color:#fff">AI 활용 능력을 평가한다</div>
+        <ul style="list-style:none; margin-top:28px; display:flex; flex-direction:column; gap:18px;">
+          <li style="font-size:18px; color:#E5E7EB; line-height:1.55">시험 중 AI 튜터를 공식 제공.</li>
+          <li style="font-size:18px; color:#E5E7EB; line-height:1.55">질문, 추론, 답안 변경까지 모두 기록.</li>
+          <li style="font-size:18px; color:#E5E7EB; line-height:1.55">과정과 결과를 분리해 채점.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="foot" style="left:92px; right:92px">
+    <div class="brand"><svg class="ql" viewBox="0 0 988 1040" xmlns="http://www.w3.org/2000/svg"><path d="M910.075 873.575L781.96 981.077L492.83 636.506L518 538.5L620.946 529.004L910.075 873.575ZM494 59C748.603 59 955 265.397 955 520C955 616.478 925.362 706.033 874.696 780.06L720.444 596.229C728.585 572.141 733 546.336 733 519.5C733 387.228 625.772 280 493.5 280C361.228 280 254 387.228 254 519.5C254 651.772 361.228 759 493.5 759C511.358 759 528.76 757.044 545.503 753.337L697.075 933.975C635.806 964.087 566.879 981 494 981C239.397 981 33 774.603 33 520C33 265.397 239.397 59 494 59Z"/><path d="M779.5 0C782.927 113.15 859.529 203.939 955 208C859.529 212.061 782.927 302.85 779.5 416C776.073 302.85 699.471 212.061 604 208C699.471 203.939 776.073 113.15 779.5 0Z"/></svg><span>Quest-On</span></div>
+    <div class="pageno">03 / 10</div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 4 — 7 STEP FLOW ===== -->
+<section class="slide" id="s4">
+  <div class="pad pad-wide">
+    <div class="label">교수 흐름</div>
+    <h1 class="h1-big" style="margin-top:18px; max-width:1060px">자료 한 번 올리면,<br/>출제부터 채점 초안까지.</h1>
+    <p class="lead" style="margin-top:16px; max-width:780px; font-size:19px">교수는 검토와 확정에 집중. 반복 작업은 Quest-On이 처리합니다.</p>
+
+    <div style="margin-top:80px;">
+      <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:14px;">
+        <div><div class="label" style="color:var(--accent)">01</div><div style="font-size:17px; font-weight:700; color:var(--ink); margin-top:8px">시험 생성</div></div>
+        <div><div class="label" style="color:var(--accent)">02</div><div style="font-size:17px; font-weight:700; color:var(--ink); margin-top:8px">자료 업로드</div></div>
+        <div><div class="label" style="color:var(--accent)">03</div><div style="font-size:17px; font-weight:700; color:var(--ink); margin-top:8px">AI 문항 생성</div></div>
+        <div><div class="label" style="color:var(--accent)">04</div><div style="font-size:17px; font-weight:700; color:var(--ink); margin-top:8px">코드 공유</div></div>
+        <div><div class="label" style="color:var(--accent)">05</div><div style="font-size:17px; font-weight:700; color:var(--ink); margin-top:8px">실시간 모니터링</div></div>
+        <div><div class="label" style="color:var(--accent)">06</div><div style="font-size:17px; font-weight:700; color:var(--ink); margin-top:8px">AI 보조 채점</div></div>
+        <div><div class="label" style="color:var(--accent)">07</div><div style="font-size:17px; font-weight:700; color:var(--ink); margin-top:8px">학생 리포트</div></div>
+      </div>
+      <hr class="rule" style="margin-top:26px"/>
+      <div style="margin-top:22px; display:grid; grid-template-columns:repeat(3, 1fr); gap:48px;">
+        <div><div class="label" style="color:var(--accent)">준비 01 – 03</div><p class="body" style="margin-top:8px; color:var(--muted)">강의자료(PDF, PPTX, DOCX, HWP)만 올리면 AI가 케이스, 객관식, OX 문항 초안을 만듭니다.</p></div>
+        <div><div class="label" style="color:var(--accent)">운영 04 – 05</div><p class="body" style="margin-top:8px; color:var(--muted)">6자리 코드로 학생이 입장. 응시, 제출, AI 대화가 실시간으로 보입니다.</p></div>
+        <div><div class="label" style="color:var(--accent)">평가 06 – 07</div><p class="body" style="margin-top:8px; color:var(--muted)">객관식과 OX는 자동, 케이스는 AI와 채팅하며 루브릭 단계로 채점합니다.</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot" style="left:92px; right:92px">
+    <div class="brand"><svg class="ql" viewBox="0 0 988 1040" xmlns="http://www.w3.org/2000/svg"><path d="M910.075 873.575L781.96 981.077L492.83 636.506L518 538.5L620.946 529.004L910.075 873.575ZM494 59C748.603 59 955 265.397 955 520C955 616.478 925.362 706.033 874.696 780.06L720.444 596.229C728.585 572.141 733 546.336 733 519.5C733 387.228 625.772 280 493.5 280C361.228 280 254 387.228 254 519.5C254 651.772 361.228 759 493.5 759C511.358 759 528.76 757.044 545.503 753.337L697.075 933.975C635.806 964.087 566.879 981 494 981C239.397 981 33 774.603 33 520C33 265.397 239.397 59 494 59Z"/><path d="M779.5 0C782.927 113.15 859.529 203.939 955 208C859.529 212.061 782.927 302.85 779.5 416C776.073 302.85 699.471 212.061 604 208C699.471 203.939 776.073 113.15 779.5 0Z"/></svg><span>Quest-On</span></div>
+    <div class="pageno">04 / 10</div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 5 — CREATE / UPLOAD / AI (rich product mock) ===== -->
+<section class="slide" id="s5">
+  <div class="pad">
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:32px; padding:0 28px;">
+      <div>
+        <div class="label">단계 01 – 03 출제</div>
+        <h1 class="h1" style="margin-top:14px; max-width:760px">제목 한 줄, 자료 첨부,<br/>그리고 AI 초안.</h1>
+      </div>
+      <p style="font-size:16px; color:var(--muted); max-width:380px; text-align:right; line-height:1.6">빈 화면에서 시작하지 않습니다.<br/>AI는 업로드한 자료 안에서만 답합니다.</p>
+    </div>
+
+    <!-- One big product mock with chrome — instructor/new full layout -->
+    <div class="mock" style="margin:32px 28px 0;">
+      <div class="mock__chrome">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="url">quest-on.app / instructor / new</div>
+        <div class="meta">교수 워크스페이스</div>
+      </div>
+      <div style="display:grid; grid-template-columns:148px 1fr; height:436px;">
+        <div class="mock__sidebar">
+          <div class="micro" style="color:var(--faint); font-weight:700; margin-bottom:8px; padding:0 10px">2025 봄 학기</div>
+          <div class="nav">
+            <div><span class="dot"></span>대시보드</div>
+            <div class="active"><span class="dot"></span>새 시험 만들기</div>
+            <div><span class="dot"></span>경영전략</div>
+            <div><span class="dot"></span>마케팅원론</div>
+            <div><span class="dot"></span>조직행동론</div>
+            <div><span class="dot"></span>학생 관리</div>
+          </div>
+        </div>
+        <div style="padding:24px 28px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+            <div>
+              <div class="label">단계 01 시험 정보</div>
+              <div class="h3" style="margin-top:6px">새 시험 만들기</div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <div class="btn btn-ghost">미리보기</div>
+              <div class="btn btn-primary">학생에게 공개</div>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1.4fr 1fr; gap:22px;">
+            <div>
+              <div class="micro" style="font-weight:700; color:var(--muted); margin-bottom:6px">시험 제목</div>
+              <div class="field active" style="font-weight:700; color:var(--ink)">2025-1 경영전략 · 진입전략 케이스</div>
+
+              <div style="display:flex; gap:12px; margin-top:14px;">
+                <div style="flex:1.3">
+                  <div class="micro" style="font-weight:700; color:var(--muted); margin-bottom:6px">시험 시간</div>
+                  <div class="field">90분</div>
+                </div>
+                <div style="flex:1">
+                  <div class="micro" style="font-weight:700; color:var(--muted); margin-bottom:6px">코드</div>
+                  <div class="field" style="font-family:'SF Mono',monospace; letter-spacing:3px; font-weight:700">A4K9P2</div>
+                </div>
+              </div>
+
+              <div style="margin-top:18px;">
+                <div class="micro" style="font-weight:700; color:var(--muted); margin-bottom:6px">단계 02 강의자료</div>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                  <div class="row">
+                    <div class="icon" style="background:#FEF2F2; color:#DC2626">PDF</div>
+                    <div style="flex:1"><div style="font-size:13px; font-weight:700; color:var(--ink)">A사_케이스_2025.pdf</div><div class="micro">2.4 MB · 18페이지</div></div>
+                    <span class="pill pill-ok">임베딩 완료</span>
+                  </div>
+                  <div class="row">
+                    <div class="icon" style="background:#FFF7ED; color:#EA580C">PPT</div>
+                    <div style="flex:1"><div style="font-size:13px; font-weight:700; color:var(--ink)">전략_프레임워크.pptx</div><div class="micro">5.1 MB · 32슬라이드</div></div>
+                    <span class="pill pill-pending">처리중 72%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="background:var(--panel); border:1px solid var(--line-2); border-radius:10px; padding:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div class="micro" style="font-weight:700; color:var(--muted)">단계 03 AI 문항 생성</div>
+                <span class="pill pill-blue">자료 기반</span>
+              </div>
+              <div style="background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:8px;">
+                <div class="micro" style="font-weight:700; color:var(--accent-d); margin-bottom:4px">문항 1 케이스</div>
+                <div style="font-size:13px; line-height:1.6; color:var(--text)">A사의 신규시장 진입에 대해 3C, SWOT를 바탕으로 STP와 4P 실행안을 제시하시오.</div>
+              </div>
+              <div style="background:#fff; border:1px solid var(--line); border-radius:8px; padding:12px;">
+                <div class="micro" style="font-weight:700; color:var(--accent-d); margin-bottom:4px">문항 2 객관식</div>
+                <div style="font-size:13px; line-height:1.6; color:var(--text)">3C 분석에서 Competitor에 해당하는 것은?</div>
+              </div>
+              <div style="display:flex; gap:6px; margin-top:10px;">
+                <div class="btn btn-ghost" style="font-size:11px; padding:6px 10px">다듬기</div>
+                <div class="btn btn-ghost" style="font-size:11px; padding:6px 10px">추가</div>
+                <div class="btn btn-primary" style="font-size:11px; padding:6px 10px; flex:1; justify-content:center">확정</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <div class="brand"><svg class="ql" viewBox="0 0 988 1040" xmlns="http://www.w3.org/2000/svg"><path d="M910.075 873.575L781.96 981.077L492.83 636.506L518 538.5L620.946 529.004L910.075 873.575ZM494 59C748.603 59 955 265.397 955 520C955 616.478 925.362 706.033 874.696 780.06L720.444 596.229C728.585 572.141 733 546.336 733 519.5C733 387.228 625.772 280 493.5 280C361.228 280 254 387.228 254 519.5C254 651.772 361.228 759 493.5 759C511.358 759 528.76 757.044 545.503 753.337L697.075 933.975C635.806 964.087 566.879 981 494 981C239.397 981 33 774.603 33 520C33 265.397 239.397 59 494 59Z"/><path d="M779.5 0C782.927 113.15 859.529 203.939 955 208C859.529 212.061 782.927 302.85 779.5 416C776.073 302.85 699.471 212.061 604 208C699.471 203.939 776.073 113.15 779.5 0Z"/></svg><span>Quest-On</span></div>
+    <div class="pageno">05 / 10</div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 6 — STUDENT EXAM (big split mock) ===== -->
+<section class="slide" id="s6">
+  <div class="pad">
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:32px; padding:0 28px;">
+      <div>
+        <div class="label">단계 04 – 05 학생 응시</div>
+        <h1 class="h1" style="margin-top:14px; max-width:780px">6자리 코드로 입장.<br/>답안과 AI 튜터가 한 화면에.</h1>
+      </div>
+      <div style="text-align:right">
+        <div class="label" style="color:var(--faint)">시험 입장 코드</div>
+        <div style="margin-top:6px; font-size:38px; font-weight:700; letter-spacing:6px; color:var(--ink); font-feature-settings:'tnum'; line-height:1">A4K9P2</div>
+      </div>
+    </div>
+
+    <div class="mock" style="margin:24px 28px 0;">
+      <div class="mock__chrome">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="url">quest-on.app / exam / A4K9P2 / answer</div>
+        <div class="meta" style="color:var(--accent); font-feature-settings:'tnum'">⏱ 42:18 / 90:00</div>
+      </div>
+      <div style="display:grid; grid-template-columns:1.55fr 1fr; height:436px;">
+        <div style="padding:22px 26px; border-right:1px solid var(--line);">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+            <span class="pill pill-blue">문항 1 / 3</span>
+            <span class="micro" style="color:var(--faint)">서술형 · 케이스</span>
+          </div>
+          <p style="font-size:15px; color:var(--text); line-height:1.7">A사의 신규 시장 진입에 대해 <b style="color:var(--ink)">3C, SWOT</b>를 바탕으로 <b style="color:var(--ink)">STP와 4P 실행안</b>을 제시하고 핵심 타겟 선정 근거를 논하시오.</p>
+          <hr class="rule" style="margin:18px 0"/>
+          <div class="label" style="color:var(--faint); font-size:11px; margin-bottom:8px">내 답안 · 자동 저장됨</div>
+          <div style="border:1px solid var(--line); border-radius:8px; padding:12px; background:#FCFDFF; font-size:13px; line-height:1.7; color:var(--text); min-height:154px;">친환경 가치에 민감한 <b style="color:var(--ink)">MZ 직장인</b>을 핵심 타겟으로 설정. 프리미엄 포지셔닝과 D2C 중심 4P를 제안한다.<br/><br/>경쟁사 대비 차별점은 경량화와 친환경 소재이며…</div>
+          <div style="margin-top:10px; font-size:12px; color:#16A34A; font-weight:700;">✓ 12초 전 자동 저장됨</div>
+        </div>
+        <div style="padding:18px; background:var(--panel); display:flex; flex-direction:column;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <div class="label" style="font-size:11px">AI 튜터 · 문항 1</div>
+            <span class="pill pill-blue">자료 안 답변</span>
+          </div>
+          <div style="flex:1; display:flex; flex-direction:column; gap:8px; overflow:hidden;">
+            <div class="bub-u">A사 케이스의 핵심 차별점이 뭐야?</div>
+            <div class="bub-a">자료 기준으로 <b>경량화</b>, <b>친환경 소재</b>, <b>D2C</b> 3가지가 핵심입니다.</div>
+            <div class="bub-u">D2C가 4P 중 어디에 들어가?</div>
+            <div class="bub-a">Place(유통). 중간 유통 단계 축소로 가격 통제력과 데이터 수집을 강화합니다.</div>
+            <div class="bub-u">우리 학교 사례도 알려줘</div>
+            <div class="bub-a" style="background:#FFFBEB; border-color:#FED7AA; color:#9A3412">업로드된 자료 밖의 외부 사례는 답변하지 않습니다.</div>
+          </div>
+          <div style="margin-top:10px; height:34px; background:#fff; border:1px solid var(--line); border-radius:99px; display:flex; align-items:center; padding:0 14px; font-size:12px; color:var(--faint);">메시지 입력…<span style="margin-left:auto; width:22px; height:22px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px;">→</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <div class="brand"><svg class="ql" viewBox="0 0 988 1040" xmlns="http://www.w3.org/2000/svg"><path d="M910.075 873.575L781.96 981.077L492.83 636.506L518 538.5L620.946 529.004L910.075 873.575ZM494 59C748.603 59 955 265.397 955 520C955 616.478 925.362 706.033 874.696 780.06L720.444 596.229C728.585 572.141 733 546.336 733 519.5C733 387.228 625.772 280 493.5 280C361.228 280 254 387.228 254 519.5C254 651.772 361.228 759 493.5 759C511.358 759 528.76 757.044 545.503 753.337L697.075 933.975C635.806 964.087 566.879 981 494 981C239.397 981 33 774.603 33 520C33 265.397 239.397 59 494 59Z"/><path d="M779.5 0C782.927 113.15 859.529 203.939 955 208C859.529 212.061 782.927 302.85 779.5 416C776.073 302.85 699.471 212.061 604 208C699.471 203.939 776.073 113.15 779.5 0Z"/></svg><span>Quest-On</span></div>
+    <div class="pageno">06 / 10</div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 7 — INTEGRITY ===== -->
+<section class="slide" id="s7">
+  <div class="pad">
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:32px; padding:0 28px;">
+      <div>
+        <div class="label">응시 데이터</div>
+        <h1 class="h1" style="margin-top:14px; max-width:840px">무엇을 붙여넣었는지,<br/>어떻게 추론했는지 모두 기록됩니다.</h1>
+      </div>
+      <p style="font-size:16px; color:var(--muted); max-width:380px; text-align:right; line-height:1.6">감시가 아니라 채점 근거.<br/>답안 뒤에 있는 데이터가 보입니다.</p>
+    </div>
+
+    <div style="margin-top:24px; display:grid; grid-template-columns:1fr 1fr; gap:24px; padding:0 28px;">
+      <div class="mock">
+        <div class="mock__chrome">
+          <div class="dots"><span></span><span></span><span></span></div>
+          <div class="url" style="max-width:280px">grade · 응시 무결성 로그</div>
+        </div>
+        <div style="padding:22px;">
+          <div style="display:flex; gap:32px;">
+            <div><div style="font-size:34px; font-weight:700; color:var(--ink); font-feature-settings:'tnum'">4</div><div class="micro" style="color:var(--faint); margin-top:2px">외부 붙여넣기</div></div>
+            <div><div style="font-size:34px; font-weight:700; color:var(--ink); font-feature-settings:'tnum'">10</div><div class="micro" style="color:var(--faint); margin-top:2px">내부 복사</div></div>
+            <div><div style="font-size:34px; font-weight:700; color:var(--ink); font-feature-settings:'tnum'">7</div><div class="micro" style="color:var(--faint); margin-top:2px">답안 수정</div></div>
+          </div>
+          <hr class="rule" style="margin:16px 0"/>
+          <div class="label" style="font-size:11px; margin-bottom:10px">붙여넣기 활동 타임라인</div>
+          <div style="display:flex; flex-direction:column; gap:7px;">
+            <div style="display:flex; align-items:center; gap:10px; padding:7px 10px; background:#FEF2F2; border:1px solid #FECACA; border-radius:6px; font-size:12px; font-feature-settings:'tnum';"><span class="pill pill-warn" style="font-size:10px; padding:2px 6px">외부</span><span style="color:#B91C1C; font-weight:700">84자</span><span style="color:#9CA3AF; margin-left:auto">12:18:12</span></div>
+            <div style="display:flex; align-items:center; gap:10px; padding:7px 10px; background:#FEF2F2; border:1px solid #FECACA; border-radius:6px; font-size:12px; font-feature-settings:'tnum';"><span class="pill pill-warn" style="font-size:10px; padding:2px 6px">외부</span><span style="color:#B91C1C; font-weight:700">380자</span><span style="color:#9CA3AF; margin-left:auto">12:35:10</span></div>
+            <div style="display:flex; align-items:center; gap:10px; padding:7px 10px; background:#FEF2F2; border:1px solid #FECACA; border-radius:6px; font-size:12px; font-feature-settings:'tnum';"><span class="pill pill-warn" style="font-size:10px; padding:2px 6px">외부</span><span style="color:#B91C1C; font-weight:700">112자</span><span style="color:#9CA3AF; margin-left:auto">12:38:22</span></div>
+            <div style="display:flex; align-items:center; gap:10px; padding:7px 10px; background:var(--accent-faint); border:1px solid #C7D8FF; border-radius:6px; font-size:12px; font-feature-settings:'tnum';"><span class="pill pill-blue" style="font-size:10px; padding:2px 6px">내부</span><span style="color:var(--accent-d); font-weight:700">문항2 → 문항1</span><span style="color:#9CA3AF; margin-left:auto">12:42:55</span></div>
+          </div>
+          <hr class="rule" style="margin:14px 0"/>
+          <div class="micro" style="color:var(--faint)">디바이스 핑거프린트 · 답안 변경 이력 · 하트비트 모두 보존</div>
+        </div>
+      </div>
+
+      <div class="mock">
+        <div class="mock__chrome">
+          <div class="dots"><span></span><span></span><span></span></div>
+          <div class="url" style="max-width:280px">grade · AI 대화 기록 · 문항 1</div>
+        </div>
+        <div style="padding:22px; background:#FAFBFC; height:380px; display:flex; flex-direction:column; gap:10px;">
+          <div class="bub-u">A사가 경쟁사 대비 강점이 뭐야?</div>
+          <div class="bub-a-soft">경량화, 친환경, D2C 3가지가 자료에 명시되어 있습니다.</div>
+          <div class="bub-u">D2C 채널의 마케팅 의미는?</div>
+          <div class="bub-a-soft">중간 유통 단계 축소, 데이터 수집, 가격 통제력 강화.</div>
+          <div class="bub-u">친환경 소재 비용은?</div>
+          <div class="bub-a-soft">자료에는 비용 수치가 명시되어 있지 않습니다. 추정 답변은 제공하지 않습니다.</div>
+          <div class="micro" style="color:var(--faint); margin-top:auto">총 7회 · 평균 응답 길이 38자 · 모두 자료 범위 내 응답</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <div class="brand"><svg class="ql" viewBox="0 0 988 1040" xmlns="http://www.w3.org/2000/svg"><path d="M910.075 873.575L781.96 981.077L492.83 636.506L518 538.5L620.946 529.004L910.075 873.575ZM494 59C748.603 59 955 265.397 955 520C955 616.478 925.362 706.033 874.696 780.06L720.444 596.229C728.585 572.141 733 546.336 733 519.5C733 387.228 625.772 280 493.5 280C361.228 280 254 387.228 254 519.5C254 651.772 361.228 759 493.5 759C511.358 759 528.76 757.044 545.503 753.337L697.075 933.975C635.806 964.087 566.879 981 494 981C239.397 981 33 774.603 33 520C33 265.397 239.397 59 494 59Z"/><path d="M779.5 0C782.927 113.15 859.529 203.939 955 208C859.529 212.061 782.927 302.85 779.5 416C776.073 302.85 699.471 212.061 604 208C699.471 203.939 776.073 113.15 779.5 0Z"/></svg><span>Quest-On</span></div>
+    <div class="pageno">07 / 10</div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 8 — AI GRADING ===== -->
+<section class="slide" id="s8">
+  <div class="pad">
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:32px; padding:0 28px;">
+      <div>
+        <div class="label">단계 06 AI 보조 채점</div>
+        <h1 class="h1" style="margin-top:14px; max-width:780px">AI가 채점 초안을 만들고,<br/>교수가 확정합니다.</h1>
+      </div>
+      <p style="font-size:16px; color:var(--muted); max-width:380px; text-align:right; line-height:1.6"><span style="color:var(--ink); font-weight:700">최종 점수는 교수가 정합니다.</span><br/>AI는 추천만, 채점권은 그대로.</p>
+    </div>
+
+    <div class="mock" style="margin:24px 28px 0;">
+      <div class="mock__chrome">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="url">quest-on.app / instructor / exam / grade · 이서연</div>
+        <div class="meta">15 / 38 채점 완료</div>
+      </div>
+      <div style="display:grid; grid-template-columns:1.4fr 1fr; height:436px;">
+        <div style="padding:20px 24px; border-right:1px solid var(--line); overflow:hidden;">
+          <div style="display:flex; gap:8px; margin-bottom:12px;">
+            <span class="pill pill-blue">문항 1 케이스</span>
+            <span class="pill" style="background:#F3F4F6; color:#6B7280">3C / SWOT / STP / 4P</span>
+          </div>
+          <div class="label" style="font-size:11px; color:var(--faint); margin-bottom:6px">학생 답안</div>
+          <div style="border:1px solid var(--line); border-radius:8px; padding:12px; background:#FCFDFF; font-size:13px; line-height:1.7; color:var(--text); max-height:108px; overflow:hidden;">…MZ 직장인을 핵심 타겟으로 설정하고 프리미엄 포지셔닝과 D2C 중심 4P를 제안한다. 차별점은 경량화와 친환경 소재…</div>
+          <hr class="rule" style="margin:14px 0"/>
+          <div class="label" style="font-size:11px; color:var(--accent-d); margin-bottom:10px">AI 채점 도우미 · 채팅</div>
+          <div style="display:flex; flex-direction:column; gap:8px; height:158px; overflow:hidden;">
+            <div class="bub-u">이 답안의 유통전략은 루브릭상 몇 점이 적절할까요?</div>
+            <div class="bub-a-soft">D2C 채널은 언급했으나 옴니채널과 물류 측면이 빠져 있어 <b>4P-Place 18/25</b>가 적절합니다.</div>
+            <div class="bub-u">옴니채널 부재 외에 다른 감점 요인은?</div>
+          </div>
+        </div>
+        <div style="padding:20px;">
+          <div class="label" style="font-size:11px; color:var(--faint); margin-bottom:14px">루브릭 단계 채점</div>
+          <div style="display:flex; flex-direction:column; gap:11px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; background:#fff; border:1px solid var(--line); border-radius:8px;"><div style="font-size:13px; font-weight:700; color:var(--ink)">3C, SWOT</div><div style="font-size:14px; font-weight:700; color:var(--ink); font-feature-settings:'tnum'">24 / 25</div></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; background:#fff; border:1px solid var(--line); border-radius:8px;"><div style="font-size:13px; font-weight:700; color:var(--ink)">STP 전략</div><div style="font-size:14px; font-weight:700; color:var(--ink); font-feature-settings:'tnum'">23 / 25</div></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; background:#FEF2F2; border:1px solid #FECACA; border-radius:8px;"><div style="font-size:13px; font-weight:700; color:#B91C1C">4P 실행안</div><div style="font-size:14px; font-weight:700; color:var(--mark); font-feature-settings:'tnum'">18 / 25</div></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 12px; background:#fff; border:1px solid var(--line); border-radius:8px;"><div style="font-size:13px; font-weight:700; color:var(--ink)">논리 설득력</div><div style="font-size:14px; font-weight:700; color:var(--ink); font-feature-settings:'tnum'">27 / 25</div></div>
+          </div>
+          <hr class="rule" style="margin:16px 0"/>
+          <div style="display:flex; justify-content:space-between; align-items:baseline;"><div class="label" style="font-size:11px; color:var(--faint)">AI 추천</div><div style="font-size:32px; font-weight:700; color:var(--ink); font-feature-settings:'tnum'; line-height:1">92</div></div>
+          <div style="display:flex; gap:8px; margin-top:14px;">
+            <div class="btn btn-ghost" style="flex:1; justify-content:center">조정</div>
+            <div class="btn btn-primary" style="flex:1; justify-content:center">교수 확정</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <div class="brand"><svg class="ql" viewBox="0 0 988 1040" xmlns="http://www.w3.org/2000/svg"><path d="M910.075 873.575L781.96 981.077L492.83 636.506L518 538.5L620.946 529.004L910.075 873.575ZM494 59C748.603 59 955 265.397 955 520C955 616.478 925.362 706.033 874.696 780.06L720.444 596.229C728.585 572.141 733 546.336 733 519.5C733 387.228 625.772 280 493.5 280C361.228 280 254 387.228 254 519.5C254 651.772 361.228 759 493.5 759C511.358 759 528.76 757.044 545.503 753.337L697.075 933.975C635.806 964.087 566.879 981 494 981C239.397 981 33 774.603 33 520C33 265.397 239.397 59 494 59Z"/><path d="M779.5 0C782.927 113.15 859.529 203.939 955 208C859.529 212.061 782.927 302.85 779.5 416C776.073 302.85 699.471 212.061 604 208C699.471 203.939 776.073 113.15 779.5 0Z"/></svg><span>Quest-On</span></div>
+    <div class="pageno">08 / 10</div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 9 — STUDENT REPORT ===== -->
+<section class="slide" id="s9">
+  <div class="pad">
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:32px; padding:0 28px;">
+      <div>
+        <div class="label">단계 07 학생 리포트</div>
+        <h1 class="h1" style="margin-top:14px; max-width:780px">제출 즉시, 학생은<br/>점수와 사고 과정을 봅니다.</h1>
+      </div>
+      <p style="font-size:16px; color:var(--muted); max-width:380px; text-align:right; line-height:1.6">답안, 대화, 코멘트가 한 화면에.<br/>학생 대시보드에 누적 추적.</p>
+    </div>
+
+    <div class="mock" style="margin:24px 28px 0;">
+      <div class="mock__chrome">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="url">quest-on.app / student / report / 4e2d7a</div>
+        <div class="meta">제출 완료</div>
+      </div>
+      <div style="display:grid; grid-template-columns:1.4fr 1fr; height:436px;">
+        <div style="padding:22px 26px; border-right:1px solid var(--line); overflow:hidden;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <div style="font-size:17px; font-weight:700; color:var(--ink)">경영전략 중간 · 리포트</div>
+              <div style="font-size:13px; color:var(--faint); margin-top:4px">제출 2025-04-18 14:38 · AI 대화 7회</div>
+            </div>
+            <div style="text-align:center; padding:8px 18px; background:#ECFDF5; border:1px solid #A7F3D0; border-radius:10px;">
+              <div style="font-size:36px; font-weight:700; color:#047857; line-height:1; font-feature-settings:'tnum'">92</div>
+              <div class="micro" style="color:#047857; font-weight:700; margin-top:2px">총점</div>
+            </div>
+          </div>
+          <hr class="rule" style="margin:18px 0"/>
+          <div class="label" style="font-size:11px; color:var(--faint); margin-bottom:10px">문항별 점수</div>
+          <div style="display:flex; gap:10px; font-feature-settings:'tnum';">
+            <div style="flex:1; padding:10px; background:#ECFDF5; border:1px solid #A7F3D0; border-radius:8px;"><div class="micro" style="color:#047857">문항 1</div><div style="font-size:20px; font-weight:700; color:#047857">92</div></div>
+            <div style="flex:1; padding:10px; background:var(--accent-faint); border:1px solid #C7D8FF; border-radius:8px;"><div class="micro" style="color:var(--accent-d)">문항 2</div><div style="font-size:20px; font-weight:700; color:var(--accent-d)">88</div></div>
+            <div style="flex:1; padding:10px; background:#FEF2F2; border:1px solid #FECACA; border-radius:8px;"><div class="micro" style="color:var(--mark)">문항 3</div><div style="font-size:20px; font-weight:700; color:var(--mark)">76</div></div>
+          </div>
+          <hr class="rule" style="margin:18px 0"/>
+          <div class="label" style="font-size:11px; color:var(--faint); margin-bottom:6px">강사 코멘트 · 문항 1</div>
+          <p style="font-size:13px; color:var(--text); line-height:1.7">타겟 설정 근거가 탄탄합니다. 다음 시험에는 <b style="color:var(--ink)">유통(Place) 실행안</b>을 더 구체화해 보세요.</p>
+        </div>
+        <div style="padding:22px; background:#FAFBFC; overflow:hidden;">
+          <div class="label" style="font-size:11px; margin-bottom:10px">시험 중 AI 대화 회상 · 문항 1</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div class="bub-u" style="font-size:12px">A사 케이스의 핵심 차별점이 뭐야?</div>
+            <div class="bub-a-soft" style="font-size:12px">자료 기준으로 경량화, 친환경 소재, D2C 3가지가 핵심입니다.</div>
+            <div class="bub-u" style="font-size:12px">D2C가 4P 중 어디에 들어가?</div>
+            <div class="bub-a-soft" style="font-size:12px">Place(유통). 중간 유통 단계를 축소합니다.</div>
+          </div>
+          <hr class="rule" style="margin:14px 0"/>
+          <div class="micro" style="color:var(--faint)">학기 누적 점수: 평균 87 · 4회 응시 (대시보드)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <div class="brand"><svg class="ql" viewBox="0 0 988 1040" xmlns="http://www.w3.org/2000/svg"><path d="M910.075 873.575L781.96 981.077L492.83 636.506L518 538.5L620.946 529.004L910.075 873.575ZM494 59C748.603 59 955 265.397 955 520C955 616.478 925.362 706.033 874.696 780.06L720.444 596.229C728.585 572.141 733 546.336 733 519.5C733 387.228 625.772 280 493.5 280C361.228 280 254 387.228 254 519.5C254 651.772 361.228 759 493.5 759C511.358 759 528.76 757.044 545.503 753.337L697.075 933.975C635.806 964.087 566.879 981 494 981C239.397 981 33 774.603 33 520C33 265.397 239.397 59 494 59Z"/><path d="M779.5 0C782.927 113.15 859.529 203.939 955 208C859.529 212.061 782.927 302.85 779.5 416C776.073 302.85 699.471 212.061 604 208C699.471 203.939 776.073 113.15 779.5 0Z"/></svg><span>Quest-On</span></div>
+    <div class="pageno">09 / 10</div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 10 — REFERENCES + CTA ===== -->
+<section class="slide" id="s10">
+  <div class="pad pad-wide">
+    <div class="label">도입 현황</div>
+    <h1 class="h1-big" style="margin-top:18px; max-width:1020px">동국대 경영대학에서<br/>이미 운영 중입니다.</h1>
+
+    <div style="margin-top:48px; display:grid; grid-template-columns:1.15fr 1fr; gap:64px; align-items:start;">
+      <div style="position:relative; padding-left:28px;">
+        <span style="position:absolute; left:0; top:6px; bottom:6px; width:4px; background:var(--mark); border-radius:2px;"></span>
+        <div class="label" style="color:var(--mark); font-weight:700; font-size:12px; letter-spacing:1.6px">동국대 경영대 운영 중</div>
+        <div style="margin-top:10px; font-size:42px; font-weight:700; color:var(--ink); letter-spacing:-1.2px; line-height:1.12">이중학 교수</div>
+        <div style="margin-top:6px; font-size:17px; color:var(--mark); font-weight:700">동국대학교 경영대학</div>
+        <p class="body" style="margin-top:20px; max-width:480px; color:var(--text)">동국대학교 경영대학 이중학 교수님께서 Quest-On으로 <span style="font-weight:700; color:var(--ink)">실제 시험을 운영</span>하고 있습니다. 같은 학과 동료 교수님의 검증된 선택입니다.</p>
+        <hr class="rule" style="margin:20px 0; max-width:480px"/>
+        <div style="display:flex; gap:40px;">
+          <div><div class="label" style="font-size:11px">유형</div><div style="font-size:15px; font-weight:700; color:var(--ink); margin-top:4px">케이스 서술</div></div>
+          <div><div class="label" style="font-size:11px">채점</div><div style="font-size:15px; font-weight:700; color:var(--ink); margin-top:4px">AI 보조 채점</div></div>
+          <div><div class="label" style="font-size:11px">학기</div><div style="font-size:15px; font-weight:700; color:var(--ink); margin-top:4px">2025학년도 적용</div></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="label">함께 도입한 교수진</div>
+        <div style="margin-top:18px; display:flex; flex-direction:column; gap:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; padding-bottom:12px; border-bottom:1px solid var(--line-2);"><span style="font-size:17px; font-weight:700; color:var(--ink)">장진욱 교수</span><span style="font-size:14px; color:var(--muted)">고려대학교</span></div>
+          <div style="display:flex; justify-content:space-between; align-items:baseline; padding-bottom:12px; border-bottom:1px solid var(--line-2);"><span style="font-size:17px; font-weight:700; color:var(--ink)">강현정 교수</span><span style="font-size:14px; color:var(--muted)">홍익대학교</span></div>
+          <div style="display:flex; justify-content:space-between; align-items:baseline; padding-bottom:12px; border-bottom:1px solid var(--line-2);"><span style="font-size:17px; font-weight:700; color:var(--ink)">최인대 교수</span><span style="font-size:14px; color:var(--muted)">경기과학기술대학교</span></div>
+          <div style="display:flex; justify-content:space-between; align-items:baseline;"><span style="font-size:17px; font-weight:700; color:var(--ink)">권효찬 교수</span><span style="font-size:14px; color:var(--muted)">경기과학기술대학교</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="position:absolute; left:92px; right:92px; bottom:64px;">
+      <hr class="rule" style="margin-bottom:20px"/>
+      <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:48px;">
+        <div>
+          <div class="label" style="color:var(--accent)">데모 미팅 요청</div>
+          <div style="font-size:21px; font-weight:700; color:var(--ink); margin-top:6px">questonkr@gmail.com · 010-5096-8981</div>
+          <div style="font-size:14px; margin-top:4px; color:var(--muted)">10분이면 시험 화면부터 채점까지 보여드릴 수 있습니다.</div>
+        </div>
+        <div style="font-size:14px; color:var(--muted); text-align:right">가입 / 자료 업로드 / 코드 공유<br/><span style="color:var(--ink); font-weight:700">3단계면 충분합니다.</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot" style="left:92px; right:92px">
+    <div class="brand"><svg class="ql" viewBox="0 0 988 1040" xmlns="http://www.w3.org/2000/svg"><path d="M910.075 873.575L781.96 981.077L492.83 636.506L518 538.5L620.946 529.004L910.075 873.575ZM494 59C748.603 59 955 265.397 955 520C955 616.478 925.362 706.033 874.696 780.06L720.444 596.229C728.585 572.141 733 546.336 733 519.5C733 387.228 625.772 280 493.5 280C361.228 280 254 387.228 254 519.5C254 651.772 361.228 759 493.5 759C511.358 759 528.76 757.044 545.503 753.337L697.075 933.975C635.806 964.087 566.879 981 494 981C239.397 981 33 774.603 33 520C33 265.397 239.397 59 494 59Z"/><path d="M779.5 0C782.927 113.15 859.529 203.939 955 208C859.529 212.061 782.927 302.85 779.5 416C776.073 302.85 699.471 212.061 604 208C699.471 203.939 776.073 113.15 779.5 0Z"/></svg><span>Quest-On</span></div>
+    <div class="pageno">10 / 10</div>
+  </div>
+</section>
+
+</body>
+</html>

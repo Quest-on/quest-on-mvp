@@ -1,0 +1,956 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+      crossorigin="anonymous"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      :root {
+        --bg: #05070f;
+        --bg-soft: #0a0f1f;
+        --primary: #3559c4;
+        --primary-light: #57cdff;
+        --primary-deep: #2f46b9;
+        --ink-inverse: #f8fafc;
+        --ink-muted: rgba(248, 250, 252, 0.62);
+        --ink-faint: rgba(248, 250, 252, 0.32);
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--bg);
+        font-family:
+          "Pretendard", "Pretendard Variable", -apple-system,
+          BlinkMacSystemFont, sans-serif;
+        color: var(--ink-inverse);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* Particle field — ambient cobalt drift behind every scene */
+      .particle-field {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+      }
+      .particle {
+        position: absolute;
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: var(--primary);
+        box-shadow: 0 0 8px rgba(53, 89, 196, 0.6);
+        opacity: 0.4;
+      }
+      .particle.bright {
+        background: var(--primary-light);
+        box-shadow: 0 0 14px rgba(87, 205, 255, 0.85);
+        opacity: 0.85;
+      }
+
+      /* Subtle vignette */
+      .vignette {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(5, 7, 15, 0) 0%,
+          rgba(5, 7, 15, 0) 55%,
+          rgba(5, 7, 15, 0.85) 100%
+        );
+        pointer-events: none;
+      }
+
+      /* Scenes */
+      .scene {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        z-index: 2;
+        background: var(--bg);
+      }
+      #scene1 {
+        z-index: 2;
+      }
+      #scene2,
+      #scene3,
+      #scene4,
+      #scene5,
+      #scene6 {
+        opacity: 0;
+      }
+
+      .scene-content {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 120px 200px;
+        box-sizing: border-box;
+      }
+
+      /* Kicker — small label above hero copy */
+      .kicker {
+        font-family: "JetBrains Mono", "Geist Mono", monospace;
+        font-size: 22px;
+        letter-spacing: 0.32em;
+        font-weight: 500;
+        color: var(--primary-light);
+        text-transform: uppercase;
+        margin-bottom: 36px;
+      }
+
+      .hero {
+        font-size: 96px;
+        font-weight: 700;
+        letter-spacing: -0.035em;
+        line-height: 1.18;
+        color: var(--ink-inverse);
+        text-align: center;
+        max-width: 1500px;
+      }
+      .hero .accent {
+        color: var(--primary-light);
+      }
+      .hero .strike {
+        color: rgba(248, 250, 252, 0.5);
+        text-decoration: line-through;
+        text-decoration-thickness: 4px;
+        text-decoration-color: rgba(248, 250, 252, 0.45);
+      }
+
+      .sub {
+        font-size: 30px;
+        font-weight: 400;
+        letter-spacing: -0.012em;
+        line-height: 1.55;
+        color: var(--ink-muted);
+        text-align: center;
+        margin-top: 36px;
+        max-width: 1100px;
+      }
+
+      /* Scene 2 — status quo blocks */
+      .blocks-row {
+        display: flex;
+        gap: 56px;
+        margin-top: 56px;
+      }
+      .block-card {
+        width: 420px;
+        height: 240px;
+        border: 1px solid rgba(248, 250, 252, 0.08);
+        background: rgba(248, 250, 252, 0.02);
+        border-radius: 14px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 18px;
+        position: relative;
+      }
+      .block-card .x-mark {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: rgba(220, 38, 38, 0.15);
+        border: 1px solid rgba(220, 38, 38, 0.55);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ff8888;
+        font-size: 28px;
+        font-weight: 700;
+      }
+      .block-card .block-label {
+        font-size: 32px;
+        font-weight: 600;
+        color: var(--ink-inverse);
+        letter-spacing: -0.01em;
+      }
+      .block-card .block-meta {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 16px;
+        letter-spacing: 0.18em;
+        color: rgba(248, 250, 252, 0.68);
+        text-transform: uppercase;
+      }
+
+      /* Scene 3 — Blackbox */
+      .stage-3 {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .blackbox {
+        position: relative;
+        width: 520px;
+        height: 520px;
+        border-radius: 32px;
+        background: linear-gradient(
+          135deg,
+          rgba(20, 24, 38, 0.95) 0%,
+          rgba(8, 11, 22, 0.98) 100%
+        );
+        border: 1px solid rgba(248, 250, 252, 0.06);
+        box-shadow:
+          0 40px 120px rgba(0, 0, 0, 0.6),
+          inset 0 0 80px rgba(5, 7, 15, 0.8);
+        overflow: hidden;
+      }
+      .blackbox-label {
+        position: absolute;
+        bottom: 32px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 14px;
+        letter-spacing: 0.4em;
+        color: rgba(248, 250, 252, 0.62);
+        text-transform: uppercase;
+      }
+      .blackbox-final {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 48px;
+        font-weight: 700;
+        color: rgba(248, 250, 252, 0.85);
+        letter-spacing: -0.02em;
+      }
+      .blackbox-interior {
+        position: absolute;
+        inset: 24px;
+        opacity: 0;
+        display: grid;
+        grid-template-rows: repeat(8, 1fr);
+        gap: 8px;
+        padding: 28px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        color: rgba(87, 205, 255, 0.7);
+        line-height: 1.4;
+      }
+      .blackbox-interior .line {
+        opacity: 0.55;
+      }
+      .blackbox-interior .line.h {
+        color: rgba(87, 205, 255, 0.92);
+      }
+      .stage-3 .annotation {
+        position: absolute;
+        right: 13%;
+        top: 50%;
+        transform: translateY(-50%);
+        max-width: 440px;
+        text-align: left;
+      }
+      .annotation .a-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 18px;
+        letter-spacing: 0.3em;
+        color: var(--primary-light);
+        text-transform: uppercase;
+        margin-bottom: 18px;
+      }
+      .annotation .a-body {
+        font-size: 38px;
+        font-weight: 600;
+        line-height: 1.35;
+        letter-spacing: -0.018em;
+        color: var(--ink-inverse);
+      }
+      .annotation .a-body em {
+        font-style: normal;
+        color: var(--primary-light);
+      }
+
+      /* Scene 4 — Pivot Blackbox -> Glassbox */
+      .pivot-row {
+        display: flex;
+        align-items: center;
+        gap: 80px;
+      }
+      .arrow {
+        font-size: 64px;
+        font-weight: 300;
+        color: var(--primary-light);
+      }
+      .glassbox {
+        position: relative;
+        width: 520px;
+        height: 520px;
+        border-radius: 32px;
+        background: linear-gradient(
+          135deg,
+          rgba(87, 205, 255, 0.05) 0%,
+          rgba(53, 89, 196, 0.12) 100%
+        );
+        border: 1px solid rgba(87, 205, 255, 0.35);
+        box-shadow:
+          0 40px 120px rgba(53, 89, 196, 0.3),
+          inset 0 0 60px rgba(87, 205, 255, 0.06);
+        overflow: hidden;
+      }
+      .glassbox-grid {
+        position: absolute;
+        inset: 32px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: 14px;
+      }
+      .glassbox-cell {
+        background: rgba(87, 205, 255, 0.05);
+        border: 1px solid rgba(87, 205, 255, 0.18);
+        border-radius: 12px;
+        padding: 18px;
+        font-family: "JetBrains Mono", monospace;
+        color: rgba(248, 250, 252, 0.85);
+      }
+      .glassbox-cell .cell-tag {
+        font-size: 11px;
+        letter-spacing: 0.32em;
+        color: var(--primary-light);
+        text-transform: uppercase;
+        margin-bottom: 10px;
+        font-weight: 600;
+      }
+      .glassbox-cell .cell-body {
+        font-size: 14px;
+        line-height: 1.5;
+        font-family:
+          "Pretendard", "Pretendard Variable", -apple-system, sans-serif;
+        font-weight: 500;
+      }
+      .glassbox-label {
+        position: absolute;
+        bottom: 22px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        letter-spacing: 0.4em;
+        color: var(--primary-light);
+        text-transform: uppercase;
+      }
+      .pivot-caption {
+        position: absolute;
+        bottom: 110px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 30px;
+        color: var(--ink-muted);
+        letter-spacing: -0.012em;
+        font-weight: 400;
+      }
+      .pivot-caption strong {
+        color: var(--ink-inverse);
+        font-weight: 600;
+      }
+
+      /* Scene 5 — Why claim */
+      .why-claim {
+        font-size: 116px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        line-height: 1.16;
+        text-align: center;
+        max-width: 1500px;
+      }
+      .why-claim .strike {
+        color: rgba(248, 250, 252, 0.5);
+        text-decoration: line-through;
+        text-decoration-thickness: 5px;
+        text-decoration-color: rgba(248, 250, 252, 0.4);
+      }
+      .why-claim .glow {
+        background: linear-gradient(
+          135deg,
+          #57cdff 0%,
+          #3559c4 60%,
+          #2f46b9 100%
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        text-shadow: 0 0 60px rgba(87, 205, 255, 0.3);
+      }
+      .why-eyebrow {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 22px;
+        letter-spacing: 0.4em;
+        color: var(--primary-light);
+        text-transform: uppercase;
+        margin-bottom: 44px;
+      }
+
+      /* Scene 6 — Lock */
+      .lock-stack {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 28px;
+      }
+      .logo-wordmark {
+        font-size: 168px;
+        font-weight: 800;
+        letter-spacing: -0.05em;
+        background: linear-gradient(
+          135deg,
+          #57cdff 0%,
+          #3559c4 50%,
+          #2f46b9 100%
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        line-height: 1;
+      }
+      .logo-rule {
+        width: 240px;
+        height: 2px;
+        background: linear-gradient(
+          90deg,
+          rgba(87, 205, 255, 0) 0%,
+          rgba(87, 205, 255, 0.85) 50%,
+          rgba(87, 205, 255, 0) 100%
+        );
+      }
+      .lock-tag {
+        font-size: 32px;
+        font-weight: 500;
+        color: var(--ink-muted);
+        letter-spacing: 0.04em;
+      }
+      .lock-meta {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 18px;
+        letter-spacing: 0.36em;
+        color: var(--primary-light);
+        text-transform: uppercase;
+        margin-top: 32px;
+      }
+
+      #scene3 .scene-content,
+      #scene4 .scene-content {
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="26"
+      data-width="1920"
+      data-height="1080"
+    >
+      <!-- Ambient particle field, persistent across all scenes -->
+      <div class="particle-field" id="particle-field"></div>
+      <div class="vignette"></div>
+
+      <!-- Scene 1: Hook -->
+      <div id="scene1" class="scene">
+        <div class="scene-content">
+          <div class="kicker" id="s1-kicker">A NEW STANDARD FOR EXAMS</div>
+          <div class="hero" id="s1-hero">
+            AI는 이미<br />
+            <span class="accent">시험 안</span>에 들어왔습니다.
+          </div>
+          <div class="sub" id="s1-sub">
+            학생들은 이미 AI와 함께 사고합니다. 우리는 그 사실을 막을 수
+            없습니다.
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene 2: Old response -->
+      <div id="scene2" class="scene">
+        <div class="scene-content">
+          <div class="kicker" id="s2-kicker">THE OLD RESPONSE</div>
+          <div class="hero" id="s2-hero" style="max-width: 1750px">
+            지금까지 우리는<br />
+            <span class="strike">금지하거나</span>,
+            <span class="strike">적발했습니다</span>.
+          </div>
+          <div class="blocks-row">
+            <div class="block-card" id="s2-card-1">
+              <div class="x-mark">✕</div>
+              <div class="block-label">AI 사용 금지</div>
+              <div class="block-meta">RULE-BASED · POLICY</div>
+            </div>
+            <div class="block-card" id="s2-card-2">
+              <div class="x-mark">✕</div>
+              <div class="block-label">사후 부정행위 적발</div>
+              <div class="block-meta">DETECTION · POST-HOC</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene 3: Blackbox insight -->
+      <div id="scene3" class="scene">
+        <div class="stage-3">
+          <div class="blackbox" id="s3-box">
+            <div class="blackbox-interior" id="s3-interior">
+              <div class="line h">prompt: "이 case를 분석해줘"</div>
+              <div class="line">↳ ai response: 핵심 변수 3가지…</div>
+              <div class="line h">edit: 답안 v1 → v2 (구조 재배치)</div>
+              <div class="line">↳ source: 강의자료 4-2 인용</div>
+              <div class="line h">prompt: "반대 관점도 검토"</div>
+              <div class="line">↳ ai response: 한계 2가지 제시</div>
+              <div class="line h">edit: 답안 v2 → v3 (반론 추가)</div>
+              <div class="line">↳ final: 학생 자신의 결론</div>
+            </div>
+            <div class="blackbox-final" id="s3-final">최종 답안</div>
+            <div class="blackbox-label">BLACKBOX</div>
+          </div>
+          <div class="annotation" id="s3-annotation">
+            <div class="a-label">THE REAL PROBLEM</div>
+            <div class="a-body">
+              문제는 AI 사용이 아니라,<br />
+              <em>과정이 보이지 않는다</em>는 것.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene 4: Pivot Blackbox -> Glassbox -->
+      <div id="scene4" class="scene">
+        <div class="stage-3">
+          <div class="pivot-row">
+            <div
+              class="blackbox"
+              style="width: 380px; height: 380px"
+              id="s4-black"
+            >
+              <div class="blackbox-final" style="font-size: 30px">최종 답안</div>
+              <div class="blackbox-label" style="font-size: 12px">BLACKBOX</div>
+            </div>
+            <div class="arrow" id="s4-arrow">→</div>
+            <div
+              class="glassbox"
+              style="width: 380px; height: 380px"
+              id="s4-glass"
+            >
+              <div class="glassbox-grid">
+                <div class="glassbox-cell">
+                  <div class="cell-tag">PROMPT</div>
+                  <div class="cell-body">학생이 던진 질문</div>
+                </div>
+                <div class="glassbox-cell">
+                  <div class="cell-tag">SOURCE</div>
+                  <div class="cell-body">참조한 자료·근거</div>
+                </div>
+                <div class="glassbox-cell">
+                  <div class="cell-tag">REVISION</div>
+                  <div class="cell-body">답안의 변화 추적</div>
+                </div>
+                <div class="glassbox-cell">
+                  <div class="cell-tag">RUBRIC</div>
+                  <div class="cell-body">평가 기준 자동 매칭</div>
+                </div>
+              </div>
+              <div class="glassbox-label">GLASSBOX</div>
+            </div>
+          </div>
+          <div class="pivot-caption" id="s4-caption">
+            Quest-On은 이 블랙박스를 <strong>글래스박스</strong>로 바꿉니다.
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene 5: Why claim -->
+      <div id="scene5" class="scene">
+        <div class="scene-content">
+          <div class="why-eyebrow" id="s5-eyebrow">WHY QUEST-ON</div>
+          <div class="why-claim" id="s5-claim">
+            <span class="strike">AI 사용을 막는</span> 대신,<br />
+            <span class="glow">활용 과정을 평가합니다.</span>
+          </div>
+          <div class="sub" id="s5-sub" style="margin-top: 56px">
+            교수자는 학생의 사고 과정을 보고, 학생은 책임 있게 AI를 활용합니다.
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene 6: Brand lock -->
+      <div id="scene6" class="scene">
+        <div class="scene-content">
+          <div class="lock-stack">
+            <div class="logo-wordmark" id="s6-logo">Quest-On</div>
+            <div class="logo-rule" id="s6-rule"></div>
+            <div class="lock-tag" id="s6-tag">AI 시대 대학 시험의 새 기준</div>
+            <div class="lock-meta" id="s6-meta">QUEST-ON.APP</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // mulberry32 seeded PRNG — particle positions are deterministic.
+      function mulberry32(seed) {
+        return function () {
+          let t = (seed += 0x6d2b79f5);
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      (function buildParticles() {
+        const field = document.getElementById("particle-field");
+        const rng = mulberry32(20260510);
+        const N = 140;
+        for (let i = 0; i < N; i++) {
+          const p = document.createElement("div");
+          p.className = "particle" + (rng() < 0.18 ? " bright" : "");
+          const x = rng() * 1920;
+          const y = rng() * 1080;
+          const r = 1 + rng() * 3;
+          p.style.left = x + "px";
+          p.style.top = y + "px";
+          p.style.width = r + "px";
+          p.style.height = r + "px";
+          p.dataset.dx = (rng() * 2 - 1).toFixed(3);
+          p.dataset.dy = (rng() * 2 - 1).toFixed(3);
+          field.appendChild(p);
+        }
+      })();
+
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      // Scene visibility hard kills — guarantees scenes don't overlap
+      // when scrubbing or if a tween conflicts. visibility: hidden takes
+      // the layer out of compositing entirely.
+      tl.set("#scene1", { visibility: "visible" }, 0);
+      tl.set("#scene2", { visibility: "hidden" }, 0);
+      tl.set("#scene3", { visibility: "hidden" }, 0);
+      tl.set("#scene4", { visibility: "hidden" }, 0);
+      tl.set("#scene5", { visibility: "hidden" }, 0);
+      tl.set("#scene6", { visibility: "hidden" }, 0);
+
+      // Persistent ambient particle drift across the whole comp.
+      const particles = document.querySelectorAll(".particle");
+      particles.forEach((p) => {
+        const dx = parseFloat(p.dataset.dx) * 24;
+        const dy = parseFloat(p.dataset.dy) * 24;
+        tl.fromTo(
+          p,
+          { x: -dx, y: -dy },
+          { x: dx, y: dy, duration: 26, ease: "sine.inOut" },
+          0,
+        );
+      });
+
+      // ---- Scene 1: Hook (0 - 4.0s) -----------------------------------------
+      tl.from(
+        "#s1-kicker",
+        { y: -16, opacity: 0, duration: 0.6, ease: "power2.out" },
+        0.25,
+      );
+      tl.from(
+        "#s1-hero",
+        { y: 60, opacity: 0, duration: 0.95, ease: "power3.out" },
+        0.55,
+      );
+      tl.from(
+        "#s1-sub",
+        { y: 30, opacity: 0, duration: 0.7, ease: "power2.out" },
+        1.1,
+      );
+
+      // 1 -> 2: blur crossfade
+      tl.set("#scene2", { visibility: "visible" }, 3.65);
+      tl.to(
+        "#scene1",
+        {
+          opacity: 0,
+          filter: "blur(14px)",
+          duration: 0.5,
+          ease: "power2.inOut",
+        },
+        3.7,
+      );
+      tl.fromTo(
+        "#scene2",
+        { opacity: 0, filter: "blur(14px)" },
+        { opacity: 1, filter: "blur(0px)", duration: 0.5, ease: "power2.inOut" },
+        3.7,
+      );
+      tl.set("#scene1", { visibility: "hidden" }, 4.25);
+
+      // ---- Scene 2: Status quo (4.0 - 7.6s) ---------------------------------
+      tl.from(
+        "#s2-kicker",
+        { y: -16, opacity: 0, duration: 0.5, ease: "power2.out" },
+        4.25,
+      );
+      tl.from(
+        "#s2-hero",
+        { y: 50, opacity: 0, duration: 0.85, ease: "expo.out" },
+        4.5,
+      );
+      tl.from(
+        "#s2-card-1",
+        {
+          y: 40,
+          opacity: 0,
+          scale: 0.94,
+          duration: 0.65,
+          ease: "back.out(1.4)",
+        },
+        5.0,
+      );
+      tl.from(
+        "#s2-card-2",
+        {
+          y: 40,
+          opacity: 0,
+          scale: 0.94,
+          duration: 0.65,
+          ease: "back.out(1.4)",
+        },
+        5.18,
+      );
+
+      // 2 -> 3: vertical push (escalation accent)
+      tl.set("#scene3", { visibility: "visible" }, 7.55);
+      tl.to(
+        "#scene2",
+        { y: -120, opacity: 0, duration: 0.45, ease: "power3.in" },
+        7.55,
+      );
+      tl.fromTo(
+        "#scene3",
+        { y: 120, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.5,
+          ease: "power3.out",
+          overwrite: "auto",
+        },
+        7.6,
+      );
+      tl.set("#scene2", { visibility: "hidden" }, 8.05);
+
+      // ---- Scene 3: Blackbox insight (8.0 - 13.0s) --------------------------
+      tl.from(
+        "#s3-box",
+        { scale: 0.85, opacity: 0, duration: 0.85, ease: "power3.out" },
+        8.1,
+      );
+      tl.from(
+        "#s3-final",
+        { y: 20, opacity: 0, duration: 0.6, ease: "power2.out" },
+        8.6,
+      );
+      tl.from(
+        "#s3-annotation .a-label",
+        { x: 30, opacity: 0, duration: 0.55, ease: "power2.out" },
+        9.0,
+      );
+      tl.from(
+        "#s3-annotation .a-body",
+        { x: 30, opacity: 0, duration: 0.7, ease: "power2.out" },
+        9.2,
+      );
+      // The crack moment — interior emerges as the answer plate dims.
+      tl.to(
+        "#s3-final",
+        { opacity: 0.18, duration: 0.7, ease: "power2.inOut" },
+        11.0,
+      );
+      tl.to(
+        "#s3-interior",
+        { opacity: 1, duration: 0.9, ease: "power2.inOut" },
+        11.0,
+      );
+
+      // 3 -> 4: blur crossfade
+      tl.set("#scene4", { visibility: "visible" }, 12.95);
+      tl.to(
+        "#scene3",
+        {
+          opacity: 0,
+          filter: "blur(16px)",
+          duration: 0.55,
+          ease: "power2.inOut",
+        },
+        13.0,
+      );
+      tl.fromTo(
+        "#scene4",
+        { opacity: 0, filter: "blur(16px)" },
+        {
+          opacity: 1,
+          filter: "blur(0px)",
+          duration: 0.55,
+          ease: "power2.inOut",
+        },
+        13.0,
+      );
+      tl.set("#scene3", { visibility: "hidden" }, 13.6);
+
+      // ---- Scene 4: Pivot Blackbox -> Glassbox (13.5 - 18.0s) ---------------
+      tl.from(
+        "#s4-black",
+        { x: -60, opacity: 0, duration: 0.6, ease: "power3.out" },
+        13.7,
+      );
+      tl.from(
+        "#s4-arrow",
+        { scale: 0.5, opacity: 0, duration: 0.45, ease: "back.out(2)" },
+        14.05,
+      );
+      tl.from(
+        "#s4-glass",
+        { x: 60, opacity: 0, duration: 0.7, ease: "power3.out" },
+        14.2,
+      );
+      tl.from(
+        "#s4-glass .glassbox-cell",
+        {
+          y: 24,
+          opacity: 0,
+          duration: 0.5,
+          ease: "power2.out",
+          stagger: 0.12,
+        },
+        14.55,
+      );
+      tl.from(
+        "#s4-caption",
+        { y: 24, opacity: 0, duration: 0.6, ease: "power2.out" },
+        15.4,
+      );
+
+      // 4 -> 5: zoom-through accent (climax payoff)
+      tl.set("#scene5", { visibility: "visible" }, 17.9);
+      tl.to(
+        "#scene4",
+        {
+          scale: 1.08,
+          opacity: 0,
+          filter: "blur(10px)",
+          duration: 0.45,
+          ease: "power3.in",
+        },
+        17.95,
+      );
+      tl.fromTo(
+        "#scene5",
+        { opacity: 0, scale: 0.94, filter: "blur(8px)" },
+        {
+          opacity: 1,
+          scale: 1,
+          filter: "blur(0px)",
+          duration: 0.55,
+          ease: "power3.out",
+        },
+        18.0,
+      );
+      tl.set("#scene4", { visibility: "hidden" }, 18.45);
+
+      // ---- Scene 5: Why claim (18.5 - 22.6s) --------------------------------
+      tl.from(
+        "#s5-eyebrow",
+        { y: -16, opacity: 0, duration: 0.55, ease: "power2.out" },
+        18.4,
+      );
+      tl.from(
+        "#s5-claim",
+        { y: 70, opacity: 0, duration: 1.0, ease: "expo.out" },
+        18.7,
+      );
+      tl.from(
+        "#s5-sub",
+        { y: 24, opacity: 0, duration: 0.7, ease: "power2.out" },
+        19.5,
+      );
+
+      // 5 -> 6: gentle blur crossfade
+      tl.set("#scene6", { visibility: "visible" }, 22.55);
+      tl.to(
+        "#scene5",
+        {
+          opacity: 0,
+          filter: "blur(12px)",
+          duration: 0.6,
+          ease: "sine.inOut",
+          overwrite: "auto",
+        },
+        22.6,
+      );
+      tl.fromTo(
+        "#scene6",
+        { opacity: 0, filter: "blur(12px)" },
+        { opacity: 1, filter: "blur(0px)", duration: 0.6, ease: "sine.inOut" },
+        22.6,
+      );
+      tl.set("#scene5", { visibility: "hidden" }, 23.25);
+
+      // ---- Scene 6: Brand lock (23.0 - 26.0s) -------------------------------
+      tl.from(
+        "#s6-logo",
+        { y: 50, opacity: 0, duration: 0.95, ease: "power3.out" },
+        23.1,
+      );
+      tl.from(
+        "#s6-rule",
+        { scaleX: 0, opacity: 0, duration: 0.7, ease: "power2.out" },
+        23.7,
+      );
+      tl.from(
+        "#s6-tag",
+        { y: 20, opacity: 0, duration: 0.6, ease: "power2.out" },
+        23.95,
+      );
+      tl.from(
+        "#s6-meta",
+        { y: 14, opacity: 0, duration: 0.5, ease: "power2.out" },
+        24.4,
+      );
+      // Final scene exit allowed — gentle fade.
+      tl.to(
+        "#scene6 .lock-stack",
+        { opacity: 0.0, duration: 0.6, ease: "sine.inOut" },
+        25.4,
+      );
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,38 @@
+{
+  "name": "quest-on-remotion",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio index.ts",
+    "render": "remotion render index.ts QuestOnV7 ../out/quest-on-demo.mp4 --concurrency=1 --gl=angle",
+    "still": "remotion still index.ts QuestOnV7 ../out/quest-on-demo.png --frame=760",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
+    "@react-three/postprocessing": "^3.0.4",
+    "@remotion/animation-utils": "4.0.457",
+    "@remotion/captions": "4.0.457",
+    "@remotion/fonts": "4.0.457",
+    "@remotion/google-fonts": "4.0.457",
+    "@remotion/layout-utils": "4.0.457",
+    "@remotion/paths": "4.0.457",
+    "@remotion/shapes": "4.0.457",
+    "@remotion/three": "^4.0.457",
+    "@remotion/transitions": "4.0.457",
+    "postprocessing": "^6.39.1",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.457",
+    "three": "^0.184.0",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@remotion/cli": "4.0.457",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.184.0",
+    "typescript": "^5.9.3"
+  }
+}

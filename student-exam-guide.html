@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quest-On 학생 시험 안내</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --background: hsl(0, 0%, 100%);
+    --foreground: hsl(240, 10%, 3.9%);
+    --card: hsl(0, 0%, 100%);
+    --card-foreground: hsl(240, 10%, 3.9%);
+    --muted: hsl(240, 5%, 96%);
+    --muted-foreground: hsl(240, 4%, 46%);
+    --border: hsl(220, 13%, 91%);
+    --primary: hsl(222, 56%, 49%);
+    --primary-foreground: hsl(0, 0%, 100%);
+    --destructive: hsl(0, 84%, 60%);
+    --destructive-foreground: hsl(0, 0%, 100%);
+    --ring: hsl(222, 56%, 49%);
+
+    --blue-50: #eff6ff; --blue-100: #dbeafe; --blue-200: #bfdbfe;
+    --blue-600: #2563eb; --blue-700: #1d4ed8; --blue-800: #1e40af;
+    --green-50: #f0fdf4; --green-100: #dcfce7; --green-200: #bbf7d0;
+    --green-600: #16a34a; --green-700: #15803d; --green-800: #166534;
+    --red-50: #fef2f2; --red-100: #fee2e2; --red-200: #fecaca;
+    --red-600: #dc2626; --red-700: #b91c1c; --red-800: #991b1b;
+    --amber-50: #fffbeb; --amber-100: #fef3c7; --amber-200: #fde68a;
+    --amber-600: #d97706; --amber-800: #92400e;
+    --purple-50: #faf5ff; --purple-100: #f3e8ff; --purple-200: #e9d5ff;
+    --purple-600: #9333ea; --purple-700: #7e22ce; --purple-800: #6b21a8;
+
+    --logo-from: #57CDFF;
+    --logo-to: #2F46B9;
+
+    --radius: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+
+    --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.08);
+    --shadow: 0 2px 6px -1px hsl(0 0% 0% / 0.1), 0 1px 3px -1px hsl(0 0% 0% / 0.06);
+    --shadow-md: 0 4px 12px -2px hsl(0 0% 0% / 0.12), 0 2px 4px -2px hsl(0 0% 0% / 0.06);
+    --shadow-lg: 0 8px 24px -4px hsl(0 0% 0% / 0.14), 0 4px 8px -4px hsl(0 0% 0% / 0.06);
+  }
+
+  body {
+    background: var(--muted);
+    color: var(--foreground);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* ===== Slide System ===== */
+  .slide {
+    display: none; width: 100vw; height: 100vh;
+    padding: 48px 64px 56px;
+    flex-direction: column;
+    background: var(--background);
+    position: relative; overflow: hidden;
+  }
+  .slide.active { display: flex; }
+
+  /* ===== Progress ===== */
+  .progress {
+    position: fixed; top: 0; left: 0; height: 3px; z-index: 100;
+    background: linear-gradient(90deg, var(--logo-from), var(--logo-to));
+    transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* ===== Nav ===== */
+  .nav {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 44px;
+    background: hsla(0, 0%, 100%, 0.92); backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; gap: 12px; z-index: 100;
+  }
+  .nav button {
+    background: var(--background); border: 1px solid var(--border); color: var(--muted-foreground);
+    width: 32px; height: 32px; border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+    transition: all 0.15s ease;
+  }
+  .nav button:hover { background: var(--muted); color: var(--foreground); border-color: hsl(220, 13%, 86%); }
+  .pg { font-size: 12px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; min-width: 48px; text-align: center; font-weight: 500; }
+
+  /* ===== Typography ===== */
+  h1 { font-size: 42px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; color: var(--foreground); }
+  h2 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.25; color: var(--foreground); }
+  h3 { font-size: 15px; font-weight: 600; line-height: 1.4; color: var(--foreground); }
+  .section-label {
+    font-size: 11px; font-weight: 600; color: var(--primary);
+    text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px;
+  }
+
+  /* ===== Logo SVG ===== */
+  .logo-mark { display: flex; align-items: center; gap: 12px; }
+  .logo-mark svg { width: 44px; height: 44px; }
+  .logo-mark span { font-size: 20px; font-weight: 700; color: var(--foreground); letter-spacing: -0.01em; }
+
+  /* ===== Cover ===== */
+  .cover { justify-content: center; align-items: center; text-align: center; }
+  .cover .sub { font-size: 18px; color: var(--muted-foreground); margin-top: 12px; font-weight: 400; line-height: 1.65; }
+
+  /* Gradient decoration for cover slides */
+  .cover-deco {
+    position: absolute; border-radius: 50%; opacity: 0.07; pointer-events: none;
+    background: linear-gradient(135deg, var(--logo-from), var(--logo-to));
+  }
+  .cover-deco-1 { width: 600px; height: 600px; top: -200px; right: -150px; }
+  .cover-deco-2 { width: 400px; height: 400px; bottom: -100px; left: -100px; }
+
+  /* ===== Lucide icon base ===== */
+  .lucide { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; flex-shrink: 0; }
+  .lucide-sm { width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; flex-shrink: 0; }
+  .lucide-lg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; flex-shrink: 0; }
+  .lucide-xl { width: 24px; height: 24px; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; flex-shrink: 0; }
+
+  /* ===== shadcn Badge ===== */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 12px; border-radius: 9999px;
+    font-size: 13px; font-weight: 600; line-height: 18px;
+    border: 1px solid transparent; white-space: nowrap;
+  }
+  .badge-primary { background: hsla(222, 56%, 49%, 0.1); color: var(--primary); border-color: hsla(222, 56%, 49%, 0.2); }
+  .badge-green { background: var(--green-50); color: var(--green-800); border-color: var(--green-200); }
+  .badge-red { background: var(--red-50); color: var(--red-800); border-color: var(--red-200); }
+
+  /* ===== shadcn Card ===== */
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 24px; box-shadow: var(--shadow-sm);
+  }
+
+  /* ===== shadcn Alert ===== */
+  .alert {
+    border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 18px;
+    display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; line-height: 1.55;
+  }
+  .alert svg { flex-shrink: 0; margin-top: 1px; }
+  .alert-destructive { border-color: var(--red-200); background: var(--red-50); color: var(--red-800); }
+  .alert-blue { border-color: var(--blue-200); background: var(--blue-50); color: var(--blue-800); }
+  .alert-green { border-color: var(--green-200); background: var(--green-50); color: var(--green-800); }
+
+  /* ===== Steps ===== */
+  .steps { display: flex; align-items: flex-start; gap: 4px; }
+  .step-item { flex: 1; text-align: center; }
+  .step-circle {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--primary); color: var(--primary-foreground);
+    font-size: 16px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;
+    box-shadow: 0 2px 8px -2px hsla(222, 56%, 49%, 0.3);
+  }
+  .step-item h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .step-item p { font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+  .step-arrow {
+    color: var(--muted-foreground); margin-top: 10px; flex-shrink: 0;
+    display: flex; align-items: center;
+  }
+
+  /* ===== Do/Don't ===== */
+  .dd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; flex: 1; }
+  .do-box, .dont-box {
+    border-radius: var(--radius-xl); padding: 28px 28px 24px;
+    display: flex; flex-direction: column;
+  }
+  .do-box {
+    background: var(--green-50); border: 1.5px solid var(--green-200);
+  }
+  .dont-box {
+    background: var(--red-50); border: 1.5px solid var(--red-200);
+  }
+  .do-box h3 { color: var(--green-700); margin-bottom: 18px; display: flex; align-items: center; gap: 8px; font-size: 17px; }
+  .dont-box h3 { color: var(--red-700); margin-bottom: 18px; display: flex; align-items: center; gap: 8px; font-size: 17px; }
+  .dd-list { list-style: none; }
+  .dd-list li {
+    font-size: 15px; line-height: 1.7; margin-bottom: 8px;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .dd-list li svg { margin-top: 4px; flex-shrink: 0; }
+
+  /* ===== Rules Grid ===== */
+  .rules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; flex: 1; }
+  .rule-card {
+    border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px;
+    display: flex; align-items: flex-start; gap: 16px; background: var(--card);
+    box-shadow: var(--shadow-sm);
+  }
+  .rule-icon {
+    width: 42px; height: 42px; border-radius: var(--radius-lg);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .rule-icon.blue { background: var(--blue-100); color: var(--blue-700); }
+  .rule-icon.green { background: var(--green-100); color: var(--green-700); }
+  .rule-icon.amber { background: var(--amber-100); color: var(--amber-600); }
+  .rule-icon.red { background: var(--red-100); color: var(--red-700); }
+  .rule-icon.purple { background: var(--purple-100); color: var(--purple-700); }
+  .rule-card h3 { font-size: 15px; margin-bottom: 4px; }
+  .rule-card p { font-size: 13px; color: var(--muted-foreground); line-height: 1.55; }
+
+  /* ===== Tip cards (AI tips slide) ===== */
+  .tip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; flex: 1; }
+  .tip-card {
+    border: 1px solid var(--border); border-radius: var(--radius-xl);
+    padding: 24px; background: var(--card); box-shadow: var(--shadow-sm);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .tip-card .tip-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: hsla(222, 56%, 49%, 0.1); color: var(--primary);
+    font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .tip-card h3 { font-size: 15px; font-weight: 700; }
+  .tip-card p { font-size: 13px; color: var(--muted-foreground); line-height: 1.6; }
+  .tip-example {
+    background: var(--muted); border-radius: var(--radius); padding: 10px 12px;
+    font-size: 12px; line-height: 1.55; color: var(--foreground);
+  }
+  .tip-example .bad { color: var(--red-600); text-decoration: line-through; opacity: 0.7; }
+  .tip-example .good { color: var(--green-700); font-weight: 500; }
+
+  /* ===== Kbd ===== */
+  .kbd {
+    display: inline-flex; padding: 2px 7px;
+    background: var(--muted); border: 1px solid var(--border);
+    border-radius: 4px; font-size: 11px;
+    font-family: 'SF Mono', 'Menlo', ui-monospace, monospace;
+    color: var(--muted-foreground); box-shadow: 0 1px 0 var(--border);
+    font-weight: 500;
+  }
+
+  /* ===== Watermark ===== */
+  .wm { position: absolute; bottom: 52px; right: 64px; font-size: 11px; color: hsl(0, 0%, 82%); font-weight: 500; }
+
+  /* ================================================================
+     EXAM MOCKUP (Slide 3) — pixel-accurate to actual components
+     ================================================================ */
+  .mockup {
+    border: 1px solid var(--border); border-radius: var(--radius-lg);
+    overflow: hidden; box-shadow: var(--shadow-lg);
+    flex: 1; display: flex; flex-direction: column; min-height: 0;
+  }
+
+  /* Header */
+  .m-header {
+    background: var(--background); border-bottom: 1px solid var(--border);
+    padding: 8px 20px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .m-logo { font-size: 14px; font-weight: 700; color: var(--foreground); display: flex; align-items: center; gap: 8px; }
+  .m-logo svg { width: 24px; height: 24px; }
+  .m-timer {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px;
+    border-radius: var(--radius); font-size: 14px; font-weight: 600;
+    background: var(--blue-100); color: var(--blue-800);
+  }
+  .m-exit-btn {
+    padding: 5px 14px; border-radius: 6px;
+    border: 1px solid var(--red-200); color: var(--red-600);
+    font-size: 12px; font-weight: 500; background: transparent;
+  }
+  .m-avatar {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--muted);
+    border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: var(--muted-foreground);
+  }
+
+  /* Body: 3 panels */
+  .m-body { display: grid; grid-template-columns: 1fr 1.3fr 1fr; flex: 1; min-height: 0; }
+  .m-panel { padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+  .m-panel + .m-panel { border-left: 1px solid var(--border); }
+
+  /* Question panel */
+  .m-q-panel { background: hsla(240, 5%, 96%, 0.5); }
+  .m-q-badge {
+    display: inline-flex; align-items: center; padding: 4px 14px; border-radius: 9999px;
+    font-size: 13px; font-weight: 600;
+    background: hsla(222, 56%, 49%, 0.1); color: var(--primary);
+    border: 1px solid hsla(222, 56%, 49%, 0.2);
+  }
+  .m-q-meta { font-size: 12px; color: var(--muted-foreground); font-weight: 500; }
+  .m-q-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 14px; font-size: 13px; line-height: 1.7; color: var(--foreground);
+    box-shadow: var(--shadow-sm);
+  }
+  .m-q-req {
+    background: hsla(240, 5%, 96%, 0.6); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 10px 12px;
+  }
+  .m-q-req h4 { font-size: 12px; font-weight: 600; margin-bottom: 5px; color: var(--foreground); }
+  .m-q-req li { font-size: 12px; color: var(--muted-foreground); line-height: 1.6; display: flex; gap: 6px; }
+  .m-q-nav { display: flex; gap: 5px; margin-top: auto; }
+  .m-q-btn {
+    width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border);
+    font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;
+    background: var(--background); color: var(--muted-foreground);
+  }
+  .m-q-btn.active { background: var(--foreground); color: var(--primary-foreground); border-color: var(--foreground); }
+  .m-q-btn.answered { background: hsla(222, 56%, 49%, 0.15); border-color: hsla(222, 56%, 49%, 0.3); color: var(--primary); }
+
+  /* Answer panel */
+  .m-a-header { display: flex; align-items: center; justify-content: space-between; }
+  .m-a-label { font-size: 15px; font-weight: 600; color: var(--muted-foreground); }
+  .m-a-save { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--green-600); font-weight: 500; }
+  .m-a-textarea {
+    flex: 1; background: white; border: 1px solid hsl(0, 0%, 83%); border-radius: 2px;
+    padding: 16px 18px; font-size: 13.5px; line-height: 1.8; color: var(--foreground);
+    box-shadow: 0 1px 2px hsl(0 0% 0% / 0.05);
+    font-family: 'Inter', sans-serif;
+  }
+  .m-a-placeholder { color: hsl(0, 0%, 64%); }
+
+  /* Chat panel */
+  .m-c-panel { background: hsl(0, 0%, 98.5%); }
+  .m-c-badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 14px; border-radius: 9999px;
+    font-size: 13px; font-weight: 600;
+    background: hsla(222, 56%, 49%, 0.1); color: var(--primary);
+    border: 1px solid hsla(222, 56%, 49%, 0.2);
+  }
+  .m-c-sub { font-size: 11px; color: var(--muted-foreground); font-weight: 500; }
+  .m-c-messages { flex: 1; display: flex; flex-direction: column; gap: 10px; overflow: hidden; padding-top: 6px; }
+
+  /* Chat bubbles — exact component patterns */
+  .m-bubble-user {
+    align-self: flex-end;
+    background: var(--primary); color: var(--primary-foreground);
+    border-radius: 16px 16px 6px 16px;
+    padding: 10px 16px; font-size: 13px; line-height: 1.55; max-width: 85%;
+    box-shadow: 0 4px 6px -1px hsla(222, 56%, 49%, 0.25);
+  }
+  .m-bubble-ai {
+    align-self: flex-start;
+    background: hsla(240, 5%, 96%, 0.6); color: var(--foreground);
+    border: 1px solid hsla(220, 13%, 91%, 0.6);
+    border-radius: 6px 24px 24px 24px;
+    padding: 10px 16px; font-size: 13px; line-height: 1.55; max-width: 85%;
+  }
+  .m-bubble-time { font-size: 10px; opacity: 0.65; margin-top: 4px; text-align: right; font-weight: 500; }
+
+  .m-c-input {
+    border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--background); box-shadow: var(--shadow);
+  }
+  .m-c-input-text { font-size: 13px; color: hsl(0, 0%, 64%); }
+  .m-c-send {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--foreground); display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Annotation callouts */
+  .callout {
+    position: absolute; display: flex; align-items: center; gap: 6px;
+    background: var(--foreground); color: var(--primary-foreground);
+    padding: 7px 14px; border-radius: var(--radius); font-size: 12px; font-weight: 500;
+    box-shadow: var(--shadow-lg); z-index: 10; white-space: nowrap; letter-spacing: -0.01em;
+  }
+  .callout svg { width: 13px; height: 13px; stroke: var(--primary-foreground); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+  .callout::after {
+    content: ''; position: absolute; width: 8px; height: 8px;
+    background: var(--foreground); transform: rotate(45deg);
+  }
+  .callout.arr-b::after { bottom: -4px; left: 18px; }
+  .callout.arr-t::after { top: -4px; left: 18px; }
+  .callout.arr-l::after { left: -4px; top: 50%; margin-top: -4px; }
+  .callout.arr-r::after { right: -4px; top: 50%; margin-top: -4px; }
+
+  /* ===== Submit dialog mockup ===== */
+  .m-dialog {
+    max-width: 400px; margin: 0 auto;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl);
+    padding: 28px; box-shadow: var(--shadow-lg);
+  }
+  .m-dialog h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .m-dialog p { font-size: 14px; color: var(--muted-foreground); line-height: 1.55; }
+  .m-dialog .bold { font-weight: 600; color: var(--foreground); display: block; margin-top: 4px; }
+  .m-dialog-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+  .m-btn {
+    padding: 9px 18px; border-radius: 8px; font-size: 14px; font-weight: 500;
+    font-family: 'Inter', sans-serif; cursor: default;
+    display: flex; align-items: center; justify-content: center; min-height: 38px;
+  }
+  .m-btn-outline { border: 1px solid var(--border); background: transparent; color: var(--foreground); }
+  .m-btn-destructive { border: none; background: var(--destructive); color: var(--destructive-foreground); }
+
+  /* ===== Print ===== */
+  @media print {
+    body { background: white; }
+    .nav, .progress { display: none !important; }
+    .slide { display: flex !important; page-break-after: always; height: auto; min-height: 100vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress" id="progressBar"></div>
+
+<!-- Reusable Lucide SVG symbols -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none;">
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+  <symbol id="i-message" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></symbol>
+  <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-alert-triangle" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+  <symbol id="i-wifi-off" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M13.83 10.17A10 10 0 0 1 19 12.859"/><path d="M2 8.82a15 15 0 0 1 4.17-2.65"/><path d="M10.66 5c4.01-.36 8.14.9 11.34 3.76"/><line x1="2" x2="22" y1="2" y2="22"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></symbol>
+  <symbol id="i-lightbulb" viewBox="0 0 24 24"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+  <symbol id="i-brain" viewBox="0 0 24 24"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></symbol>
+  <!-- Quest-On Logo with gradient -->
+  <symbol id="logo-q" viewBox="0 0 36 36">
+    <defs>
+      <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#57CDFF"/>
+        <stop offset="100%" style="stop-color:#2F46B9"/>
+      </linearGradient>
+    </defs>
+    <rect width="36" height="36" rx="8" fill="url(#logo-grad)"/>
+    <text x="18" y="25" text-anchor="middle" fill="white" font-family="Inter, sans-serif" font-size="20" font-weight="800">Q</text>
+  </symbol>
+</svg>
+
+
+<!-- ===== Slide 1: Cover ===== -->
+<div class="slide cover active" data-slide="1">
+  <div class="cover-deco cover-deco-1"></div>
+  <div class="cover-deco cover-deco-2"></div>
+  <div class="logo-mark">
+    <svg><use href="#logo-q"/></svg>
+    <span>Quest-On</span>
+  </div>
+  <h1 style="margin-top: 20px;">학생 시험 안내</h1>
+  <p class="sub">AI를 활용하는 새로운 방식의 시험입니다.<br>시작 전에 아래 안내를 꼭 확인해주세요.</p>
+  <div style="display: flex; gap: 12px; margin-top: 32px; align-items: center;">
+    <span class="badge badge-primary" style="font-size: 14px; padding: 6px 16px;">
+      <svg class="lucide-sm"><use href="#i-monitor"/></svg>
+      노트북 필수
+    </span>
+    <span class="badge badge-primary" style="font-size: 14px; padding: 6px 16px;">
+      <svg class="lucide-sm"><use href="#i-globe"/></svg>
+      Chrome / Edge
+    </span>
+    <span class="badge badge-primary" style="font-size: 14px; padding: 6px 16px;">
+      <svg class="lucide-sm"><use href="#i-shield"/></svg>
+      AI 대화 기록됨
+    </span>
+  </div>
+  <p style="font-size: 14px; color: var(--muted-foreground); margin-top: 40px; font-weight: 500;">quest-on.co</p>
+</div>
+
+
+<!-- ===== Slide 2: 접속 방법 ===== -->
+<div class="slide" data-slide="2">
+  <div class="section-label">How to Join</div>
+  <h2>접속 방법</h2>
+
+  <div class="steps" style="margin-top: 36px;">
+    <div class="step-item">
+      <div class="step-circle">1</div>
+      <h3>회원가입</h3>
+      <p>quest-on.co 접속<br>Google 등으로 로그인</p>
+    </div>
+    <div class="step-arrow"><svg class="lucide"><use href="#i-chevron-right"/></svg></div>
+    <div class="step-item">
+      <div class="step-circle">2</div>
+      <h3>프로필 설정</h3>
+      <p>이름 · 학번 · 학교<br>정확하게 입력</p>
+    </div>
+    <div class="step-arrow"><svg class="lucide"><use href="#i-chevron-right"/></svg></div>
+    <div class="step-item">
+      <div class="step-circle">3</div>
+      <h3>시험 코드 입력</h3>
+      <p>교수님이 안내한<br>코드 입력</p>
+    </div>
+    <div class="step-arrow"><svg class="lucide"><use href="#i-chevron-right"/></svg></div>
+    <div class="step-item">
+      <div class="step-circle">4</div>
+      <h3>규칙 확인</h3>
+      <p>체크박스 2개<br>선택 후 입장</p>
+    </div>
+    <div class="step-arrow"><svg class="lucide"><use href="#i-chevron-right"/></svg></div>
+    <div class="step-item">
+      <div class="step-circle">5</div>
+      <h3>대기실</h3>
+      <p>교수님이 시작<br>버튼 누르면 시험 시작</p>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: auto; padding-top: 32px;">
+    <div class="alert alert-blue">
+      <svg class="lucide"><use href="#i-monitor"/></svg>
+      <div><strong>사전 준비:</strong> 시험 전에 미리 가입 + 프로필 설정을 완료하세요.</div>
+    </div>
+    <div class="alert" style="border-color: var(--border);">
+      <svg class="lucide" style="color: var(--muted-foreground);"><use href="#i-globe"/></svg>
+      <div><strong>환경:</strong> 노트북 + Chrome/Edge 최신 버전 + 안정적 인터넷</div>
+    </div>
+  </div>
+  <span class="wm">Quest-On Student Guide</span>
+</div>
+
+
+<!-- ===== Slide 3: 시험 화면 (HERO) ===== -->
+<div class="slide" data-slide="3" style="padding: 36px 48px 52px;">
+  <div class="section-label">Exam Interface</div>
+  <h2 style="margin-bottom: 10px;">시험 화면</h2>
+
+  <div class="mockup" style="position: relative;">
+    <!-- Exam Header -->
+    <div class="m-header">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div class="m-logo">
+          <svg style="width:22px;height:22px;"><use href="#logo-q"/></svg>
+          Quest-On
+        </div>
+        <div class="m-timer">
+          <svg class="lucide-sm"><use href="#i-clock"/></svg>
+          42:15
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div class="m-exit-btn">그만두기</div>
+        <div class="m-avatar">김</div>
+      </div>
+    </div>
+
+    <!-- 3-Panel Body -->
+    <div class="m-body">
+
+      <!-- Left: Question Panel -->
+      <div class="m-panel m-q-panel">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span class="m-q-badge">문제 1</span>
+          <span class="m-q-meta">서술형 · 20점</span>
+        </div>
+
+        <div class="m-q-card">
+          디지털 전환(Digital Transformation)이 기업 경쟁력에 미치는 영향을 설명하고, 성공적인 디지털 전환을 위한 핵심 요소 3가지를 논하시오.
+        </div>
+
+        <div class="m-q-req">
+          <h4>요구사항</h4>
+          <ul style="list-style: none;">
+            <li><span style="color: var(--primary);">•</span> 문제를 정확히 이해하고 답변하세요</li>
+            <li><span style="color: var(--primary);">•</span> 풀이 과정을 단계별로 명확히 작성하세요</li>
+          </ul>
+        </div>
+
+        <div class="m-q-nav">
+          <div class="m-q-btn active">1</div>
+          <div class="m-q-btn answered">2</div>
+          <div class="m-q-btn">3</div>
+          <div class="m-q-btn">4</div>
+          <div class="m-q-btn">5</div>
+        </div>
+      </div>
+
+      <!-- Center: Answer Panel -->
+      <div class="m-panel">
+        <div class="m-a-header">
+          <span class="m-a-label">답안 작성</span>
+          <div class="m-a-save">
+            <svg class="lucide-sm"><use href="#i-save"/></svg>
+            저장됨 · 14:32
+          </div>
+        </div>
+
+        <div class="m-a-textarea">
+          디지털 전환은 기업이 디지털 기술을 활용하여 비즈니스 모델, 운영 프로세스, 고객 경험을 근본적으로 변화시키는 전략적 활동이다.<br><br>
+          첫째, 디지털 전환이 경쟁력에 미치는 영향을 살펴보면, 데이터 기반 의사결정이 가능해지면서 시장 변화에 대한 민첩한 대응이 가능해진다.<br><br>
+          둘째, 고객 접점의 디지털화를 통해...<br><br>
+          <span class="m-a-placeholder">| (계속 작성 중)</span>
+        </div>
+      </div>
+
+      <!-- Right: AI Chat Sidebar -->
+      <div class="m-panel m-c-panel">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="m-c-badge">
+            <svg class="lucide-sm"><use href="#i-message"/></svg>
+            AI 도우미
+          </span>
+          <span class="m-c-sub">문제 1 관련 대화</span>
+        </div>
+
+        <div class="m-c-messages">
+          <div class="m-bubble-ai">
+            안녕하세요! 이 문제에 대해 궁금한 점이 있으면 자유롭게 질문해주세요.
+          </div>
+          <div class="m-bubble-user">
+            디지털 전환의 핵심 요소가 뭐야?
+            <div class="m-bubble-time">14:28</div>
+          </div>
+          <div class="m-bubble-ai">
+            디지털 전환의 핵심 요소를 정리해볼게요. 먼저 어떤 측면에서 접근하고 싶으신가요?<br><br>
+            1. 기술적 인프라<br>
+            2. 조직 문화<br>
+            3. 리더십과 전략
+          </div>
+          <div class="m-bubble-user">
+            조직 문화 관점에서 더 알려줘
+            <div class="m-bubble-time">14:31</div>
+          </div>
+        </div>
+
+        <div class="m-c-input">
+          <span class="m-c-input-text">AI에게 질문하기...</span>
+          <div class="m-c-send">
+            <svg style="width:14px;height:14px;stroke:white;stroke-width:2;fill:none;"><use href="#i-arrow-up"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Annotation Callouts -->
+    <div class="callout arr-b" style="top: 38px; left: 140px;">
+      <svg><use href="#i-clock"/></svg>
+      남은 시간 — 종료 시 자동 제출
+    </div>
+    <div class="callout arr-r" style="bottom: 60px; left: -6px; transform: translateX(-100%);">
+      <svg><use href="#i-check"/></svg>
+      문제 이동 (번호 클릭)
+    </div>
+    <div class="callout arr-l" style="top: 50%; right: -6px; transform: translateX(100%) translateY(-50%);">
+      <svg><use href="#i-message"/></svg>
+      AI와 자유롭게 대화
+    </div>
+    <div class="callout arr-t" style="bottom: 70px; left: 42%;">
+      <svg><use href="#i-save"/></svg>
+      30초 자동 저장 · Ctrl+S
+    </div>
+  </div>
+  <span class="wm">Quest-On Student Guide</span>
+</div>
+
+
+<!-- ===== Slide 4: AI 사용 규칙 ===== -->
+<div class="slide" data-slide="4">
+  <div class="section-label">AI Policy</div>
+  <h2>AI 사용 규칙</h2>
+
+  <div class="dd-grid" style="margin-top: 24px;">
+    <div class="do-box">
+      <h3>
+        <svg class="lucide-lg" style="color: var(--green-600);"><use href="#i-check"/></svg>
+        플랫폼 내 AI 자유 활용
+      </h3>
+      <ul class="dd-list">
+        <li><svg class="lucide" style="color: var(--green-600);"><use href="#i-check"/></svg> 개념 질문, 힌트 요청</li>
+        <li><svg class="lucide" style="color: var(--green-600);"><use href="#i-check"/></svg> 풀이 방향 확인</li>
+        <li><svg class="lucide" style="color: var(--green-600);"><use href="#i-check"/></svg> 논리 전개 피드백 요청</li>
+        <li><svg class="lucide" style="color: var(--green-600);"><use href="#i-check"/></svg> 용어 · 배경지식 질문</li>
+      </ul>
+    </div>
+    <div class="dont-box">
+      <h3>
+        <svg class="lucide-lg" style="color: var(--red-600);"><use href="#i-x"/></svg>
+        절대 금지
+      </h3>
+      <ul class="dd-list">
+        <li><svg class="lucide" style="color: var(--red-600);"><use href="#i-x"/></svg> ChatGPT, Claude 등 외부 AI</li>
+        <li><svg class="lucide" style="color: var(--red-600);"><use href="#i-x"/></svg> 외부 웹사이트 검색</li>
+        <li><svg class="lucide" style="color: var(--red-600);"><use href="#i-x"/></svg> 외부 텍스트 붙여넣기</li>
+        <li><svg class="lucide" style="color: var(--red-600);"><use href="#i-x"/></svg> 다른 학생과 답안 공유</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="alert alert-destructive" style="margin-top: auto; padding-top: 24px;">
+    <svg class="lucide"><use href="#i-alert-triangle"/></svg>
+    <div>
+      <strong>모든 AI 대화와 활동이 기록됩니다.</strong>
+      사고 과정이 평가 기준이므로, AI 응답을 그대로 복사하지 말고 본인의 분석을 보여주세요.
+    </div>
+  </div>
+  <span class="wm">Quest-On Student Guide</span>
+</div>
+
+
+<!-- ===== Slide 5: AI 활용 팁 (NEW) ===== -->
+<div class="slide" data-slide="5">
+  <div class="section-label">AI Tips</div>
+  <h2>AI 활용 팁</h2>
+
+  <div class="tip-grid" style="margin-top: 24px;">
+    <div class="tip-card">
+      <div class="tip-num">1</div>
+      <h3>질문은 구체적으로</h3>
+      <p>막연한 질문보다 구체적인 질문이 더 좋은 힌트를 받을 수 있습니다.</p>
+      <div class="tip-example">
+        <div class="bad">"디지털 전환이 뭐야?"</div>
+        <div class="good" style="margin-top: 4px;">"디지털 전환에서 조직 문화가 중요한 이유를 알려줘"</div>
+      </div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num">2</div>
+      <h3>대화를 이어가세요</h3>
+      <p>한 번 질문으로 끝내지 말고, 후속 질문으로 깊이 있는 이해에 도달하세요.</p>
+      <div class="tip-example">
+        <div class="good">"좀 더 자세히 설명해줘" → "그럼 실제 사례가 있어?"</div>
+      </div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num">3</div>
+      <h3>자신만의 언어로 재구성</h3>
+      <p>AI 답변을 그대로 복사하지 마세요. 이해한 내용을 본인의 표현으로 작성해야 합니다.</p>
+      <div class="tip-example">
+        <div class="bad">AI 응답 → Ctrl+C → 답안에 Ctrl+V</div>
+        <div class="good" style="margin-top: 4px;">AI 힌트 참고 → 본인 언어로 답안 작성</div>
+      </div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-num">4</div>
+      <h3>사고 과정이 평가 기준</h3>
+      <p>AI와의 대화 자체가 채점에 반영됩니다. 질문의 질이 곧 평가 점수입니다.</p>
+      <div class="tip-example">
+        <div class="good">좋은 질문 = 높은 이해도 = 좋은 점수</div>
+      </div>
+    </div>
+  </div>
+  <span class="wm">Quest-On Student Guide</span>
+</div>
+
+
+<!-- ===== Slide 6: 주의사항 ===== -->
+<div class="slide" data-slide="6">
+  <div class="section-label">Key Rules</div>
+  <h2>시험 중 주의사항</h2>
+
+  <div class="rules-grid" style="margin-top: 24px;">
+    <div class="rule-card">
+      <div class="rule-icon blue"><svg class="lucide-lg"><use href="#i-clock"/></svg></div>
+      <div>
+        <h3>시간 종료 = 자동 제출</h3>
+        <p>타이머가 끝나면 작성 중인 답안이 자동 제출됩니다.</p>
+      </div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-icon green"><svg class="lucide-lg"><use href="#i-save"/></svg></div>
+      <div>
+        <h3>30초마다 자동 저장</h3>
+        <p><span class="kbd">Ctrl</span> + <span class="kbd">S</span> 로 수동 저장도 가능합니다.</p>
+      </div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-icon red"><svg class="lucide-lg"><use href="#i-clipboard"/></svg></div>
+      <div>
+        <h3>붙여넣기 자동 감지</h3>
+        <p>외부 복사/붙여넣기는 기록되어 교수님이 확인합니다.</p>
+      </div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-icon amber"><svg class="lucide-lg"><use href="#i-shield"/></svg></div>
+      <div>
+        <h3>AI 대화 전체 기록</h3>
+        <p>AI와의 모든 대화가 저장되어 채점에 반영됩니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-green" style="margin-top: auto; padding-top: 24px;">
+    <svg class="lucide"><use href="#i-wifi-off"/></svg>
+    <div>
+      <strong>접속이 끊겨도 안심하세요.</strong>
+      답안은 자동 저장되어 있습니다. 같은 시험 코드로 다시 입장하면 이어서 작성할 수 있습니다.
+    </div>
+  </div>
+  <span class="wm">Quest-On Student Guide</span>
+</div>
+
+
+<!-- ===== Slide 7: 제출 ===== -->
+<div class="slide" data-slide="7">
+  <div class="section-label">Submission</div>
+  <h2>제출 및 채점</h2>
+
+  <div class="steps" style="margin-top: 36px;">
+    <div class="step-item">
+      <div class="step-circle">1</div>
+      <h3>답안 작성 완료</h3>
+      <p>모든 문제 확인</p>
+    </div>
+    <div class="step-arrow"><svg class="lucide"><use href="#i-chevron-right"/></svg></div>
+    <div class="step-item">
+      <div class="step-circle">2</div>
+      <h3>"제출하기" 클릭</h3>
+      <p>상단 버튼</p>
+    </div>
+    <div class="step-arrow"><svg class="lucide"><use href="#i-chevron-right"/></svg></div>
+    <div class="step-item">
+      <div class="step-circle">3</div>
+      <h3>최종 확인</h3>
+      <p>제출 후 수정 불가</p>
+    </div>
+    <div class="step-arrow"><svg class="lucide"><use href="#i-chevron-right"/></svg></div>
+    <div class="step-item">
+      <div class="step-circle" style="background: linear-gradient(135deg, var(--logo-from), var(--logo-to));">
+        <svg style="width:18px;height:18px;stroke:white;stroke-width:2;fill:none;"><use href="#i-sparkles"/></svg>
+      </div>
+      <h3>AI 자동 채점</h3>
+      <p>1~2분 소요</p>
+    </div>
+    <div class="step-arrow"><svg class="lucide"><use href="#i-chevron-right"/></svg></div>
+    <div class="step-item">
+      <div class="step-circle" style="background: var(--green-600);">
+        <svg style="width:18px;height:18px;stroke:white;stroke-width:2;fill:none;"><use href="#i-check"/></svg>
+      </div>
+      <h3>교수님 최종 리뷰</h3>
+      <p>피드백 확인 가능</p>
+    </div>
+  </div>
+
+  <div class="m-dialog" style="margin-top: auto;">
+    <h3>시험 제출 확인</h3>
+    <p>정말로 시험을 제출하시겠습니까?</p>
+    <p><span class="bold">제출 후에는 답안을 수정할 수 없습니다.</span></p>
+    <div class="m-dialog-footer">
+      <div class="m-btn m-btn-outline">취소</div>
+      <div class="m-btn m-btn-destructive">제출하기</div>
+    </div>
+  </div>
+
+  <p style="text-align: center; margin-top: 16px; font-size: 13px; color: var(--muted-foreground);">
+    시간 종료 시에도 자동으로 제출됩니다. 미완성이더라도 작성한 부분까지 채점됩니다.
+  </p>
+  <span class="wm">Quest-On Student Guide</span>
+</div>
+
+
+<!-- ===== Slide 8: 마무리 ===== -->
+<div class="slide cover" data-slide="8">
+  <div class="cover-deco cover-deco-1"></div>
+  <div class="cover-deco cover-deco-2"></div>
+  <div class="logo-mark">
+    <svg><use href="#logo-q"/></svg>
+    <span>Quest-On</span>
+  </div>
+  <h1 style="font-size: 34px; margin-top: 20px;">시험 준비 완료되셨나요?</h1>
+  <div style="display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; justify-content: center;">
+    <span class="badge badge-primary" style="font-size: 14px; padding: 6px 16px;">
+      <svg class="lucide-sm"><use href="#i-check"/></svg>
+      사전 가입 + 프로필 설정
+    </span>
+    <span class="badge badge-primary" style="font-size: 14px; padding: 6px 16px;">
+      <svg class="lucide-sm"><use href="#i-check"/></svg>
+      노트북 + Chrome/Edge
+    </span>
+    <span class="badge badge-primary" style="font-size: 14px; padding: 6px 16px;">
+      <svg class="lucide-sm"><use href="#i-check"/></svg>
+      시험 코드 확인
+    </span>
+  </div>
+  <div style="margin-top: 40px; display: flex; gap: 32px; align-items: center;">
+    <div style="text-align: center;">
+      <div style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 4px; font-weight: 500;">접속</div>
+      <div style="font-size: 20px; font-weight: 700;">quest-on.co</div>
+    </div>
+    <div style="width: 1px; height: 32px; background: var(--border);"></div>
+    <div style="text-align: center;">
+      <div style="font-size: 12px; color: var(--muted-foreground); margin-bottom: 4px; font-weight: 500;">문의</div>
+      <div style="font-size: 20px; font-weight: 700;">교수님께 질문</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== Nav ===== -->
+<div class="nav">
+  <button onclick="go(-1)" aria-label="이전">&#9664;</button>
+  <span class="pg" id="pg">1 / 8</span>
+  <button onclick="go(1)" aria-label="다음">&#9654;</button>
+</div>
+
+<script>
+  let c = 1;
+  const t = document.querySelectorAll('.slide').length;
+
+  function show(n) {
+    if (n < 1 || n > t) return;
+    document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+    document.querySelector(`[data-slide="${n}"]`).classList.add('active');
+    c = n;
+    document.getElementById('pg').textContent = `${c} / ${t}`;
+    document.getElementById('progressBar').style.width = `${(c / t) * 100}%`;
+  }
+  function go(d) { show(c + d); }
+
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight','ArrowDown',' '].includes(e.key)) { e.preventDefault(); go(1); }
+    else if (['ArrowLeft','ArrowUp'].includes(e.key)) { e.preventDefault(); go(-1); }
+    else if (e.key === 'Home') show(1);
+    else if (e.key === 'End') show(t);
+  });
+
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.changedTouches[0].screenX; });
+  document.addEventListener('touchend', e => {
+    const d = tx - e.changedTouches[0].screenX;
+    if (Math.abs(d) > 50) go(d > 0 ? 1 : -1);
+  });
+
+  show(1);
+</script>
+
+</body>
+</html>
