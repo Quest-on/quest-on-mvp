@@ -274,7 +274,7 @@ test.describe("Student — Objective-Only Exam UX", () => {
     await expect(examPage.questionNav(1)).toBeVisible({
       timeout: TIMEOUTS.ELEMENT_VISIBLE,
     });
-    await examPage.goToQuestion(1);
+    await examPage.nextQuestion();
 
     await expect(
       studentPage.getByText(/OOP/i),
@@ -302,7 +302,7 @@ test.describe("Student — Objective-Only Exam UX", () => {
     await examPage.objectiveOption(0).click();
 
     // Move to question 2
-    await examPage.goToQuestion(1);
+    await examPage.nextQuestion();
     await expect(
       studentPage.getByText(/OOP/i),
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
@@ -346,7 +346,7 @@ test.describe("Student — Mixed Exam (essay + MCQ) UX", () => {
     await expect(chatPresent.first()).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
 
     // Navigate to MCQ question
-    await examPage.goToQuestion(1);
+    await examPage.nextQuestion();
     await expect(
       studentPage.getByText(/compile-time/i),
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
@@ -360,14 +360,7 @@ test.describe("Student — Mixed Exam (essay + MCQ) UX", () => {
       timeout: TIMEOUTS.ELEMENT_VISIBLE,
     });
 
-    // Navigate back to essay
-    await examPage.goToQuestion(0);
-    await expect(
-      studentPage.getByText(/polymorphism/i),
-    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
-
-    // Chat UI should be restored on the essay question
-    await expect(chatPresent.first()).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
+    // 단방향 진행: MCQ에서 이전 essay 문제로 되돌아갈 수 없다(되돌아가기 검증 제거).
 
     // TODO(S2): Verify chat-history *content* preservation across MCQ navigation.
     // useExamChat is mounted at page level so history survives unmount, but

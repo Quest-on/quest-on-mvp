@@ -64,9 +64,16 @@ export class StudentExamPage {
     return this.page.locator(`[data-testid="exam-question-nav-${index}"]`);
   }
 
-  /** Navigate to question by index (0-based) via left/bottom timeline nav. */
-  async goToQuestion(index: number) {
-    await this.questionNav(index).click();
+  get nextBtn(): Locator {
+    return this.page.locator('[data-testid="exam-next-btn"]');
+  }
+
+  /**
+   * 단방향 진행: 다음 문제로 전진한다(임의 점프·되돌아가기 불가).
+   * 객관식은 답을 선택해야 다음 버튼이 활성화된다.
+   */
+  async nextQuestion() {
+    await this.nextBtn.click();
   }
 
   /** Returns the nth objective option by index (0-based). */

@@ -22,7 +22,6 @@ interface UseExamGuardsOptions {
   examCode: string;
   currentQuestion: number;
   isOnline: boolean;
-  setCurrentQuestion: (idx: number) => void;
   setShowExitConfirm: (show: boolean) => void;
 }
 
@@ -35,7 +34,6 @@ export function useExamGuards({
   examCode,
   currentQuestion,
   isOnline,
-  setCurrentQuestion,
   setShowExitConfirm,
 }: UseExamGuardsOptions) {
   // Warn user about unsaved answers when closing/refreshing tab during exam
@@ -112,20 +110,5 @@ export function useExamGuards({
     prevOnlineRef.current = isOnline;
   }, [isOnline]);
 
-  // Keyboard shortcuts: Alt+1~9 for question navigation
-  useEffect(() => {
-    if (!exam || isSubmitted) return;
-
-    const handleQuestionShortcut = (e: KeyboardEvent) => {
-      if (!e.altKey || e.ctrlKey || e.metaKey) return;
-      const num = parseInt(e.key, 10);
-      if (num >= 1 && num <= Math.min(9, exam.questions.length)) {
-        e.preventDefault();
-        setCurrentQuestion(num - 1);
-      }
-    };
-
-    document.addEventListener("keydown", handleQuestionShortcut);
-    return () => document.removeEventListener("keydown", handleQuestionShortcut);
-  }, [exam, isSubmitted, setCurrentQuestion]);
+  // 단방향 진행 정책: Alt+1~9 임의 점프 단축키는 제거됨(역행/점프 차단).
 }

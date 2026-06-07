@@ -178,7 +178,6 @@ export default function ExamPage() {
     examCode,
     currentQuestion,
     isOnline: autoSave.isOnline,
-    setCurrentQuestion: setCurrentQuestionWithReveal,
     setShowExitConfirm,
   });
 
@@ -267,6 +266,8 @@ export default function ExamPage() {
       if (currentQuestionId) autoSave.updateAnswer(currentQuestionId, value);
     },
     onNext: () => {
+      // 단방향 + 선택 강제: 현재 객관식 답을 선택해야만 엔터로 다음 이동.
+      if (!questionNavItems[currentQuestion]?.hasAnswer) return;
       if (exam && currentQuestion < exam.questions.length - 1) {
         setCurrentQuestionWithReveal((prev) => prev + 1);
       }
@@ -479,7 +480,6 @@ export default function ExamPage() {
       <ExamQuestionNav
         questions={questionNavItems}
         currentQuestion={currentQuestion}
-        onSelect={setCurrentQuestionWithReveal}
         onExit={() => setShowExitConfirm(true)}
       />
 
@@ -570,39 +570,54 @@ export default function ExamPage() {
                     currentIndex={currentQuestion}
                     total={exam.questions.length}
                     onNavigate={setCurrentQuestionWithReveal}
+                    canNext={questionNavItems[currentQuestion]?.hasAnswer ?? false}
                     className="shrink-0"
                   />
                 </div>
-              ) : isQuestionVisible ? (
-                <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
-                  <ResizablePanel defaultSize={40} minSize={20} maxSize={70}>
-                    <QuestionPanel question={exam.questions[currentQuestion]} questionNumber={currentQuestion + 1} />
-                  </ResizablePanel>
-                  <ResizableHandle withHandle />
-                  <ResizablePanel defaultSize={60} minSize={30}>
-                    <AnswerPanel
-                      value={autoSave.draftAnswers[currentQuestion]?.text || ""}
-                      onChange={(value) => autoSave.updateAnswer(exam.questions[currentQuestion].id, value)}
-                      onPaste={submission.handlePaste}
-                      isSaving={autoSave.isSaving}
-                      lastSaved={autoSave.lastSaved}
-                      saveError={autoSave.saveError}
-                      saveShortcut={saveShortcut}
-                      onFocus={() => setIsQuestionVisible(false)}
-                    />
-                  </ResizablePanel>
-                </ResizablePanelGroup>
               ) : (
-                <AnswerPanel
-                  value={autoSave.draftAnswers[currentQuestion]?.text || ""}
-                  onChange={(value) => autoSave.updateAnswer(exam.questions[currentQuestion].id, value)}
-                  onPaste={submission.handlePaste}
-                  isSaving={autoSave.isSaving}
-                  lastSaved={autoSave.lastSaved}
-                  saveError={autoSave.saveError}
-                  saveShortcut={saveShortcut}
-                  fullHeight
-                />
+                // CASE/서술형: 단방향 진행을 위해 하단에 '다음' 바를 둔다(작성 무관 진행).
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    {isQuestionVisible ? (
+                      <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
+                        <ResizablePanel defaultSize={40} minSize={20} maxSize={70}>
+                          <QuestionPanel question={exam.questions[currentQuestion]} questionNumber={currentQuestion + 1} />
+                        </ResizablePanel>
+                        <ResizableHandle withHandle />
+                        <ResizablePanel defaultSize={60} minSize={30}>
+                          <AnswerPanel
+                            value={autoSave.draftAnswers[currentQuestion]?.text || ""}
+                            onChange={(value) => autoSave.updateAnswer(exam.questions[currentQuestion].id, value)}
+                            onPaste={submission.handlePaste}
+                            isSaving={autoSave.isSaving}
+                            lastSaved={autoSave.lastSaved}
+                            saveError={autoSave.saveError}
+                            saveShortcut={saveShortcut}
+                            onFocus={() => setIsQuestionVisible(false)}
+                          />
+                        </ResizablePanel>
+                      </ResizablePanelGroup>
+                    ) : (
+                      <AnswerPanel
+                        value={autoSave.draftAnswers[currentQuestion]?.text || ""}
+                        onChange={(value) => autoSave.updateAnswer(exam.questions[currentQuestion].id, value)}
+                        onPaste={submission.handlePaste}
+                        isSaving={autoSave.isSaving}
+                        lastSaved={autoSave.lastSaved}
+                        saveError={autoSave.saveError}
+                        saveShortcut={saveShortcut}
+                        fullHeight
+                      />
+                    )}
+                  </div>
+                  <ObjectiveNavBar
+                    currentIndex={currentQuestion}
+                    total={exam.questions.length}
+                    onNavigate={setCurrentQuestionWithReveal}
+                    canNext
+                    className="shrink-0"
+                  />
+                </div>
               )}
             </div>
           </MainContentWrapper>
