@@ -257,7 +257,7 @@ test.describe("Student — Objective-Only Exam UX", () => {
     await examPage.goto(exam.code);
 
     await expect(
-      studentPage.getByText(/LIFO/i),
+      studentPage.getByText(/LIFO|OOP/i),
     ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
 
     // First objective option must be visible
@@ -277,7 +277,7 @@ test.describe("Student — Objective-Only Exam UX", () => {
     await examPage.nextQuestion();
 
     await expect(
-      studentPage.getByText(/OOP/i),
+      studentPage.getByText(/LIFO|OOP/i),
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
 
     // Second question's first option should also be visible
@@ -295,7 +295,7 @@ test.describe("Student — Objective-Only Exam UX", () => {
     await examPage.goto(exam.code);
 
     await expect(
-      studentPage.getByText(/LIFO/i),
+      studentPage.getByText(/LIFO|OOP/i),
     ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
 
     // Select an option on question 1
@@ -304,7 +304,7 @@ test.describe("Student — Objective-Only Exam UX", () => {
     // Move to question 2
     await examPage.nextQuestion();
     await expect(
-      studentPage.getByText(/OOP/i),
+      studentPage.getByText(/LIFO|OOP/i),
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
 
     // Select an option on question 2
@@ -326,7 +326,7 @@ test.describe("Student — Mixed Exam (essay + MCQ) UX", () => {
     await cleanupTestData();
   });
 
-  test("essay question shows chat sidebar button; MCQ question hides it", async ({
+  test("MCQ question hides chat sidebar; essay question shows it (CASE shuffled last)", async ({
     studentPage,
   }) => {
     const { exam } = await seedMixedExam();
@@ -334,33 +334,29 @@ test.describe("Student — Mixed Exam (essay + MCQ) UX", () => {
     const examPage = new StudentExamPage(studentPage);
     await examPage.goto(exam.code);
 
-    // First question is an essay — chat UI must be present
-    await expect(
-      studentPage.getByText(/polymorphism/i),
-    ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
-
-    // On essay question: either floating chat button or sidebar close button
-    // is present (sidebar opens by default on essay)
-    const chatPresent = studentPage
-      .locator('[aria-label="AI 채팅 열기"], [aria-label="채팅 사이드바 닫기"]');
-    await expect(chatPresent.first()).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
-
-    // Navigate to MCQ question
-    await examPage.nextQuestion();
+    // 셔플 정책: CASE(essay)는 항상 맨 뒤 → 첫 화면은 MCQ(compile-time).
     await expect(
       studentPage.getByText(/compile-time/i),
-    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
+    ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
 
-    // On MCQ question: AI chat elements must be hidden
+    // On MCQ question: AI chat elements must be hidden + 선택지 보임
     await expect(examPage.floatingChatButton).toHaveCount(0);
     await expect(examPage.chatSidebarClose).toHaveCount(0);
-
-    // ObjectiveAnswerPanel must be present
     await expect(examPage.objectiveOption(0)).toBeVisible({
       timeout: TIMEOUTS.ELEMENT_VISIBLE,
     });
 
-    // 단방향 진행: MCQ에서 이전 essay 문제로 되돌아갈 수 없다(되돌아가기 검증 제거).
+    // 단방향 + 선택 강제: 객관식 답을 선택해야 다음(essay)으로 이동 가능.
+    await examPage.objectiveOption(0).click();
+    await examPage.nextQuestion();
+
+    // essay 화면: polymorphism + 채팅 UI 존재(사이드바 기본 노출).
+    await expect(
+      studentPage.getByText(/polymorphism/i),
+    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
+    const chatPresent = studentPage
+      .locator('[aria-label="AI 채팅 열기"], [aria-label="채팅 사이드바 닫기"]');
+    await expect(chatPresent.first()).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
 
     // TODO(S2): Verify chat-history *content* preservation across MCQ navigation.
     // useExamChat is mounted at page level so history survives unmount, but

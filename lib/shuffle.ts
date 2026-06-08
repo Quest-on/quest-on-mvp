@@ -1,10 +1,12 @@
 /**
- * Deterministic, seeded permutations — used to shuffle MCQ option order at
- * exam time. Pure functions, no dependencies, no persistence.
+ * Deterministic, seeded permutations — used to shuffle MCQ option order and
+ * question display order at exam time. Pure functions, no persistence.
  *
  * The same `(seed, length)` pair always yields the identical array, so a
  * student sees the same option order on every render / reload / device.
  */
+
+import { isObjectiveQuestion } from "./grading-helpers";
 
 /** FNV-1a 32-bit string hash. Pure, deterministic. */
 function fnv1aHash(str: string): number {
@@ -45,4 +47,28 @@ export function seededOptionOrder(seed: string, length: number): number[] {
     [order[i], order[j]] = [order[j], order[i]];
   }
   return order;
+}
+
+/**
+ * 시험 문항의 표시 순서(표시위치 → 원본 인덱스) 매핑을 반환한다.
+ *
+ * - 객관식(MCQ/OX)만 `seed`로 결정론적 통합 셔플한다.
+ * - CASE(비객관식 전부)는 원래 출제 순서를 유지해 항상 맨 뒤에 배치한다.
+ *
+ * 반환 배열은 항상 `[0 .. questions.length-1]`의 순열이며,
+ * `displayOrder[표시위치] = 원본 인덱스(q_idx)`. 원본 배열·q_idx는 건드리지 않으므로
+ * 정답/채점 매핑은 그대로 유지된다(표시 전용). 같은 `seed`면 항상 동일 결과.
+ */
+export function examQuestionDisplayOrder(
+  seed: string,
+  questions: { type: string }[],
+): number[] {
+  const objective: number[] = [];
+  const cases: number[] = [];
+  questions.forEach((q, i) => {
+    if (isObjectiveQuestion(q.type)) objective.push(i);
+    else cases.push(i);
+  });
+  const perm = seededOptionOrder(seed, objective.length);
+  return [...perm.map((p) => objective[p]), ...cases];
 }
