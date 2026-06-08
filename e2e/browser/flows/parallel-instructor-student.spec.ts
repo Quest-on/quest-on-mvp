@@ -105,7 +105,7 @@ test.describe("Parallel Instructor + Student — Full Cross-Role E2E", () => {
       );
 
       // Navigate to Q2 and answer it
-      await examPage.goToQuestion(1);
+      await examPage.nextQuestion();
       await expect(examPage.answerArea).toBeVisible({ timeout: TIMEOUTS.API_RESPONSE });
       await examPage.typeAnswer(
         "A stack is LIFO (last in, first out) while a queue is FIFO (first in, first out).",

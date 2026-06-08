@@ -49,7 +49,7 @@ test.describe("Full Exam Submission Flow", () => {
       "Polymorphism is a core OOP concept that allows objects to take many forms.",
     );
 
-    await examPage.goToQuestion(1);
+    await examPage.nextQuestion();
     await expect(examPage.answerArea).toBeVisible({ timeout: TIMEOUTS.API_RESPONSE });
     await examPage.typeAnswer(
       "A stack is LIFO, while a queue is FIFO.",

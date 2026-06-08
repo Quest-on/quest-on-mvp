@@ -13,7 +13,6 @@ export interface ExamQuestionNavItem {
 interface ExamQuestionNavProps {
   questions: ExamQuestionNavItem[];
   currentQuestion: number;
-  onSelect: (index: number) => void;
   onExit: () => void;
   className?: string;
 }
@@ -34,11 +33,14 @@ export function questionNavTypeBadge(type: string): string | null {
   }
 }
 
-/** 좌측 세로 문항 타임라인 + 하단 나가기. md 이상에서 좌측 고정. */
+/**
+ * 좌측 세로 문항 타임라인 + 하단 나가기. md 이상에서 좌측 고정.
+ * 단방향 진행 정책: 문항은 클릭으로 이동할 수 없는 '진행 표시' 전용이다.
+ * (이전 문제로 되돌아가거나 앞 문제로 점프하는 것을 막는다.)
+ */
 export function ExamQuestionNav({
   questions,
   currentQuestion,
-  onSelect,
   onExit,
   className,
 }: ExamQuestionNavProps) {
@@ -50,7 +52,7 @@ export function ExamQuestionNav({
           "hidden md:flex h-full flex-col shrink-0 border-r border-border bg-muted/30 w-16 lg:w-20",
           className,
         )}
-        aria-label="문항 이동"
+        aria-label="문항 진행 상황"
       >
         <div className="flex flex-col items-center gap-2 py-4 px-2 overflow-y-auto hide-scrollbar flex-1 min-h-0">
           {questions.map((q, idx) => (
@@ -61,7 +63,6 @@ export function ExamQuestionNav({
               isCurrent={idx === currentQuestion}
               hasAnswer={q.hasAnswer}
               hasChat={q.hasChat}
-              onSelect={() => onSelect(idx)}
               layout="vertical"
             />
           ))}
@@ -83,7 +84,7 @@ export function ExamQuestionNav({
       {/* Mobile: bottom horizontal timeline */}
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-background/95 backdrop-blur-sm"
-        aria-label="문항 이동"
+        aria-label="문항 진행 상황"
       >
         <div className="flex items-center gap-2 px-3 py-2 overflow-x-auto hide-scrollbar">
           {questions.map((q, idx) => (
@@ -94,7 +95,6 @@ export function ExamQuestionNav({
               isCurrent={idx === currentQuestion}
               hasAnswer={q.hasAnswer}
               hasChat={q.hasChat}
-              onSelect={() => onSelect(idx)}
               layout="horizontal"
             />
           ))}
@@ -113,13 +113,13 @@ export function ExamQuestionNav({
   );
 }
 
+/** 진행 표시 전용 칩(비대화형). 단방향 진행이므로 클릭 이동을 제공하지 않는다. */
 function QuestionPill({
   index,
   questionType,
   isCurrent,
   hasAnswer,
   hasChat,
-  onSelect,
   layout,
 }: {
   index: number;
@@ -127,24 +127,21 @@ function QuestionPill({
   isCurrent: boolean;
   hasAnswer: boolean;
   hasChat: boolean;
-  onSelect: () => void;
   layout: "vertical" | "horizontal";
 }) {
   const typeBadge = questionNavTypeBadge(questionType);
 
   return (
-    <button
-      type="button"
-      onClick={onSelect}
+    <div
       data-testid={layout === "vertical" ? `exam-question-nav-${index}` : undefined}
       className={cn(
-        "relative rounded-lg text-xs font-semibold border transition-all shrink-0 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
+        "relative flex items-center justify-center rounded-lg text-xs font-semibold border shrink-0 cursor-default select-none",
         layout === "vertical" ? "w-10 h-10 lg:w-11 lg:h-11" : "w-10 h-10",
         isCurrent
           ? "ring-2 ring-primary bg-primary text-primary-foreground border-primary"
           : hasAnswer
-            ? "bg-primary/15 border-primary/30 text-primary hover:bg-primary/25"
-            : "bg-background border-border text-muted-foreground hover:bg-muted/80",
+            ? "bg-primary/15 border-primary/30 text-primary"
+            : "bg-background border-border text-muted-foreground",
       )}
       aria-label={`문제 ${index + 1}${typeBadge ? ` (${typeBadge})` : ""}${isCurrent ? " (현재)" : ""}${hasAnswer ? " (작성됨)" : " (미작성)"}${hasChat ? " (채팅 있음)" : ""}`}
       aria-current={isCurrent ? "step" : undefined}
@@ -169,6 +166,6 @@ function QuestionPill({
           aria-hidden="true"
         />
       )}
-    </button>
+    </div>
   );
 }
