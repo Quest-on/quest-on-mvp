@@ -21,7 +21,6 @@ interface AnswerPanelProps {
   saveError?: boolean;
   saveShortcut: ReactNode;
   fullHeight?: boolean;
-  onFocus?: () => void;
 }
 
 export function AnswerPanel({
@@ -33,7 +32,6 @@ export function AnswerPanel({
   saveError = false,
   saveShortcut,
   fullHeight = false,
-  onFocus,
 }: AnswerPanelProps) {
   return (
     <div
@@ -64,7 +62,6 @@ export function AnswerPanel({
                 }
                 value={value}
                 onChange={onChange}
-                onFocus={onFocus}
                 onPaste={onPaste}
                 className="!min-h-[60vh] sm:!min-h-[70vh] lg:!min-h-[1123px] !border-0 !shadow-none !focus:ring-0 !p-4 sm:!p-6 lg:!p-8 !text-base sm:!text-lg !leading-relaxed !font-sans !resize-none !bg-transparent !w-full"
               />

@@ -89,7 +89,7 @@ test.describe("Student — Exam Flow", () => {
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
   });
 
-  test("reopens question panel when moving to next question", async ({
+  test("keeps the question panel open when the answer editor is focused", async ({
     studentPage,
   }) => {
     const { exam } = await seedStudentExamScenario({
@@ -104,18 +104,51 @@ test.describe("Student — Exam Flow", () => {
       studentPage.getByText(/polymorphism/i),
     ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
 
-    // Focus answer editor to collapse question panel first
+    // Panel starts open: the toolbar shows "문제 접기" (collapse action).
+    await expect(examPage.questionCollapseBtn).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_VISIBLE,
+    });
+
+    // Focusing the answer editor must NOT auto-collapse the question panel.
     await expect(examPage.answerArea).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
     await examPage.answerArea.click();
-    await expect(
-      studentPage.getByRole("button", { name: "문제 보기" }),
-    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
 
-    // Moving to another question should reopen the panel
-    await examPage.nextQuestion();
+    await expect(examPage.questionCollapseBtn).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_VISIBLE,
+    });
+    await expect(examPage.questionExpandBtn).toHaveCount(0);
+    await expect(studentPage.getByText(/polymorphism/i)).toBeVisible();
+  });
+
+  test("reopens the question panel after manual collapse and navigation", async ({
+    studentPage,
+  }) => {
+    const { exam } = await seedStudentExamScenario({
+      examStatus: "running",
+      sessionStatus: "in_progress",
+    });
+
+    const examPage = new StudentExamPage(studentPage);
+    await examPage.goto(exam.code);
+
     await expect(
-      studentPage.getByRole("button", { name: "문제 접기" }),
-    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
+      studentPage.getByText(/polymorphism/i),
+    ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
+
+    // Student collapses the panel manually via the toolbar toggle.
+    await expect(examPage.questionCollapseBtn).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_VISIBLE,
+    });
+    await examPage.questionCollapseBtn.click();
+    await expect(examPage.questionExpandBtn).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_VISIBLE,
+    });
+
+    // Moving to another question should reopen the panel.
+    await examPage.nextQuestion();
+    await expect(examPage.questionCollapseBtn).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_VISIBLE,
+    });
     await expect(
       studentPage.getByText(/stack|queue/i),
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
