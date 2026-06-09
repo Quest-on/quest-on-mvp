@@ -89,7 +89,7 @@ export function QuestionPanel({
       </div>
 
       {scrollTop === 0 && (
-        <div className="sticky bottom-0 left-0 right-0 z-20 flex justify-center pb-2 pt-2 bg-gradient-to-t from-muted/20 via-muted/20 to-transparent pointer-events-none">
+        <div className="sticky bottom-0 left-0 right-0 z-20 flex justify-center pb-2 pt-2 bg-gradient-to-t from-muted/20 via-muted/20 to-transparent backdrop-blur-sm pointer-events-none">
           <Button
             variant="ghost"
             size="icon"
