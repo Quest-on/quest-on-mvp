@@ -20,8 +20,6 @@ interface AnswerPanelProps {
   lastSaved: string | null;
   saveError?: boolean;
   saveShortcut: ReactNode;
-  fullHeight?: boolean;
-  onFocus?: () => void;
 }
 
 export function AnswerPanel({
@@ -32,16 +30,10 @@ export function AnswerPanel({
   lastSaved,
   saveError = false,
   saveShortcut,
-  fullHeight = false,
-  onFocus,
 }: AnswerPanelProps) {
   return (
-    <div
-      className={`${fullHeight ? "h-full" : ""} overflow-y-auto hide-scrollbar bg-muted/20`}
-    >
-      <div
-        className={`max-w-4xl mx-auto bg-background ${fullHeight ? "min-h-full" : ""}`}
-      >
+    <div className="h-full overflow-y-auto hide-scrollbar bg-muted/20">
+      <div className="max-w-4xl mx-auto bg-background min-h-full">
         <div className="p-4 sm:p-6 lg:p-8">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
             <Label className="text-base sm:text-lg font-semibold text-foreground flex items-center gap-2">
@@ -64,7 +56,6 @@ export function AnswerPanel({
                 }
                 value={value}
                 onChange={onChange}
-                onFocus={onFocus}
                 onPaste={onPaste}
                 className="!min-h-[60vh] sm:!min-h-[70vh] lg:!min-h-[1123px] !border-0 !shadow-none !focus:ring-0 !p-4 sm:!p-6 lg:!p-8 !text-base sm:!text-lg !leading-relaxed !font-sans !resize-none !bg-transparent !w-full"
               />

@@ -622,7 +622,6 @@ export default function ExamPage() {
                             lastSaved={autoSave.lastSaved}
                             saveError={autoSave.saveError}
                             saveShortcut={saveShortcut}
-                            onFocus={() => setIsQuestionVisible(false)}
                           />
                         </ResizablePanel>
                       </ResizablePanelGroup>
@@ -635,7 +634,6 @@ export default function ExamPage() {
                         lastSaved={autoSave.lastSaved}
                         saveError={autoSave.saveError}
                         saveShortcut={saveShortcut}
-                        fullHeight
                       />
                     )}
                   </div>
