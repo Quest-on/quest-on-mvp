@@ -1,0 +1,14 @@
+{
+  "name": "quest-on-brochure",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Quest-On Company Brochure 2026 — HTML/PDF deck",
+  "scripts": {
+    "build": "node scripts/build-pdf.mjs",
+    "preview": "npx serve -p 4400 ."
+  },
+  "devDependencies": {
+    "playwright": "^1.47.0"
+  }
+}
