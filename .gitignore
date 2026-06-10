@@ -94,3 +94,6 @@ marketing/video/remotion/.omx/
 marketing/video/demo-video/renders/
 marketing/video/demo-video/assets/
 marketing/video/demo-video/fonts/
+
+# ---- brochure: build deps (regenerated via npm install) ----
+brochure/node_modules/
