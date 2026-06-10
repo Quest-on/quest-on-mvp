@@ -793,12 +793,24 @@ img { display: block; max-width: 100%; height: auto; }
   color: var(--ink-900);
   margin: 0;
 }
-.quote__org {
-  font-family: var(--font-en);
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--qo-blue);
-  margin: 2px 0 0;
+/* big semi-transparent school logo, bleeding off the right edge */
+.quotes .quote { position: relative; overflow: hidden; }
+.quotes .quote > div { position: relative; z-index: 1; }
+.quotes .quote__text { padding-right: 64px; }
+.quote__brand {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  /* fixed box + centered contain → every logo aligns by its center,
+     regardless of aspect ratio (circular seals vs. taller shields) */
+  width: 132px;
+  height: 120px;
+  object-fit: contain;
+  object-position: center;
+  opacity: 0.20;
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* ---------- TEAM HERO (slide 11) ---------- */
@@ -888,6 +900,8 @@ img { display: block; max-width: 100%; height: auto; }
   flex: 1;
 }
 .cv-card {
+  position: relative;
+  overflow: hidden;
   background: white;
   border: 1px solid var(--ink-200);
   border-radius: var(--radius);
@@ -897,6 +911,20 @@ img { display: block; max-width: 100%; height: auto; }
   gap: 28px;
   align-items: start;
   align-content: start;
+}
+.cv-card > div { position: relative; z-index: 1; }
+/* big school logo watermark, anchored bottom-right of the card */
+.cv-card__brand {
+  position: absolute;
+  right: -48px;
+  bottom: -48px;
+  width: 400px;
+  height: 400px;
+  object-fit: contain;
+  object-position: center;
+  opacity: 0.09;
+  pointer-events: none;
+  z-index: 0;
 }
 .cv-card__photo {
   width: 120px;
