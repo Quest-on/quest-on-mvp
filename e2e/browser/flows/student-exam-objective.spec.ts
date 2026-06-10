@@ -5,6 +5,8 @@
  * 1. An objective-only (MCQ) exam hides all AI chat UI elements.
  * 2. A mixed exam (1 essay + 1 MCQ) shows/hides chat per-question.
  * 3. The PreflightModal shows the correct checkboxes based on exam type.
+ * 4. One-way progression holds across the objective→CASE boundary: a CASE
+ *    reached after an objective shows no "prev" button (no return to objective).
  *
  * NOTE: These tests require a running Next.js dev server (port 3000) and
  * a seeded test database. They were written and verified structurally but
@@ -362,6 +364,32 @@ test.describe("Student — Mixed Exam (essay + MCQ) UX", () => {
     // useExamChat is mounted at page level so history survives unmount, but
     // exercising the full path requires sending a chat message — which hits
     // /api/chat (OpenAI). Add this once a chat-API mock fixture exists.
+  });
+
+  test("CASE after objective: no prev button — one-way to objective preserved", async ({
+    studentPage,
+  }) => {
+    // Mixed seed = 1 MCQ (objective) + 1 essay (CASE, shuffled last).
+    const { exam } = await seedMixedExam();
+
+    const examPage = new StudentExamPage(studentPage);
+    await examPage.goto(exam.code);
+
+    // First screen is the MCQ (CASE shuffled last). Objective has no prev button.
+    await expect(
+      studentPage.getByText(/compile-time/i),
+    ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
+    await expect(examPage.prevBtn).toHaveCount(0);
+
+    // Answer the MCQ → advance into the single CASE (essay).
+    await examPage.objectiveOption(0).click();
+    await examPage.nextQuestion();
+    await expect(
+      studentPage.getByText(/polymorphism/i),
+    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
+
+    // The only CASE: prev must NOT appear — student cannot return to the objective.
+    await expect(examPage.prevBtn).toHaveCount(0);
   });
 });
 

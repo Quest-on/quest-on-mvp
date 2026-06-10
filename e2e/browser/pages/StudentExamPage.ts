@@ -76,6 +76,15 @@ export class StudentExamPage {
     await this.nextBtn.click();
   }
 
+  /** CASE 블록 내 '이전' 버튼(CASE↔CASE 양방향 이동 한정). 객관식엔 존재하지 않음. */
+  get prevBtn(): Locator {
+    return this.page.locator('[data-testid="exam-prev-btn"]');
+  }
+
+  async prevQuestion() {
+    await this.prevBtn.click();
+  }
+
   /** Returns the nth objective option by index (0-based). */
   objectiveOption(index: number): Locator {
     return this.page.locator(`[data-testid="objective-option-${index}"]`);
