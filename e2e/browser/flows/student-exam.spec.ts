@@ -81,7 +81,10 @@ test.describe("Student — Exam Flow", () => {
     await expect(examPage.prevBtn).toHaveCount(0);
 
     // Record an answer to verify original-index mapping survives back-navigation.
-    await examPage.typeAnswer("my polymorphism answer");
+    // NOTE: keep this free of the question keywords (polymorphism/stack/queue) — the
+    // controlled <textarea> exposes its value as text content, so a colliding word
+    // would make getByText(/polymorphism/i) match both the prompt and the answer.
+    await examPage.typeAnswer("persisted answer text");
 
     // Next → second CASE (stack/queue): prev now available, next hidden (last).
     await examPage.nextQuestion();
@@ -97,7 +100,7 @@ test.describe("Student — Exam Flow", () => {
       studentPage.getByText(/polymorphism/i),
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
     await expect(examPage.prevBtn).toHaveCount(0);
-    await expect(examPage.answerArea).toHaveValue("my polymorphism answer");
+    await expect(examPage.answerArea).toHaveValue("persisted answer text");
   });
 
   test("keeps the question panel open when the answer editor is focused", async ({
