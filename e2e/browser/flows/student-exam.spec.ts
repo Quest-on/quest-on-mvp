@@ -62,9 +62,10 @@ test.describe("Student — Exam Flow", () => {
     ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
   });
 
-  test("navigates between questions using prev/next buttons", async ({
+  test("navigates between CASE questions using prev/next buttons", async ({
     studentPage,
   }) => {
+    // Default seed = 2 essay (CASE) questions, no objective.
     const { exam } = await seedStudentExamScenario({
       examStatus: "running",
       sessionStatus: "in_progress",
@@ -73,20 +74,33 @@ test.describe("Student — Exam Flow", () => {
     const examPage = new StudentExamPage(studentPage);
     await examPage.goto(exam.code);
 
-    // Wait for first question to load
+    // First CASE (polymorphism) — no prev button (cannot go before the first CASE).
     await expect(
       studentPage.getByText(/polymorphism/i),
     ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
+    await expect(examPage.prevBtn).toHaveCount(0);
 
-    // Navigate to next question — button must be visible
-    await expect(examPage.questionNav(1)).toBeVisible({
-      timeout: TIMEOUTS.ELEMENT_VISIBLE,
-    });
+    // Record an answer to verify original-index mapping survives back-navigation.
+    // NOTE: keep this free of the question keywords (polymorphism/stack/queue) — the
+    // controlled <textarea> exposes its value as text content, so a colliding word
+    // would make getByText(/polymorphism/i) match both the prompt and the answer.
+    await examPage.typeAnswer("persisted answer text");
+
+    // Next → second CASE (stack/queue): prev now available, next hidden (last).
     await examPage.nextQuestion();
-    // Second question should show
     await expect(
       studentPage.getByText(/stack|queue/i),
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
+    await expect(examPage.prevBtn).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
+    await expect(examPage.nextBtn).toHaveCount(0);
+
+    // Prev → back to the first CASE; its answer must persist (keyed by original idx).
+    await examPage.prevQuestion();
+    await expect(
+      studentPage.getByText(/polymorphism/i),
+    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
+    await expect(examPage.prevBtn).toHaveCount(0);
+    await expect(examPage.answerArea).toHaveValue("persisted answer text");
   });
 
   test("keeps the question panel open when the answer editor is focused", async ({

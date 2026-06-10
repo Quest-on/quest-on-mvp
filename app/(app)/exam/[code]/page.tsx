@@ -220,6 +220,15 @@ export default function ExamPage() {
     ? questionDisplayOrder.indexOf(currentQuestion)
     : currentQuestion;
 
+  // CASE(비객관식)는 표시순서 맨 뒤에 연속 배치된다(lib/shuffle.ts). 첫 CASE의 표시위치.
+  // CASE 블록 내에서만 '이전' 이동을 허용하기 위한 경계값(CASE 없으면 -1).
+  const firstCasePos = useMemo(() => {
+    if (!exam || !questionDisplayOrder) return -1;
+    return questionDisplayOrder.findIndex(
+      (origIdx) => !isObjectiveQuestion(exam.questions[origIdx].type),
+    );
+  }, [exam, questionDisplayOrder]);
+
   // 셔플된 표시 순서의 첫 문제로 1회만 진입한다(원본 0이 아닐 수 있음).
   const didInitDisplayStartRef = useRef(false);
   useEffect(() => {
@@ -645,6 +654,15 @@ export default function ExamPage() {
                         setCurrentQuestionWithReveal(questionDisplayOrder[nextPos]);
                     }}
                     canNext
+                    canPrev={firstCasePos >= 0 && displayPos > firstCasePos}
+                    onPrev={() => {
+                      const prevOrig = questionDisplayOrder?.[displayPos - 1];
+                      if (prevOrig === undefined) return;
+                      // 단방향 보호(이중 가드): CASE 블록 내에서만 뒤로 이동.
+                      // 목적지가 객관식이면 절대 이동하지 않는다(객관식 누수 차단).
+                      if (isObjectiveQuestion(exam.questions[prevOrig].type)) return;
+                      setCurrentQuestionWithReveal(prevOrig);
+                    }}
                     className="shrink-0"
                   />
                 </div>
