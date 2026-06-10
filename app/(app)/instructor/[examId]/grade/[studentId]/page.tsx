@@ -455,10 +455,24 @@ export default function GradeStudentPage({
           {/* 종합요약리포트(CASE 종합 평가) — 페이지 최상단 */}
           {!isObjectiveQuestion(currentQuestion?.type) && (
             <div className="mb-6 space-y-4">
-              <AIOverallSummary
-                summary={sessionSummary}
-                loading={summaryLoading}
-              />
+              {/*
+                TODO(종합평가-제거): 케이스가 2개 이상이면 'CASE 종합 평가'(AIOverallSummary)를
+                UI에서 숨기고, 각 케이스별 'CASE 문항 평가'(QuestionAiSummaryCard)만 노출한다.
+                케이스가 1개일 때는 기존대로 종합 평가를 유지한다.
+
+                ⚠️ 지금은 UI에서만 숨긴 상태다(요구사항: 완전 제거 X, UI 제거 O).
+                컴포넌트와 서버측 session 단위 ai_summary 생성 로직은 그대로 살아 있다.
+                추후 별도 작업에서 아래를 완전히 제거해야 한다:
+                  1) 이 파일의 AIOverallSummary 렌더링 + import + sessionSummary/hasSessionSummary 등 관련 상태
+                  2) 서버측 session 단위 ai_summary 생성 파이프라인(grading worker의 session_summary phase 등)
+                  ※ 과제 개별 채점 페이지 / 리포트 카드(PDF)의 종합 평가는 이번 범위 밖이므로 함께 검토할 것.
+              */}
+              {caseCount < 2 && (
+                <AIOverallSummary
+                  summary={sessionSummary}
+                  loading={summaryLoading}
+                />
+              )}
               {caseCount >= 2 && (
                 <QuestionAiSummaryCard
                   summary={currentGrade?.ai_summary ?? null}
