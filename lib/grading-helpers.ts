@@ -267,6 +267,54 @@ export function formatSummaryScoreLabel(params: {
   return `${params.score ?? 0}점`;
 }
 
+/** 학생이 최종 답안·정답 작성을 AI에 직접 요청하는 표현 */
+const ANSWER_WRITE_REQUEST_PATTERNS = [
+  /답\s*써\s*줘/,
+  /답안\s*(을\s*)?(작성|써)\s*줘/,
+  /제출용\s*(으로\s*)?(답|작성|써)/,
+  /정답\s*알려\s*줘/,
+  /그대로\s*제출/,
+  /이걸\s*바탕으로\s*답/,
+  /바탕으로\s*답\s*써/,
+];
+
+/**
+ * 답안 작성 위임 단축 평가 경로 적용 여부.
+ * "답 써줘"류가 있고, 그 전에 학생 스스로의 분석·가정·판단이 거의 없을 때만 true.
+ */
+export function detectAnswerDelegationSuspected(
+  userMessages: string[],
+): boolean {
+  if (userMessages.length === 0) return false;
+
+  const writeRequestIdx = userMessages.findIndex((content) =>
+    ANSWER_WRITE_REQUEST_PATTERNS.some((pattern) => pattern.test(content)),
+  );
+  if (writeRequestIdx < 0) return false;
+
+  const prior = userMessages.slice(0, writeRequestIdx);
+  const priorSelfDriven = prior.filter((content) => {
+    if (ANSWER_WRITE_REQUEST_PATTERNS.some((pattern) => pattern.test(content))) {
+      return false;
+    }
+    if (content.length >= 80) return true;
+    return /(?:내가|나는|a안|b안|가정|기준|생각|선택|비교|계산|설정|전략|판단)/i.test(
+      content,
+    );
+  }).length;
+
+  return priorSelfDriven < 2;
+}
+
+export function buildSummaryDelegationPreCheckHint(
+  userMessages: string[],
+): string {
+  if (detectAnswerDelegationSuspected(userMessages)) {
+    return `[판정 힌트 — 단축 경로 적용] 학생 채팅에 최종 답안 작성 직접 요청이 있고, 그 이전 자기 분석·가정·판단이 거의 없습니다. **답안 작성 위임 단축 경로만** 적용하세요.`;
+  }
+  return `[판정 힌트 — 일반 평가] 학생 채팅에 "답 써줘", "답안 작성해줘", "이걸 바탕으로 답 써줘" 등 **최종 답안 작성 직접 요청이 없습니다.** "알려줘", "예를 들어줘", "어떻게 풀면", "설명해줘", 가정·판단 제시는 단축 경로가 아닙니다. **일반 종합 평가**를 작성하세요 (상세 summary, 필요 시 강점·개선점).`;
+}
+
 /** Calculate weighted score from chat and answer stages. */
 export function calculateWeightedScore(
   stageGrading: {

@@ -13,6 +13,7 @@ import {
   listCaseQuestionsForSummary,
   isAssignmentGradingSession,
   markObjectiveOnlyGradingDone,
+  markCaseQuestionSummariesComplete,
 } from "@/lib/grading";
 import { enqueueGradingPhase } from "@/lib/qstash";
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -29,7 +30,7 @@ import type {
  *   grade_question (objective only)
  *   → caseCount 0: objective_only_done
  *   → caseCount 1: session_summary
- *   → caseCount ≥ 2: question_summary (per case) → session_summary
+ *   → caseCount ≥ 2: question_summary (per case, v6 variant) — no session_summary
  *
  * Assignment pipeline unchanged: grade → question_summary → session_summary.
  */
@@ -169,7 +170,13 @@ async function computeNextPhase(
         qIdx: next,
       };
     }
-    return { sessionId: payload.sessionId, phase: "session_summary" };
+
+    if (isAssignment) {
+      return { sessionId: payload.sessionId, phase: "session_summary" };
+    }
+
+    await markCaseQuestionSummariesComplete(payload.sessionId);
+    return null;
   }
 
   return null;

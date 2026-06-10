@@ -397,13 +397,25 @@ export default function GradeStudentPage({
     sessionSummary.summary.trim().length > 0;
 
   const gp = sessionData.gradingProgress;
+  const hasCurrentQuestionSummary =
+    !!currentGrade?.ai_summary &&
+    typeof currentGrade.ai_summary.summary === "string" &&
+    currentGrade.ai_summary.summary.trim().length > 0;
+
   const summaryLoading =
-    !hasSessionSummary &&
-    (gp?.status === "queued" ||
-      gp?.status === "running") &&
-    (gp?.phase === "session_summary" ||
-      gp?.phase === "qsummary" ||
-      gp?.phase === "grade");
+    caseCount >= 2
+      ? !hasCurrentQuestionSummary &&
+        (gp?.status === "queued" ||
+          gp?.status === "running") &&
+        (gp?.phase === "qsummary" ||
+          gp?.phase === "grade" ||
+          gp?.phase === "question_summary")
+      : !hasSessionSummary &&
+        (gp?.status === "queued" ||
+          gp?.status === "running") &&
+        (gp?.phase === "session_summary" ||
+          gp?.phase === "qsummary" ||
+          gp?.phase === "grade");
 
   const objectiveQuestionType =
     questionType === "multiple-choice" || questionType === "true-false"
@@ -452,17 +464,18 @@ export default function GradeStudentPage({
             />
           </div>
 
-          {/* 종합요약리포트(CASE 종합 평가) — 페이지 최상단 */}
+          {/* CASE 평가 — 2문항 이상: 문항별 / 1문항: 세션 종합 */}
           {!isObjectiveQuestion(currentQuestion?.type) && (
             <div className="mb-6 space-y-4">
-              <AIOverallSummary
-                summary={sessionSummary}
-                loading={summaryLoading}
-              />
-              {caseCount >= 2 && (
+              {caseCount >= 2 ? (
                 <QuestionAiSummaryCard
                   summary={currentGrade?.ai_summary ?? null}
-                  loading={summaryLoading && !currentGrade?.ai_summary}
+                  loading={summaryLoading}
+                />
+              ) : (
+                <AIOverallSummary
+                  summary={sessionSummary}
+                  loading={summaryLoading}
                 />
               )}
             </div>
@@ -744,8 +757,10 @@ export default function GradeStudentPage({
                         studentNumber: sessionData.student.student_number,
                         school: sessionData.student.school,
                         aiSummary:
-                          (sessionData.session.ai_summary as SummaryData | null) ??
-                          null,
+                          caseCount >= 2
+                            ? null
+                            : ((sessionData.session.ai_summary as SummaryData | null) ??
+                              null),
                       }
                     : undefined
                 }

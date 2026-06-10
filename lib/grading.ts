@@ -2,11 +2,14 @@ import { z } from "zod";
 import { getOpenAI, AI_MODEL_HEAVY } from "@/lib/openai";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import {
-  buildSummaryGenerationSystemPrompt,
-  buildSummaryEvaluationSystemPrompt,
   buildAssignmentResearchSummarySystemPrompt,
   buildAssignmentGradingPrompt,
 } from "@/lib/prompts";
+import {
+  buildCaseSessionSummarySystemPrompt,
+  buildCaseSessionSummaryUserPrompt,
+  usesSummaryDelegationPreCheckHint,
+} from "@/lib/prompts/case-session-summary-prompts";
 import { logError } from "@/lib/logger";
 import {
   decompressSubmissions,
@@ -19,6 +22,7 @@ import {
   isObjectiveQuestion,
   gradeObjectiveAnswer,
   formatSummaryScoreLabel,
+  buildSummaryDelegationPreCheckHint,
   type DecompressionWarning,
   type NormalizedQuestion,
 } from "@/lib/grading-helpers";
@@ -475,14 +479,33 @@ async function gradeSingleQuestion(params: {
 
 /**
  * 문제별 종합평가 생성 — grades.ai_summary 컬럼에 저장.
- * 기존 buildSummaryEvaluationSystemPrompt를 재활용하되, 단일 문제로 스코프 좁힘.
+ * 시험 CASE는 buildCaseSessionSummary* (variant v4/v5/v6) 사용.
  */
+function formatExamRubricText(rubric: unknown): string {
+  if (!rubric || !Array.isArray(rubric) || rubric.length === 0) {
+    return "";
+  }
+  return `
+[평가 루브릭]
+${(
+  rubric as Array<{ evaluationArea: string; detailedCriteria: string }>
+)
+  .map(
+    (item, index) =>
+      `${index + 1}. ${item.evaluationArea}
+   - 세부 기준: ${item.detailedCriteria}`,
+  )
+  .join("\n")}
+`;
+}
+
 async function generateQuestionSummary(params: {
-  question: { idx: number; prompt?: string; ai_context?: string };
+  question: { idx: number; prompt?: string; ai_context?: string; type?: string };
   submission: { answer: string } | undefined;
   questionMessages: Array<{ role: string; content: string }>;
   grade: GradeResult;
   rubricItems: RubricItem[];
+  examRubric?: unknown;
   examTitle: string;
   isAssignment?: boolean;
   examId: string;
@@ -497,6 +520,7 @@ async function generateQuestionSummary(params: {
     questionMessages,
     grade,
     rubricItems,
+    examRubric,
     examTitle,
     isAssignment = false,
     examId,
@@ -512,10 +536,10 @@ async function generateQuestionSummary(params: {
         ? `\n[평가 루브릭]\n${rubricItems
             .map(
               (item, index) =>
-                `${index + 1}. ${item.evaluationArea}\n   - 세부 기준: ${item.detailedCriteria}`
+                `${index + 1}. ${item.evaluationArea}\n   - 세부 기준: ${item.detailedCriteria}`,
             )
             .join("\n")}\n`
-        : "";
+        : formatExamRubricText(examRubric);
 
     const chatHistoryText =
       questionMessages.length > 0
@@ -535,13 +559,117 @@ async function generateQuestionSummary(params: {
       .filter(Boolean)
       .join("\n");
 
-    const systemPrompt = isAssignment
-      ? buildAssignmentResearchSummarySystemPrompt()
-      : buildSummaryGenerationSystemPrompt();
     const assignmentLabel = isAssignment ? scoreToAssignmentLabel(grade.score) : null;
 
-    const userPrompt = isAssignment
-      ? `
+    if (!isAssignment) {
+      const questionText = `문제 ${question.idx + 1}:
+${question.prompt || ""}
+
+답안:
+${submission?.answer || "답안 없음"}
+${chatHistoryText}
+
+점수: ${formatSummaryScoreLabel({
+        score: grade.score,
+        ungraded: grade.ungraded,
+        hasSubmission: !!submission,
+        questionType: question.type,
+        isAssignment: false,
+      })}
+${stageInfoText}
+${aiDependencyText}`;
+
+      const summaryUserMessages = usesSummaryDelegationPreCheckHint()
+        ? questionMessages
+            .filter((msg) => msg.role === "user")
+            .map((msg) => msg.content)
+        : [];
+
+      const systemPrompt = buildCaseSessionSummarySystemPrompt();
+      const userPrompt = buildCaseSessionSummaryUserPrompt({
+        examTitle,
+        rubricText,
+        questionsText: questionText,
+        ...(usesSummaryDelegationPreCheckHint()
+          ? {
+              delegationPreCheckHint:
+                buildSummaryDelegationPreCheckHint(summaryUserMessages),
+            }
+          : {}),
+      });
+
+      const tracked = await callTrackedChatCompletion(
+        () =>
+          getOpenAI().chat.completions.create(
+            {
+              model: AI_MODEL_HEAVY,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+              response_format: { type: "json_object" },
+              temperature: 0.3,
+              seed: deriveSessionSeed(sessionId),
+            },
+            { signal },
+          ),
+        {
+          feature: "auto_grading_question_summary",
+          route: "lib/grading.ts",
+          model: AI_MODEL_HEAVY,
+          userId: studentId,
+          examId,
+          sessionId,
+          qIdx: question.idx,
+          metadata: buildAiTextMetadata({
+            inputText: [systemPrompt, userPrompt],
+            extra: {
+              message_count: questionMessages.length,
+              prompt_variant: "case_session_summary",
+            },
+          }),
+        },
+        {
+          timeoutMs,
+          metadataBuilder: (result) =>
+            buildAiTextMetadata({
+              outputText:
+                (result as { choices?: Array<{ message?: { content?: string | null } }> })
+                  .choices?.[0]?.message?.content ?? null,
+            }),
+        },
+      );
+
+      const completion = tracked.data;
+      const questionSummarySchema = z.object({
+        sentiment: z.enum(["positive", "negative", "neutral"]),
+        summary: z.string(),
+        strengths: z.array(z.string()),
+        weaknesses: z.array(z.string()),
+        keyQuotes: z.array(z.string()).optional(),
+      });
+
+      let rawSummary: unknown;
+      try {
+        rawSummary = JSON.parse(completion.choices[0]?.message?.content || "{}");
+      } catch {
+        return null;
+      }
+
+      const parsed = questionSummarySchema.safeParse(rawSummary);
+      if (!parsed.success) {
+        return null;
+      }
+
+      return {
+        ...parsed.data,
+        keyQuotes: parsed.data.keyQuotes ?? [],
+      };
+    }
+
+    const systemPrompt = buildAssignmentResearchSummarySystemPrompt();
+
+    const userPrompt = `
 과제 제목: ${examTitle}
 ${rubricText}
 과제 ${question.idx + 1}: ${question.prompt || ""}
@@ -561,36 +689,6 @@ ${aiDependencyText}
 3. 주요 강점 (3가지 이내): 후속 질문, 출처 요청, 자료 신뢰도 판단, AI 답변 검증, 방향 전환이 드러난 구체적 행동을 제시하세요.
 4. 개선이 필요한 점 (3가지 이내): 부족한 리서치 행동을 다음 대화에서 해야 할 행동으로 제시하세요.
 5. 핵심 인용구 (2가지): 학생의 좋은 질문, 검증 시도, 방향 전환, 자료 판단이 드러나는 채팅 또는 퀴즈 기록을 원문 그대로 인용하세요.
-
-JSON 형식으로 응답해주세요:
-{
-  "sentiment": "positive" | "negative" | "neutral",
-  "summary": "상세한 종합 의견 텍스트",
-  "strengths": ["강점1", "강점2", ...],
-  "weaknesses": ["개선점1", "개선점2", ...],
-  "keyQuotes": ["인용구1", "인용구2"]
-}
-`
-      : `
-시험 제목: ${examTitle}
-${rubricText}
-문제 ${question.idx + 1}: ${question.prompt || ""}
-
-학생 답안:
-${submission?.answer || "답안 없음"}
-${chatHistoryText}
-
-점수: ${grade.score}점
-${stageInfoText}
-${aiDependencyText}
-
-위 문제에 대한 학생의 수행을 상세하게 분석하여 요약 평가해주세요.
-다음 항목을 반드시 포함해야 합니다:
-1. 전체적인 평가 (긍정적/부정적/중립적)
-2. 종합 의견: 답안과 대화의 논리성, 정확성, 이해도를 종합적으로 분석.
-3. 주요 강점 (3가지 이내): 구체적인 예시를 들어 설명하세요.
-4. 개선이 필요한 점 (3가지 이내): 구체적인 개선 방안과 함께 제시하세요.
-5. 핵심 인용구 (2가지): 평가에 결정적인 영향을 미친 문장을 원문 그대로 인용하세요.
 
 JSON 형식으로 응답해주세요:
 {
@@ -1139,6 +1237,7 @@ export async function generateOneQuestionSummary(
     questionMessages,
     grade,
     rubricItems,
+    examRubric: ctx.exam.rubric,
     examTitle: ctx.exam.title,
     isAssignment: ctx.isAssignment,
     examId: ctx.exam.id,
@@ -1186,9 +1285,26 @@ export async function generateOneQuestionSummary(
   return { skipped: false, generated: true };
 }
 
+export async function markCaseQuestionSummariesComplete(
+  sessionId: string
+): Promise<void> {
+  const supabase = getSupabaseServer();
+  const caseIdxs = await listCaseQuestionsForSummary(sessionId);
+  await updateGradingProgress(supabase, sessionId, {
+    status: "completed",
+    phase: "done",
+    total: caseIdxs.length,
+    completed: caseIdxs.length,
+    failed: 0,
+    current_q_idx: undefined,
+  });
+}
+
 /**
  * Phase 3: generate session-level AI summary (stored on sessions.ai_summary).
  * Idempotent: skips if sessions.ai_summary.summary is already a non-empty string.
+ *
+ * Exam with 2+ CASE questions skips this phase — per-question summaries only.
  *
  * Throws on failure so QStash retries — the "종합평가 빈칸" symptom is
  * specifically the silent null return this phase now catches loudly.
@@ -1206,6 +1322,15 @@ export async function generateSessionSummaryPhase(
 
   if (sessionErr || !sessionRow) {
     throw new Error(`Session not found: ${sessionId}`);
+  }
+
+  const ctx = await loadPhaseContext(sessionId, supabase);
+  if (!ctx.isAssignment) {
+    const caseIdxs = await listCaseQuestionsForSummary(sessionId);
+    if (caseIdxs.length >= 2) {
+      await markCaseQuestionSummariesComplete(sessionId);
+      return { skipped: true, generated: false };
+    }
   }
 
   const existingSummary = (sessionRow as { ai_summary: unknown }).ai_summary as
@@ -1228,7 +1353,6 @@ export async function generateSessionSummaryPhase(
     phase: "session_summary",
   });
 
-  const ctx = await loadPhaseContext(sessionId, supabase);
   const summaryQuestions = ctx.isAssignment
     ? ctx.questions
     : ctx.questions.filter((q) => isCaseQuestion(q.type));
@@ -1430,6 +1554,15 @@ export async function autoGradeSession(
           });
         }
       }
+
+      await markCaseQuestionSummariesComplete(sessionId);
+
+      return {
+        grades,
+        summary: null,
+        failedQuestions,
+        timedOut: false,
+      };
     }
 
     let summary: SummaryData | null = null;
@@ -1599,9 +1732,17 @@ ${
       })
       .join("\n---\n\n");
 
+    const summaryUserMessages = usesSummaryDelegationPreCheckHint()
+      ? questions.flatMap((q) =>
+          (messagesByQuestion[q.idx] || [])
+            .filter((msg) => msg.role === "user")
+            .map((msg) => msg.content),
+        )
+      : [];
+
     const systemPrompt = isAssignment
       ? buildAssignmentResearchSummarySystemPrompt()
-      : buildSummaryEvaluationSystemPrompt();
+      : buildCaseSessionSummarySystemPrompt();
 
     const userPrompt = isAssignment
       ? `
@@ -1630,52 +1771,17 @@ ${
         "weaknesses": ["약점1", "약점2", ...],
         "keyQuotes": ["인용구1", "인용구2"]
       }`
-      : `
-      시험 제목: ${exam.title}
-
-      ${rubricText}
-
-      [학생의 CASE 답안, CASE 관련 채팅 대화 기록 및 점수]
-      ${questionsText}
-
-      [범용 평가 엄격화 가이드]
-      - 질문의 '논리적 구조'와 '내용의 사실 관계'를 분리하여 평가하십시오.
-      - 아래 5가지 행동 패턴이 발견되면 '이해도 부족'으로 간주하여 엄격히 평가합니다.
-        사용된 표현의 형식(직접적/우회적/공손한)과 무관하게, 행동의 의도로 판단합니다:
-        1) **답/풀이 위임형**: 자신의 분석 없이 AI에게 정답, 풀이법, 접근법, 프레임워크 선택을 요청. "어떻게 풀어?"든 "일반적으로 어떤 접근이 통용되나요?"든 의도가 동일하면 동일하게 판단.
-        2) **출발점 의존형**: 어디서 시작해야 하는지, 어떤 개념을 써야 하는지를 AI에게 물어봄. 스스로 진입점을 잡지 못함.
-        3) **조건/수치 변형형**: 시나리오에 명시된 수치/조건을 임의로 다른 값으로 바꿔서 질문하거나 답안에 사용.
-        4) **개념 역전형**: 핵심 인과관계, 정의, 방향성을 거꾸로 이해하여 질문하거나 답안 작성.
-        5) **교정 미반영형**: AI가 오류를 교정했음에도 최종 답안이 동일한 오류를 그대로 포함.
-      - 질문의 양이 많더라도, 그 질문들이 문제의 본질(Core Task)에서 벗어난 지엽적인 것이라면 '자기주도적 학습 역량' 점수를 높게 주지 마십시오.
-      - 직접 답변을 받은 사실 자체는 금지 위반이 아닙니다. 그러나 이후 독립 추론이 약하면 엄격히 감점하고, 회복이 확인되면 그 회복 근거를 분명히 적으십시오.
-      - 학생이 주어지지 않은 정보를 논리적으로 가정(Assume)하여 논의를 진전시키는 경우에는 이를 '문제 해결을 위한 창의적 접근'으로 보아 긍정적으로 평가하십시오.
-        다만, 이러한 가정이 문제에 이미 명시된 조건을 부정하는 용도로 쓰인다면 예외 없이 엄격하게 감점하십시오.
-
-      [이해도 과대평가 방지 상한 규칙(매우 중요)]
-      - 위 5가지 행동 패턴 중 하나라도 1회 이상 발견되었고,
-        학생이 이후에 스스로 '개념 선택 + 조건/가정 정리 + 중간 추론/검증'을 모두 보여주지 못했다면 sentiment는 절대 positive로 주지 마세요.
-      - 행동 패턴이 반복되거나, 개념 역전형 또는 교정 미반영형이 확인되면 negative를 우선하세요(회복이 매우 강한 경우만 neutral).
-
-      위 내용을 바탕으로 학생의 CASE 수행 능력을 상세하게 분석하여 요약 평가해주세요.
-      **중요**: CASE 관련 채팅 대화 기록이 있는 경우, 학생이 AI와의 대화에서 보여준 질문의 질, 문제 이해도, 개념 파악 수준, 학습 태도 등을 종합적으로 고려하세요. 사지선다와 O/X 문제는 이 종합 평가의 근거로 사용하지 마세요.
-
-      다음 항목을 반드시 포함해야 합니다:
-      1. 전체적인 평가 (긍정적/부정적/중립적)
-      2. 종합 의견: 학생의 CASE 답안과 CASE 관련 채팅 대화 기록을 종합하여 깊이 있게 분석. 답안의 논리성, 정확성, 창의성뿐만 아니라 채팅에서 보여준 학습 과정과 이해도도 함께 고려하세요.
-      3. 주요 강점 (3가지 이내): 구체적인 예시를 들어 설명하세요. 채팅에서 보여준 질문의 질도 강점으로 포함할 수 있습니다.
-      4. 개선이 필요한 점 (3가지 이내): 구체적인 개선 방안과 함께 제시하세요. 채팅에서 드러난 문제 이해 부족이나 개념 파악의 어려움을 포함하세요.
-      5. 핵심 인용구 (2가지): 학생의 답안 또는 채팅 대화 중 평가에 결정적인 영향을 미친 문장이나 구절을 2개 뽑아주세요.
-         - 감점 트리거가 있다면 2개 중 최소 1개는 그 문장을 반드시 원문 그대로 인용하세요.
-
-      JSON 형식으로 응답해주세요:
-      {
-        "sentiment": "positive" | "negative" | "neutral",
-        "summary": "상세한 종합 의견 텍스트",
-        "strengths": ["강점1", "강점2", ...],
-        "weaknesses": ["약점1", "약점2", ...],
-        "keyQuotes": ["인용구1", "인용구2"]
-      }`;
+      : buildCaseSessionSummaryUserPrompt({
+          examTitle: exam.title,
+          rubricText,
+          questionsText,
+          ...(usesSummaryDelegationPreCheckHint()
+            ? {
+                delegationPreCheckHint:
+                  buildSummaryDelegationPreCheckHint(summaryUserMessages),
+              }
+            : {}),
+        });
 
     const tracked = await callTrackedChatCompletion(
       () =>
