@@ -24,7 +24,7 @@ import {
   AIOverallSummary,
   type SummaryData,
 } from "@/components/instructor/AIOverallSummary";
-import { isObjectiveQuestion } from "@/lib/grading-helpers";
+import { isObjectiveQuestion, resolveByQIdx } from "@/lib/grading-helpers";
 import {
   buildTypedQuestionEntries,
   getSubmissionForQuestion,
@@ -354,10 +354,14 @@ export default function GradeStudentPage({
   // Get current question data
   const currentQuestion = sessionData.exam?.questions?.[selectedQuestionIdx];
   const selectedQuestionQIdx = currentQuestion?.idx ?? selectedQuestionIdx;
-  const currentSubmission = sessionData.submissions?.[selectedQuestionQIdx] as
+  // q_idx 키 후보: 문항 idx 필드 우선, 없으면 배열 위치(저장 진실)로 폴백.
+  // 일부 시험은 question.idx ≠ 배열 위치라, idx 키로만 조회하면 답안/채팅/점수가
+  // 빈 값으로 빠진다(데이터는 배열 위치 q_idx로 저장됨). [[resolveByQIdx]] 참고.
+  const qIdxKeys = [selectedQuestionQIdx, selectedQuestionIdx];
+  const currentSubmission = resolveByQIdx(sessionData.submissions, qIdxKeys) as
     | Submission
     | undefined;
-  const currentGrade = sessionData.grades?.[selectedQuestionQIdx] as
+  const currentGrade = resolveByQIdx(sessionData.grades, qIdxKeys) as
     | Grade
     | undefined;
 
@@ -367,7 +371,7 @@ export default function GradeStudentPage({
     currentGrade?.stage_grading?.answer?.comment ?? currentGrade?.comment ?? "";
 
   // Try to get messages by both index and question.id (for backward compatibility)
-  let currentMessages = (sessionData.messages?.[selectedQuestionQIdx] ||
+  let currentMessages = (resolveByQIdx(sessionData.messages, qIdxKeys) ??
     []) as Conversation[];
 
   // If no messages found by index, try using question.id
@@ -682,7 +686,8 @@ export default function GradeStudentPage({
                     pasteLogs={
                       currentQuestion
                         ? sessionData.pasteLogs?.[currentQuestion.id] ||
-                          sessionData.pasteLogs?.[String(selectedQuestionQIdx)]
+                          sessionData.pasteLogs?.[String(selectedQuestionQIdx)] ||
+                          sessionData.pasteLogs?.[String(selectedQuestionIdx)]
                         : undefined
                     }
                     questionId={currentQuestion?.id}

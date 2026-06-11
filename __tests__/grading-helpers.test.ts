@@ -9,7 +9,42 @@ import {
   analyzeAiDependency,
   summarizeAiDependencyAssessments,
   formatSummaryScoreLabel,
+  resolveByQIdx,
 } from "@/lib/grading-helpers";
+
+describe("resolveByQIdx", () => {
+  // 회귀: 채점 페이지가 question.idx 로만 조회해, idx ≠ 배열 위치인 시험에서
+  // 답안/채팅이 빈 값으로 빠지던 버그. [idx, 배열위치] 폴백으로 복구한다.
+  const submissions = { 17: { answer: "essay-A" }, 18: { answer: "essay-B" } };
+
+  it("idx ≠ 배열 위치일 때 배열 위치 키로 폴백한다", () => {
+    // question.idx 22 → 저장은 배열 위치 17
+    expect(resolveByQIdx(submissions, [22, 17])).toEqual({ answer: "essay-A" });
+  });
+
+  it("idx == 배열 위치인 일반 시험은 그대로 첫 키로 찾는다", () => {
+    expect(resolveByQIdx(submissions, [17, 17])).toEqual({ answer: "essay-A" });
+  });
+
+  it("앞선 키에 값이 있으면 그 값을 우선한다", () => {
+    const both = { 17: "pos", 22: "idx" };
+    expect(resolveByQIdx(both, [22, 17])).toBe("idx");
+  });
+
+  it("어느 키에도 값이 없으면 undefined", () => {
+    expect(resolveByQIdx(submissions, [22, 23])).toBeUndefined();
+  });
+
+  it("빈 배열 값도 정의된 값으로 취급한다(메시지 빈 배열)", () => {
+    const messages = { 17: [] as unknown[] };
+    expect(resolveByQIdx(messages, [22, 17])).toEqual([]);
+  });
+
+  it("record 가 없으면 undefined", () => {
+    expect(resolveByQIdx(undefined, [1, 2])).toBeUndefined();
+    expect(resolveByQIdx(null, [1, 2])).toBeUndefined();
+  });
+});
 
 describe("selectBestSubmission", () => {
   it("uses deterministic id-based tiebreak when timestamps match", () => {
