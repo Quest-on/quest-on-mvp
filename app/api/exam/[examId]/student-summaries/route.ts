@@ -136,6 +136,29 @@ function hasNonEmptyAnswer(answer: string | undefined): boolean {
   return typeof answer === "string" && answer.trim().length > 0;
 }
 
+/**
+ * Supabase(PostgREST)는 기본 1000행 제한이 있어, .in(...) 조회가 1000행을 넘으면
+ * 조용히 잘린다(예: 55명 × 19문항 = 1045 submissions → 45개 누락 → 답안이 있는데도
+ * caseProgress가 "미제출/일부 제출"로 오집계). 안정 정렬(.order) 후 .range()로 전부 가져온다.
+ */
+async function fetchAllPaged<Row>(
+  makeQuery: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
+): Promise<{ data: Row[]; error: { message: string } | null }> {
+  const PAGE = 1000;
+  const all: Row[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await makeQuery(from, from + PAGE - 1);
+    if (error) return { data: [], error };
+    const rows = data ?? [];
+    all.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return { data: all, error: null };
+}
+
 function isValidProposedGrade(value: unknown): value is ProposedGrade {
   if (!value || typeof value !== "object") return false;
   const score = (value as { score?: unknown }).score;
@@ -334,14 +357,22 @@ export async function GET(
 
     const [submissionsResult, gradesResult, profilesResult, clerkMap, gradingSessionResult] =
       await Promise.all([
-        supabase
-          .from("submissions")
-          .select("id, session_id, q_idx, answer, compressed_answer_data, created_at")
-          .in("session_id", sessionIds),
-        supabase
-          .from("grades")
-          .select("session_id, q_idx, score, grade_type")
-          .in("session_id", sessionIds),
+        fetchAllPaged((from, to) =>
+          supabase
+            .from("submissions")
+            .select("id, session_id, q_idx, answer, compressed_answer_data, created_at")
+            .in("session_id", sessionIds)
+            .order("id", { ascending: true })
+            .range(from, to),
+        ),
+        fetchAllPaged((from, to) =>
+          supabase
+            .from("grades")
+            .select("id, session_id, q_idx, score, grade_type")
+            .in("session_id", sessionIds)
+            .order("id", { ascending: true })
+            .range(from, to),
+        ),
         supabase
           .from("student_profiles")
           .select("student_id, name, student_number, school")
