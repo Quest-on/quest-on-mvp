@@ -13,6 +13,10 @@ const GRACE_PERIOD_MS = 5_000;
 /** 5-minute threshold: sessions with no heartbeat for this long are considered stale (orphaned) */
 const STALE_HEARTBEAT_MS = 5 * 60 * 1000;
 
+/** Session fields returned by initExamSession — must include final_answer for assignment reload. */
+const INIT_EXAM_SESSION_SELECT =
+  "id, exam_id, student_id, submitted_at, is_active, status, started_at, attempt_timer_started_at, device_fingerprint, created_at, used_clarifications, compressed_session_data, compression_metadata, last_heartbeat_at, final_answer, final_answer_updated_at";
+
 /**
  * Check if a session is stale based on last_heartbeat_at.
  * A stale session is one where the heartbeat hasn't been received for STALE_HEARTBEAT_MS.
@@ -355,7 +359,7 @@ export async function initExamSession(data: {
     // 2. Get all existing sessions (most recent first)
     const { data: existingSessions, error: checkError } = await getSupabase()
       .from("sessions")
-      .select("id, exam_id, student_id, submitted_at, is_active, status, started_at, attempt_timer_started_at, device_fingerprint, created_at, used_clarifications, compressed_session_data, compression_metadata, last_heartbeat_at")
+      .select(INIT_EXAM_SESSION_SELECT)
       .eq("exam_id", exam.id)
       .eq("student_id", data.studentId)
       .order("created_at", { ascending: false });
@@ -663,7 +667,7 @@ export async function initExamSession(data: {
       if (!upsertedSession) {
         const { data: existing, error: fetchError } = await getSupabase()
           .from("sessions")
-          .select("id, exam_id, student_id, submitted_at, is_active, status, started_at, attempt_timer_started_at, device_fingerprint, created_at, used_clarifications, compressed_session_data, compression_metadata, last_heartbeat_at")
+          .select(INIT_EXAM_SESSION_SELECT)
           .eq("exam_id", exam.id)
           .eq("student_id", data.studentId)
           .single();
