@@ -46,10 +46,15 @@ export function buildTypedQuestionEntries<Q extends { type?: string }>(
 }
 
 /**
- * Resolve a question's submission. Prefers an explicit `idx`, then the
- * question's GLOBAL index in the full list (the submission key), then a
- * numeric `id`. The global index — not the per-type filtered position — is
- * what guarantees OX questions resolve to OX submissions.
+ * Resolve a question's submission. Submissions are written keyed by the
+ * question's GLOBAL position in the full list (`q_idx = findIndex(...)`), so we
+ * try that position FIRST. We fall back to the question's `idx` field and a
+ * numeric `id` only for legacy/edge shapes.
+ *
+ * Position-first matters because some exams (edited during authoring) carry an
+ * `idx` field that no longer equals the array position — and that stale `idx`
+ * can collide with ANOTHER question's position (e.g. an OX question whose idx
+ * is 17 would otherwise grab the submission stored at position 17, an essay).
  */
 export function getSubmissionForQuestion<S>(
   submissions: Record<string, S> | undefined,
@@ -59,8 +64,8 @@ export function getSubmissionForQuestion<S>(
   if (!submissions) return undefined;
 
   const candidates = [
-    Number.isInteger(question.idx) ? (question.idx as number) : null,
     globalIndex,
+    Number.isInteger(question.idx) ? (question.idx as number) : null,
     Number.isInteger(Number(question.id)) ? Number(question.id) : null,
   ].filter((value): value is number => value !== null);
 
