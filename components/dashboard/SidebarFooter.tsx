@@ -73,7 +73,7 @@ export function SidebarFooter() {
         프로필
       </DropdownMenuItem>
       <DropdownMenuItem
-        onClick={() => router.push("/profile")}
+        onClick={() => router.push("/settings")}
         className="cursor-pointer"
       >
         <Settings className="mr-2 h-4 w-4" />
