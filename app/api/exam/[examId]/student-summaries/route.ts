@@ -26,6 +26,7 @@ import type {
   ExamStudentSummary,
 } from "@/lib/types/student-summary";
 import type { GradingProgress } from "@/lib/types/grading";
+import { fetchAllPaged } from "@/lib/supabase-paged";
 
 function getSupabase() {
   return getSupabaseServer();
@@ -35,8 +36,36 @@ function isCaseQuestion(type?: string): boolean {
   return type === "case" || type === "essay" || type === "short-answer";
 }
 
-function isCaseGraded(gradeType?: string): boolean {
+export function isCaseGraded(gradeType?: string | null): boolean {
   return gradeType === "manual" || gradeType === "auto";
+}
+
+/**
+ * 케이스(서술형) 문항 채점 집계.
+ * grade 조회 키는 q.idx ?? pos — 일부 시험은 문항에 idx가 없어(undefined) grades가
+ * 배열 위치(pos)로 저장된다. export(loadExamResultData)와 동일한 규약으로 맞춰
+ * 대시보드 채점 상태와 엑셀 결과가 어긋나지 않게 한다.
+ */
+export function computeCaseGrades<
+  G extends { grade_type?: string | null; score?: number | null },
+>(
+  caseEntries: ReadonlyArray<{ q: { idx?: number }; pos: number }>,
+  gradeByQ: Map<number, G>,
+): { caseGraded: number; hasManualCase: boolean; hasFailed: boolean; caseScores: number[] } {
+  let caseGraded = 0;
+  let hasManualCase = false;
+  let hasFailed = false;
+  const caseScores: number[] = [];
+  for (const { q, pos } of caseEntries) {
+    const best = gradeByQ.get(q.idx ?? pos);
+    if (best?.grade_type === "ai_failed") hasFailed = true;
+    if (best && isCaseGraded(best.grade_type)) {
+      caseGraded += 1;
+      if (best.grade_type === "manual") hasManualCase = true;
+      if (typeof best.score === "number") caseScores.push(best.score);
+    }
+  }
+  return { caseGraded, hasManualCase, hasFailed, caseScores };
 }
 
 /** Session statuses that should appear on the instructor dashboard. */
@@ -141,24 +170,6 @@ function hasNonEmptyAnswer(answer: string | undefined): boolean {
  * 조용히 잘린다(예: 55명 × 19문항 = 1045 submissions → 45개 누락 → 답안이 있는데도
  * caseProgress가 "미제출/일부 제출"로 오집계). 안정 정렬(.order) 후 .range()로 전부 가져온다.
  */
-async function fetchAllPaged<Row>(
-  makeQuery: (
-    from: number,
-    to: number,
-  ) => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
-): Promise<{ data: Row[]; error: { message: string } | null }> {
-  const PAGE = 1000;
-  const all: Row[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await makeQuery(from, from + PAGE - 1);
-    if (error) return { data: [], error };
-    const rows = data ?? [];
-    all.push(...rows);
-    if (rows.length < PAGE) break;
-  }
-  return { data: all, error: null };
-}
-
 function isValidProposedGrade(value: unknown): value is ProposedGrade {
   if (!value || typeof value !== "object") return false;
   const score = (value as { score?: unknown }).score;
@@ -202,7 +213,7 @@ function deriveStudentBulkGradeStatus(
   return globalStatus;
 }
 
-function deriveOverallStatus(params: {
+export function deriveOverallStatus(params: {
   sessionStatus: ExamStudentSessionStatus;
   caseTotal: number;
   caseGraded: number;
@@ -218,6 +229,13 @@ function deriveOverallStatus(params: {
   if (hasFailed) return "failed";
 
   const gpStatus = gradingProgress?.status;
+
+  // 전 케이스 문항이 실제로 채점 완료(grades 존재)면, 채점 후 진행상태가 정리되지 않아
+  // grading_progress가 running/queued로 stale하게 남아 있어도 완료로 본다.
+  if (caseTotal > 0 && caseGraded === caseTotal) {
+    return hasManualCase ? "manually_graded" : "ai_graded";
+  }
+
   if (gpStatus === "running" || gpStatus === "queued") {
     return "grading";
   }
@@ -226,8 +244,6 @@ function deriveOverallStatus(params: {
     return gpStatus === "failed" ? "failed" : "grading";
   }
 
-  if (hasManualCase) return "manually_graded";
-  if (caseTotal > 0 && caseGraded === caseTotal) return "ai_graded";
   if (caseTotal === 0) return "ai_graded";
 
   return "pending";
@@ -307,7 +323,8 @@ export async function GET(
     // 제출물(submissions/messages)은 배열 위치(q_idx = findIndex)로 저장되므로
     // 문항을 "배열 위치(pos)"와 함께 들고 다닌다. 일부 시험은 question.idx ≠ 배열
     // 위치라(출제 중 문항 삭제), 제출 조회는 반드시 pos로 해야 한다.
-    // (grades/proposed는 저장 키가 q.idx이므로 그쪽 조회는 q.idx 그대로 사용)
+    // grades/proposed 조회는 q.idx ?? pos — 문항에 idx가 없는(undefined) 시험은
+    // grades가 배열 위치로 저장되며, export(loadExamResultData)와 규약을 일치시킨다.
     const mcqEntries = questions
       .map((q, pos) => ({ q, pos }))
       .filter(({ q }) => q.type === "multiple-choice");
@@ -514,37 +531,20 @@ export async function GET(
         }
       }
 
-      let caseGraded = 0;
+      // 제출 여부는 배열 위치(pos)로 조회한 답안 기준
       let caseSubmitted = 0;
-      let hasManualCase = false;
-      let hasFailed = false;
-      const caseScores: number[] = [];
-
-      // dedupedGrades(gradeByQ)는 이미 manual>auto>ai_failed 우선순위로 중복 제거됨
-      for (const { q, pos } of caseEntries) {
+      for (const { pos } of caseEntries) {
         if (
           hasNonEmptyAnswer(decompressedSubsByQ[pos]?.answer) ||
           hasNonEmptySubmission(subsByQ.get(pos))
         ) {
           caseSubmitted += 1;
         }
-
-        // grades는 저장 키가 q.idx이므로 grade 조회는 q.idx 그대로 사용
-        const best = gradeByQ.get(q.idx);
-
-        if (best?.grade_type === "ai_failed") {
-          hasFailed = true;
-        }
-        if (best && isCaseGraded(best.grade_type)) {
-          caseGraded += 1;
-          if (best.grade_type === "manual") {
-            hasManualCase = true;
-          }
-          if (best.score !== undefined) {
-            caseScores.push(best.score);
-          }
-        }
       }
+      // 채점 집계(grade 조회 q.idx ?? pos)는 computeCaseGrades로 일원화한다.
+      // dedupedGrades(gradeByQ)는 이미 manual>auto>ai_failed 우선순위로 중복 제거됨.
+      const { caseGraded, hasManualCase, hasFailed, caseScores } =
+        computeCaseGrades(caseEntries, gradeByQ);
 
       const overallStatus = deriveOverallStatus({
         sessionStatus,
@@ -564,7 +564,7 @@ export async function GET(
         if (q.type === "multiple-choice" || q.type === "true-false") {
           const sub = subsByQ.get(pos);
           return {
-            qIdx: q.idx,
+            qIdx: q.idx ?? pos,
             type: q.type,
             score: objectiveScoreFromRawAnswer({
               rawAnswer: (sub?.answer as string) ?? "",
@@ -574,9 +574,9 @@ export async function GET(
           };
         }
 
-        const best = gradeByQ.get(q.idx);
+        const best = gradeByQ.get(q.idx ?? pos);
         return {
-          qIdx: q.idx,
+          qIdx: q.idx ?? pos,
           type: q.type,
           // grade_type이 null인 legacy grade는 포함하되 ai_failed/ai_summary는 제외
           score: isScoringGrade(best) ? best.score : undefined,
@@ -596,8 +596,8 @@ export async function GET(
         caseEntries.length > 0 && caseSubmitted === caseEntries.length;
       const hasCompleteProposedCaseGrades =
         caseEntries.length > 0 &&
-        caseEntries.every(({ q }) =>
-          getProposedGrade(proposedGrades, session.id, q.idx),
+        caseEntries.every(({ q, pos }) =>
+          getProposedGrade(proposedGrades, session.id, q.idx ?? pos),
         );
       const studentBulkGradeStatus = deriveStudentBulkGradeStatus(
         bulkGradeStatus,
@@ -608,7 +608,7 @@ export async function GET(
         if (q.type === "multiple-choice" || q.type === "true-false") {
           const sub = subsByQ.get(pos);
           return {
-            qIdx: q.idx,
+            qIdx: q.idx ?? pos,
             type: q.type,
             score: objectiveScoreFromRawAnswer({
               rawAnswer: (sub?.answer as string) ?? "",
@@ -620,13 +620,13 @@ export async function GET(
 
         if (isCaseQuestion(q.type)) {
           return {
-            qIdx: q.idx,
+            qIdx: q.idx ?? pos,
             type: q.type,
-            score: getProposedGrade(proposedGrades, session.id, q.idx)?.score,
+            score: getProposedGrade(proposedGrades, session.id, q.idx ?? pos)?.score,
           };
         }
 
-        return { qIdx: q.idx, type: q.type, score: undefined };
+        return { qIdx: q.idx ?? pos, type: q.type, score: undefined };
       });
       const proposedScoreResult =
         canShowProposedScores &&

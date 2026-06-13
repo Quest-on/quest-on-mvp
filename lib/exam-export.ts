@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { batchGetUserInfo } from "@/lib/app-users";
+import { fetchAllPaged } from "@/lib/supabase-paged";
 import {
   calculateScoreFromItems,
   deduplicateGrades,
@@ -28,7 +29,8 @@ export type ExportQuestion = {
   correctOptionIndex?: number;
 };
 
-export type OrderedQuestion = ExportQuestion & { qIdx: number };
+/** qIdx = question.idx ?? 배열 위치(grades/점수 매칭용). pos = 원래 배열 위치(submissions 매칭용). */
+export type OrderedQuestion = ExportQuestion & { qIdx: number; pos: number };
 
 type GradeRow = {
   session_id: string;
@@ -76,6 +78,55 @@ export function averageInt(values: number[]): number {
   return Math.round(values.reduce((sum, v) => sum + v, 0) / values.length);
 }
 
+/**
+ * 한 학생의 문항별 결과(응답 여부·선택지·점수)를 계산한다.
+ * - 객관식 답안/선택/재채점: submissions는 배열 위치(pos)로 저장되므로 **pos**로 조회한다.
+ * - 서술형 점수: grades는 `idx ?? pos`로 저장되므로 **qIdx(=idx ?? pos)**로 조회한다.
+ * (대시보드 student-summaries와 동일 규약. idx≠위치(결번) 시험에서 답안 누락을 방지.)
+ */
+export function computeStudentQuestionResults<S extends { answer?: string | null }>(
+  orderedQuestions: OrderedQuestion[],
+  submissionsByPos: Map<number, S>,
+  scoreByQuestion: Map<number, number>,
+  hasSubmitted: boolean
+): {
+  answered: boolean[];
+  selectedOptions: Array<number | null>;
+  scores: Array<number | undefined>;
+} {
+  const answered = orderedQuestions.map((q) => {
+    const sub = submissionsByPos.get(q.pos);
+    return (sub?.answer ?? "").trim().length > 0;
+  });
+
+  const selectedOptions = orderedQuestions.map((q) => {
+    if (!isObjectiveQuestion(q.type)) return null;
+    const sub = submissionsByPos.get(q.pos);
+    const raw = (sub?.answer ?? "").trim();
+    if (raw === "") return null;
+    const idx = Number.parseInt(raw, 10);
+    return Number.isInteger(idx) && idx >= 0 ? idx : null;
+  });
+
+  const scores: Array<number | undefined> = hasSubmitted
+    ? orderedQuestions.map((question) => {
+        if (isObjectiveQuestion(question.type)) {
+          // 객관식은 raw 제출을 결정론적으로 재채점한다(stale grade row보다 우선).
+          const submission = submissionsByPos.get(question.pos);
+          const objective = gradeObjectiveAnswer({
+            rawAnswer: submission?.answer ?? "",
+            options: question.options,
+            correctOptionIndex: question.correctOptionIndex,
+          });
+          return objective ? objective.score : undefined;
+        }
+        return scoreByQuestion.get(question.qIdx);
+      })
+    : orderedQuestions.map(() => undefined);
+
+  return { answered, selectedOptions, scores };
+}
+
 export type ExamRowForExport = {
   questions: unknown;
   score_weights: unknown;
@@ -108,6 +159,7 @@ export async function loadExamResultData(
     .map((question, index) => ({
       ...question,
       qIdx: typeof question.idx === "number" ? question.idx : index,
+      pos: index,
     }))
     .sort((a, b) => a.qIdx - b.qIdx);
   const scoreWeights = normalizeScoreWeights(exam.score_weights);
@@ -116,25 +168,35 @@ export async function loadExamResultData(
   const sessionIds = (sessions ?? []).map((s) => s.id);
   const studentIds = [...new Set((sessions ?? []).map((s) => s.student_id))];
 
+  // 1000행(PostgREST max-rows) 절단 방지: .in(전체 세션) 조회를 페이지네이션으로 전량 수집
   const [profilesResult, gradesResult, submissionsResult, clerkUserMap] =
     await Promise.all([
       studentIds.length > 0
-        ? supabase
-            .from("student_profiles")
-            .select("student_id, name, student_number")
-            .in("student_id", studentIds)
+        ? fetchAllPaged((from, to) =>
+            supabase
+              .from("student_profiles")
+              .select("student_id, name, student_number")
+              .in("student_id", studentIds)
+              .range(from, to)
+          )
         : Promise.resolve({ data: [], error: null }),
       sessionIds.length > 0
-        ? supabase
-            .from("grades")
-            .select("session_id, q_idx, score, grade_type")
-            .in("session_id", sessionIds)
+        ? fetchAllPaged((from, to) =>
+            supabase
+              .from("grades")
+              .select("session_id, q_idx, score, grade_type")
+              .in("session_id", sessionIds)
+              .range(from, to)
+          )
         : Promise.resolve({ data: [], error: null }),
       sessionIds.length > 0
-        ? supabase
-            .from("submissions")
-            .select("id, session_id, q_idx, answer, created_at")
-            .in("session_id", sessionIds)
+        ? fetchAllPaged((from, to) =>
+            supabase
+              .from("submissions")
+              .select("id, session_id, q_idx, answer, created_at")
+              .in("session_id", sessionIds)
+              .range(from, to)
+          )
         : Promise.resolve({ data: [], error: null }),
       batchGetUserInfo(studentIds),
     ]);
@@ -208,38 +270,15 @@ export async function loadExamResultData(
     const scoreByQuestion = new Map(
       dedupedGrades.map((grade) => [grade.q_idx, grade.score])
     );
-    const submissionsByQuestion =
+    const submissionsByQuestion: Map<number, SubmissionRow> =
       submissionsBySessionQuestion.get(session.id) ?? new Map();
 
-    const answered = orderedQuestions.map((q) => {
-      const sub = submissionsByQuestion.get(q.qIdx);
-      return (sub?.answer ?? "").trim().length > 0;
-    });
-
-    const selectedOptions = orderedQuestions.map((q) => {
-      if (!isObjectiveQuestion(q.type)) return null;
-      const sub = submissionsByQuestion.get(q.qIdx);
-      const raw = (sub?.answer ?? "").trim();
-      if (raw === "") return null;
-      const idx = Number.parseInt(raw, 10);
-      return Number.isInteger(idx) && idx >= 0 ? idx : null;
-    });
-
-    const scores: Array<number | undefined> = hasSubmitted
-      ? orderedQuestions.map((question) => {
-          if (isObjectiveQuestion(question.type)) {
-            // 객관식은 raw 제출을 결정론적으로 재채점한다(stale grade row보다 우선).
-            const submission = submissionsByQuestion.get(question.qIdx);
-            const objective = gradeObjectiveAnswer({
-              rawAnswer: submission?.answer ?? "",
-              options: question.options,
-              correctOptionIndex: question.correctOptionIndex,
-            });
-            return objective ? objective.score : undefined;
-          }
-          return scoreByQuestion.get(question.qIdx);
-        })
-      : orderedQuestions.map(() => undefined);
+    const { answered, selectedOptions, scores } = computeStudentQuestionResults(
+      orderedQuestions,
+      submissionsByQuestion,
+      scoreByQuestion,
+      hasSubmitted
+    );
 
     const scoreItems = orderedQuestions.map((question, index) => ({
       qIdx: question.qIdx,
