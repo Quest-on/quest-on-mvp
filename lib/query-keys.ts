@@ -108,6 +108,18 @@ export const qk = {
       }
       return ["student-assignment-quiz", sessionId] as const;
     },
+
+    /**
+     * 마감된 과제의 본인 기록 읽기 전용 열람 (과제 정보·문제·채팅·최종답안·퀴즈)
+     * @param code - 과제 코드 (exams.code)
+     * @param userId - 학생 사용자 ID (optional, 부분 매칭 가능)
+     */
+    assignmentReview: (code: string, userId?: string) => {
+      if (userId) {
+        return ["student-assignment-review", code, userId] as const;
+      }
+      return ["student-assignment-review", code] as const;
+    },
   },
 
   session: {

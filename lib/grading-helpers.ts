@@ -205,6 +205,31 @@ export function isCaseQuestion(type?: string): boolean {
 }
 
 /**
+ * Resolve a per-question record (submissions/messages/grades) by trying several
+ * candidate q_idx keys in order, returning the first defined value.
+ *
+ * Why: the storage layer (submissions/messages/grades tables) keys rows by the
+ * question's *array position* (0-based). Most exams have `question.idx` equal to
+ * that position, but exams edited during authoring can leave `question.idx`
+ * diverged from the array position (e.g. essays at positions 17/18 carry idx
+ * 22/23). The grade page historically looked up data by `question.idx` only,
+ * so those answers/chats silently went missing. Passing
+ * `[question.idx, arrayPosition]` lets the lookup fall back to the storage
+ * truth without changing behaviour for aligned exams.
+ */
+export function resolveByQIdx<T>(
+  record: Record<string | number, T> | undefined | null,
+  keys: Array<number | string>,
+): T | undefined {
+  if (!record) return undefined;
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
+/**
  * Deterministically grade an objective (mcq/true-false) question.
  *
  * The student's submitted answer is stored as the chosen option index in

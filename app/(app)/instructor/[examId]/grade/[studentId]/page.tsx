@@ -24,7 +24,7 @@ import {
   AIOverallSummary,
   type SummaryData,
 } from "@/components/instructor/AIOverallSummary";
-import { isObjectiveQuestion } from "@/lib/grading-helpers";
+import { isObjectiveQuestion, resolveByQIdx } from "@/lib/grading-helpers";
 import {
   buildTypedQuestionEntries,
   getSubmissionForQuestion,
@@ -354,10 +354,15 @@ export default function GradeStudentPage({
   // Get current question data
   const currentQuestion = sessionData.exam?.questions?.[selectedQuestionIdx];
   const selectedQuestionQIdx = currentQuestion?.idx ?? selectedQuestionIdx;
-  const currentSubmission = sessionData.submissions?.[selectedQuestionQIdx] as
+  // q_idx 키 후보: 배열 위치(저장 진실) 먼저, 그다음 문항 idx 필드.
+  // 데이터는 배열 위치 q_idx로 저장되므로 위치를 우선해야 한다. idx 우선이면,
+  // idx가 다른 문항의 위치와 겹칠 때(예: OX idx 17 ↔ 위치 17 에세이) 엉뚱한
+  // 답안을 집어온다. [[resolveByQIdx]] 참고.
+  const qIdxKeys = [selectedQuestionIdx, selectedQuestionQIdx];
+  const currentSubmission = resolveByQIdx(sessionData.submissions, qIdxKeys) as
     | Submission
     | undefined;
-  const currentGrade = sessionData.grades?.[selectedQuestionQIdx] as
+  const currentGrade = resolveByQIdx(sessionData.grades, qIdxKeys) as
     | Grade
     | undefined;
 
@@ -367,7 +372,7 @@ export default function GradeStudentPage({
     currentGrade?.stage_grading?.answer?.comment ?? currentGrade?.comment ?? "";
 
   // Try to get messages by both index and question.id (for backward compatibility)
-  let currentMessages = (sessionData.messages?.[selectedQuestionQIdx] ||
+  let currentMessages = (resolveByQIdx(sessionData.messages, qIdxKeys) ??
     []) as Conversation[];
 
   // If no messages found by index, try using question.id
@@ -455,10 +460,24 @@ export default function GradeStudentPage({
           {/* 종합요약리포트(CASE 종합 평가) — 페이지 최상단 */}
           {!isObjectiveQuestion(currentQuestion?.type) && (
             <div className="mb-6 space-y-4">
-              <AIOverallSummary
-                summary={sessionSummary}
-                loading={summaryLoading}
-              />
+              {/*
+                TODO(종합평가-제거): 케이스가 2개 이상이면 'CASE 종합 평가'(AIOverallSummary)를
+                UI에서 숨기고, 각 케이스별 'CASE 문항 평가'(QuestionAiSummaryCard)만 노출한다.
+                케이스가 1개일 때는 기존대로 종합 평가를 유지한다.
+
+                ⚠️ 지금은 UI에서만 숨긴 상태다(요구사항: 완전 제거 X, UI 제거 O).
+                컴포넌트와 서버측 session 단위 ai_summary 생성 로직은 그대로 살아 있다.
+                추후 별도 작업에서 아래를 완전히 제거해야 한다:
+                  1) 이 파일의 AIOverallSummary 렌더링 + import + sessionSummary/hasSessionSummary 등 관련 상태
+                  2) 서버측 session 단위 ai_summary 생성 파이프라인(grading worker의 session_summary phase 등)
+                  ※ 과제 개별 채점 페이지 / 리포트 카드(PDF)의 종합 평가는 이번 범위 밖이므로 함께 검토할 것.
+              */}
+              {caseCount < 2 && (
+                <AIOverallSummary
+                  summary={sessionSummary}
+                  loading={summaryLoading}
+                />
+              )}
               {caseCount >= 2 && (
                 <QuestionAiSummaryCard
                   summary={currentGrade?.ai_summary ?? null}
@@ -668,7 +687,8 @@ export default function GradeStudentPage({
                     pasteLogs={
                       currentQuestion
                         ? sessionData.pasteLogs?.[currentQuestion.id] ||
-                          sessionData.pasteLogs?.[String(selectedQuestionQIdx)]
+                          sessionData.pasteLogs?.[String(selectedQuestionQIdx)] ||
+                          sessionData.pasteLogs?.[String(selectedQuestionIdx)]
                         : undefined
                     }
                     questionId={currentQuestion?.id}

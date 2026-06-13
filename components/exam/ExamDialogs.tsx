@@ -24,6 +24,8 @@ interface ExamDialogsProps {
   unansweredDialog: { open: boolean; indices: number[] };
   setUnansweredDialog: (value: { open: boolean; indices: number[] }) => void;
   setCurrentQuestion: (idx: number) => void;
+  /** 표시순서 → 원본인덱스 매핑. 셔플 시 미작성 라벨/정렬을 표시번호로 보정. */
+  displayOrder?: number[];
   setShowSubmitConfirm: (open: boolean) => void;
   autoSubmitFailed: boolean;
   setAutoSubmitFailed: (open: boolean) => void;
@@ -42,6 +44,7 @@ export function ExamDialogs({
   unansweredDialog,
   setUnansweredDialog,
   setCurrentQuestion,
+  displayOrder,
   setShowSubmitConfirm,
   autoSubmitFailed,
   setAutoSubmitFailed,
@@ -82,6 +85,12 @@ export function ExamDialogs({
   const unansweredSubmitRemainingSeconds = Math.ceil(unansweredSubmitRemainingMs / 1000);
   const isUnansweredSubmitCoolingDown = unansweredSubmitRemainingSeconds > 0;
 
+  // 셔플 시 미작성 라벨/정렬을 화면 표시번호로 보정한다(idx는 항상 원본 q_idx).
+  const displayNumber = (idx: number) => {
+    const pos = displayOrder ? displayOrder.indexOf(idx) : idx;
+    return (pos >= 0 ? pos : idx) + 1;
+  };
+
   return (
     <>
       {/* 그만두기 확인 다이얼로그 */}
@@ -115,20 +124,22 @@ export function ExamDialogs({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex flex-wrap gap-2 py-2">
-            {unansweredDialog.indices.map((idx) => (
-              <Button
-                key={idx}
-                variant="outline"
-                size="sm"
-                className="text-destructive border-destructive/50 hover:bg-destructive/10"
-                onClick={() => {
-                  setCurrentQuestion(idx);
-                  setUnansweredDialog({ open: false, indices: [] });
-                }}
-              >
-                문제 {idx + 1}
-              </Button>
-            ))}
+            {[...unansweredDialog.indices]
+              .sort((a, b) => displayNumber(a) - displayNumber(b))
+              .map((idx) => (
+                <Button
+                  key={idx}
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                  onClick={() => {
+                    setCurrentQuestion(idx);
+                    setUnansweredDialog({ open: false, indices: [] });
+                  }}
+                >
+                  문제 {displayNumber(idx)}
+                </Button>
+              ))}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>돌아가기</AlertDialogCancel>

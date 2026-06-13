@@ -64,9 +64,25 @@ export class StudentExamPage {
     return this.page.locator(`[data-testid="exam-question-nav-${index}"]`);
   }
 
-  /** Navigate to question by index (0-based) via left/bottom timeline nav. */
-  async goToQuestion(index: number) {
-    await this.questionNav(index).click();
+  get nextBtn(): Locator {
+    return this.page.locator('[data-testid="exam-next-btn"]');
+  }
+
+  /**
+   * 단방향 진행: 다음 문제로 전진한다(임의 점프·되돌아가기 불가).
+   * 객관식은 답을 선택해야 다음 버튼이 활성화된다.
+   */
+  async nextQuestion() {
+    await this.nextBtn.click();
+  }
+
+  /** CASE 블록 내 '이전' 버튼(CASE↔CASE 양방향 이동 한정). 객관식엔 존재하지 않음. */
+  get prevBtn(): Locator {
+    return this.page.locator('[data-testid="exam-prev-btn"]');
+  }
+
+  async prevQuestion() {
+    await this.prevBtn.click();
   }
 
   /** Returns the nth objective option by index (0-based). */

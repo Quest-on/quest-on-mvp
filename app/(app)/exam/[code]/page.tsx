@@ -53,7 +53,7 @@ import { PreflightModal } from "@/components/exam/PreflightModal";
 import { WaitingRoom } from "@/components/exam/WaitingRoom";
 import { LateEntryWaiting } from "@/components/exam/LateEntryWaiting";
 import { ObjectiveNavBar } from "@/components/exam/ObjectiveNavBar";
-import { seededOptionOrder } from "@/lib/shuffle";
+import { seededOptionOrder, examQuestionDisplayOrder } from "@/lib/shuffle";
 import { useObjectiveKeyboardSelect } from "@/hooks/useObjectiveKeyboardSelect";
 
 interface Question {
@@ -178,7 +178,6 @@ export default function ExamPage() {
     examCode,
     currentQuestion,
     isOnline: autoSave.isOnline,
-    setCurrentQuestion: setCurrentQuestionWithReveal,
     setShowExitConfirm,
   });
 
@@ -210,17 +209,52 @@ export default function ExamPage() {
     [exam]
   );
 
-  const questionNavItems = useMemo(
-    () =>
-      exam?.questions.map((q, idx) => ({
+  // 문제 표시 순서(표시위치 → 원본 q_idx). MCQ/OX만 sessionId로 셔플, CASE는 맨 뒤.
+  // currentQuestion 상태는 항상 원본 인덱스를 유지하며, 이 매핑은 순수 표시용이다.
+  const questionDisplayOrder = useMemo(
+    () => (exam && sessionId ? examQuestionDisplayOrder(sessionId, exam.questions) : null),
+    [exam, sessionId],
+  );
+  const totalQuestions = exam?.questions.length ?? 0;
+  const displayPos = questionDisplayOrder
+    ? questionDisplayOrder.indexOf(currentQuestion)
+    : currentQuestion;
+
+  // CASE(비객관식)는 표시순서 맨 뒤에 연속 배치된다(lib/shuffle.ts). 첫 CASE의 표시위치.
+  // CASE 블록 내에서만 '이전' 이동을 허용하기 위한 경계값(CASE 없으면 -1).
+  const firstCasePos = useMemo(() => {
+    if (!exam || !questionDisplayOrder) return -1;
+    return questionDisplayOrder.findIndex(
+      (origIdx) => !isObjectiveQuestion(exam.questions[origIdx].type),
+    );
+  }, [exam, questionDisplayOrder]);
+
+  // 셔플된 표시 순서의 첫 문제로 1회만 진입한다(원본 0이 아닐 수 있음).
+  const didInitDisplayStartRef = useRef(false);
+  useEffect(() => {
+    if (didInitDisplayStartRef.current) return;
+    if (!questionDisplayOrder || questionDisplayOrder.length === 0) return;
+    didInitDisplayStartRef.current = true;
+    // 비동기 로드된 셔플 순서로 첫 문제를 1회 동기화(ref 가드로 cascading 없음).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCurrentQuestion(questionDisplayOrder[0]);
+  }, [questionDisplayOrder]);
+
+  // 좌측 네비는 표시 순서로 나열하되, 각 항목 데이터는 원본 인덱스로 조회한다.
+  const questionNavItems = useMemo(() => {
+    if (!exam) return [];
+    const order = questionDisplayOrder ?? exam.questions.map((_, i) => i);
+    return order.map((orig) => {
+      const q = exam.questions[orig];
+      return {
         type: q.type,
-        hasAnswer: hasQuestionAnswer(autoSave.draftAnswers[idx]?.text || "", q.type),
+        hasAnswer: hasQuestionAnswer(autoSave.draftAnswers[orig]?.text || "", q.type),
         hasChat:
           !isObjectiveQuestion(q.type) &&
-          examChat.chatHistory.some((msg) => msg.qIdx === idx),
-      })) ?? [],
-    [exam, autoSave.draftAnswers, examChat.chatHistory],
-  );
+          examChat.chatHistory.some((msg) => msg.qIdx === orig),
+      };
+    });
+  }, [exam, questionDisplayOrder, autoSave.draftAnswers, examChat.chatHistory]);
 
   // 객관식 문제에서는 SidebarProvider 전역 Ctrl/Cmd+B 단축키가 보이지 않는 사이드바 상태를
   // 토글하지 못하도록 캡처 단계에서 차단한다.
@@ -267,8 +301,10 @@ export default function ExamPage() {
       if (currentQuestionId) autoSave.updateAnswer(currentQuestionId, value);
     },
     onNext: () => {
-      if (exam && currentQuestion < exam.questions.length - 1) {
-        setCurrentQuestionWithReveal((prev) => prev + 1);
+      // 단방향 + 선택 강제: 현재 객관식 답을 선택해야만 엔터로 다음(표시순서) 이동.
+      if (!questionNavItems[displayPos]?.hasAnswer) return;
+      if (questionDisplayOrder && displayPos < totalQuestions - 1) {
+        setCurrentQuestionWithReveal(questionDisplayOrder[displayPos + 1]);
       }
     },
   });
@@ -478,8 +514,7 @@ export default function ExamPage() {
     <div className="flex h-screen w-full bg-background">
       <ExamQuestionNav
         questions={questionNavItems}
-        currentQuestion={currentQuestion}
-        onSelect={setCurrentQuestionWithReveal}
+        currentQuestion={displayPos}
         onExit={() => setShowExitConfirm(true)}
       />
 
@@ -548,7 +583,7 @@ export default function ExamPage() {
                     <div className="shrink-0">
                       <QuestionPanel
                         question={exam.questions[currentQuestion]}
-                        questionNumber={currentQuestion + 1}
+                        questionNumber={displayPos + 1}
                       />
                     </div>
                     <div className="shrink-0">
@@ -567,42 +602,70 @@ export default function ExamPage() {
                     </div>
                   </div>
                   <ObjectiveNavBar
-                    currentIndex={currentQuestion}
-                    total={exam.questions.length}
-                    onNavigate={setCurrentQuestionWithReveal}
+                    currentIndex={displayPos}
+                    total={totalQuestions}
+                    onNavigate={(nextPos) => {
+                      if (questionDisplayOrder?.[nextPos] !== undefined)
+                        setCurrentQuestionWithReveal(questionDisplayOrder[nextPos]);
+                    }}
+                    canNext={questionNavItems[displayPos]?.hasAnswer ?? false}
                     className="shrink-0"
                   />
                 </div>
-              ) : isQuestionVisible ? (
-                <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
-                  <ResizablePanel defaultSize={40} minSize={20} maxSize={70}>
-                    <QuestionPanel question={exam.questions[currentQuestion]} questionNumber={currentQuestion + 1} />
-                  </ResizablePanel>
-                  <ResizableHandle withHandle />
-                  <ResizablePanel defaultSize={60} minSize={30}>
-                    <AnswerPanel
-                      value={autoSave.draftAnswers[currentQuestion]?.text || ""}
-                      onChange={(value) => autoSave.updateAnswer(exam.questions[currentQuestion].id, value)}
-                      onPaste={submission.handlePaste}
-                      isSaving={autoSave.isSaving}
-                      lastSaved={autoSave.lastSaved}
-                      saveError={autoSave.saveError}
-                      saveShortcut={saveShortcut}
-                      onFocus={() => setIsQuestionVisible(false)}
-                    />
-                  </ResizablePanel>
-                </ResizablePanelGroup>
               ) : (
-                <AnswerPanel
-                  value={autoSave.draftAnswers[currentQuestion]?.text || ""}
-                  onChange={(value) => autoSave.updateAnswer(exam.questions[currentQuestion].id, value)}
-                  onPaste={submission.handlePaste}
-                  isSaving={autoSave.isSaving}
-                  lastSaved={autoSave.lastSaved}
-                  saveError={autoSave.saveError}
-                  saveShortcut={saveShortcut}
-                  fullHeight
-                />
+                // CASE/서술형: 단방향 진행을 위해 하단에 '다음' 바를 둔다(작성 무관 진행).
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    {isQuestionVisible ? (
+                      <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
+                        <ResizablePanel defaultSize={40} minSize={20} maxSize={70}>
+                          <QuestionPanel question={exam.questions[currentQuestion]} questionNumber={displayPos + 1} />
+                        </ResizablePanel>
+                        <ResizableHandle withHandle />
+                        <ResizablePanel defaultSize={60} minSize={30}>
+                          <AnswerPanel
+                            value={autoSave.draftAnswers[currentQuestion]?.text || ""}
+                            onChange={(value) => autoSave.updateAnswer(exam.questions[currentQuestion].id, value)}
+                            onPaste={submission.handlePaste}
+                            isSaving={autoSave.isSaving}
+                            lastSaved={autoSave.lastSaved}
+                            saveError={autoSave.saveError}
+                            saveShortcut={saveShortcut}
+                          />
+                        </ResizablePanel>
+                      </ResizablePanelGroup>
+                    ) : (
+                      <AnswerPanel
+                        value={autoSave.draftAnswers[currentQuestion]?.text || ""}
+                        onChange={(value) => autoSave.updateAnswer(exam.questions[currentQuestion].id, value)}
+                        onPaste={submission.handlePaste}
+                        isSaving={autoSave.isSaving}
+                        lastSaved={autoSave.lastSaved}
+                        saveError={autoSave.saveError}
+                        saveShortcut={saveShortcut}
+                      />
+                    )}
+                  </div>
+                  <ObjectiveNavBar
+                    currentIndex={displayPos}
+                    total={totalQuestions}
+                    onNavigate={(nextPos) => {
+                      if (questionDisplayOrder?.[nextPos] !== undefined)
+                        setCurrentQuestionWithReveal(questionDisplayOrder[nextPos]);
+                    }}
+                    canNext
+                    canPrev={firstCasePos >= 0 && displayPos > firstCasePos}
+                    onPrev={() => {
+                      const prevOrig = questionDisplayOrder?.[displayPos - 1];
+                      if (prevOrig === undefined) return;
+                      // 단방향 보호(이중 가드): CASE 블록 내에서만 뒤로 이동.
+                      // 목적지가 객관식이면 절대 이동하지 않는다(객관식 누수 차단).
+                      if (isObjectiveQuestion(exam.questions[prevOrig].type)) return;
+                      setCurrentQuestionWithReveal(prevOrig);
+                    }}
+                    className="shrink-0"
+                  />
+                </div>
               )}
             </div>
           </MainContentWrapper>
@@ -621,6 +684,7 @@ export default function ExamPage() {
         unansweredDialog={submission.unansweredDialog}
         setUnansweredDialog={submission.setUnansweredDialog}
         setCurrentQuestion={setCurrentQuestionWithReveal}
+        displayOrder={questionDisplayOrder ?? undefined}
         setShowSubmitConfirm={submission.setShowSubmitConfirm}
         autoSubmitFailed={submission.autoSubmitFailed}
         setAutoSubmitFailed={submission.setAutoSubmitFailed}

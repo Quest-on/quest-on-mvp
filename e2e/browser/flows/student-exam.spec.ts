@@ -62,9 +62,10 @@ test.describe("Student — Exam Flow", () => {
     ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
   });
 
-  test("navigates between questions using prev/next buttons", async ({
+  test("navigates between CASE questions using prev/next buttons", async ({
     studentPage,
   }) => {
+    // Default seed = 2 essay (CASE) questions, no objective.
     const { exam } = await seedStudentExamScenario({
       examStatus: "running",
       sessionStatus: "in_progress",
@@ -73,23 +74,36 @@ test.describe("Student — Exam Flow", () => {
     const examPage = new StudentExamPage(studentPage);
     await examPage.goto(exam.code);
 
-    // Wait for first question to load
+    // First CASE (polymorphism) — no prev button (cannot go before the first CASE).
     await expect(
       studentPage.getByText(/polymorphism/i),
     ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
+    await expect(examPage.prevBtn).toHaveCount(0);
 
-    // Navigate to next question — button must be visible
-    await expect(examPage.questionNav(1)).toBeVisible({
-      timeout: TIMEOUTS.ELEMENT_VISIBLE,
-    });
-    await examPage.goToQuestion(1);
-    // Second question should show
+    // Record an answer to verify original-index mapping survives back-navigation.
+    // NOTE: keep this free of the question keywords (polymorphism/stack/queue) — the
+    // controlled <textarea> exposes its value as text content, so a colliding word
+    // would make getByText(/polymorphism/i) match both the prompt and the answer.
+    await examPage.typeAnswer("persisted answer text");
+
+    // Next → second CASE (stack/queue): prev now available, next hidden (last).
+    await examPage.nextQuestion();
     await expect(
       studentPage.getByText(/stack|queue/i),
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
+    await expect(examPage.prevBtn).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
+    await expect(examPage.nextBtn).toHaveCount(0);
+
+    // Prev → back to the first CASE; its answer must persist (keyed by original idx).
+    await examPage.prevQuestion();
+    await expect(
+      studentPage.getByText(/polymorphism/i),
+    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
+    await expect(examPage.prevBtn).toHaveCount(0);
+    await expect(examPage.answerArea).toHaveValue("persisted answer text");
   });
 
-  test("reopens question panel when moving to next question", async ({
+  test("keeps the question panel open when the answer editor is focused", async ({
     studentPage,
   }) => {
     const { exam } = await seedStudentExamScenario({
@@ -104,18 +118,51 @@ test.describe("Student — Exam Flow", () => {
       studentPage.getByText(/polymorphism/i),
     ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
 
-    // Focus answer editor to collapse question panel first
+    // Panel starts open: the toolbar shows "문제 접기" (collapse action).
+    await expect(examPage.questionCollapseBtn).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_VISIBLE,
+    });
+
+    // Focusing the answer editor must NOT auto-collapse the question panel.
     await expect(examPage.answerArea).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
     await examPage.answerArea.click();
-    await expect(
-      studentPage.getByRole("button", { name: "문제 보기" }),
-    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
 
-    // Moving to another question should reopen the panel
-    await examPage.goToQuestion(1);
+    await expect(examPage.questionCollapseBtn).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_VISIBLE,
+    });
+    await expect(examPage.questionExpandBtn).toHaveCount(0);
+    await expect(studentPage.getByText(/polymorphism/i)).toBeVisible();
+  });
+
+  test("reopens the question panel after manual collapse and navigation", async ({
+    studentPage,
+  }) => {
+    const { exam } = await seedStudentExamScenario({
+      examStatus: "running",
+      sessionStatus: "in_progress",
+    });
+
+    const examPage = new StudentExamPage(studentPage);
+    await examPage.goto(exam.code);
+
     await expect(
-      studentPage.getByRole("button", { name: "문제 접기" }),
-    ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
+      studentPage.getByText(/polymorphism/i),
+    ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
+
+    // Student collapses the panel manually via the toolbar toggle.
+    await expect(examPage.questionCollapseBtn).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_VISIBLE,
+    });
+    await examPage.questionCollapseBtn.click();
+    await expect(examPage.questionExpandBtn).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_VISIBLE,
+    });
+
+    // Moving to another question should reopen the panel.
+    await examPage.nextQuestion();
+    await expect(examPage.questionCollapseBtn).toBeVisible({
+      timeout: TIMEOUTS.ELEMENT_VISIBLE,
+    });
     await expect(
       studentPage.getByText(/stack|queue/i),
     ).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });

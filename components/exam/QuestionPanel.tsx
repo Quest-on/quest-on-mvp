@@ -45,10 +45,6 @@ export function QuestionPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
 
-  // 객관식/OX 는 서술형 풀이 안내가 의미 없다.
-  const isObjective =
-    question.type === "multiple-choice" || question.type === "true-false";
-
   return (
     <div className="relative h-full flex flex-col border-b border-border bg-muted/20">
       <div
@@ -89,29 +85,11 @@ export function QuestionPanel({
               />
             </CopyProtector>
           </div>
-
-          {!isObjective && (
-            <div className="bg-muted/40 p-3 sm:p-4 rounded-lg border border-border">
-              <h4 className="font-semibold mb-2 sm:mb-3 text-sm sm:text-base text-foreground">
-                요구사항
-              </h4>
-              <ul className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm text-muted-foreground">
-                <li className="flex items-start gap-2">
-                  <span className="text-primary mt-0.5">•</span>
-                  <span>문제를 정확히 이해하고 답변하세요</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-primary mt-0.5">•</span>
-                  <span>풀이 과정을 단계별로 명확히 작성하세요</span>
-                </li>
-              </ul>
-            </div>
-          )}
         </div>
       </div>
 
       {scrollTop === 0 && (
-        <div className="sticky bottom-0 left-0 right-0 z-20 flex justify-center pb-2 pt-2 bg-gradient-to-t from-muted/20 via-muted/20 to-transparent pointer-events-none">
+        <div className="sticky bottom-0 left-0 right-0 z-20 flex justify-center pb-2 pt-2 bg-gradient-to-t from-muted/20 via-muted/20 to-transparent backdrop-blur-sm pointer-events-none">
           <Button
             variant="ghost"
             size="icon"

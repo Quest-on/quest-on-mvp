@@ -96,6 +96,11 @@ interface StudentStatsResponse {
   overallAverageScore: number | null;
 }
 
+/** 과제 제출 기한이 지났는지 — 렌더 순수성(react-hooks/purity) 유지를 위해 컴포넌트 밖에 둔다. */
+function isAssignmentDeadlinePassed(deadline: string | null): boolean {
+  return !!deadline && new Date(deadline).getTime() < Date.now();
+}
+
 function getGreeting(name: string) {
   const h = new Date().getHours();
   if (h < 12) return `좋은 아침이에요, ${name}님 ☀️`;
@@ -492,6 +497,22 @@ export default function StudentDashboard() {
   // Session action/CTA renderer (shared between grid and list views)
   const renderSessionAction = (session: ExamSession) => {
     if (session.status === "in-progress") {
+      // 과제(duration===0)이고 제출 기한이 지났으면 재입장이 막히므로,
+      // 본인 기록을 읽기 전용으로 보여주는 열람 페이지로 유도한다.
+      const isAssignment = session.duration === 0;
+      if (isAssignment && isAssignmentDeadlinePassed(session.deadline)) {
+        return (
+          <Link
+            href={`/assignment/${session.examCode}/review`}
+            className="focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-md"
+          >
+            <Button variant="outline" size="sm" className="min-h-[36px] px-4">
+              <FileText className="w-4 h-4 mr-1.5" aria-hidden="true" />
+              기록 보기
+            </Button>
+          </Link>
+        );
+      }
       const resumePath = session.duration === 0
         ? `/assignment/${session.examCode}`
         : `/exam/${session.examCode}`;

@@ -74,8 +74,12 @@ export function useAssignmentSession(code: string) {
 
       if (!sessionRes.ok) {
         const errData = await sessionRes.json().catch(() => ({}));
+        // 마감으로 입장이 막힌 경우: 본인 기록을 읽기 전용으로 보여주는 열람 페이지로 유도
+        if (errData.error === "ENTRY_WINDOW_CLOSED") {
+          router.replace(`/assignment/${code}/review`);
+          return null;
+        }
         const errorMessages: Record<string, string> = {
-          ENTRY_WINDOW_CLOSED: "제출 기한이 마감되었습니다.",
           ENTRY_WINDOW_NOT_OPEN: "아직 과제가 시작되지 않았습니다.",
           EXAM_NOT_AVAILABLE: "과제가 종료되었거나 비공개 상태입니다.",
           EXAM_NOT_FOUND: "과제를 찾을 수 없습니다.",
