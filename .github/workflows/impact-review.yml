@@ -35,17 +35,6 @@ jobs:
       # 그래서 모델 2차 리뷰는 opencode 헤드리스를 경유한다(.github/impact-review/opencode.json).
       - name: Install opencode (whitelisted coding agent)
         run: npm install -g opencode-ai@1.17.6 # 핀 고정(재현성; DEPENDENCY_POLICY 준수)
-      # [TEMP] qIdx 회귀 재현 테스트 — AI 레인이 배열위치 딥링크(qIdx 위반)를 잡는지 검증.
-      - name: qIdx regression smoke (does the AI lane catch it?)
-        run: |
-          echo "::group::qidx smoke"
-          npm run impact-review -- --diff-file __tests__/fixtures/impact-review/qidx-regression.diff --provider opencode --no-post || true
-          echo "::endgroup::"
-        env:
-          OPENCODE_CONFIG: ${{ github.workspace }}/.github/impact-review/opencode.json
-          ZAI_CODING_API_KEY: ${{ secrets.ZAI_CODING_API_KEY }}
-          IMPACT_REVIEW_PROVIDER: opencode
-          IMPACT_REVIEW_AGENT_MODEL: zai-coding/glm-5.2
       - name: Run impact review (opencode / GLM Coding Plan)
         run: npm run impact-review -- --event github --post-github-comment --ci --provider opencode --threshold 80
         env:
