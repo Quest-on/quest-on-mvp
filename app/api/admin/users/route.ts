@@ -22,11 +22,31 @@ export async function GET(request: NextRequest) {
     const offset = Math.max(isNaN(rawOffset) ? 0 : rawOffset, 0);
 
     const supabase = getSupabaseServer();
-    const { data: users, count, error } = await supabase
+
+    // 통계는 현재 페이지가 아닌 전체 총수 기준으로 집계
+    const [
+      { count: totalCount, error: totalError },
+      { count: instructorCount, error: instructorError },
+      { count: studentCount, error: studentError },
+    ] = await Promise.all([
+      supabase.from("profiles").select("id", { count: "exact", head: true }),
+      supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "instructor"),
+      supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "student"),
+    ]);
+
+    if (totalError) throw totalError;
+    if (instructorError) throw instructorError;
+    if (studentError) throw studentError;
+
+    const { data: users, error } = await supabase
       .from("profiles")
-      .select("id, display_name, role, status, avatar_url, created_at", {
-        count: "exact",
-      })
+      .select("id, display_name, role, status, avatar_url, created_at")
       .range(offset, offset + limit - 1)
       .order("created_at", { ascending: false });
 
@@ -46,7 +66,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const total = count ?? 0;
+    const total = totalCount ?? 0;
     const usersWithRoles = (users ?? []).map((user) => ({
       id: user.id,
       email: emailMap.get(user.id) ?? "",
@@ -57,11 +77,13 @@ export async function GET(request: NextRequest) {
       createdAt: user.created_at,
     }));
 
+    const instructors = instructorCount ?? 0;
+    const students = studentCount ?? 0;
     const stats = {
       total,
-      instructors: usersWithRoles.filter((u) => u.role === "instructor").length,
-      students: usersWithRoles.filter((u) => u.role === "student").length,
-      noRole: usersWithRoles.filter((u) => !u.role || u.role === "").length,
+      instructors,
+      students,
+      noRole: Math.max(total - instructors - students, 0),
     };
 
     return successJson({
