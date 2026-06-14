@@ -67,3 +67,7 @@
 - **"for coding" 구독 키(Kimi for Coding, GLM Coding Plan)는 raw API(SDK/curl/CI 스크립트)로 못 쓴다.** 엔드포인트가 클라이언트 화이트리스트(Claude Code/opencode/Cline/Kimi CLI 등)를 강제하고 비대화형 배치 호출을 금지한다. User-Agent 위조는 계정 정지 사유 → 금지.
 - 구독 키를 합법적으로 쓰려면 **화이트리스트 코딩 CLI를 헤드리스로 경유**한다(여기선 GLM Coding Plan + `opencode run`, `.github/impact-review/opencode.json` + `OPENCODE_CONFIG`). raw API가 필요하면 *일반 종량제* 키(`api.moonshot.ai/v1` / `api.z.ai/api/paas/v4`)를 따로 발급해야 한다. coding 엔드포인트는 `.../coding/...` 경로로 구분된다.
 - coding 구독은 인터랙티브 quota와 같은 통을 쓰므로 CI 자동 실행은 quota를 잠식하고 ToS 회색지대다. opencode→coding 엔드포인트 *라이브* 호출은 사용자 CI에서만 검증 가능(샌드박스 미검증). 정적 검증은 faked-runner 단위테스트로 커버한다.
+- 결정적 레이어는 **고신뢰·무오탐만**(거울 Vitest 테스트 + tsc/lint). qIdx/채점/DB 같은 *의미 판단*은 정규식 룰로 박지 말고(오탐多·성숙도구 재발명) **AI 레인에 위임**한다. 구조 경계가 정말 아프면 그때 ast-grep/dependency-cruiser/Danger 같은 표준 도구를 쓴다.
+- codegraph는 **거울 seed만** 결정적으로 제공(복붙 거울은 import edge 없어 grep 불가). importer 전이 추적은 강한 에이전트가 직접 grep하므로 과투자 금지.
+- **리뷰 에이전트에 라이브 DB 권한 금지**(read-only라도). CI에 DB 크레덴셜=PII 유출 위험 + 6/03 DB 성역 위반. 데이터모델 영향은 `database/NNN_*.sql`·`prisma/schema.prisma`를 *파일로 read*해서 판단한다.
+- coding 구독(GLM/Kimi) 모델 id는 빨리 낡는다(glm-4.7→5.1→5.2). opencode.json `model` + workflow env 한 줄로 스왑 가능하게 유지.

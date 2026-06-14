@@ -114,7 +114,6 @@ async function main() {
     range,
     confidenceThreshold: args.threshold,
     provider: args.provider,
-    scanBlastRadius: !args.diffFile, // fixture 모드에선 repo 스캔 안 함.
     policy: { failOnDeterministicCritical: true, failOnAiCritical: args.failOnAiCritical },
   });
 

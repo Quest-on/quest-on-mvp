@@ -47,7 +47,11 @@ const AGENT_SYSTEM_PROMPT =
   "You can read any file with your tools. Investigate regression and cross-file impact of the change " +
   "described below: read the changed files, their importers/callers (see blast_radius), mirror siblings, " +
   "shared modules, and affected tests as needed. " +
-  "Report ONLY net-new regression or cross-file risks that the deterministic layer has NOT already reported " +
+  "Also apply the convention checks documented in .github/impact-review/rules.md (read it): " +
+  "qIdx deep-link/array-position assumptions; MCQ/OX scoring must use raw answers + correctOptionIndex (not ai_summary/grade rows); " +
+  "score_weights kept in sync with question types; and DB/migration impact — assess by READING database/NNN_*.sql (DDL/constraints/RLS/indexes) and prisma/schema.prisma, NEVER by connecting to a live database. " +
+  "Also flag if the impact-review runner/workflow itself adds Supabase/DB/.env access (it must stay read-only). " +
+  "Report ONLY net-new risks that the deterministic layer has NOT already reported " +
   "(do not repeat entries in deterministic_findings). Do NOT modify any file — read-only review. " +
   "Do NOT report style-only issues. " +
   'When done, output ONLY a JSON object on its own line: {"findings":[{"severity":"Critical|Warning|Suggestion",' +

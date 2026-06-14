@@ -1,11 +1,4 @@
-import type {
-  DiffFile,
-  DeterministicFinding,
-  MirrorRule,
-  PatternRule,
-  Rule,
-  RuleCatalog,
-} from "./types";
+import type { DiffFile, DeterministicFinding, MirrorRule, RuleCatalog } from "./types";
 
 /**
  * 모델 호출 *전*에 실행되는 결정적 prechecks.
@@ -24,9 +17,8 @@ export function runPrechecks(files: DiffFile[], catalog: RuleCatalog): Determini
     if (rule.kind === "mirror") {
       const f = checkMirror(rule, byPath);
       if (f) findings.push(f);
-    } else {
-      findings.push(...checkPattern(rule, files));
     }
+    // 패턴(qIdx/채점/DB 등)은 정규식 오탐이 많아 AI 레인으로 이관됨(.github/impact-review/rules.md 참조).
   }
   return findings;
 }
@@ -94,50 +86,4 @@ function helperHunkCovers(helperHunk: string[], helperChangedText: string): bool
   if (matched.length === 0) return false;
   const strong = matched.some((t) => /[a-z][A-Z]/.test(t) && t.length >= 12);
   return strong || matched.length >= 2;
-}
-
-function checkPattern(rule: PatternRule, files: DiffFile[]): DeterministicFinding[] {
-  const out: DeterministicFinding[] = [];
-  const prefixes = rule.anyPath.length ? rule.anyPath : [""];
-  const regexes = rule.signals.map((s) => safeRegex(s));
-  for (const f of files) {
-    if (!prefixes.some((p) => f.path.startsWith(p))) continue;
-    // 주석/문서 텍스트의 단순 언급은 패턴 발화에서 제외(오탐 방지).
-    const codeText = stripComments(f.changedText);
-    const hit = regexes.some((re) => re.test(codeText));
-    if (hit) {
-      out.push({
-        source: "deterministic",
-        severity: rule.severity,
-        confidence: 100,
-        ruleIds: [rule.id],
-        message: rule.message,
-        location: { path: f.path },
-      });
-    }
-  }
-  return out;
-}
-
-function safeRegex(src: string): RegExp {
-  try {
-    return new RegExp(src);
-  } catch {
-    // 정규식이 깨지면 리터럴로 escape 후 매칭.
-    return new RegExp(src.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  }
-}
-
-/** 라인/블록 주석을 제거해 패턴 룰이 코드가 아닌 문서 텍스트에 오발화하지 않게 한다. */
-function stripComments(text: string): string {
-  return text
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .split("\n")
-    .map((line) => line.replace(/\/\/.*$/, ""))
-    .filter((line) => !/^\s*[*#]/.test(line))
-    .join("\n");
-}
-
-export function _isRule(x: unknown): x is Rule {
-  return !!x && typeof x === "object" && "kind" in (x as object);
 }

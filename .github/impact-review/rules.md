@@ -20,16 +20,20 @@ quest-on 변경 영향/회귀 자동 리뷰가 사용하는 결정적 규칙과 
 - `MIRROR-EXAM-AUTHORING-FORMS`: `instructor/new` ↔ `instructor/[examId]/edit`
 - `MIRROR-ASSIGNMENT-AUTHORING-FORMS`: `instructor/assignment/new` ↔ `instructor/assignment/[assignmentId]/edit`
 
-## Pattern rules (단일 파일 고위험 패턴)
+## Convention checks (AI 레인이 판단 — 정규식 아님)
 
-- `QIDX-DEEP-LINKS`: 딥링크·채점 선택은 배열 위치 가정 금지, 명시적 `qIdx`/`idx ?? pos`.
-- `OBJECTIVE-SCORING-RAW-ANSWERS`: MCQ/OX 채점은 raw 선택답 + `correctOptionIndex`만. AI grade row나 `ai_summary` placeholder 금지.
-- `SCORE-WEIGHT-SYNC`: 문항 유형 버킷과 `score_weights`는 항상 동기화.
-- `DB-SAFETY-READ-ONLY`: 리뷰/러너는 read-only. Supabase 연결·마이그레이션·seed·cleanup·`.env.local` source 금지.
+아래는 결정적 규칙이 아니라 **AI 리뷰 레인이 코드 의미를 보고 판단**할 가이드다.
+(정규식 패턴 룰은 오탐이 많아 제거했고, 의미 판단은 모델에게 맡긴다.)
 
-## Model guidance (LLM 2차 리뷰용)
+- **qIdx 딥링크:** 딥링크·채점 선택은 배열 위치를 가정하지 말 것. 명시적 `qIdx` 또는 테스트된 `idx ?? pos` 규약.
+- **객관식 채점:** MCQ/OX 채점은 raw 선택답 + `correctOptionIndex`만 사용. AI grade row나 `ai_summary` placeholder 혼입 금지.
+- **점수 비중:** 문항 유형 세트와 `score_weights`는 항상 동기화. stale weight 금지.
+- **DB 영향(파일로만):** 마이그레이션/스키마 변경은 `database/NNN_*.sql`(DDL·제약·RLS·인덱스 = source of truth)과 `prisma/schema.prisma`를 **읽어서** 판단 — RLS 누락, 위험한 backfill(NOT NULL+default), 인덱스 누락 등. **라이브 DB에는 절대 접속하지 않는다.**
+- **리뷰어 read-only 자기보존:** `lib/impact-review/*`·`scripts/impact-review.ts`·워크플로 자체가 Supabase/DB 연결·`.env.local` source·migration/seed 실행 코드를 넣으면 안 된다(러너는 파일 read 전용).
 
-모델은 결정적 finding을 제거/강등할 수 없다. 회귀·교차파일 영향만 검토하고, 스타일-온리 지적은 금지. JSON만 반환.
+## Model guidance (LLM 레인용)
+
+모델은 결정적 finding을 제거/강등할 수 없다. 위 convention + 회귀·교차파일·아키텍처 영향을 검토하고, 스타일-온리 지적은 금지. JSON만 반환.
 
 ```yaml impact-review-rules
 version: 1
@@ -120,46 +124,4 @@ rules:
       # shared-ui-contract: ExamInfoForm/QuestionsList/CaseQuestionGenerator 컴포넌트-온리 변경은
       #   review context/blast-radius 입력일 뿐, 거울 Critical 억제자가 아님.
 
-  - id: QIDX-DEEP-LINKS
-    kind: pattern
-    severity: Warning
-    anyPath: ["app/", "lib/", "components/"]
-    signals:
-      - "questions\\[\\s*\\d+\\s*\\]"
-      - "\\.questions\\[idx\\]"
-      - "deepLink"
-      - "qIdx"
-    message: "딥링크/채점 선택이 배열 위치를 가정할 수 있습니다. 명시적 qIdx 또는 idx ?? pos 규약을 확인하세요."
-
-  - id: OBJECTIVE-SCORING-RAW-ANSWERS
-    kind: pattern
-    severity: Warning
-    anyPath: ["app/api/", "lib/"]
-    signals:
-      - "ai_summary"
-      - "grade_type"
-    message: "MCQ/OX 채점은 raw 선택답 + correctOptionIndex만 사용해야 합니다. AI grade row/ai_summary placeholder 혼입 금지."
-
-  - id: SCORE-WEIGHT-SYNC
-    kind: pattern
-    severity: Warning
-    anyPath: ["app/", "lib/"]
-    signals:
-      - "score_weights"
-      - "scoreWeights"
-      - "buildDefaultScoreWeightsForQuestionTypes"
-      - "validateScoreWeightsForQuestions"
-    message: "문항 유형 변경 시 score_weights를 재동기화해야 합니다. stale weight를 남기지 마세요."
-
-  - id: DB-SAFETY-READ-ONLY
-    kind: pattern
-    severity: Critical
-    anyPath: ["lib/impact-review/", "scripts/impact-review.ts", ".github/workflows/impact-review.yml"]
-    signals:
-      - "getSupabaseServer"
-      - "SUPABASE_SERVICE_ROLE_KEY"
-      - "createClient\\("
-      - "\\.env\\.local"
-      - "prisma"
-    message: "Impact-review는 read-only여야 합니다. Supabase/DB/마이그레이션/.env.local 접근 코드가 러너에 들어가면 안 됩니다."
 ```

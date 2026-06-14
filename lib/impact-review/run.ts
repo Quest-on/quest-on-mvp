@@ -30,8 +30,6 @@ export interface RunReviewOptions {
   provider?: "none" | "auto" | "agent-cli" | "opencode";
   modelOptions?: ReviewModelOptions;
   agentOptions?: AgentCliOptions;
-  /** importer/caller 정적 스캔 (러너 환경에서만 true). */
-  scanBlastRadius?: boolean;
   /** 모델에 보낼 최대 변경 파일 수 / 변경 라인 수 (초과 시 모델 skip). */
   maxModelFiles?: number;
   maxModelLines?: number;
@@ -62,11 +60,9 @@ export async function runReview(opts: RunReviewOptions): Promise<ReviewResult> {
   // 3) 결정적 prechecks (모델 호출 전, 최종).
   const deterministic = runPrechecks(files, catalog);
 
-  // 4) 심볼 + blast radius.
+  // 4) 심볼 + blast radius(거울 seed). importer 추적은 AI 에이전트가 직접 grep.
   const symbols = extractChangedSymbols(files);
-  const blastRadius = computeBlastRadius(files, symbols, catalog, {
-    scan: opts.scanBlastRadius ?? false,
-  });
+  const blastRadius = computeBlastRadius(files, catalog);
 
   // 5) 모델 2차 리뷰.
   const mode = opts.provider ?? "auto";
