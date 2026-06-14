@@ -138,8 +138,6 @@ rules:
     signals:
       - "ai_summary"
       - "grade_type"
-      - "correctOptionIndex"
-      - "selectedAnswer"
     message: "MCQ/OX 채점은 raw 선택답 + correctOptionIndex만 사용해야 합니다. AI grade row/ai_summary placeholder 혼입 금지."
 
   - id: SCORE-WEIGHT-SYNC

@@ -21,6 +21,7 @@ export function extractChangedSymbols(files: DiffFile[]): ChangedSymbol[] {
       let m: RegExpExecArray | null;
       while ((m = re.exec(f.changedText))) {
         const name = m[1];
+        if (!isMeaningfulSymbol(name)) continue;
         const key = `${f.path}:${name}`;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -29,4 +30,18 @@ export function extractChangedSymbols(files: DiffFile[]): ChangedSymbol[] {
     }
   }
   return out;
+}
+
+/** importer/caller 스캔 노이즈를 막기 위해 너무 흔하거나 짧은 식별자는 제외. */
+const COMMON_NAMES = new Set([
+  "all", "client", "read", "get", "set", "run", "main", "data", "res", "req",
+  "ctx", "err", "error", "value", "result", "item", "items", "list", "map",
+  "name", "type", "props", "state", "config", "options", "handler", "callback",
+  "next", "prev", "index", "args", "params", "body", "headers", "supabase",
+]);
+
+function isMeaningfulSymbol(name: string): boolean {
+  if (name.length < 4) return false;
+  if (COMMON_NAMES.has(name)) return false;
+  return true;
 }

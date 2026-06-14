@@ -102,7 +102,9 @@ function checkPattern(rule: PatternRule, files: DiffFile[]): DeterministicFindin
   const regexes = rule.signals.map((s) => safeRegex(s));
   for (const f of files) {
     if (!prefixes.some((p) => f.path.startsWith(p))) continue;
-    const hit = regexes.some((re) => re.test(f.changedText));
+    // 주석/문서 텍스트의 단순 언급은 패턴 발화에서 제외(오탐 방지).
+    const codeText = stripComments(f.changedText);
+    const hit = regexes.some((re) => re.test(codeText));
     if (hit) {
       out.push({
         source: "deterministic",
@@ -124,6 +126,16 @@ function safeRegex(src: string): RegExp {
     // 정규식이 깨지면 리터럴로 escape 후 매칭.
     return new RegExp(src.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   }
+}
+
+/** 라인/블록 주석을 제거해 패턴 룰이 코드가 아닌 문서 텍스트에 오발화하지 않게 한다. */
+function stripComments(text: string): string {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .split("\n")
+    .map((line) => line.replace(/\/\/.*$/, ""))
+    .filter((line) => !/^\s*[*#]/.test(line))
+    .join("\n");
 }
 
 export function _isRule(x: unknown): x is Rule {

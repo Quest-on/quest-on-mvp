@@ -271,3 +271,57 @@ describe("model output parsing", () => {
     expect(parseModelFindings("not json")).toEqual([]);
   });
 });
+
+describe("false-positive hardening (from live run)", () => {
+  const patternIds = (f: Finding[]) => f.flatMap((x) => x.ruleIds);
+
+  it("DB-SAFETY does NOT fire on a comment-only mention of .env.local", async () => {
+    const diff = [
+      "diff --git a/lib/impact-review/foo.ts b/lib/impact-review/foo.ts",
+      "--- a/lib/impact-review/foo.ts",
+      "+++ b/lib/impact-review/foo.ts",
+      "@@ -1,0 +1,2 @@",
+      "+// read-only: no Supabase / .env.local / prisma access here",
+      "+export const ok = true;",
+    ].join("\n");
+    const r = await review(diff);
+    expect(patternIds(r.deterministicFindings)).not.toContain("DB-SAFETY-READ-ONLY");
+  });
+
+  it("DB-SAFETY DOES fire on real createClient code in a reviewer file", async () => {
+    const diff = [
+      "diff --git a/lib/impact-review/foo.ts b/lib/impact-review/foo.ts",
+      "--- a/lib/impact-review/foo.ts",
+      "+++ b/lib/impact-review/foo.ts",
+      "@@ -1,0 +1,1 @@",
+      "+const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, key);",
+    ].join("\n");
+    const r = await review(diff);
+    expect(patternIds(r.deterministicFindings)).toContain("DB-SAFETY-READ-ONLY");
+  });
+
+  it("OBJECTIVE-SCORING does NOT fire on bare correctOptionIndex (too broad signal removed)", async () => {
+    const diff = [
+      "diff --git a/lib/x.ts b/lib/x.ts",
+      "--- a/lib/x.ts",
+      "+++ b/lib/x.ts",
+      "@@ -1,0 +1,1 @@",
+      "+const ok = q.correctOptionIndex === idx;",
+    ].join("\n");
+    const r = await review(diff);
+    expect(patternIds(r.deterministicFindings)).not.toContain("OBJECTIVE-SCORING-RAW-ANSWERS");
+  });
+
+  it("skips the model when the diff exceeds the size cap (deterministic still runs)", async () => {
+    const r = await runReview({
+      diffText: FX("mixed-exam-new-plus-unrelated-grade-utils.diff"),
+      catalog,
+      provider: "opencode",
+      maxModelFiles: 1, // 2-file fixture exceeds → skip model
+      agentOptions: { command: "opencode", runner: async () => ({ stdout: "{}", stderr: "", code: 0 }) },
+    });
+    expect(r.provider.skipped).toBe(true);
+    expect(r.provider.skippedReason).toMatch(/too large/);
+    expect(criticalRuleIds(r.deterministicFindings)).toContain("MIRROR-EXAM-AUTHORING-FORMS");
+  });
+});

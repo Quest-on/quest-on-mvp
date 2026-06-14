@@ -28,6 +28,9 @@ export interface RunReviewOptions {
   agentOptions?: AgentCliOptions;
   /** importer/caller 정적 스캔 (러너 환경에서만 true). */
   scanBlastRadius?: boolean;
+  /** 모델에 보낼 최대 변경 파일 수 / 변경 라인 수 (초과 시 모델 skip). */
+  maxModelFiles?: number;
+  maxModelLines?: number;
 }
 
 export async function runReview(opts: RunReviewOptions): Promise<ReviewResult> {
@@ -72,6 +75,15 @@ export async function runReview(opts: RunReviewOptions): Promise<ReviewResult> {
     blast_radius: blastRadius,
     confidence_threshold: threshold,
   };
+  // 거대 diff는 모델에 보내지 않는다(프롬프트 폭발/E2BIG/비용 방지). 결정적 레이어는 그대로 동작.
+  const maxFiles = opts.maxModelFiles ?? 60;
+  const totalChangedLines = files.reduce(
+    (n, f) => n + f.hunks.reduce((h, hk) => h + hk.changedText.split("\n").length, 0),
+    0
+  );
+  const maxLines = opts.maxModelLines ?? 4000;
+  const tooLarge = files.length > maxFiles || totalChangedLines > maxLines;
+
   let provider;
   if (mode === "none") {
     provider = {
@@ -79,6 +91,14 @@ export async function runReview(opts: RunReviewOptions): Promise<ReviewResult> {
       model: null,
       skipped: true,
       skippedReason: "provider=none",
+      findings: [],
+    };
+  } else if (tooLarge) {
+    provider = {
+      provider: "none" as const,
+      model: null,
+      skipped: true,
+      skippedReason: `diff too large for model review (${files.length} files, ~${totalChangedLines} changed lines)`,
       findings: [],
     };
   } else if (mode === "agent-cli" || mode === "opencode") {
