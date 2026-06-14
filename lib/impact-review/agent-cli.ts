@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import type { ProviderResult } from "./types";
-import { SYSTEM_PROMPT, parseModelFindings } from "./model";
+import { parseModelFindings } from "./model";
 import { redactForLog } from "./redact";
 
 /**
@@ -34,11 +34,26 @@ export interface AgentCliOptions {
   runner?: AgentRunner;
 }
 
+/**
+ * 에이전트 탐색 프롬프트. diff를 통째로 stuffing하지 않고, 변경 요약(brief)을 주고
+ * opencode가 레포를 *직접 읽어가며* blast radius/회귀 위험을 조사하게 한다.
+ */
+const AGENT_SYSTEM_PROMPT =
+  "You are a change-impact code reviewer operating INSIDE this repository's working tree. " +
+  "You can read any file with your tools. Investigate regression and cross-file impact of the change " +
+  "described below: read the changed files, their importers/callers (see blast_radius), mirror siblings, " +
+  "shared modules, and affected tests as needed. " +
+  "Report ONLY net-new regression or cross-file risks that the deterministic layer has NOT already reported " +
+  "(do not repeat entries in deterministic_findings). Do NOT modify any file — read-only review. " +
+  "Do NOT report style-only issues. " +
+  'When done, output ONLY a JSON object on its own line: {"findings":[{"severity":"Critical|Warning|Suggestion",' +
+  '"confidence":0-100,"message":string,"location":{"path":string,"line":number?},"ruleIds":string[]?,"evidence":string[]?}]}';
+
 export function buildAgentPrompt(promptInput: unknown): string {
   return (
-    `${SYSTEM_PROMPT}\n\n` +
-    `REVIEW PACKET (JSON):\n${JSON.stringify(promptInput)}\n\n` +
-    `Return ONLY the JSON object described above. No prose, no code fences.`
+    `${AGENT_SYSTEM_PROMPT}\n\n` +
+    `CHANGE BRIEF (JSON):\n${JSON.stringify(promptInput)}\n\n` +
+    `Explore the repository as needed, then return ONLY the JSON object. No prose, no code fences.`
   );
 }
 
@@ -51,7 +66,7 @@ export async function reviewWithAgentCli(
   const prompt = buildAgentPrompt(promptInput);
   const runner =
     opts.runner ??
-    defaultSpawnRunner(command, opts.subcommand ?? ["run"], model, opts.timeoutMs ?? 120_000);
+    defaultSpawnRunner(command, opts.subcommand ?? ["run"], model, opts.timeoutMs ?? 600_000);
 
   try {
     const { stdout, code } = await runner(prompt);

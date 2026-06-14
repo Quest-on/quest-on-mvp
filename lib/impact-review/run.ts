@@ -75,14 +75,18 @@ export async function runReview(opts: RunReviewOptions): Promise<ReviewResult> {
     blast_radius: blastRadius,
     confidence_threshold: threshold,
   };
-  // 거대 diff는 모델에 보내지 않는다(프롬프트 폭발/E2BIG/비용 방지). 결정적 레이어는 그대로 동작.
+  const isAgent = mode === "agent-cli" || mode === "opencode";
+
+  // raw-API 모델은 파일을 못 읽으므로 거대 diff는 skip(프롬프트 폭발/비용 방지).
+  // 에이전트(opencode) 경로는 *brief만 주입*하고 레포를 직접 읽으므로 캡을 적용하지 않는다.
   const maxFiles = opts.maxModelFiles ?? 60;
   const totalChangedLines = files.reduce(
     (n, f) => n + f.hunks.reduce((h, hk) => h + hk.changedText.split("\n").length, 0),
     0
   );
   const maxLines = opts.maxModelLines ?? 4000;
-  const tooLarge = files.length > maxFiles || totalChangedLines > maxLines;
+  const tooLargeForRawApi =
+    !isAgent && (files.length > maxFiles || totalChangedLines > maxLines);
 
   let provider;
   if (mode === "none") {
@@ -93,16 +97,16 @@ export async function runReview(opts: RunReviewOptions): Promise<ReviewResult> {
       skippedReason: "provider=none",
       findings: [],
     };
-  } else if (tooLarge) {
+  } else if (tooLargeForRawApi) {
     provider = {
       provider: "none" as const,
       model: null,
       skipped: true,
-      skippedReason: `diff too large for model review (${files.length} files, ~${totalChangedLines} changed lines)`,
+      skippedReason: `diff too large for raw-API model review (${files.length} files, ~${totalChangedLines} changed lines); use provider=opencode for agentic review`,
       findings: [],
     };
-  } else if (mode === "agent-cli" || mode === "opencode") {
-    // coding 구독 키: 화이트리스트 CLI(opencode) 헤드리스 경유.
+  } else if (isAgent) {
+    // coding 구독 키: 화이트리스트 CLI(opencode) 헤드리스 에이전트가 레포를 직접 탐색.
     provider = await reviewWithAgentCli(packet, opts.agentOptions);
   } else {
     provider = await reviewWithModel(packet, opts.modelOptions);

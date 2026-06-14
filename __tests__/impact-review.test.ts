@@ -312,16 +312,36 @@ describe("false-positive hardening (from live run)", () => {
     expect(patternIds(r.deterministicFindings)).not.toContain("OBJECTIVE-SCORING-RAW-ANSWERS");
   });
 
-  it("skips the model when the diff exceeds the size cap (deterministic still runs)", async () => {
+  it("raw-API model is skipped when the diff exceeds the size cap (deterministic still runs)", async () => {
+    const r = await runReview({
+      diffText: FX("mixed-exam-new-plus-unrelated-grade-utils.diff"),
+      catalog,
+      provider: "auto",
+      maxModelFiles: 1, // 2-file fixture exceeds → raw-API skip
+      modelOptions: { providers: [] },
+    });
+    expect(r.provider.skipped).toBe(true);
+    expect(r.provider.skippedReason).toMatch(/too large/);
+    expect(criticalRuleIds(r.deterministicFindings)).toContain("MIRROR-EXAM-AUTHORING-FORMS");
+  });
+
+  it("agent (opencode) path is NOT size-capped — it explores the repo itself", async () => {
     const r = await runReview({
       diffText: FX("mixed-exam-new-plus-unrelated-grade-utils.diff"),
       catalog,
       provider: "opencode",
-      maxModelFiles: 1, // 2-file fixture exceeds → skip model
-      agentOptions: { command: "opencode", runner: async () => ({ stdout: "{}", stderr: "", code: 0 }) },
+      maxModelFiles: 1, // would cap raw-API, but agent path ignores it
+      agentOptions: {
+        command: "opencode",
+        runner: async () => ({
+          stdout: '{"findings":[{"severity":"Suggestion","confidence":90,"message":"nit"}]}',
+          stderr: "",
+          code: 0,
+        }),
+      },
     });
-    expect(r.provider.skipped).toBe(true);
-    expect(r.provider.skippedReason).toMatch(/too large/);
+    expect(r.provider.skipped).toBe(false);
+    expect(r.provider.provider).toBe("opencode");
     expect(criticalRuleIds(r.deterministicFindings)).toContain("MIRROR-EXAM-AUTHORING-FORMS");
   });
 });

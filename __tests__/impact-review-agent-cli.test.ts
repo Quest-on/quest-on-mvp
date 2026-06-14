@@ -24,11 +24,12 @@ const ok =
   async () => ({ stdout, stderr: "", code: 0 });
 
 describe("buildAgentPrompt", () => {
-  it("embeds the packet and demands JSON-only output", () => {
+  it("embeds the change brief and invites repo exploration + JSON-only output", () => {
     const p = buildAgentPrompt({ hello: "world" });
-    expect(p).toContain("REVIEW PACKET");
+    expect(p).toContain("CHANGE BRIEF");
     expect(p).toContain('"hello":"world"');
-    expect(p).toMatch(/Return ONLY the JSON object/);
+    expect(p).toMatch(/Explore the repository/i);
+    expect(p).toMatch(/return ONLY the JSON object/i);
   });
 });
 
