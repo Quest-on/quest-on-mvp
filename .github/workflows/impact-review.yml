@@ -35,17 +35,6 @@ jobs:
       # 그래서 모델 2차 리뷰는 opencode 헤드리스를 경유한다(.github/impact-review/opencode.json).
       - name: Install opencode (whitelisted coding agent)
         run: npm install -g opencode-ai
-      # [TEMP smoke test] opencode→GLM coding plan 라이브 경로 검증 (작은 fixture, job 안 깨짐).
-      - name: opencode smoke test (GLM coding plan model path)
-        run: |
-          echo "::group::opencode smoke"
-          npm run impact-review -- --diff-file __tests__/fixtures/impact-review/mirror-only-exam-new.diff --provider opencode --no-post || true
-          echo "::endgroup::"
-        env:
-          OPENCODE_CONFIG: ${{ github.workspace }}/.github/impact-review/opencode.json
-          ZAI_CODING_API_KEY: ${{ secrets.ZAI_CODING_API_KEY }}
-          IMPACT_REVIEW_PROVIDER: opencode
-          IMPACT_REVIEW_AGENT_MODEL: zai-coding/glm-4.7
       - name: Run impact review (opencode / GLM Coding Plan)
         run: npm run impact-review -- --event github --post-github-comment --ci --provider opencode --threshold 80
         env:
