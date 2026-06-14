@@ -1,0 +1,9 @@
+diff --git a/app/(app)/instructor/[examId]/grade/[studentId]/page.tsx b/app/(app)/instructor/[examId]/grade/[studentId]/page.tsx
+--- a/app/(app)/instructor/[examId]/grade/[studentId]/page.tsx
++++ b/app/(app)/instructor/[examId]/grade/[studentId]/page.tsx
+@@ -120,4 +120,4 @@ export default function GradeStudent() {
+   // deep-link: 채점 화면에서 특정 문항으로 점프 (?q= 파라미터)
+   const targetQ = searchParams.get("q");
+-  const question = questions.find((q) => q.idx === Number(targetQ));
++  const question = questions[Number(targetQ)];
+   setActiveQuestion(question);
