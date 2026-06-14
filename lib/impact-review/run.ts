@@ -156,7 +156,7 @@ async function runAgentLanes(
       lane === "architecture"
         ? res.findings.map((f) => ({
             ...f,
-            ruleIds: ["ARCHITECTURE", ...f.ruleIds],
+            ruleIds: [...new Set(["ARCHITECTURE", ...f.ruleIds])],
           }))
         : res.findings;
     allFindings.push(...tagged);

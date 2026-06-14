@@ -43,5 +43,5 @@ jobs:
           OPENCODE_CONFIG: ${{ github.workspace }}/.github/impact-review/opencode.json
           ZAI_CODING_API_KEY: ${{ secrets.ZAI_CODING_API_KEY }}
           IMPACT_REVIEW_PROVIDER: opencode
-          IMPACT_REVIEW_AGENT_MODEL: zai-coding/glm-5.1 # 최신 플래그십은 glm-5.2(1M ctx)로 스왑 가능
+          IMPACT_REVIEW_AGENT_MODEL: zai-coding/glm-5.2 # 최신 플래그십(1M ctx 변형은 glm-5.2[1m])
           # 키/opencode 미가용 시 자동으로 결정적-only로 떨어지고, 결정적 Critical은 그대로 job 실패시킴.
