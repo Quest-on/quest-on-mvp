@@ -60,3 +60,10 @@
 - 테스트/CI 보정 중에도 `.env.local`의 `DATABASE_URL` 또는 Supabase 키를 source해서 실행하지 않는다. DB URL이 로컬 테스트 DB인지 사용자가 확인해주기 전에는 어떤 schema/data 명령도 금지한다.
 - `e2e/helpers/seed.ts::cleanupTestData()`는 `exam_nodes`, `exams` 전체 row를 지울 수 있으므로 절대 수동 실행하지 않는다. 이 helper를 import하는 Playwright/API/E2E 테스트도 DB-backed로 간주하고, `docs/CODEX_DB_SAFETY.md`의 preflight 없이 실행하지 않는다.
 - Codex 세션에서 검증 계획을 세울 때 DB-backed 테스트는 기본 제외한다. 허용 기본값은 `npx tsc --noEmit`, `npm run lint`, DB helper를 import하지 않는 pure Vitest, `git diff --check`뿐이다.
+
+## 2026-06-14 — Change-impact 리뷰 & 코딩 구독 키
+
+- 한쪽 구현만 고치고 거울 짝(예: instructor new↔edit, assignment new↔edit)을 안 고치는 drift는 **복붙이라 import edge가 없어** 의존성 그래프로 못 잡는다. 결정적 가드는 `.github/impact-review/rules.md`(거울 쌍·watch·same-dimension 면제) + `__tests__/mirror-drift.test.ts`(공용 헬퍼 import 강제) + `lib/impact-review/prechecks.ts`(모델 호출 전 non-vetoable Critical)로 둔다. 면제는 same-dimension 공용 헬퍼 hunk일 때만(broad 토큰 1개로 오면제 금지).
+- **"for coding" 구독 키(Kimi for Coding, GLM Coding Plan)는 raw API(SDK/curl/CI 스크립트)로 못 쓴다.** 엔드포인트가 클라이언트 화이트리스트(Claude Code/opencode/Cline/Kimi CLI 등)를 강제하고 비대화형 배치 호출을 금지한다. User-Agent 위조는 계정 정지 사유 → 금지.
+- 구독 키를 합법적으로 쓰려면 **화이트리스트 코딩 CLI를 헤드리스로 경유**한다(여기선 GLM Coding Plan + `opencode run`, `.github/impact-review/opencode.json` + `OPENCODE_CONFIG`). raw API가 필요하면 *일반 종량제* 키(`api.moonshot.ai/v1` / `api.z.ai/api/paas/v4`)를 따로 발급해야 한다. coding 엔드포인트는 `.../coding/...` 경로로 구분된다.
+- coding 구독은 인터랙티브 quota와 같은 통을 쓰므로 CI 자동 실행은 quota를 잠식하고 ToS 회색지대다. opencode→coding 엔드포인트 *라이브* 호출은 사용자 CI에서만 검증 가능(샌드박스 미검증). 정적 검증은 faked-runner 단위테스트로 커버한다.

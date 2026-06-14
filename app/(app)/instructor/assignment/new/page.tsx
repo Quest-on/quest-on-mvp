@@ -26,10 +26,7 @@ import {
   ScrollProgressProvider,
   ScrollProgress,
 } from "@/components/animate-ui/primitives/animate/scroll-progress";
-
-function isQuestionContentEmpty(text: string): boolean {
-  return text.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() === "";
-}
+import { isQuestionContentEmpty } from "@/lib/authoring-validation";
 
 export default function CreateAssignment() {
   const router = useRouter();

@@ -48,22 +48,10 @@ import {
   validateScoreWeightsForQuestions,
   type ScoreWeights,
 } from "@/lib/grade-utils";
-
-function isQuestionContentEmpty(text: string): boolean {
-  return text.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() === "";
-}
-
-/** 객관식/OX 문제의 선택지·정답이 덜 채워졌는지 검사한다. */
-function isObjectiveQuestionIncomplete(q: Question): boolean {
-  if (q.type !== "multiple-choice" && q.type !== "true-false") return false;
-  if (typeof q.correctOptionIndex !== "number") return true;
-  if (q.type === "multiple-choice") {
-    const opts = q.options ?? [];
-    if (opts.length < 4) return true;
-    return opts.slice(0, 4).some((o) => o.trim() === "");
-  }
-  return false;
-}
+import {
+  isObjectiveQuestionIncomplete,
+  isQuestionContentEmpty,
+} from "@/lib/authoring-validation";
 
 export default function CreateExam() {
   const router = useRouter();

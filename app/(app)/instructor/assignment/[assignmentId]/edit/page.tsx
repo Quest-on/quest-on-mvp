@@ -14,10 +14,7 @@ import { QuestionsList } from "@/components/instructor/QuestionsList";
 import type { Question } from "@/components/instructor/QuestionEditor";
 import { CaseQuestionGenerator } from "@/components/instructor/CaseQuestionGenerator";
 import { isoToKSTDateString } from "@/lib/date-utils";
-
-function isQuestionContentEmpty(text: string): boolean {
-  return text.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() === "";
-}
+import { isQuestionContentEmpty } from "@/lib/authoring-validation";
 
 export default function EditAssignment({
   params,
