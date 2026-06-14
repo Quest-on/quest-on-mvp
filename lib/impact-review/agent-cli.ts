@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { writeFileSync, unlinkSync } from "node:fs";
+import path from "node:path";
 import type { ProviderResult } from "./types";
 import { parseModelFindings } from "./model";
 import { redactForLog } from "./redact";
@@ -57,24 +59,62 @@ export function buildAgentPrompt(promptInput: unknown): string {
   );
 }
 
+export function buildAgentFilePrompt(briefRelPath: string): string {
+  return (
+    `${AGENT_SYSTEM_PROMPT}\n\n` +
+    `The CHANGE BRIEF (JSON) is in this repository at \`${briefRelPath}\`. ` +
+    `Read that file first, then explore the repository (changed files, importers in blast_radius, ` +
+    `mirror siblings, shared modules, tests) as needed, and return ONLY the JSON object. No prose, no code fences.`
+  );
+}
+
 export async function reviewWithAgentCli(
   promptInput: unknown,
   opts: AgentCliOptions = {}
 ): Promise<ProviderResult> {
   const command = opts.command || process.env.IMPACT_REVIEW_AGENT_CMD || "opencode";
   const model = opts.model || process.env.IMPACT_REVIEW_AGENT_MODEL || null;
-  const prompt = buildAgentPrompt(promptInput);
-  const runner =
-    opts.runner ??
-    defaultSpawnRunner(command, opts.subcommand ?? ["run"], model, opts.timeoutMs ?? 600_000);
 
+  // 테스트(주입 runner)에서는 brief를 inline 프롬프트로(argv 한도 신경 안 씀).
+  if (opts.runner) {
+    return runAndParse(opts.runner, buildAgentPrompt(promptInput), command, model);
+  }
+
+  // 실제 실행: brief를 레포 임시파일로 쓰고, opencode에는 그 파일을 읽으라는 *작은* 프롬프트만 전달.
+  // (Linux argv 단일 인자 한도 128KB(MAX_ARG_STRLEN) 회피 — 큰 변경에서도 안전.)
+  const briefRel = `.impact-review-brief.${process.pid}.json`;
+  const briefAbs = path.join(process.cwd(), briefRel);
+  const runner = defaultSpawnRunner(
+    command,
+    opts.subcommand ?? ["run"],
+    model,
+    opts.timeoutMs ?? 600_000
+  );
+  try {
+    writeFileSync(briefAbs, JSON.stringify(promptInput));
+    return await runAndParse(runner, buildAgentFilePrompt(briefRel), command, model);
+  } catch (err) {
+    console.error(`[impact-review] agent-cli (${command}) failed: ${redactForLog(err)}`);
+    return skipped(command, model, "agent-cli error");
+  } finally {
+    try {
+      unlinkSync(briefAbs);
+    } catch {
+      /* best-effort cleanup */
+    }
+  }
+}
+
+async function runAndParse(
+  runner: AgentRunner,
+  prompt: string,
+  command: string,
+  model: string | null
+): Promise<ProviderResult> {
   try {
     const { stdout, code } = await runner(prompt);
-    if (code !== 0) {
-      return skipped(command, model, `agent exited ${code}`);
-    }
-    const findings = parseModelFindings(stdout);
-    return { provider: command, model, skipped: false, findings };
+    if (code !== 0) return skipped(command, model, `agent exited ${code}`);
+    return { provider: command, model, skipped: false, findings: parseModelFindings(stdout) };
   } catch (err) {
     console.error(`[impact-review] agent-cli (${command}) failed: ${redactForLog(err)}`);
     return skipped(command, model, "agent-cli error");
