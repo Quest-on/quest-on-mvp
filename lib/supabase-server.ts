@@ -1,3 +1,4 @@
+import { assertSupabaseTarget } from "@/lib/env-target";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -27,6 +28,13 @@ export function getSupabaseServer(): SupabaseClient {
       "Missing Supabase server environment variables (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)"
     );
   }
+
+  assertSupabaseTarget({
+    url: supabaseUrl,
+    serviceRoleKey: supabaseServiceRoleKey,
+    databaseUrl: process.env.DATABASE_URL,
+    context: "server",
+  });
 
   return createClient(supabaseUrl, supabaseServiceRoleKey);
 }

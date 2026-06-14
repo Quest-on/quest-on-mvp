@@ -1,0 +1,6 @@
+# Code owners — main 브랜치 보호의 "리드 승인 필수"를 기계화한다.
+# branch protection 의 "Require review from Code Owners" 와 함께 동작한다.
+#
+# ⚠️ 실제 리드의 GitHub handle 로 교체하세요. 현재는 repo owner(jcmaker)를 기본값으로 둡니다.
+# 비리드 팀원이 여기에 포함되면 안 됩니다(리드 승인 게이트가 무력화됨).
+* @jcmaker

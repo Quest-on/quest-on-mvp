@@ -59,3 +59,44 @@ next-env.d.ts
 *.sql
 # SQL files in database directory (can be committed if needed)
 !database/*.sql
+
+# ---- agent / tooling state (machine-local, not project code) ----
+.omc/
+.agents/skills/
+.claude/skills/animejs
+.claude/skills/contribute-catalog
+.claude/skills/css-animations
+.claude/skills/gsap
+.claude/skills/hyperframes
+.claude/skills/hyperframes-cli
+.claude/skills/hyperframes-media
+.claude/skills/hyperframes-registry
+.claude/skills/lottie
+.claude/skills/remotion-to-hyperframes
+.claude/skills/tailwind
+.claude/skills/three
+.claude/skills/waapi
+.claude/skills/website-to-hyperframes
+skills-lock.json
+
+# ---- remotion video subproject: deps, rendered output, media, tooling ----
+marketing/video/remotion/node_modules/
+marketing/video/remotion/out/
+marketing/video/remotion/public/
+marketing/video/remotion/.cache/
+marketing/video/remotion/.agents/
+marketing/video/remotion/.claude/
+marketing/video/remotion/.factory/
+marketing/video/remotion/.kiro/
+marketing/video/remotion/.omx/
+
+# ---- demo-video: rendered output + media assets + fonts (code/docs only) ----
+marketing/video/demo-video/renders/
+marketing/video/demo-video/assets/
+marketing/video/demo-video/fonts/
+
+# ---- brochure: build deps (regenerated via npm install) ----
+brochure/node_modules/
+
+# GJC 워크플로 상태/플랜 (제품 리포에 미포함)
+.gjc/
