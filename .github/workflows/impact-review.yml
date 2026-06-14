@@ -34,7 +34,7 @@ jobs:
       # 코딩 구독(GLM Coding Plan)은 raw API를 거부하고 화이트리스트 코딩 CLI에서만 동작.
       # 그래서 모델 2차 리뷰는 opencode 헤드리스를 경유한다(.github/impact-review/opencode.json).
       - name: Install opencode (whitelisted coding agent)
-        run: npm install -g opencode-ai
+        run: npm install -g opencode-ai@1.17.6 # 핀 고정(재현성; DEPENDENCY_POLICY 준수)
       - name: Run impact review (opencode / GLM Coding Plan)
         run: npm run impact-review -- --event github --post-github-comment --ci --provider opencode --threshold 80
         env:
