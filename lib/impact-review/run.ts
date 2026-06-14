@@ -4,9 +4,13 @@ import { runPrechecks } from "./prechecks";
 import { extractChangedSymbols } from "./symbols";
 import { computeBlastRadius } from "./blast-radius";
 import { reviewWithModel, type ReviewModelOptions } from "./model";
-import { reviewWithAgentCli, type AgentCliOptions } from "./agent-cli";
+import {
+  reviewWithAgentCli,
+  ARCH_SYSTEM_PROMPT,
+  type AgentCliOptions,
+} from "./agent-cli";
 import { mergeFindings, computeShouldFail } from "./findings";
-import type { ReviewExitPolicy, ReviewResult, RuleCatalog } from "./types";
+import type { ModelFinding, ProviderResult, ReviewExitPolicy, ReviewResult, RuleCatalog } from "./types";
 
 export interface RunReviewOptions {
   /** diff 텍스트 직접 주입 (테스트/`--diff-file`). 우선순위 최상. */
@@ -31,6 +35,8 @@ export interface RunReviewOptions {
   /** 모델에 보낼 최대 변경 파일 수 / 변경 라인 수 (초과 시 모델 skip). */
   maxModelFiles?: number;
   maxModelLines?: number;
+  /** agent 모드 리뷰 레인. 기본 ["regression","architecture"]. */
+  lanes?: Array<"regression" | "architecture">;
 }
 
 export async function runReview(opts: RunReviewOptions): Promise<ReviewResult> {
@@ -107,7 +113,9 @@ export async function runReview(opts: RunReviewOptions): Promise<ReviewResult> {
     };
   } else if (isAgent) {
     // coding 구독 키: 화이트리스트 CLI(opencode) 헤드리스 에이전트가 레포를 직접 탐색.
-    provider = await reviewWithAgentCli(packet, opts.agentOptions);
+    // 두 레인을 돌린다: regression(국소 회귀/cross-file) + architecture(큰 방향성).
+    const lanes = opts.lanes ?? ["regression", "architecture"];
+    provider = await runAgentLanes(packet, lanes, opts.agentOptions);
   } else {
     provider = await reviewWithModel(packet, opts.modelOptions);
   }
@@ -125,5 +133,40 @@ export async function runReview(opts: RunReviewOptions): Promise<ReviewResult> {
     provider,
     findings,
     shouldFail,
+  };
+}
+
+/**
+ * agent 리뷰 레인을 순차 실행해 하나의 ProviderResult로 병합한다.
+ * - regression: 국소 회귀/cross-file 위험.
+ * - architecture: 큰 방향성(아키텍처/경계/중복/단순화). 결과는 ruleId "ARCHITECTURE"로 태깅.
+ */
+async function runAgentLanes(
+  packet: unknown,
+  lanes: Array<"regression" | "architecture">,
+  agentOptions?: AgentCliOptions
+): Promise<ProviderResult> {
+  const results: ProviderResult[] = [];
+  const allFindings: ModelFinding[] = [];
+  for (const lane of lanes) {
+    const systemPrompt = lane === "architecture" ? ARCH_SYSTEM_PROMPT : undefined;
+    const res = await reviewWithAgentCli(packet, { ...agentOptions, systemPrompt });
+    results.push(res);
+    const tagged =
+      lane === "architecture"
+        ? res.findings.map((f) => ({
+            ...f,
+            ruleIds: ["ARCHITECTURE", ...f.ruleIds],
+          }))
+        : res.findings;
+    allFindings.push(...tagged);
+  }
+  const ran = results.find((r) => !r.skipped);
+  return {
+    provider: results[0]?.provider ?? "opencode",
+    model: ran?.model ?? results[0]?.model ?? null,
+    skipped: !ran,
+    skippedReason: ran ? undefined : results[0]?.skippedReason,
+    findings: allFindings,
   };
 }

@@ -91,4 +91,32 @@ describe("runReview via provider=opencode", () => {
     expect(criticalRuleIds(r.deterministicFindings)).toContain("MIRROR-EXAM-AUTHORING-FORMS");
     expect(r.shouldFail).toBe(true);
   });
+
+  it("runs regression + architecture lanes and tags architecture findings", async () => {
+    const laneRunner: AgentRunner = async (prompt) =>
+      /ARCHITECT/i.test(prompt)
+        ? {
+            stdout: '{"findings":[{"severity":"Warning","confidence":85,"message":"arch concern"}]}',
+            stderr: "",
+            code: 0,
+          }
+        : {
+            stdout: '{"findings":[{"severity":"Suggestion","confidence":85,"message":"regression nit"}]}',
+            stderr: "",
+            code: 0,
+          };
+    const r = await runReview({
+      diffText: FX("mirror-only-exam-new.diff"),
+      catalog,
+      provider: "opencode",
+      agentOptions: { command: "opencode", runner: laneRunner },
+    });
+    const model = r.provider.findings;
+    const arch = model.find((f) => f.message === "arch concern");
+    const reg = model.find((f) => f.message === "regression nit");
+    expect(arch).toBeTruthy();
+    expect(arch!.ruleIds).toContain("ARCHITECTURE");
+    expect(reg).toBeTruthy();
+    expect(reg!.ruleIds).not.toContain("ARCHITECTURE");
+  });
 });

@@ -14,7 +14,9 @@ const ICON: Record<string, string> = { Critical: "🔴", Warning: "🟡", Sugges
 export function formatComment(result: ReviewResult, event: "pr" | "push"): string {
   const visible = visibleFindings(result.findings);
   const det = visible.filter((f) => f.source === "deterministic");
-  const model = visible.filter((f) => f.source === "model");
+  const isArch = (f: Finding) => f.ruleIds.includes("ARCHITECTURE");
+  const model = visible.filter((f) => f.source === "model" && !isArch(f));
+  const arch = visible.filter((f) => f.source === "model" && isArch(f));
 
   const lines: string[] = [markerFor(event), "## 🧭 Impact Review"];
   lines.push(
@@ -32,8 +34,12 @@ export function formatComment(result: ReviewResult, event: "pr" | "push"): strin
     for (const f of det) lines.push(renderFinding(f));
   }
   if (model.length) {
-    lines.push("", "### Model review");
+    lines.push("", "### Model review (regression / cross-file)");
     for (const f of model) lines.push(renderFinding(f));
+  }
+  if (arch.length) {
+    lines.push("", "### Architecture / direction");
+    for (const f of arch) lines.push(renderFinding(f));
   }
 
   if (result.blastRadius.length) {

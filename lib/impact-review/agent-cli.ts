@@ -32,6 +32,8 @@ export interface AgentCliOptions {
   /** 모델 id (예: "zai-coding/glm-4.7"). 없으면 CLI 기본/설정에 위임. */
   model?: string;
   timeoutMs?: number;
+  /** lane별 system 프롬프트 override (없으면 회귀(regression) 프롬프트). */
+  systemPrompt?: string;
   /** 테스트 주입용. 없으면 실제 spawn. */
   runner?: AgentRunner;
 }
@@ -51,20 +53,40 @@ const AGENT_SYSTEM_PROMPT =
   'When done, output ONLY a JSON object on its own line: {"findings":[{"severity":"Critical|Warning|Suggestion",' +
   '"confidence":0-100,"message":string,"location":{"path":string,"line":number?},"ruleIds":string[]?,"evidence":string[]?}]}';
 
-export function buildAgentPrompt(promptInput: unknown): string {
+/**
+ * 상위(아키텍처/방향성) 리뷰 프롬프트. 국소 회귀가 아니라 *큰 그림*을 본다:
+ * 기존 아키텍처/컨벤션과의 정합성, 레이어/도메인 경계 위반, 기존 서브시스템 중복,
+ * 더 단순/정합적인 접근 여부, 과도한 범위 등.
+ */
+export const ARCH_SYSTEM_PROMPT =
+  "You are a senior software ARCHITECT reviewing a change INSIDE this repository's working tree. " +
+  "First read the project's architecture ground truth: ARCHITECTURE.md, the root and nested CLAUDE.md, " +
+  "AGENTS.md, and docs/ (e.g. docs/API_CONVENTIONS.md, docs/SECURITY.md). Then read the changed files and " +
+  "their context. Assess the change at the BIG-PICTURE level, not line nits: does it fit the intended " +
+  "architecture and conventions? Does it violate layering or domain boundaries? Does it duplicate an existing " +
+  "subsystem/utility instead of reusing it? Is there a materially simpler or more aligned approach? Is the scope " +
+  "creeping? Use severity Critical only for genuine architectural violations; otherwise Warning/Suggestion for " +
+  "design-direction feedback. Do NOT modify files — read-only. Do NOT report style-only nits. " +
+  'When done, output ONLY a JSON object on its own line: {"findings":[{"severity":"Critical|Warning|Suggestion",' +
+  '"confidence":0-100,"message":string,"location":{"path":string,"line":number?},"ruleIds":string[]?,"evidence":string[]?}]}';
+
+export function buildAgentPrompt(promptInput: unknown, systemPrompt = AGENT_SYSTEM_PROMPT): string {
   return (
-    `${AGENT_SYSTEM_PROMPT}\n\n` +
+    `${systemPrompt}\n\n` +
     `CHANGE BRIEF (JSON):\n${JSON.stringify(promptInput)}\n\n` +
     `Explore the repository as needed, then return ONLY the JSON object. No prose, no code fences.`
   );
 }
 
-export function buildAgentFilePrompt(briefRelPath: string): string {
+export function buildAgentFilePrompt(
+  briefRelPath: string,
+  systemPrompt = AGENT_SYSTEM_PROMPT
+): string {
   return (
-    `${AGENT_SYSTEM_PROMPT}\n\n` +
+    `${systemPrompt}\n\n` +
     `The CHANGE BRIEF (JSON) is in this repository at \`${briefRelPath}\`. ` +
-    `Read that file first, then explore the repository (changed files, importers in blast_radius, ` +
-    `mirror siblings, shared modules, tests) as needed, and return ONLY the JSON object. No prose, no code fences.`
+    `Read that file first, then explore the repository (architecture docs, changed files, importers in ` +
+    `blast_radius, mirror siblings, shared modules, tests) as needed, and return ONLY the JSON object. No prose, no code fences.`
   );
 }
 
@@ -74,10 +96,11 @@ export async function reviewWithAgentCli(
 ): Promise<ProviderResult> {
   const command = opts.command || process.env.IMPACT_REVIEW_AGENT_CMD || "opencode";
   const model = opts.model || process.env.IMPACT_REVIEW_AGENT_MODEL || null;
+  const systemPrompt = opts.systemPrompt;
 
   // 테스트(주입 runner)에서는 brief를 inline 프롬프트로(argv 한도 신경 안 씀).
   if (opts.runner) {
-    return runAndParse(opts.runner, buildAgentPrompt(promptInput), command, model);
+    return runAndParse(opts.runner, buildAgentPrompt(promptInput, systemPrompt), command, model);
   }
 
   // 실제 실행: brief를 레포 임시파일로 쓰고, opencode에는 그 파일을 읽으라는 *작은* 프롬프트만 전달.
@@ -92,7 +115,7 @@ export async function reviewWithAgentCli(
   );
   try {
     writeFileSync(briefAbs, JSON.stringify(promptInput));
-    return await runAndParse(runner, buildAgentFilePrompt(briefRel), command, model);
+    return await runAndParse(runner, buildAgentFilePrompt(briefRel, systemPrompt), command, model);
   } catch (err) {
     console.error(`[impact-review] agent-cli (${command}) failed: ${redactForLog(err)}`);
     return skipped(command, model, "agent-cli error");
