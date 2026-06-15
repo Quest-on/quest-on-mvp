@@ -145,8 +145,12 @@ async function runAndParse(
   model: string | null
 ): Promise<ProviderResult> {
   try {
-    const { stdout, code } = await runner(prompt);
-    if (code !== 0) return skipped(command, model, `agent exited ${code}`);
+    const { stdout, stderr, code } = await runner(prompt);
+    if (code !== 0) {
+      const tail = redactForLog(stderr || "").slice(-600);
+      console.error(`[impact-review] agent (${command}) exited ${code}${tail ? ` — stderr tail: ${tail}` : ""}`);
+      return skipped(command, model, `agent exited ${code}`);
+    }
     return { provider: command, model, skipped: false, findings: parseModelFindings(stdout) };
   } catch (err) {
     console.error(`[impact-review] agent-cli (${command}) failed: ${redactForLog(err)}`);
