@@ -26,10 +26,7 @@ import {
   ScrollProgressProvider,
   ScrollProgress,
 } from "@/components/animate-ui/primitives/animate/scroll-progress";
-
-function isQuestionContentEmpty(text: string): boolean {
-  return text.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() === "";
-}
+import { isQuestionContentEmpty } from "@/lib/authoring-validation";
 
 export default function CreateAssignment() {
   const router = useRouter();
@@ -216,7 +213,7 @@ export default function CreateAssignment() {
               onQuestionsAccepted={(newQuestions) => {
                 const newIds = newQuestions.map((q) => q.id);
                 setQuestions((prev) => {
-                  const nonEmpty = prev.filter((q) => q.text.replace(/<[^>]*>/g, "").trim() !== "");
+                  const nonEmpty = prev.filter((q) => !isQuestionContentEmpty(q.text));
                   return [...nonEmpty, ...newQuestions.map((q) => ({ id: q.id, text: q.text, type: q.type as "essay" | "short-answer" | "multiple-choice" }))];
                 });
                 setHighlightedQuestionIds(new Set(newIds));

@@ -21,6 +21,7 @@ Domain-specific rules live in nested `CLAUDE.md` files (`app/api/`, `components/
 | Grading / QStash / sweeper logic | `docs/GRADING_PIPELINE_RUNBOOK.md` |
 | Adding or upgrading packages | `docs/DEPENDENCY_POLICY.md` |
 | Recurring mistakes in this project | `tasks/lessons.md` |
+| Mirror-pair / change-impact review rules (거울 쌍·qIdx·채점 불변식) | `.github/impact-review/rules.md` |
 
 ---
 

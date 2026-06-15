@@ -14,7 +14,8 @@
     "test:api": "playwright test --project=api-integration --config=e2e/playwright.config.ts",
     "test:e2e": "playwright test --project=browser-e2e --config=e2e/playwright.config.ts",
     "test:browser": "playwright test --project=browser-e2e --project=browser-flows --config=e2e/playwright.config.ts",
-    "mock-server": "tsx scripts/start-mock-server.ts"
+    "mock-server": "tsx scripts/start-mock-server.ts",
+    "impact-review": "tsx scripts/impact-review.ts"
   },
   "dependencies": {
     "@base-ui-components/react": "^1.0.0-rc.0",
@@ -68,6 +69,7 @@
     "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
     "isomorphic-dompurify": "^3.0.0",
+    "js-yaml": "^4.1.0",
     "jspdf": "^3.0.4",
     "katex": "^0.16.22",
     "lowlight": "^3.3.0",
@@ -107,6 +109,7 @@
     "@types/adm-zip": "^0.5.7",
     "@types/dompurify": "^3.0.5",
     "@types/express": "^5.0.6",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -118,6 +121,7 @@
     "express": "^5.2.1",
     "prisma": "^6.19.2",
     "tailwindcss": "^4",
+    "tsx": "^4.20.6",
     "tw-animate-css": "^1.3.7",
     "typescript": "^5",
     "vitest": "^4.0.18",

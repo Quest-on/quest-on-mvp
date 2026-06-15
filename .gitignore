@@ -59,3 +59,6 @@ next-env.d.ts
 *.sql
 # SQL files in database directory (can be committed if needed)
 !database/*.sql
+
+# impact-review per-run agent brief artifact (best-effort cleanup; guard against commit)
+.impact-review-brief.*.json

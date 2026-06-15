@@ -1,0 +1,15 @@
+diff --git a/app/(app)/instructor/new/page.tsx b/app/(app)/instructor/new/page.tsx
+--- a/app/(app)/instructor/new/page.tsx
++++ b/app/(app)/instructor/new/page.tsx
+@@ -498,3 +498,3 @@ export default function CreateExam() {
+-    questions.length > 0 && !scoreWeights
++    questions.length > 0 && (!scoreWeights || validateScoreWeightsForQuestions(questions, scoreWeights) !== null)
+       ? "문제 유형별 점수 비중을 확인해주세요"
+       : null,
+diff --git a/lib/grade-utils.ts b/lib/grade-utils.ts
+--- a/lib/grade-utils.ts
++++ b/lib/grade-utils.ts
+@@ -12,2 +12,3 @@
+ // grade utilities
++// (typo fix in unrelated doc comment — not a score-weight helper change)
+ export const GRADE_EPSILON = 0.0001;
