@@ -34,7 +34,7 @@ export async function POST(
     }
 
     const access = await requireBulkGradeAccess(examId, user, {
-      requireClosed: true,
+      requireGradable: true,
     });
     if (!access.ok) return access.response;
 

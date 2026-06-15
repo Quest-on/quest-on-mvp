@@ -157,6 +157,7 @@ export interface BulkGradingPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCommitted?: () => void;
+  mode?: "exam" | "assignment";
 }
 
 export function BulkGradingPanel({
@@ -164,8 +165,11 @@ export function BulkGradingPanel({
   open,
   onOpenChange,
   onCommitted,
+  mode = "exam",
 }: BulkGradingPanelProps) {
   const queryClient = useQueryClient();
+  /** Visible noun for the grading target: "과제" for assignments, "CASE" for exams. */
+  const gradeNoun = mode === "assignment" ? "과제" : "CASE";
   const [criteriaMode, setCriteriaMode] = useState<"custom" | "ai_default">("custom");
   const [approvalMode, setApprovalMode] = useState<"review_before_commit" | "no_precheck">(
     "review_before_commit",
@@ -411,7 +415,7 @@ export function BulkGradingPanel({
       return res.json() as Promise<{ ok: boolean; total: number }>;
     },
     onSuccess: (result) => {
-      toast.success(`${result.total}명 전체 CASE 가채점을 시작했습니다.`);
+      toast.success(`${result.total}명 전체 ${gradeNoun} 가채점을 시작했습니다.`);
       setEditedGrades(null);
       setRegradeArmed(false);
       setDraft("");
@@ -751,7 +755,7 @@ export function BulkGradingPanel({
             className="text-xs text-muted-foreground"
             aria-live="polite"
           >
-            전체 CASE 가채점 중 · 처리 {processedCount}/{progress?.total ?? 0}
+            전체 {gradeNoun} 가채점 중 · 처리 {processedCount}/{progress?.total ?? 0}
             {progress && progress.failed > 0 ? ` · 실패 ${progress.failed}명` : ""}
           </p>
         ),
@@ -881,7 +885,7 @@ export function BulkGradingPanel({
       <Badge variant="outline">가채점 완료</Badge>
     );
 
-    const title = committed ? "확정된 CASE 채점" : "AI 제안 점수";
+    const title = committed ? `확정된 ${gradeNoun} 채점` : "AI 제안 점수";
     const count = committed ? finalRows.length : totalGrades;
 
     return (
@@ -1091,7 +1095,11 @@ export function BulkGradingPanel({
                       </td>
                       <td className="py-1.5">
                         <a
-                          href={`/instructor/${examId}/grade/${row.sessionId}?questionType=case&qIdx=${row.qIdx}`}
+                          href={
+                            mode === "assignment"
+                              ? `/instructor/assignment/${examId}/grade/${row.sessionId}`
+                              : `/instructor/${examId}/grade/${row.sessionId}?questionType=case&qIdx=${row.qIdx}`
+                          }
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`${row.studentName} Q${row.qIdx + 1} 개별 채점 새 탭에서 열기`}
@@ -1147,7 +1155,7 @@ export function BulkGradingPanel({
   return (
     <aside
       role="complementary"
-      aria-label="CASE AI 가채점"
+      aria-label={`${gradeNoun} AI 가채점`}
       aria-hidden={!open}
       inert={!open}
       className={cn(
@@ -1158,7 +1166,7 @@ export function BulkGradingPanel({
     >
       {/* Header */}
       <div className="flex shrink-0 items-center gap-2 border-b px-5 py-3">
-        <h2 className="text-sm font-semibold text-foreground">CASE AI 가채점</h2>
+        <h2 className="text-sm font-semibold text-foreground">{gradeNoun} AI 가채점</h2>
         {data?.studentCount != null && (
           <span className="text-xs font-normal text-muted-foreground">
             (대상 {data.studentCount}명)
@@ -1370,7 +1378,7 @@ export function BulkGradingPanel({
             <Button
               type="button"
               size="icon"
-              aria-label={sendMode === "start" ? "전체 CASE 가채점 시작" : "가채점 대화 전송"}
+              aria-label={sendMode === "start" ? `전체 ${gradeNoun} 가채점 시작` : "가채점 대화 전송"}
               onClick={send}
               disabled={sendDisabled}
               data-testid="bulk-grade-send"

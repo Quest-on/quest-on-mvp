@@ -5,6 +5,7 @@ import {
   buildProposedGradesMap,
   estimateTokenCount,
   selectCalibrationSampleSessionIds,
+  getBulkGradableQuestions,
 } from "@/lib/bulk-grading";
 
 const SESSION_A = "11111111-1111-1111-1111-111111111111";
@@ -282,5 +283,52 @@ describe("selectCalibrationSampleSessionIds", () => {
     expect(result).toHaveLength(3);
     // last chunk [2,4) with random≈1 picks sessionD
     expect(result[2]).toEqual(sessionD);
+  });
+});
+
+// ─── getBulkGradableQuestions ─────────────────────────────────────────────────
+
+describe("getBulkGradableQuestions", () => {
+  const mixedQuestions = [
+    { id: "q0", type: "case", text: "Case prompt" },
+    { id: "q1", type: "multiple-choice", text: "MCQ" },
+    { id: "q2", type: "essay", text: "Essay prompt" },
+    { id: "q3", type: "true-false", text: "OX" },
+  ];
+
+  it("exam: returns every case-like question (case/essay/short-answer)", () => {
+    const result = getBulkGradableQuestions({ type: "exam", questions: mixedQuestions });
+    expect(result.map((q) => q.qIdx)).toEqual([0, 2]);
+    expect(result[0].questionPrompt).toBe("Case prompt");
+  });
+
+  it("exam: treats null/undefined type as exam", () => {
+    const result = getBulkGradableQuestions({ type: null, questions: mixedQuestions });
+    expect(result.map((q) => q.qIdx)).toEqual([0, 2]);
+  });
+
+  it("assignment (report): grades only the single question at idx 0", () => {
+    const assignmentQuestions = [
+      { id: "a0", type: "essay", text: "Assignment task" },
+      { id: "a1", type: "essay", text: "Should be ignored" },
+    ];
+    const result = getBulkGradableQuestions({ type: "report", questions: assignmentQuestions });
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ qIdx: 0, questionPrompt: "Assignment task" });
+  });
+
+  it("assignment: any non-exam type (assignment/code/erd/mindmap) maps to q_idx 0", () => {
+    for (const type of ["assignment", "code", "erd", "mindmap"]) {
+      const result = getBulkGradableQuestions({
+        type,
+        questions: [{ id: "x", type: "multiple-choice", text: "Q0" }],
+      });
+      expect(result).toEqual([{ qIdx: 0, questionPrompt: "Q0" }]);
+    }
+  });
+
+  it("returns [] for empty/invalid questions", () => {
+    expect(getBulkGradableQuestions({ type: "report", questions: [] })).toEqual([]);
+    expect(getBulkGradableQuestions({ type: "exam", questions: null })).toEqual([]);
   });
 });

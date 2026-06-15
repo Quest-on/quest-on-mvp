@@ -8,7 +8,7 @@ import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { bulkGradeCommitSchema, validateRequest } from "@/lib/validations";
 import { upsertGradesBySessionQuestion } from "@/lib/grades-upsert";
 import { requireBulkGradeAccess } from "@/lib/bulk-grade-access";
-import { isCaseQuestion, normalizeQuestions } from "@/lib/grading-helpers";
+import { getBulkGradableQuestions } from "@/lib/bulk-grading";
 
 const COMMITTING_STALE_MS = 2 * 60 * 1000;
 
@@ -39,7 +39,7 @@ export async function POST(
     }
 
     const access = await requireBulkGradeAccess(examId, user, {
-      requireClosed: true,
+      requireGradable: true,
     });
     if (!access.ok) return access.response;
 
@@ -71,12 +71,10 @@ export async function POST(
     }
 
     const caseQIdxes = new Set(
-      normalizeQuestions(access.ctx.exam.questions)
-        .filter((q) => isCaseQuestion(q.type))
-        .map((q) => q.idx),
+      getBulkGradableQuestions(access.ctx.exam).map((q) => q.qIdx),
     );
     if (grades.some((g) => !caseQIdxes.has(g.q_idx))) {
-      return errorJson("VALIDATION_ERROR", "CASE 문제 점수만 확정할 수 있습니다.", 400);
+      return errorJson("VALIDATION_ERROR", "채점 대상 문제 점수만 확정할 수 있습니다.", 400);
     }
 
     // [HIGH-1] Block commit while grading is in progress
