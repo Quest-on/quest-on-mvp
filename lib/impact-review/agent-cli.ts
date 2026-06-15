@@ -54,6 +54,7 @@ const AGENT_SYSTEM_PROMPT =
   "Report ONLY net-new risks that the deterministic layer has NOT already reported " +
   "(do not repeat entries in deterministic_findings). Do NOT modify any file — read-only review. " +
   "Do NOT report style-only issues. " +
+  "Write every \"message\" and \"evidence\" string in natural Korean (한국어); keep code identifiers, paths, and ruleIds verbatim. " +
   'When done, output ONLY a JSON object on its own line: {"findings":[{"severity":"Critical|Warning|Suggestion",' +
   '"confidence":0-100,"message":string,"location":{"path":string,"line":number?},"ruleIds":string[]?,"evidence":string[]?}]}';
 
@@ -71,6 +72,7 @@ export const ARCH_SYSTEM_PROMPT =
   "subsystem/utility instead of reusing it? Is there a materially simpler or more aligned approach? Is the scope " +
   "creeping? Use severity Critical only for genuine architectural violations; otherwise Warning/Suggestion for " +
   "design-direction feedback. Do NOT modify files — read-only. Do NOT report style-only nits. " +
+  "Write every \"message\" and \"evidence\" string in natural Korean (한국어); keep code identifiers, paths, and ruleIds verbatim. " +
   'When done, output ONLY a JSON object on its own line: {"findings":[{"severity":"Critical|Warning|Suggestion",' +
   '"confidence":0-100,"message":string,"location":{"path":string,"line":number?},"ruleIds":string[]?,"evidence":string[]?}]}';
 

@@ -9,8 +9,10 @@ export function markerFor(event: "pr" | "push"): string {
 }
 
 const ICON: Record<string, string> = { Critical: "🔴", Warning: "🟡", Suggestion: "🔵" };
+const SEV_KO: Record<string, string> = { Critical: "치명", Warning: "경고", Suggestion: "제안" };
+const BOT_NAME = "Yeongjun Code Review Bot";
 
-/** PR/커밋 코멘트용 Markdown. 결정적 섹션 먼저, 모델 섹션 다음. 간결 유지. */
+/** PR/커밋 코멘트용 Markdown(한국어). 결정적 섹션 먼저, 모델 섹션 다음. 간결 유지. */
 export function formatComment(result: ReviewResult, event: "pr" | "push"): string {
   const visible = visibleFindings(result.findings);
   const det = visible.filter((f) => f.source === "deterministic");
@@ -18,33 +20,35 @@ export function formatComment(result: ReviewResult, event: "pr" | "push"): strin
   const model = visible.filter((f) => f.source === "model" && !isArch(f));
   const arch = visible.filter((f) => f.source === "model" && isArch(f));
 
-  const lines: string[] = [markerFor(event), "## 🧭 Impact Review"];
+  const lines: string[] = [markerFor(event), `## 🤖 ${BOT_NAME}`];
   lines.push(
-    `_range: \`${result.range ?? "n/a"}\` · files: ${result.changedFiles.length} · ` +
-      `provider: ${providerLabel(result.provider)}_`
+    `_모델 \`${providerLabel(result.provider)}\` · 범위 \`${result.range ?? "n/a"}\` · ` +
+      `변경 파일 ${result.changedFiles.length}개_`
   );
 
   if (visible.length === 0) {
-    lines.push("", "✅ No blocking impact findings.");
+    lines.push("", "✅ 차단할 영향/회귀 이슈가 없습니다.");
+    lines.push("", `<sub>🤖 ${BOT_NAME} — 변경 영향·거울 드리프트 자동 리뷰</sub>`);
     return lines.join("\n");
   }
 
   if (det.length) {
-    lines.push("", "### Deterministic (non-vetoable)");
+    lines.push("", "### 🔒 결정적 검사 (거부 불가)");
     for (const f of det) lines.push(renderFinding(f));
   }
   if (model.length) {
-    lines.push("", "### Model review (regression / cross-file)");
+    lines.push("", "### 🔁 회귀 / 교차 영향");
     for (const f of model) lines.push(renderFinding(f));
   }
   if (arch.length) {
-    lines.push("", "### Architecture / direction");
+    lines.push("", "### 🧭 아키텍처 / 방향성");
     for (const f of arch) lines.push(renderFinding(f));
   }
 
   if (result.blastRadius.length) {
-    lines.push("", "### Blast radius", ...renderBlast(result.blastRadius));
+    lines.push("", "### 💥 영향 반경 (blast radius)", ...renderBlast(result.blastRadius));
   }
+  lines.push("", `<sub>🤖 ${BOT_NAME} — 변경 영향·거울 드리프트 자동 리뷰</sub>`);
   return lines.join("\n");
 }
 
@@ -52,9 +56,9 @@ function renderFinding(f: Finding): string {
   const loc = f.location?.path
     ? ` \`${f.location.path}${f.location.line ? `:${f.location.line}` : ""}\``
     : "";
-  const conf = f.source === "model" ? ` (conf ${f.confidence})` : "";
+  const conf = f.source === "model" ? ` (신뢰도 ${f.confidence})` : "";
   const rules = f.ruleIds.length ? ` [${f.ruleIds.join(", ")}]` : "";
-  return `- ${ICON[f.severity] ?? ""} **${f.severity}**${conf}${rules}${loc} — ${f.message}`;
+  return `- ${ICON[f.severity] ?? ""} **${SEV_KO[f.severity] ?? f.severity}**${conf}${rules}${loc} — ${f.message}`;
 }
 
 function renderBlast(entries: BlastRadiusEntry[]): string[] {
@@ -77,9 +81,9 @@ export function formatSummary(result: ReviewResult): string {
   const counts = { Critical: 0, Warning: 0, Suggestion: 0 } as Record<string, number>;
   for (const f of visibleFindings(result.findings)) counts[f.severity]++;
   return (
-    `impact-review: ${counts.Critical} Critical, ${counts.Warning} Warning, ` +
-    `${counts.Suggestion} Suggestion · provider ${providerLabel(result.provider)} · ` +
-    `shouldFail=${result.shouldFail}`
+    `${BOT_NAME}: 치명 ${counts.Critical} · 경고 ${counts.Warning} · ` +
+    `제안 ${counts.Suggestion} · 모델 ${providerLabel(result.provider)} · ` +
+    `실패=${result.shouldFail}`
   );
 }
 
