@@ -5,7 +5,7 @@ name: impact-review
 # read-only: Supabase/DB/.env 미전달. pull_request_target 사용 금지.
 on:
   pull_request:
-    branches: [main]
+    branches: [main, yeongjun]
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
