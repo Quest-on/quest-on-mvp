@@ -35,3 +35,7 @@
 - Point at logs, errors, failing tests - then resolve them
 - Zero context switching required from the user
 - Go fix failing CI tests without being told how
+
+### 7. Change-Impact / Mirror Rules
+- Before editing authoring forms or grading/scoring code, read `.github/impact-review/rules.md` (canonical mirror-pair + qIdx + scoring invariants).
+- Mirror pairs (create↔edit for exam/assignment) MUST stay in sync; edit one side, update its sibling. The `impact-review` GitHub Action (PR + push:main) flags one-sided mirror drift as a deterministic Critical.

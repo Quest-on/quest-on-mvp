@@ -23,24 +23,12 @@ import {
   validateScoreWeightsForQuestions,
   type ScoreWeights,
 } from "@/lib/grade-utils";
-
-// ─── 헬퍼 ────────────────────────────────────────────────────────────────────
-
-function isQuestionContentEmpty(text: string): boolean {
-  return text.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() === "";
-}
-
-/** 객관식/OX 문제의 선택지·정답이 덜 채워졌는지 검사 (new/page.tsx와 동일). */
-function isObjectiveQuestionIncomplete(q: Question): boolean {
-  if (q.type !== "multiple-choice" && q.type !== "true-false") return false;
-  if (typeof q.correctOptionIndex !== "number") return true;
-  if (q.type === "multiple-choice") {
-    const opts = q.options ?? [];
-    if (opts.length < 4) return true;
-    return opts.slice(0, 4).some((o) => o.trim() === "");
-  }
-  return false;
-}
+import {
+  EXAM_DURATION_REASON,
+  isExamDurationTooShort,
+  isObjectiveQuestionIncomplete,
+  isQuestionContentEmpty,
+} from "@/lib/authoring-validation";
 
 // ─── 페이지 ─────────────────────────────────────────────────────────────────
 
@@ -355,9 +343,7 @@ export default function EditExam({
         ? "문제 내용을 입력해주세요"
         : null,
       !canAddMoreFiles ? "파일 용량이 50MB를 초과했습니다" : null,
-      examData.duration !== 0 && examData.duration < 15
-        ? "시험 시간은 최소 15분 이상이어야 합니다"
-        : null,
+      isExamDurationTooShort(examData.duration) ? EXAM_DURATION_REASON : null,
       questions.some((q) => isObjectiveQuestionIncomplete(q))
         ? "객관식 문제의 선택지와 정답을 입력해주세요"
         : null,

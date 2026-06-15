@@ -60,3 +60,15 @@
 - 테스트/CI 보정 중에도 `.env.local`의 `DATABASE_URL` 또는 Supabase 키를 source해서 실행하지 않는다. DB URL이 로컬 테스트 DB인지 사용자가 확인해주기 전에는 어떤 schema/data 명령도 금지한다.
 - `e2e/helpers/seed.ts::cleanupTestData()`는 `exam_nodes`, `exams` 전체 row를 지울 수 있으므로 절대 수동 실행하지 않는다. 이 helper를 import하는 Playwright/API/E2E 테스트도 DB-backed로 간주하고, `docs/CODEX_DB_SAFETY.md`의 preflight 없이 실행하지 않는다.
 - Codex 세션에서 검증 계획을 세울 때 DB-backed 테스트는 기본 제외한다. 허용 기본값은 `npx tsc --noEmit`, `npm run lint`, DB helper를 import하지 않는 pure Vitest, `git diff --check`뿐이다.
+
+## 2026-06-14 — Change-impact 리뷰 & 코딩 구독 키
+
+- 한쪽 구현만 고치고 거울 짝(예: instructor new↔edit, assignment new↔edit)을 안 고치는 drift는 **복붙이라 import edge가 없어** 의존성 그래프로 못 잡는다. 결정적 가드는 `.github/impact-review/rules.md`(거울 쌍·watch·same-dimension 면제) + `__tests__/mirror-drift.test.ts`(공용 헬퍼 import 강제) + `lib/impact-review/prechecks.ts`(모델 호출 전 non-vetoable Critical)로 둔다. 면제는 same-dimension 공용 헬퍼 hunk일 때만(broad 토큰 1개로 오면제 금지).
+- **"for coding" 구독 키(Kimi for Coding, GLM Coding Plan)는 raw API(SDK/curl/CI 스크립트)로 못 쓴다.** 엔드포인트가 클라이언트 화이트리스트(Claude Code/opencode/Cline/Kimi CLI 등)를 강제하고 비대화형 배치 호출을 금지한다. User-Agent 위조는 계정 정지 사유 → 금지.
+- 구독 키를 합법적으로 쓰려면 **화이트리스트 코딩 CLI를 헤드리스로 경유**한다(여기선 GLM Coding Plan + `opencode run`, `.github/impact-review/opencode.json` + `OPENCODE_CONFIG`). raw API가 필요하면 *일반 종량제* 키(`api.moonshot.ai/v1` / `api.z.ai/api/paas/v4`)를 따로 발급해야 한다. coding 엔드포인트는 `.../coding/...` 경로로 구분된다.
+- coding 구독은 인터랙티브 quota와 같은 통을 쓰므로 CI 자동 실행은 quota를 잠식하고 ToS 회색지대다. opencode→coding 엔드포인트 *라이브* 호출은 사용자 CI에서만 검증 가능(샌드박스 미검증). 정적 검증은 faked-runner 단위테스트로 커버한다.
+- 결정적 레이어는 **고신뢰·무오탐만**(거울 Vitest 테스트 + tsc/lint). 단순 의미 판단(스타일류)은 정규식 룰로 박지 말고 **AI 레인**으로. 단 **사고 이력이 있는 핵심 불변식(qIdx 등)은 결정적 Vitest 회귀 테스트로 박는다**(아래 실측 참조) — 정규식은 빼되 AI-only로 두지 말 것. 구조 경계가 정말 아프면 ast-grep/dependency-cruiser/Danger 같은 표준 도구.
+- codegraph는 **거울 seed만** 결정적으로 제공(복붙 거울은 import edge 없어 grep 불가). importer 전이 추적은 강한 에이전트가 직접 grep하므로 과투자 금지.
+- **리뷰 에이전트에 라이브 DB 권한 금지**(read-only라도). CI에 DB 크레덴셜=PII 유출 위험 + 6/03 DB 성역 위반. 데이터모델 영향은 `database/NNN_*.sql`·`prisma/schema.prisma`를 *파일로 read*해서 판단한다.
+- coding 구독(GLM/Kimi) 모델 id는 빨리 낡는다(glm-4.7→5.1→5.2). opencode.json `model` + workflow env 한 줄로 스왑 가능하게 유지.
+- **[실측] AI 리뷰 레인은 *미묘한 실제 회귀*를 놓친다.** 실제 사고(commit e4ae062: 채점 페이지 q_idx 매핑)를 되돌린 diff를 GLM-5.2 2레인에 라이브로 먹였더니 "0 findings"로 통과시킴(뻔한 합성 케이스는 잡음). diff만 보면 `submissions?.[qIdx]`가 멀쩡해 보이고 "저장은 배열위치 키잉" 맥락을 알아야만 버그라서. → **사고 낸 적 있는 핵심 불변식은 AI에 맡기지 말고 결정적 Vitest 회귀 테스트로 박는다**(`__tests__/qidx-grade-mapping.test.ts`: 채점 페이지가 resolveByQIdx 폴백 쓰는지 검사). 정규식 룰은 빼되(오탐), 그 자리에 *정밀 테스트*를 넣어야지 AI-only로 두면 커버리지 회귀. AI 레인은 *미지/신규* 이슈 보조용.
