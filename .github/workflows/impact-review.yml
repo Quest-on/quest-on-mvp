@@ -44,6 +44,6 @@ jobs:
           ZAI_CODING_API_KEY: ${{ secrets.ZAI_CODING_API_KEY }}
           IMPACT_REVIEW_PROVIDER: opencode
           IMPACT_REVIEW_AGENT_MODEL: zai-coding/glm-5.2 # 최신 플래그십(1M ctx 변형은 glm-5.2[1m])
-          # 레인(regression/architecture)은 병렬 실행. opencode+GLM 지연 대비 레인당 15분 캡.
+          # 레인(regression/architecture)은 순차 실행(opencode 동시 실행 시 공유상태 충돌 회피). 레인당 15분 캡 → 직렬 최대 ~30분.
           IMPACT_REVIEW_AGENT_TIMEOUT_MS: "900000"
           # 키/opencode 미가용 시 자동으로 결정적-only로 떨어지고, 결정적 Critical은 그대로 job 실패시킴.
