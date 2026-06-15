@@ -24,6 +24,8 @@ import {
   type ScoreWeights,
 } from "@/lib/grade-utils";
 import {
+  EXAM_DURATION_REASON,
+  isExamDurationTooShort,
   isObjectiveQuestionIncomplete,
   isQuestionContentEmpty,
 } from "@/lib/authoring-validation";
@@ -341,9 +343,7 @@ export default function EditExam({
         ? "문제 내용을 입력해주세요"
         : null,
       !canAddMoreFiles ? "파일 용량이 50MB를 초과했습니다" : null,
-      examData.duration !== 0 && examData.duration < 15
-        ? "시험 시간은 최소 15분 이상이어야 합니다"
-        : null,
+      isExamDurationTooShort(examData.duration) ? EXAM_DURATION_REASON : null,
       questions.some((q) => isObjectiveQuestionIncomplete(q))
         ? "객관식 문제의 선택지와 정답을 입력해주세요"
         : null,

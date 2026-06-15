@@ -33,3 +33,18 @@ export function isObjectiveQuestionIncomplete(q: ObjectiveQuestionLike): boolean
   }
   return false;
 }
+
+/** 시험 최소 시간(분). 0은 무제한을 의미한다. */
+export const EXAM_DURATION_MIN_MINUTES = 15;
+
+/** 무제한(0)이 아니면서 최소 시간 미만이면 true. */
+export function isExamDurationTooShort(durationMinutes: number): boolean {
+  return durationMinutes !== 0 && durationMinutes < EXAM_DURATION_MIN_MINUTES;
+}
+
+/**
+ * 거울 페이지(exam new/edit) 공용 duration 검증 사유 메시지(단일 소스).
+ * 과거 new/edit가 서로 다른 문구를 들고 있어 drift가 났다 → 한 곳에서 관리.
+ */
+export const EXAM_DURATION_REASON =
+  "시험 시간은 15분 이상이거나 무제한이어야 합니다";

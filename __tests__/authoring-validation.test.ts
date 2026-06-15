@@ -1,9 +1,32 @@
 import { describe, expect, it } from "vitest";
 import {
+  EXAM_DURATION_MIN_MINUTES,
+  EXAM_DURATION_REASON,
+  isExamDurationTooShort,
   isObjectiveQuestionIncomplete,
   isQuestionContentEmpty,
   type ObjectiveQuestionLike,
 } from "@/lib/authoring-validation";
+
+describe("isExamDurationTooShort (shared exam new/edit duration rule)", () => {
+  it("treats 0 (unlimited) as valid", () => {
+    expect(isExamDurationTooShort(0)).toBe(false);
+  });
+
+  it("flags durations below the minimum", () => {
+    expect(isExamDurationTooShort(1)).toBe(true);
+    expect(isExamDurationTooShort(EXAM_DURATION_MIN_MINUTES - 1)).toBe(true);
+  });
+
+  it("accepts durations at or above the minimum", () => {
+    expect(isExamDurationTooShort(EXAM_DURATION_MIN_MINUTES)).toBe(false);
+    expect(isExamDurationTooShort(60)).toBe(false);
+  });
+
+  it("exposes a single shared reason message (no per-page drift)", () => {
+    expect(EXAM_DURATION_REASON).toContain("무제한");
+  });
+});
 
 describe("isQuestionContentEmpty", () => {
   it("treats empty string as empty", () => {
