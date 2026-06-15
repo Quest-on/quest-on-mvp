@@ -57,6 +57,11 @@ describe("authoring-validation mirror-drift guard", () => {
           expect(importBlock).toMatch(new RegExp(`${helper}[\\s\\S]*${SHARED_IMPORT.replace(/[/\\]/g, "\\$&")}`));
         });
       }
+
+      it("uses isQuestionContentEmpty, not an inline HTML-strip+trim emptiness check (no &nbsp; drift)", () => {
+        // `q.text.replace(/<[^>]*>/g, "").trim()` 은 &nbsp; 정규화가 빠져 헬퍼와 의미가 달라진다.
+        expect(src).not.toMatch(/\.replace\(\/<\[\^>\]\*>\/g,\s*""\)\.trim\(\)/);
+      });
     });
   }
 });

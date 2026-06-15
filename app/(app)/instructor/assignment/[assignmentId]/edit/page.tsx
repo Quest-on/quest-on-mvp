@@ -319,7 +319,7 @@ export default function EditAssignment({
               const newIds = newQuestions.map((q) => q.id);
               setQuestions((prev) => {
                 const nonEmpty = prev.filter(
-                  (q) => q.text.replace(/<[^>]*>/g, "").trim() !== ""
+                  (q) => !isQuestionContentEmpty(q.text)
                 );
                 return [
                   ...nonEmpty,
