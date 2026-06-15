@@ -96,6 +96,9 @@ export function buildAgentFilePrompt(
   );
 }
 
+/** 동시 레인 실행 시 brief 파일명 충돌 방지용 프로세스-내 카운터. */
+let briefSeq = 0;
+
 export async function reviewWithAgentCli(
   promptInput: unknown,
   opts: AgentCliOptions = {}
@@ -111,13 +114,13 @@ export async function reviewWithAgentCli(
 
   // 실제 실행: brief를 레포 임시파일로 쓰고, opencode에는 그 파일을 읽으라는 *작은* 프롬프트만 전달.
   // (Linux argv 단일 인자 한도 128KB(MAX_ARG_STRLEN) 회피 — 큰 변경에서도 안전.)
-  const briefRel = `.impact-review-brief.${process.pid}.json`;
+  const briefRel = `.impact-review-brief.${process.pid}-${briefSeq++}.json`;
   const briefAbs = path.join(process.cwd(), briefRel);
   const runner = defaultSpawnRunner(
     command,
     opts.subcommand ?? ["run"],
     model,
-    opts.timeoutMs ?? 600_000
+    opts.timeoutMs ?? (Number(process.env.IMPACT_REVIEW_AGENT_TIMEOUT_MS) || 600_000)
   );
   try {
     writeFileSync(briefAbs, JSON.stringify(promptInput));

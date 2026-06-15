@@ -133,30 +133,37 @@ export async function runReview(opts: RunReviewOptions): Promise<ReviewResult> {
 }
 
 /**
- * agent 리뷰 레인을 순차 실행해 하나의 ProviderResult로 병합한다.
+ * agent 리뷰 레인을 병렬 실행해 하나의 ProviderResult로 병합한다.
  * - regression: 국소 회귀/cross-file 위험.
  * - architecture: 큰 방향성(아키텍처/경계/중복/단순화). 결과는 ruleId "ARCHITECTURE"로 태깅.
+ * 레인은 *병렬* 실행한다(벽시계 시간 = 합 → 최댓값). 각 reviewWithAgentCli는 고유 brief
+ * 파일을 쓰므로 동시 실행이 안전하다.
  */
 async function runAgentLanes(
   packet: unknown,
   lanes: Array<"regression" | "architecture">,
   agentOptions?: AgentCliOptions
 ): Promise<ProviderResult> {
-  const results: ProviderResult[] = [];
-  const allFindings: ModelFinding[] = [];
-  for (const lane of lanes) {
-    const systemPrompt = lane === "architecture" ? ARCH_SYSTEM_PROMPT : undefined;
-    const res = await reviewWithAgentCli(packet, { ...agentOptions, systemPrompt });
-    results.push(res);
-    const tagged =
-      lane === "architecture"
-        ? res.findings.map((f) => ({
-            ...f,
-            ruleIds: [...new Set(["ARCHITECTURE", ...f.ruleIds])],
-          }))
-        : res.findings;
-    allFindings.push(...tagged);
-  }
+  const settled = await Promise.all(
+    lanes.map(async (lane) => {
+      const systemPrompt = lane === "architecture" ? ARCH_SYSTEM_PROMPT : undefined;
+      const t0 = Date.now();
+      const res = await reviewWithAgentCli(packet, { ...agentOptions, systemPrompt });
+      const secs = Math.round((Date.now() - t0) / 1000);
+      const outcome = res.skipped ? `skipped(${res.skippedReason})` : `${res.findings.length} findings`;
+      console.error(`[impact-review] lane ${lane}: ${outcome} in ${secs}s`);
+      const tagged =
+        lane === "architecture"
+          ? res.findings.map((f) => ({
+              ...f,
+              ruleIds: [...new Set(["ARCHITECTURE", ...f.ruleIds])],
+            }))
+          : res.findings;
+      return { res, tagged };
+    })
+  );
+  const results = settled.map((s) => s.res);
+  const allFindings: ModelFinding[] = settled.flatMap((s) => s.tagged);
   const ran = results.find((r) => !r.skipped);
   return {
     provider: results[0]?.provider ?? "opencode",

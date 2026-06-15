@@ -19,8 +19,8 @@ const ROOT = path.resolve(__dirname, "..");
 describe("impact-review brief artifact never leaks into git (real incident PR #47)", () => {
   it("agent-cli writes the brief as .impact-review-brief.<pid>.json at repo root", () => {
     const src = readFileSync(path.join(ROOT, "lib/impact-review/agent-cli.ts"), "utf8");
-    // `.impact-review-brief.${process.pid}.json` 형태를 유지하는지 (글롭 커버리지 전제).
-    expect(src).toMatch(/`\.impact-review-brief\.\$\{process\.pid\}\.json`/);
+    // `.impact-review-brief.${process.pid}...json` 형태 유지 (글롭 `.impact-review-brief.*.json` 커버리지 전제).
+    expect(src).toMatch(/`\.impact-review-brief\.\$\{process\.pid\}[^`]*\.json`/);
   });
 
   it(".gitignore ignores the brief artifact pattern", () => {
