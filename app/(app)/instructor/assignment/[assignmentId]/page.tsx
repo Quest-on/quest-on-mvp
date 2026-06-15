@@ -30,6 +30,8 @@ import {
   RefreshCw,
   FileText,
   Pencil,
+  Bot,
+  Loader2,
 } from "lucide-react";
 import {
   Tooltip,
@@ -37,11 +39,28 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { BulkGradingPanel } from "@/components/instructor/BulkGradingPanel";
 import { useExamDetail } from "@/hooks/useExamDetail";
 import { useStudentFiltering } from "@/hooks/useStudentFiltering";
 import { qk } from "@/lib/query-keys";
+import { cn } from "@/lib/utils";
 import type { InstructorStudent } from "@/lib/types/exam";
 import type { StudentFilterSortOption } from "@/hooks/useStudentFiltering";
+
+type BulkGradeProgress = {
+  total: number;
+  completed: number;
+  failed: number;
+};
+
+type BulkGradeStatusData = {
+  session: {
+    status: string;
+    grading_scope?: string;
+    progress?: BulkGradeProgress;
+  } | null;
+  studentCount: number;
+};
 
 function getStatusBadge(status: string, submittedAt?: string, isGraded?: boolean) {
   if (isGraded) {
@@ -75,6 +94,7 @@ export default function AssignmentDashboard({
   const [examInfoOpen, setExamInfoOpen] = useState(false);
   const [questionsOpen, setQuestionsOpen] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
+  const [bulkGradingOpen, setBulkGradingOpen] = useState(false);
 
   const {
     exam,
@@ -117,6 +137,83 @@ export default function AssignmentDashboard({
   });
 
   const queryClient = useQueryClient();
+
+  const isPastDeadline = !!exam?.deadline && new Date() > new Date(exam.deadline);
+
+  const { data: bulkGradeStatus } = useQuery<BulkGradeStatusData>({
+    queryKey: qk.instructor.bulkGradeSession(resolvedParams.assignmentId),
+    queryFn: async ({ signal }) => {
+      const response = await fetch(
+        `/api/exam/${resolvedParams.assignmentId}/bulk-grade`,
+        { signal }
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "일괄 채점 상태를 불러오지 못했습니다.");
+      }
+      return response.json() as Promise<BulkGradeStatusData>;
+    },
+    enabled: !!exam && isPastDeadline && isLoaded && !!isSignedIn,
+    staleTime: 0,
+    refetchInterval: (query) => {
+      const status = query.state.data?.session?.status;
+      return status === "grading" ? 3000 : false;
+    },
+  });
+
+  const bulkGradeSessionStatus = bulkGradeStatus?.session?.status ?? null;
+
+  // Only submitted students are gradable. `exam.students` also includes
+  // in-progress sessions, so gate on submitted count (status === "completed")
+  // plus the authoritative submitted count from the bulk-grade status endpoint.
+  const submittedStudentCount =
+    exam?.students.filter((s) => s.status === "completed").length ?? 0;
+
+  const showBulkGradingCta =
+    isPastDeadline &&
+    (submittedStudentCount > 0 ||
+      (bulkGradeStatus?.studentCount ?? 0) > 0 ||
+      !!bulkGradeSessionStatus);
+
+  const bulkGradeProgress = bulkGradeStatus?.session?.progress;
+  const bulkGradeProcessed = bulkGradeProgress
+    ? Math.min(
+        bulkGradeProgress.total,
+        bulkGradeProgress.completed + bulkGradeProgress.failed
+      )
+    : 0;
+  const isBulkGrading = bulkGradeSessionStatus === "grading";
+  const bulkGradingFailed = bulkGradeSessionStatus === "grading_failed";
+  const bulkGradingDone = bulkGradeSessionStatus === "grading_done";
+  const bulkGradingCommitted = bulkGradeSessionStatus === "committed";
+  const bulkCtaTitle = isBulkGrading
+    ? "과제 AI 가채점 진행 중"
+    : bulkGradingFailed
+      ? "과제 AI 가채점 실패"
+      : bulkGradingCommitted
+        ? "과제 채점 결과"
+        : bulkGradingDone
+          ? "과제 제안 점수 생성 완료"
+          : "과제 AI 가채점하기";
+  const bulkCtaDescription =
+    isBulkGrading && bulkGradeProgress && bulkGradeProgress.total > 0
+      ? `백그라운드 가채점 중 · ${bulkGradeProcessed}/${bulkGradeProgress.total}명 처리`
+      : bulkGradingFailed
+        ? "실패 원인을 확인하고 다시 채점을 시작할 수 있습니다"
+        : bulkGradingCommitted
+          ? "확정된 결과와 가채점 대화 기록을 확인합니다"
+          : bulkGradingDone
+            ? "제안 점수를 검토한 뒤 확정해주세요"
+            : "강사의 자연어 기준으로 학생 답안을 일괄 가채점합니다";
+  const bulkCtaButtonLabel = isBulkGrading
+    ? "진행 상황 보기"
+    : bulkGradingCommitted
+      ? "결과/채팅 보기"
+      : bulkGradingDone
+        ? "검토/확정"
+        : bulkGradingFailed
+          ? "다시 보기"
+          : "가채점 시작";
 
   useEffect(() => {
     if (sortOption === "score") {
@@ -213,7 +310,12 @@ export default function AssignmentDashboard({
 
   return (
     <SidebarProvider defaultOpen={false} className="flex-row-reverse">
-      <SidebarInset>
+      <SidebarInset
+        className={cn(
+          "transition-[padding] duration-300 ease-in-out",
+          bulkGradingOpen && "lg:pr-[500px]",
+        )}
+      >
         <div className="container mx-auto p-4 sm:p-6">
           {/* Header */}
           <div className="mb-8">
@@ -360,6 +462,33 @@ export default function AssignmentDashboard({
 
           {/* Student Submissions Table */}
           <div className="space-y-4">
+            {showBulkGradingCta && (
+              <div className="flex items-center justify-between p-3 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+                <div className="flex items-center gap-2">
+                  {isBulkGrading ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400 shrink-0" aria-hidden="true" />
+                  ) : (
+                    <Bot className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" aria-hidden="true" />
+                  )}
+                  <div>
+                    <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      {bulkCtaTitle}
+                    </span>
+                    <span className="text-xs text-blue-600 dark:text-blue-400 hidden sm:inline ml-2">
+                      {bulkCtaDescription}
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white shrink-0"
+                  onClick={() => setBulkGradingOpen(true)}
+                >
+                  {bulkCtaButtonLabel}
+                </Button>
+              </div>
+            )}
+
             {/* Search & Sort */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="relative flex-1">
@@ -453,6 +582,18 @@ export default function AssignmentDashboard({
           </div>
         </div>
       </SidebarInset>
+
+      <BulkGradingPanel
+        examId={exam.id}
+        mode="assignment"
+        open={bulkGradingOpen}
+        onOpenChange={setBulkGradingOpen}
+        onCommitted={() =>
+          queryClient.invalidateQueries({
+            queryKey: qk.instructor.examDetail(resolvedParams.assignmentId),
+          })
+        }
+      />
     </SidebarProvider>
   );
 }

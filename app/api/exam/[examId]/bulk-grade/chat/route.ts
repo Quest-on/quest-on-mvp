@@ -213,7 +213,7 @@ export async function GET(
     }
 
     const access = await requireBulkGradeAccess(examId, user, {
-      requireClosed: true,
+      requireGradable: true,
     });
     if (!access.ok) return access.response;
 
@@ -286,7 +286,7 @@ export async function POST(
     }
 
     const access = await requireBulkGradeAccess(examId, user, {
-      requireClosed: true,
+      requireGradable: true,
     });
     if (!access.ok) return access.response;
 
@@ -314,7 +314,7 @@ export async function POST(
     }
 
     if (examMeta.caseQuestions.length === 0) {
-      return errorJson("VALIDATION_ERROR", "채점할 케이스 문제가 없습니다.", 400);
+      return errorJson("VALIDATION_ERROR", "채점할 문제가 없습니다.", 400);
     }
 
     const { data: submittedSessions, error: submittedError } = await supabase
@@ -446,6 +446,7 @@ export async function POST(
       supabase,
       sampleSessionIds,
       caseQIdxes,
+      examMeta.isAssignment,
     );
     const sampleStudentsWithPrompts = sampleStudents.map((student) => ({
       ...student,
@@ -464,6 +465,7 @@ export async function POST(
         caseQuestions: examMeta.caseQuestions,
         sampleStudents: sampleStudentsWithPrompts,
         language: examMeta.examLanguage,
+        isAssignment: examMeta.isAssignment,
       }),
       buildDiscussionOnlyPhaseInstructions(gradingSession, examMeta.examLanguage),
     ].join("\n\n");

@@ -205,6 +205,17 @@ export function isCaseQuestion(type?: string): boolean {
 }
 
 /**
+ * True when an exam row is an assignment-style task (과제), not a timed exam.
+ * Assignments are persisted with `exams.type` ∈ {report, code, erd, mindmap, assignment}
+ * (the create form sends "report"), while exams use "exam" (or null default).
+ * The whole non-exam family shares the assignment dashboard + final_answer flow,
+ * so detect by "anything that isn't an exam" rather than a single literal.
+ */
+export function isAssignmentType(type?: string | null): boolean {
+  return type != null && type !== "exam";
+}
+
+/**
  * Resolve a per-question record (submissions/messages/grades) by trying several
  * candidate q_idx keys in order, returning the first defined value.
  *

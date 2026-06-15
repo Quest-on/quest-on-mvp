@@ -84,7 +84,7 @@ export async function POST(
     }
 
     const access = await requireBulkGradeAccess(examId, user, {
-      requireClosed: true,
+      requireGradable: true,
     });
     if (!access.ok) return access.response;
 
@@ -109,7 +109,7 @@ export async function POST(
     ]);
 
     if (examMeta.caseQuestions.length === 0) {
-      return errorJson("VALIDATION_ERROR", "채점할 케이스 문제가 없습니다.", 400);
+      return errorJson("VALIDATION_ERROR", "채점할 문제가 없습니다.", 400);
     }
 
     if (sessionsResult.error || !sessionsResult.data?.length) {

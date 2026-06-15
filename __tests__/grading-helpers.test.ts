@@ -10,7 +10,22 @@ import {
   summarizeAiDependencyAssessments,
   formatSummaryScoreLabel,
   resolveByQIdx,
+  isAssignmentType,
 } from "@/lib/grading-helpers";
+
+describe("isAssignmentType", () => {
+  it("treats every non-exam task type as an assignment", () => {
+    for (const type of ["report", "code", "erd", "mindmap", "assignment"]) {
+      expect(isAssignmentType(type)).toBe(true);
+    }
+  });
+
+  it("treats exam and empty/null type as not an assignment", () => {
+    expect(isAssignmentType("exam")).toBe(false);
+    expect(isAssignmentType(null)).toBe(false);
+    expect(isAssignmentType(undefined)).toBe(false);
+  });
+});
 
 describe("resolveByQIdx", () => {
   // 회귀: 채점 페이지가 question.idx 로만 조회해, idx ≠ 배열 위치인 시험에서
