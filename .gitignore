@@ -97,3 +97,5 @@ marketing/video/demo-video/fonts/
 
 # ---- brochure: build deps (regenerated via npm install) ----
 brochure/node_modules/
+# impact-review per-run agent brief artifact (best-effort cleanup; guard against commit)
+.impact-review-brief.*.json

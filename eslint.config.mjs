@@ -34,6 +34,14 @@ const eslintConfig = [
     },
   },
   {
+    // CommonJS Node utility scripts (.js, run via `node scripts/*.js`);
+    // package.json has no "type":"module", so require() is correct here.
+    files: ["scripts/**/*.js"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+  {
     files: ["lib/logger.ts"],
     rules: {
       "no-console": "off",
