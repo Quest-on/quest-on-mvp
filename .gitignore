@@ -97,3 +97,7 @@ marketing/video/demo-video/fonts/
 
 # ---- brochure: build deps (regenerated via npm install) ----
 brochure/node_modules/
+
+# ---- impact-review: per-run agent brief artifact (written to repo root for the
+# in-repo agent to read; best-effort cleanup, so guard against accidental commit) ----
+.impact-review-brief.*.json
