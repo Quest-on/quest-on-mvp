@@ -8,22 +8,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Star, Check, Sparkles, Quote, Plus, Minus, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { StageKey, QuestionSummaryData } from "@/lib/types/grading";
-import {
-  assignmentLabelToScore,
-  getAssignmentGradeDescription,
-  scoreToAssignmentLabel,
-  type AssignmentGradeLabel,
-} from "@/lib/grading-utils";
 
 interface GradingPanelProps {
   questionNumber: number;
@@ -76,7 +63,6 @@ export function GradingPanel({
   // 입력 중에는 문자열로 관리하여 "020" 같은 문제 방지
   const [scoreInput, setScoreInput] = useState<string>(overallScore.toString());
   const isAssignmentMode = mode === "assignment";
-  const assignmentLabel = scoreToAssignmentLabel(overallScore);
 
   // overallScore가 외부에서 변경되면 (예: 다른 문제로 이동) input 값 업데이트
   useEffect(() => {
@@ -114,7 +100,7 @@ export function GradingPanel({
         </CardTitle>
         <CardDescription>
           {isAssignmentMode
-            ? "AI 요약 평가를 참고해 등급을 확정하세요."
+            ? "AI 요약 평가를 참고해 점수를 확정하세요."
             : isAiGradedOnly
             ? "가채점만 있습니다. 반드시 점수를 직접 입력해야 합니다."
             : isGraded && overallScore > 0
@@ -198,27 +184,10 @@ export function GradingPanel({
         <div className="space-y-4">
           <div>
             <Label htmlFor="score" className="text-sm font-medium">
-              {isAssignmentMode ? "종합 등급" : "종합 점수 (0-100)"}
+              종합 점수 (0-100)
             </Label>
             <div className="mt-1 flex gap-2">
-              {isAssignmentMode ? (
-                <Select
-                  value={assignmentLabel}
-                  onValueChange={(value) =>
-                    onOverallScoreChange(assignmentLabelToScore(value as AssignmentGradeLabel))
-                  }
-                >
-                  <SelectTrigger id="score" data-testid="assignment-grade-select" className="flex-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="우수">우수</SelectItem>
-                    <SelectItem value="평범">평범</SelectItem>
-                    <SelectItem value="미흡">미흡</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <input
+              <input
                   type="number"
                   id="score"
                   data-testid="grade-score-input"
@@ -287,8 +256,7 @@ export function GradingPanel({
                     isAiGradedOnly ? "bg-gray-100 text-gray-500" : ""
                   }`}
                 />
-              )}
-              {!isAssignmentMode && isAiGradedOnly && aiGradedScore !== undefined && onAcceptAiScore && (
+              {isAiGradedOnly && aiGradedScore !== undefined && onAcceptAiScore && (
                 <Button
                   type="button"
                   variant="outline"
@@ -301,11 +269,7 @@ export function GradingPanel({
                 </Button>
               )}
             </div>
-            {isAssignmentMode ? (
-              <p className="text-xs text-muted-foreground mt-1">
-                {getAssignmentGradeDescription(assignmentLabel)}
-              </p>
-            ) : isAiGradedOnly && aiGradedScore !== undefined && (
+            {isAiGradedOnly && aiGradedScore !== undefined && (
               <p className="text-xs text-gray-500 mt-1">
                 가채점 점수: {aiGradedScore}점. 체크 버튼을 눌러 가채점 점수로 채점하거나 직접 입력해주세요.
               </p>
@@ -385,16 +349,14 @@ export function GradingPanel({
 
         <Button
           onClick={onSave}
-          disabled={saving || (!isAssignmentMode && isAiGradedOnly)}
+          disabled={saving || isAiGradedOnly}
           className="w-full"
           data-testid="grade-save-btn"
         >
           {saving
             ? "저장 중..."
-            : !isAssignmentMode && isAiGradedOnly
+            : isAiGradedOnly
             ? "점수를 입력해주세요"
-            : isAssignmentMode
-            ? "등급 확정 저장"
             : "문제 채점 저장"}
         </Button>
 
@@ -409,7 +371,7 @@ export function GradingPanel({
             }`}
           >
             {isAssignmentMode
-              ? `현재 등급: ${assignmentLabel}`
+              ? `현재 점수: ${overallScore}점`
               : isAiGradedOnly
               ? "⚠ 가채점만 있습니다"
               : overallScore > 0

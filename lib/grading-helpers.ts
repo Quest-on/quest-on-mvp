@@ -216,6 +216,24 @@ export function isAssignmentType(type?: string | null): boolean {
 }
 
 /**
+ * 과제 대시보드 학생 목록용: 확정(grade_type="manual", q_idx 0) grade row들을
+ * session_id → score 맵으로 만든다. 호출 측에서 q_idx/grade_type 필터를 끝낸 행만 넘긴다.
+ * score가 유한한 숫자가 아닌 행은 제외해, 채점되지 않은(또는 손상된) 항목이 0점으로
+ * 잘못 노출되지 않게 한다.
+ */
+export function buildAssignmentScoreMap(
+  rows: ReadonlyArray<{ session_id: string; score: unknown }>,
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    if (typeof row.score === "number" && Number.isFinite(row.score)) {
+      map.set(row.session_id, row.score);
+    }
+  }
+  return map;
+}
+
+/**
  * Resolve a per-question record (submissions/messages/grades) by trying several
  * candidate q_idx keys in order, returning the first defined value.
  *

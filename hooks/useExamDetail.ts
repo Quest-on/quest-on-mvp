@@ -142,13 +142,21 @@ export function useExamDetail({
                 : String(selectedSession.created_at)
               : undefined;
 
+          // 과제(assignment) 확정 점수 — sessions API가 채워줄 때만 존재.
+          // 시험은 score/is_graded를 안 내려보내므로 undefined/false로 유지된다.
+          const confirmedScore =
+            typeof selectedSession.score === "number"
+              ? selectedSession.score
+              : undefined;
+          const isGraded = selectedSession.is_graded === true;
+
           return {
             id: sessionId,
             name: studentName,
             email: studentEmail,
             status: submittedAt ? "completed" : "in-progress",
-            score: undefined,
-            finalScore: undefined,
+            score: confirmedScore,
+            finalScore: confirmedScore,
             submittedAt: submittedAt as string | undefined,
             createdAt: createdAt as string | undefined,
             student_number:
@@ -161,7 +169,7 @@ export function useExamDetail({
                 : undefined,
             questionCount: undefined,
             answerLength: undefined,
-            isGraded: false,
+            isGraded,
             gradingProgress:
               (selectedSession.grading_progress as InstructorStudent["gradingProgress"]) ?? null,
           } as InstructorStudent;
