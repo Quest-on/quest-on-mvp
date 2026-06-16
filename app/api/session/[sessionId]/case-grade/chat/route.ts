@@ -25,6 +25,7 @@ import {
   questionPromptByQIdx,
   requireCaseGradeAccess,
 } from "@/lib/case-grade-access";
+import { isAssignmentType } from "@/lib/grading-helpers";
 import { stripEmoji } from "@/lib/sanitize";
 
 type GradingChatRow = {
@@ -157,7 +158,7 @@ export async function GET(
 
     const user = await currentUser();
     const access = await requireCaseGradeAccess(sessionId, user, qIdx, {
-      requireClosed: true,
+      requireGradable: true,
     });
     if (!access.ok) return access.response;
 
@@ -210,7 +211,7 @@ export async function POST(
     const { qIdx, message, clientMessageId } = validation.data;
 
     const access = await requireCaseGradeAccess(sessionId, user, qIdx, {
-      requireClosed: true,
+      requireGradable: true,
     });
     if (!access.ok) return access.response;
 
@@ -265,7 +266,11 @@ export async function POST(
         .eq("session_id", sessionId)
         .eq("q_idx", qIdx)
         .order("created_at", { ascending: true }),
-      loadStudentAnswer(supabase, sessionId, qIdx),
+      isAssignmentType(exam.type)
+        ? Promise.resolve(
+            typeof session.final_answer === "string" ? session.final_answer : "",
+          )
+        : loadStudentAnswer(supabase, sessionId, qIdx),
       loadStudentChatSummary(supabase, sessionId, qIdx),
     ]);
 
