@@ -108,16 +108,7 @@ export interface MirrorRule {
   exemptions?: MirrorExemption[];
 }
 
-export interface PatternRule {
-  id: string;
-  kind: "pattern";
-  severity: Severity;
-  anyPath: string[];
-  signals: string[];
-  message: string;
-}
-
-export type Rule = MirrorRule | PatternRule;
+export type Rule = MirrorRule;
 
 export interface RuleCatalog {
   version: number;
