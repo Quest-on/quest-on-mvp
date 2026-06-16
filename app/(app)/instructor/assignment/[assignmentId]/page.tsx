@@ -44,6 +44,7 @@ import { useExamDetail } from "@/hooks/useExamDetail";
 import { useStudentFiltering } from "@/hooks/useStudentFiltering";
 import { qk } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
+import { getScoreColor } from "@/lib/grading-utils";
 import type { InstructorStudent } from "@/lib/types/exam";
 import type { StudentFilterSortOption } from "@/hooks/useStudentFiltering";
 
@@ -531,9 +532,10 @@ export default function AssignmentDashboard({
             <div className="border rounded-lg overflow-hidden">
               {/* Table Header */}
               <div className="bg-muted/50 border-b px-4 py-3">
-                <div className="grid grid-cols-[1fr_140px_100px_80px] gap-4 items-center text-sm font-medium text-muted-foreground">
+                <div className="grid grid-cols-[1fr_130px_70px_90px_70px] gap-4 items-center text-sm font-medium text-muted-foreground">
                   <span>학생</span>
                   <span>제출일시</span>
+                  <span>점수</span>
                   <span>상태</span>
                   <span className="text-center">액션</span>
                 </div>
@@ -608,7 +610,7 @@ function StudentRow({
   analyticsData?: Record<string, unknown> | null;
 }) {
   return (
-    <div className="grid grid-cols-[1fr_140px_100px_80px] gap-4 items-center px-4 py-3 hover:bg-muted/50 transition-colors">
+    <div className="grid grid-cols-[1fr_130px_70px_90px_70px] gap-4 items-center px-4 py-3 hover:bg-muted/50 transition-colors">
       {/* Student info */}
       <div className="flex items-center gap-3 min-w-0">
         <Avatar className="h-8 w-8 border flex-shrink-0">
@@ -639,6 +641,15 @@ function StudentRow({
               minute: "2-digit",
             })
           : "-"}
+      </div>
+
+      {/* Score — 확정(commit)된 과제 점수만 표시 */}
+      <div className="text-sm font-semibold">
+        {student.isGraded && student.score != null ? (
+          <span className={getScoreColor(student.score)}>{student.score}점</span>
+        ) : (
+          <span className="text-muted-foreground font-normal">-</span>
+        )}
       </div>
 
       {/* Status */}

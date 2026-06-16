@@ -41,11 +41,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { StageGrading, StageKey, QuestionSummaryData, GradingProgress } from "@/lib/types/grading";
-import {
-  assignmentLabelToScore,
-  isAiGraded,
-  scoreToAssignmentLabel,
-} from "@/lib/grading-utils";
+import { isAiGraded } from "@/lib/grading-utils";
 
 interface Conversation {
   id: string;
@@ -276,7 +272,8 @@ export default function AssignmentGradePage({
 
       Object.entries(sessionData.grades).forEach(([qIdx, grade]) => {
         const typedGrade = grade as Grade;
-        initialScores[parseInt(qIdx)] = assignmentLabelToScore(scoreToAssignmentLabel(typedGrade.score));
+        // AI 가채점 원점수(0-100)를 그대로 사용 — 등급 라벨로 양자화하지 않는다.
+        initialScores[parseInt(qIdx)] = typedGrade.score;
         initialFeedbacks[parseInt(qIdx)] = typedGrade.comment || "";
         if (typedGrade.stage_grading) {
           if (typedGrade.stage_grading.chat) {
@@ -454,7 +451,7 @@ export default function AssignmentGradePage({
       setScores({ ...scores, [selectedQuestionIdx]: currentAiGradedScore });
       setAcceptedAiScores({ ...acceptedAiScores, [selectedQuestionIdx]: true });
       toast.success(
-        `AI 추천 등급 ${scoreToAssignmentLabel(currentAiGradedScore)}으로 설정되었습니다. 저장 버튼을 눌러 확정하세요.`,
+        `AI 추천 점수 ${currentAiGradedScore}점으로 설정되었습니다. 저장 버튼을 눌러 확정하세요.`,
         { duration: 3000 }
       );
     }
@@ -579,7 +576,7 @@ export default function AssignmentGradePage({
                 </div>
                 {sessionData.overallScore !== null && (
                   <p className="text-lg font-semibold mt-2">
-                    전체 등급: {scoreToAssignmentLabel(sessionData.overallScore)}
+                    전체 점수: {sessionData.overallScore}점
                   </p>
                 )}
               </div>

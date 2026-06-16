@@ -11,6 +11,7 @@ import {
   formatSummaryScoreLabel,
   resolveByQIdx,
   isAssignmentType,
+  buildAssignmentScoreMap,
 } from "@/lib/grading-helpers";
 
 describe("isAssignmentType", () => {
@@ -24,6 +25,39 @@ describe("isAssignmentType", () => {
     expect(isAssignmentType("exam")).toBe(false);
     expect(isAssignmentType(null)).toBe(false);
     expect(isAssignmentType(undefined)).toBe(false);
+  });
+});
+
+describe("buildAssignmentScoreMap", () => {
+  it("maps session_id → score for valid numeric scores", () => {
+    const map = buildAssignmentScoreMap([
+      { session_id: "s1", score: 82 },
+      { session_id: "s2", score: 0 },
+      { session_id: "s3", score: 100 },
+    ]);
+    expect(map.get("s1")).toBe(82);
+    expect(map.get("s2")).toBe(0); // 0점도 유효한 확정 점수
+    expect(map.get("s3")).toBe(100);
+    expect(map.size).toBe(3);
+  });
+
+  it("preserves the raw AI score without rounding to grade bands (82 stays 82)", () => {
+    const map = buildAssignmentScoreMap([{ session_id: "s1", score: 82 }]);
+    expect(map.get("s1")).toBe(82);
+  });
+
+  it("excludes rows with non-finite or non-number scores so ungraded items never show as 0", () => {
+    const map = buildAssignmentScoreMap([
+      { session_id: "s1", score: null },
+      { session_id: "s2", score: undefined },
+      { session_id: "s3", score: "85" },
+      { session_id: "s4", score: NaN },
+    ]);
+    expect(map.size).toBe(0);
+  });
+
+  it("returns an empty map for no rows", () => {
+    expect(buildAssignmentScoreMap([]).size).toBe(0);
   });
 });
 
