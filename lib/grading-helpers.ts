@@ -216,6 +216,23 @@ export function isAssignmentType(type?: string | null): boolean {
 }
 
 /**
+ * 강사 채점을 시작할 수 있는 시점인지 판정한다(시험/과제 통일 게이트).
+ * - 과제(isAssignmentType): 마감(deadline) 경과 후. deadline 미설정이면 아직 불가.
+ * - 시험: status === "closed" (대기실 종료 흐름).
+ * bulk-grade-access의 requireGradable 분기와 동일한 규약 — case-grade·grade 라우트가 공유한다.
+ */
+export function isGradingOpen(exam: {
+  type?: string | null;
+  status?: string | null;
+  deadline?: string | null;
+}): boolean {
+  if (isAssignmentType(exam.type)) {
+    return exam.deadline != null && new Date() > new Date(exam.deadline);
+  }
+  return exam.status === "closed";
+}
+
+/**
  * 과제 대시보드 학생 목록용: 확정(grade_type="manual", q_idx 0) grade row들을
  * session_id → score 맵으로 만든다. 호출 측에서 q_idx/grade_type 필터를 끝낸 행만 넘긴다.
  * score가 유한한 숫자가 아닌 행은 제외해, 채점되지 않은(또는 손상된) 항목이 0점으로

@@ -1,22 +1,29 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { errorJson } from "@/lib/api-response";
 import type { AppUser } from "@/lib/get-current-user";
-import { isCaseQuestion, normalizeQuestions } from "@/lib/grading-helpers";
+import {
+  isCaseQuestion,
+  normalizeQuestions,
+  isAssignmentType,
+  isGradingOpen,
+} from "@/lib/grading-helpers";
 
 export type CaseGradeAccessContext = {
   supabase: ReturnType<typeof getSupabaseServer>;
-  session: { id: string; exam_id: string };
+  session: { id: string; exam_id: string; final_answer?: string | null };
   exam: {
     instructor_id: string;
     questions: unknown;
     language?: string | null;
     status?: string | null;
+    type?: string | null;
+    deadline?: string | null;
   };
   user: AppUser;
 };
 
 type CaseGradeAccessOptions = {
-  requireClosed?: boolean;
+  requireGradable?: boolean;
 };
 
 export function hasQuestionWithQIdx(questions: unknown, qIdx: number): boolean {
@@ -57,7 +64,7 @@ export async function requireCaseGradeAccess(
 
   const { data: session, error: sessionError } = await supabase
     .from("sessions")
-    .select("id, exam_id")
+    .select("id, exam_id, final_answer")
     .eq("id", sessionId)
     .single();
 
@@ -67,7 +74,7 @@ export async function requireCaseGradeAccess(
 
   const { data: exam, error: examError } = await supabase
     .from("exams")
-    .select("instructor_id, questions, language, status")
+    .select("instructor_id, questions, language, status, type, deadline")
     .eq("id", session.exam_id)
     .single();
 
@@ -79,7 +86,17 @@ export async function requireCaseGradeAccess(
     return { ok: false, response: errorJson("FORBIDDEN", "Forbidden", 403) };
   }
 
-  if (options.requireClosed && exam.status !== "closed") {
+  if (options.requireGradable && !isGradingOpen(exam)) {
+    if (isAssignmentType(exam.type)) {
+      return {
+        ok: false,
+        response: errorJson(
+          "ASSIGNMENT_NOT_DUE",
+          "과제 마감 후에 채점할 수 있습니다.",
+          409,
+        ),
+      };
+    }
     return {
       ok: false,
       response: errorJson(
@@ -107,7 +124,9 @@ export async function requireCaseGradeAccess(
         ),
       };
     }
-    if (Array.isArray(exam.questions) && !isCaseQuestionQIdx(exam.questions, qIdx)) {
+    // For assignments, q_idx=0 is the single answer surface — skip case-type gate.
+    // For exams, enforce that the question must be a case-type.
+    if (!isAssignmentType(exam.type) && Array.isArray(exam.questions) && !isCaseQuestionQIdx(exam.questions, qIdx)) {
       return {
         ok: false,
         response: errorJson(
