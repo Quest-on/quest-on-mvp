@@ -469,6 +469,22 @@ export async function updateExam(data: {
       throw error;
     }
 
+    if (typeof data.update.title === "string") {
+      const { error: nodeSyncError } = await getSupabase()
+        .from("exam_nodes")
+        .update({ name: data.update.title })
+        .eq("exam_id", data.id)
+        .eq("instructor_id", user.id)
+        .eq("kind", "exam");
+
+      if (nodeSyncError) {
+        logError("[updateExam] Failed to sync exam node name", nodeSyncError, {
+          path: "/api/supa/exam-handlers",
+          additionalData: { examId: data.id },
+        });
+      }
+    }
+
     // Audit log: exam status change (awaited for critical operations)
     if (data.update.status) {
       await auditLog({

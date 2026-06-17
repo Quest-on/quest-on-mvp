@@ -14,13 +14,21 @@ import { describe, expect, it } from "vitest";
  */
 const PAGE = "app/(app)/instructor/[examId]/grade/[studentId]/page.tsx";
 
-/** 채점 페이지가 세 조회(submissions/grades/messages)에 resolveByQIdx 폴백을 쓰는가. */
+/** 채점 페이지가 submissions(배열 위치)와 grades(question.idx) 이중 q_idx 규약을 분리해 쓰는가. */
 export function usesQIdxFallback(src: string): boolean {
-  const imported = /import\s*\{[^}]*\bresolveByQIdx\b[^}]*\}\s*from\s*["']@\/lib\/grading-helpers["']/.test(src);
-  const sub = /resolveByQIdx\s*\(\s*sessionData\.submissions\b/.test(src);
-  const grade = /resolveByQIdx\s*\(\s*sessionData\.grades\b/.test(src);
-  const msg = /resolveByQIdx\s*\(\s*sessionData\.messages\b/.test(src);
-  return imported && sub && grade && msg;
+  const resolveByQIdxPattern =
+    /import\s*\{[^}]*\bresolveByQIdx\b[^}]*\}\s*from\s*["']@\/lib\/grading-helpers["']/.test(src) &&
+    /resolveByQIdx\s*\(\s*sessionData\.submissions\b/.test(src) &&
+    /resolveByQIdx\s*\(\s*sessionData\.grades\b/.test(src) &&
+    /resolveByQIdx\s*\(\s*sessionData\.messages\b/.test(src);
+
+  const splitIdxPattern =
+    /const\s+submissionQIdx\s*=\s*selectedQuestionIdx/.test(src) &&
+    /sessionData\.submissions\?\.\[submissionQIdx\]/.test(src) &&
+    /sessionData\.grades\?\.\[gradeQIdx\]/.test(src) &&
+    /sessionData\.messages\?\.\[submissionQIdx\]/.test(src);
+
+  return resolveByQIdxPattern || splitIdxPattern;
 }
 
 describe("q_idx grade-mapping regression guard (real incident e4ae062)", () => {

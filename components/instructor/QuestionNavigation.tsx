@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { getGradeDisplayScore, resolveQuestionQIdx } from "@/lib/grade-utils";
 
 interface Question {
   id: string;
@@ -16,6 +17,10 @@ interface Grade {
   q_idx: number;
   score: number;
   comment?: string;
+  grade_type?: string;
+  stage_grading?: {
+    answer?: { score?: number };
+  };
 }
 
 type FilterType = "all" | "multiple-choice" | "true-false" | "case";
@@ -26,6 +31,8 @@ interface QuestionNavigationProps {
   onSelectQuestion: (idx: number) => void;
   grades: Record<number, Grade>;
   hideScores?: boolean;
+  /** questions[i]의 전역 q_idx. CASE만 필터링해 넘길 때 필수. */
+  questionGlobalIndices?: number[];
   /** URL questionType 파라미터로부터 초기 선택할 탭. */
   initialFilter?: string;
 }
@@ -45,12 +52,6 @@ function normalizeFilter(raw?: string): FilterType {
   if (raw === "true-false") return "true-false";
   if (raw === "case") return "case";
   return "all";
-}
-
-function questionFilterBucket(type: string): Exclude<FilterType, "all"> {
-  if (type === "multiple-choice") return "multiple-choice";
-  if (type === "true-false") return "true-false";
-  return "case";
 }
 
 /** 문제 유형별 번호를 붙인 레이블 배열 반환. 예: ["사지선다 1", "사지선다 2", "OX 1", "CASE 1"] */
@@ -76,6 +77,7 @@ export function QuestionNavigation({
   onSelectQuestion,
   grades,
   hideScores = false,
+  questionGlobalIndices,
   initialFilter,
 }: QuestionNavigationProps) {
   const [activeFilter, setActiveFilter] = useState<FilterType>(() =>
@@ -92,6 +94,11 @@ export function QuestionNavigation({
 
   const labels = buildQuestionLabels(questions);
 
+  const distinctQuestionTypes = new Set(
+    questions.map((q) => (isCaseType(q.type) ? "case" : q.type)),
+  );
+  const hasMultipleQuestionTypes = distinctQuestionTypes.size > 1;
+
   // 실제 탭에 표시할 유형만 (해당 유형 문제가 1개 이상 있을 때)
   const availableTabs = FILTER_TABS.filter((tab) => {
     if (tab.key === "all") return true;
@@ -99,13 +106,6 @@ export function QuestionNavigation({
       tab.key === "case" ? isCaseType(q.type) : q.type === tab.key
     );
   });
-
-  // 유형이 하나뿐이면 "모두" vs "Case" 등 필터 탭이 동일 집합만 보여줘 의미 없음
-  const distinctTypeBuckets = new Set(
-    questions.map((q) => questionFilterBucket(q.type))
-  );
-  const showFilterTabs =
-    distinctTypeBuckets.size > 1 && availableTabs.length > 1;
 
   // 필터에 맞는 (배열 인덱스, question) 쌍
   const visibleQuestions = questions
@@ -118,7 +118,7 @@ export function QuestionNavigation({
 
   return (
     <div className="mb-6 space-y-3">
-      {showFilterTabs && (
+      {hasMultipleQuestionTypes && availableTabs.length > 1 && (
         <div className="flex gap-1 flex-wrap">
           {availableTabs.map((tab) => (
             <Button
@@ -148,8 +148,10 @@ export function QuestionNavigation({
 
       <div className="flex gap-2 flex-wrap">
         {visibleQuestions.map(({ q, arrIdx, label }) => {
-          const qIdx = Number.isInteger(q.idx) ? q.idx : arrIdx;
+          const globalIndex = questionGlobalIndices?.[arrIdx] ?? arrIdx;
+          const qIdx = resolveQuestionQIdx(q, globalIndex);
           const grade = grades[qIdx];
+          const displayScore = getGradeDisplayScore(grade);
           return (
             <Button
               key={q.id || arrIdx}
@@ -160,12 +162,12 @@ export function QuestionNavigation({
               data-testid={`question-nav-${arrIdx}`}
             >
               {label}
-              {grade && !hideScores && (
+              {displayScore !== null && !hideScores && (
                 <Badge
                   variant="secondary"
                   className="ml-2 bg-green-100 text-green-800"
                 >
-                  {grade.score || 0}점
+                  {displayScore}점
                 </Badge>
               )}
             </Button>

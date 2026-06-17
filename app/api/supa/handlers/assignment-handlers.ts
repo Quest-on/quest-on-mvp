@@ -313,6 +313,22 @@ export async function updateAssignment(data: {
       return errorJson("UPDATE_ASSIGNMENT_FAILED", "Failed to update assignment", 500);
     }
 
+    if (typeof title === "string") {
+      const { error: nodeSyncError } = await getSupabase()
+        .from("exam_nodes")
+        .update({ name: title })
+        .eq("exam_id", data.id)
+        .eq("instructor_id", user.id)
+        .eq("kind", "exam");
+
+      if (nodeSyncError) {
+        logError("[updateAssignment] Failed to sync exam node name", nodeSyncError, {
+          path: "/api/supa/assignment-handlers",
+          additionalData: { assignmentId: data.id },
+        });
+      }
+    }
+
     return successJson({ updated: true });
   } catch (error) {
     logError("[updateAssignment] Failed", error, { path: "/api/supa/assignment-handlers" });
