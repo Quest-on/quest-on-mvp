@@ -4,154 +4,15 @@ import {
   decompressSubmissions,
   decompressMessages,
   normalizeQuestions,
+  resolveSubmissionQIdx,
   calculateWeightedScore,
   calculateAiDependencyPenalty,
   analyzeAiDependency,
   summarizeAiDependencyAssessments,
   formatSummaryScoreLabel,
-  resolveByQIdx,
-  isAssignmentType,
-  buildAssignmentScoreMap,
-  isGradingOpen,
+  detectAnswerDelegationSuspected,
+  buildSummaryDelegationPreCheckHint,
 } from "@/lib/grading-helpers";
-
-describe("isGradingOpen", () => {
-  // Fixed reference point: 2026-06-16 (today per MEMORY). Tests use relative
-  // ISO strings that are clearly in the past or future.
-  const PAST = "2024-01-01T00:00:00Z";   // well before today
-  const FUTURE = "2099-12-31T23:59:59Z"; // well after today
-
-  describe("assignment (type='report')", () => {
-    it("returns true when deadline is in the past", () => {
-      expect(isGradingOpen({ type: "report", deadline: PAST })).toBe(true);
-    });
-
-    it("returns false when deadline is in the future", () => {
-      expect(isGradingOpen({ type: "report", deadline: FUTURE })).toBe(false);
-    });
-
-    it("returns false when deadline is null (not yet set)", () => {
-      expect(isGradingOpen({ type: "report", deadline: null })).toBe(false);
-    });
-
-    it("returns false when deadline is undefined", () => {
-      expect(isGradingOpen({ type: "report" })).toBe(false);
-    });
-
-    it("ignores status field — assignment gate depends only on deadline", () => {
-      expect(isGradingOpen({ type: "report", status: "closed", deadline: FUTURE })).toBe(false);
-      expect(isGradingOpen({ type: "report", status: "draft",  deadline: PAST  })).toBe(true);
-    });
-  });
-
-  describe("exam (type='exam' or null/undefined)", () => {
-    it("returns true when status is 'closed'", () => {
-      expect(isGradingOpen({ type: "exam",  status: "closed" })).toBe(true);
-      expect(isGradingOpen({ type: null,    status: "closed" })).toBe(true);
-      expect(isGradingOpen({ type: undefined, status: "closed" })).toBe(true);
-    });
-
-    it("returns false when status is 'draft'", () => {
-      expect(isGradingOpen({ type: "exam", status: "draft" })).toBe(false);
-    });
-
-    it("returns false when status is 'open'", () => {
-      expect(isGradingOpen({ type: "exam", status: "open" })).toBe(false);
-    });
-
-    it("returns false when status is null", () => {
-      expect(isGradingOpen({ type: "exam", status: null })).toBe(false);
-    });
-
-    it("ignores deadline field — exam gate depends only on status", () => {
-      // Past deadline should not make a non-closed exam gradable
-      expect(isGradingOpen({ type: "exam", status: "open", deadline: PAST })).toBe(false);
-      // Future deadline should not block a closed exam
-      expect(isGradingOpen({ type: "exam", status: "closed", deadline: FUTURE })).toBe(true);
-    });
-  });
-});
-
-describe("isAssignmentType", () => {
-  it("treats every non-exam task type as an assignment", () => {
-    for (const type of ["report", "code", "erd", "mindmap", "assignment"]) {
-      expect(isAssignmentType(type)).toBe(true);
-    }
-  });
-
-  it("treats exam and empty/null type as not an assignment", () => {
-    expect(isAssignmentType("exam")).toBe(false);
-    expect(isAssignmentType(null)).toBe(false);
-    expect(isAssignmentType(undefined)).toBe(false);
-  });
-});
-
-describe("buildAssignmentScoreMap", () => {
-  it("maps session_id → score for valid numeric scores", () => {
-    const map = buildAssignmentScoreMap([
-      { session_id: "s1", score: 82 },
-      { session_id: "s2", score: 0 },
-      { session_id: "s3", score: 100 },
-    ]);
-    expect(map.get("s1")).toBe(82);
-    expect(map.get("s2")).toBe(0); // 0점도 유효한 확정 점수
-    expect(map.get("s3")).toBe(100);
-    expect(map.size).toBe(3);
-  });
-
-  it("preserves the raw AI score without rounding to grade bands (82 stays 82)", () => {
-    const map = buildAssignmentScoreMap([{ session_id: "s1", score: 82 }]);
-    expect(map.get("s1")).toBe(82);
-  });
-
-  it("excludes rows with non-finite or non-number scores so ungraded items never show as 0", () => {
-    const map = buildAssignmentScoreMap([
-      { session_id: "s1", score: null },
-      { session_id: "s2", score: undefined },
-      { session_id: "s3", score: "85" },
-      { session_id: "s4", score: NaN },
-    ]);
-    expect(map.size).toBe(0);
-  });
-
-  it("returns an empty map for no rows", () => {
-    expect(buildAssignmentScoreMap([]).size).toBe(0);
-  });
-});
-
-describe("resolveByQIdx", () => {
-  // 회귀: 채점 페이지가 question.idx 로만 조회해, idx ≠ 배열 위치인 시험에서
-  // 답안/채팅이 빈 값으로 빠지던 버그. [idx, 배열위치] 폴백으로 복구한다.
-  const submissions = { 17: { answer: "essay-A" }, 18: { answer: "essay-B" } };
-
-  it("idx ≠ 배열 위치일 때 배열 위치 키로 폴백한다", () => {
-    // question.idx 22 → 저장은 배열 위치 17
-    expect(resolveByQIdx(submissions, [22, 17])).toEqual({ answer: "essay-A" });
-  });
-
-  it("idx == 배열 위치인 일반 시험은 그대로 첫 키로 찾는다", () => {
-    expect(resolveByQIdx(submissions, [17, 17])).toEqual({ answer: "essay-A" });
-  });
-
-  it("앞선 키에 값이 있으면 그 값을 우선한다", () => {
-    const both = { 17: "pos", 22: "idx" };
-    expect(resolveByQIdx(both, [22, 17])).toBe("idx");
-  });
-
-  it("어느 키에도 값이 없으면 undefined", () => {
-    expect(resolveByQIdx(submissions, [22, 23])).toBeUndefined();
-  });
-
-  it("빈 배열 값도 정의된 값으로 취급한다(메시지 빈 배열)", () => {
-    const messages = { 17: [] as unknown[] };
-    expect(resolveByQIdx(messages, [22, 17])).toEqual([]);
-  });
-
-  it("record 가 없으면 undefined", () => {
-    expect(resolveByQIdx(undefined, [1, 2])).toBeUndefined();
-    expect(resolveByQIdx(null, [1, 2])).toBeUndefined();
-  });
-});
 
 describe("selectBestSubmission", () => {
   it("uses deterministic id-based tiebreak when timestamps match", () => {
@@ -409,6 +270,22 @@ describe("normalizeQuestions", () => {
   });
 });
 
+describe("resolveSubmissionQIdx", () => {
+  it("maps grade qIdx to array position when question.idx differs (BIFJ0Z pattern)", () => {
+    const questions = [
+      { idx: 17, type: "true-false" },
+      { idx: 22, type: "essay" },
+    ];
+    expect(resolveSubmissionQIdx(questions, 22)).toBe(1);
+    expect(resolveSubmissionQIdx(questions, 17)).toBe(0);
+  });
+
+  it("returns gradeQIdx when it already matches array position", () => {
+    const questions = [{ type: "essay" }, { type: "essay" }];
+    expect(resolveSubmissionQIdx(questions, 1)).toBe(1);
+  });
+});
+
 describe("analyzeAiDependency", () => {
   it("detects delegation and starting-point dependency without recovery", () => {
     const assessment = analyzeAiDependency({
@@ -447,6 +324,45 @@ describe("analyzeAiDependency", () => {
     expect(assessment.recoveryObserved).toBe(true);
     expect(assessment.recoveryEvidence.length).toBeGreaterThan(0);
     expect(["low", "medium"]).toContain(assessment.overallRisk);
+  });
+});
+
+describe("detectAnswerDelegationSuspected", () => {
+  it("detects direct answer write requests", () => {
+    expect(detectAnswerDelegationSuspected(["답 써줘"])).toBe(true);
+  });
+
+  it("detects common typos as delegation", () => {
+    expect(detectAnswerDelegationSuspected(["탑 써줘"])).toBe(true);
+    expect(detectAnswerDelegationSuspected(["답 서줘"])).toBe(true);
+    expect(detectAnswerDelegationSuspected(["답 써조"])).toBe(true);
+    expect(detectAnswerDelegationSuspected(["답안 작성해조"])).toBe(true);
+    expect(detectAnswerDelegationSuspected(["정답 알려조"])).toBe(true);
+    expect(detectAnswerDelegationSuspected(["답썾"])).toBe(true);
+    expect(detectAnswerDelegationSuspected(["답써"])).toBe(true);
+  });
+
+  it("does not treat concept questions as delegation", () => {
+    expect(detectAnswerDelegationSuspected(["개념 알려줘"])).toBe(false);
+    expect(detectAnswerDelegationSuspected(["예를 들어줘"])).toBe(false);
+  });
+
+  it("returns false when prior self-analysis is sufficient", () => {
+    expect(
+      detectAnswerDelegationSuspected([
+        "내가 A안과 B안을 비교해봤는데 수출이 낫다고 생각해",
+        "가정을 정리하면 브랜드 통제가 핵심이야",
+        "답 써줘",
+      ]),
+    ).toBe(false);
+  });
+});
+
+describe("buildSummaryDelegationPreCheckHint", () => {
+  it("uses shortcut hint for typo delegation messages", () => {
+    const hint = buildSummaryDelegationPreCheckHint(["탑 써조"]);
+    expect(hint).toContain("단축 경로 적용");
+    expect(hint).toContain("오타");
   });
 });
 

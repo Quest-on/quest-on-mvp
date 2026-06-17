@@ -72,36 +72,52 @@ describe("getSubmissionForQuestion — OX must resolve to OX submissions", () =>
   });
 });
 
-describe("getSubmissionForQuestion — candidate precedence (position-first)", () => {
-  it("prefers the GLOBAL position over a stale idx (submissions are keyed by position)", () => {
-    // question.idx (5) ≠ array position (0). Storage is by position → position wins.
-    const q = { idx: 5, id: "uuid-5", type: "true-false" };
-    const sub = getSubmissionForQuestion(SUBMISSIONS, q, 0);
-    expect(sub).toEqual(SUBMISSIONS["0"]);
-  });
-
-  it("REGRESSION: an OX whose stale idx collides with another question's position resolves to its OWN position", () => {
-    // OX at array position 14 carries idx 17 (idx gaps from deleted questions);
-    // position 17 holds a different (essay) submission. Must NOT grab it.
-    const subs: Record<string, { answer: string }> = {
-      "14": { answer: "1" }, // the OX answer at its real position
-      "17": { answer: "essay text..." }, // a different question's submission
+describe("getSubmissionForQuestion — candidate precedence", () => {
+  it("prefers global index over explicit idx when they differ", () => {
+    const subs = {
+      "14": { q_idx: 14, answer: "0" },
+      "17": { q_idx: 17, answer: "essay text" },
     };
-    const oxQuestion = { idx: 17, id: "uuid-ox", type: "true-false" };
-    expect(getSubmissionForQuestion(subs, oxQuestion, 14)).toEqual({ answer: "1" });
+    const q = { idx: 17, type: "true-false" };
+    expect(getSubmissionForQuestion(subs, q, 14)).toEqual(subs["14"]);
   });
 
-  it("falls back to idx, then numeric id, when the position misses", () => {
+  it("falls back to explicit idx when global index has no submission", () => {
+    const subs = {
+      "5": { q_idx: 5, answer: "1" },
+    };
+    const q = { idx: 5, id: "uuid-5", type: "true-false" };
+    const sub = getSubmissionForQuestion(subs, q, 0);
+    expect(sub).toEqual(subs["5"]);
+  });
+
+  it("falls back to numeric id when idx absent and global index misses", () => {
     const subs = { "42": { q_idx: 42, answer: "1" } };
-    // position 99 misses, idx absent → numeric id 42
-    expect(getSubmissionForQuestion(subs, { id: "42", type: "true-false" }, 99)).toEqual(subs["42"]);
-    // position 99 misses, idx 42 hits
-    expect(getSubmissionForQuestion(subs, { idx: 42, id: "uuid", type: "true-false" }, 99)).toEqual(subs["42"]);
+    const q = { id: "42", type: "true-false" };
+    expect(getSubmissionForQuestion(subs, q, 99)).toEqual(subs["42"]);
   });
 
   it("returns undefined when nothing resolves", () => {
     expect(getSubmissionForQuestion(SUBMISSIONS, { id: "uuid-x", type: "true-false" }, 99)).toBeUndefined();
     expect(getSubmissionForQuestion(undefined, { id: "x" }, 0)).toBeUndefined();
+  });
+});
+
+describe("getSubmissionForQuestion — non-sequential question idx (BIFJ0Z pattern)", () => {
+  it("resolves OX/CASE submissions stored at array positions, not question.idx", () => {
+    const questions = [
+      { idx: 17, type: "true-false" },
+      { idx: 22, type: "essay" },
+    ];
+    const subs = {
+      "0": { q_idx: 0, answer: "0" },
+      "1": { q_idx: 1, answer: "Student essay answer" },
+    };
+
+    expect(getSubmissionForQuestion(subs, questions[0], 0)?.answer).toBe("0");
+    expect(getSubmissionForQuestion(subs, questions[1], 1)?.answer).toBe(
+      "Student essay answer",
+    );
   });
 });
 

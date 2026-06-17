@@ -43,6 +43,14 @@ test.describe("Supa — POST /api/supa (extended actions)", () => {
     const dbExam = await getExam(exam.id);
     expect(dbExam.title).toBe("Updated Title");
     expect(dbExam.duration).toBe(90);
+
+    const { data: examNode } = await supabase
+      .from("exam_nodes")
+      .select("name")
+      .eq("exam_id", exam.id)
+      .eq("kind", "exam")
+      .single();
+    expect(examNode?.name).toBe("Updated Title");
   });
 
   test("student cannot update exam → 403", async ({ studentRequest }) => {

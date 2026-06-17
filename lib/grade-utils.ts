@@ -91,6 +91,32 @@ export function isScoringGrade(
   );
 }
 
+type GradeDisplaySource = {
+  score?: number | null;
+  grade_type?: string | null;
+  stage_grading?: {
+    answer?: { score?: number | null };
+  } | null;
+};
+
+/** Navigation/UI용 점수: 확정 채점(manual/auto)만 반영, placeholder 제외. */
+export function getGradeDisplayScore(
+  grade: GradeDisplaySource | null | undefined,
+): number | null {
+  if (!grade || !isScoringGrade(grade)) return null;
+
+  const stageScore = grade.stage_grading?.answer?.score;
+  if (typeof stageScore === "number" && Number.isFinite(stageScore)) {
+    return Math.round(stageScore);
+  }
+
+  return Math.round(grade.score);
+}
+
+export function isManualGradeType(gradeType?: string | null): boolean {
+  return gradeType === "manual";
+}
+
 /** Deduplicate grades: keep highest-priority grade per q_idx (manual > auto > ai_failed) */
 export function deduplicateGrades<T extends GradeRow>(grades: T[]): T[] {
   const bestByIdx = new Map<number, T>();
@@ -159,6 +185,14 @@ function questionQIdx(question: ScoreQuestion, fallbackIndex: number): number {
     return question.q_idx;
   }
   return fallbackIndex;
+}
+
+/** Submissions/grades 키와 맞출 때 사용하는 전역 문항 인덱스. */
+export function resolveQuestionQIdx(
+  question: ScoreQuestion,
+  globalIndex: number,
+): number {
+  return questionQIdx(question, globalIndex);
 }
 
 function scoreItemQIdx(item: ScoreItem): number | null {
