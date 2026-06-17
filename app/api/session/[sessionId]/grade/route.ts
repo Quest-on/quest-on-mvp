@@ -14,18 +14,10 @@ import { upsertGradesBySessionQuestion } from "@/lib/grades-upsert";
 import {
   calculateScoreFromItems,
   deduplicateGrades,
-  isManualGradeType,
-  isScoringGrade,
   isSuccessfulGradeType,
   normalizeScoreWeights,
   type ScoreItem,
 } from "@/lib/grade-utils";
-import {
-  getProposedGrade,
-  isBulkGradingSessionCommitted,
-  normalizeProposedGrades,
-} from "@/lib/bulk-grade-proposed";
-import { parseSuggestedScoreFromText } from "@/lib/case-grade-score";
 import { hasQuestionWithQIdx } from "@/lib/case-grade-access";
 import { gradeObjectiveAnswer, isObjectiveQuestion, isGradingOpen, isAssignmentType } from "@/lib/grading-helpers";
 
@@ -111,7 +103,7 @@ export async function GET(
     }
 
     // Optimized: Fetch submissions, messages, grades, paste_logs, and assignment quiz in parallel
-    const [submissionsResult, messagesResult, gradesResult, pasteLogsResult, quizResult, gradingSessionResult] =
+    const [submissionsResult, messagesResult, gradesResult, pasteLogsResult, quizResult] =
       await Promise.all([
         supabase
           .from("submissions")
@@ -191,12 +183,6 @@ export async function GET(
           )
           .eq("session_id", sessionId)
           .maybeSingle(),
-        supabase
-          .from("exam_grading_sessions")
-          .select("proposed_grades, status, committed_at")
-          .eq("exam_id", session.exam_id)
-          .eq("instructor_id", user.id)
-          .maybeSingle(),
       ]);
 
     const { data: submissions, error: submissionsError } = submissionsResult;
@@ -204,7 +190,6 @@ export async function GET(
     const { data: grades, error: gradesError } = gradesResult;
     const { data: pasteLogs, error: pasteLogsError } = pasteLogsResult;
     const { data: quizAttempt, error: quizError } = quizResult;
-    const { data: gradingSession, error: gradingSessionError } = gradingSessionResult;
 
     const path = `/api/session/${sessionId}/grade`;
     if (submissionsError) logError("Submissions query failed", submissionsError, { path, additionalData: { sessionId } });
@@ -212,12 +197,6 @@ export async function GET(
     if (gradesError) logError("Grades query failed", gradesError, { path, additionalData: { sessionId } });
     if (pasteLogsError) logError("PasteLogs query failed", pasteLogsError, { path, additionalData: { sessionId } });
     if (quizError) logError("Assignment quiz query failed", quizError, { path, additionalData: { sessionId } });
-    if (gradingSessionError) {
-      logError("Bulk grading session query failed", gradingSessionError, {
-        path,
-        additionalData: { sessionId },
-      });
-    }
 
     // Check if instructor owns the exam
     if (exam.instructor_id !== user.id) {
@@ -373,90 +352,13 @@ export async function GET(
       });
     }
 
-    // Organize grades by question index (manual > auto; exclude ai_summary placeholders)
+    // Organize grades by question index
     const gradesByQuestion: Record<string, unknown> = {};
-    const dedupedGrades = deduplicateGrades(grades ?? []);
-    for (const grade of dedupedGrades) {
-      if (isScoringGrade(grade)) {
-        gradesByQuestion[grade.q_idx] = grade;
-      }
-    }
-
-    const proposedGrades = normalizeProposedGrades(gradingSession?.proposed_grades);
-    const bulkGradingCommitted = isBulkGradingSessionCommitted(gradingSession);
-
-    if (Array.isArray(exam.questions)) {
-      const caseQIdxsMissingScore: number[] = [];
-
-      exam.questions.forEach((question: { idx?: number; type?: string }, index: number) => {
-        if (isObjectiveQuestion(question.type)) return;
-
-        const qIdx = typeof question.idx === "number" ? question.idx : index;
-        const existing = gradesByQuestion[qIdx] as
-          | { grade_type?: string | null }
-          | undefined;
-
-        if (existing && isManualGradeType(existing.grade_type)) {
-          return;
-        }
-
-        if (!bulkGradingCommitted) {
-          const proposed = getProposedGrade(proposedGrades, sessionId, qIdx);
-          if (proposed) {
-            gradesByQuestion[qIdx] = {
-              id: `proposed-${qIdx}`,
-              q_idx: qIdx,
-              score: proposed.score,
-              comment: proposed.comment ?? "",
-              grade_type: "auto",
-            };
-            return;
-          }
-        }
-
-        if (!gradesByQuestion[qIdx]) {
-          caseQIdxsMissingScore.push(qIdx);
-        }
+    if (grades) {
+      grades.forEach((grade: Record<string, unknown>) => {
+        const qIdx = grade.q_idx as number;
+        gradesByQuestion[qIdx] = grade;
       });
-
-      if (caseQIdxsMissingScore.length > 0) {
-        const { data: gradingChatRows, error: gradingChatError } = await supabase
-          .from("grading_chats")
-          .select("q_idx, role, content, created_at")
-          .eq("session_id", sessionId)
-          .in("q_idx", caseQIdxsMissingScore)
-          .eq("role", "assistant")
-          .order("created_at", { ascending: false });
-
-        if (gradingChatError) {
-          logError("Grading chat query failed", gradingChatError, {
-            path,
-            additionalData: { sessionId },
-          });
-        } else if (gradingChatRows) {
-          const latestChatByQIdx = new Map<number, string>();
-          for (const row of gradingChatRows) {
-            const qIdx = row.q_idx as number;
-            if (!latestChatByQIdx.has(qIdx) && typeof row.content === "string") {
-              latestChatByQIdx.set(qIdx, row.content);
-            }
-          }
-
-          for (const qIdx of caseQIdxsMissingScore) {
-            const content = latestChatByQIdx.get(qIdx);
-            if (!content) continue;
-            const suggested = parseSuggestedScoreFromText(content);
-            if (suggested === null) continue;
-            gradesByQuestion[qIdx] = {
-              id: `suggested-${qIdx}`,
-              q_idx: qIdx,
-              score: suggested,
-              comment: "",
-              grade_type: "auto",
-            };
-          }
-        }
-      }
     }
 
     // Organize paste logs by question_id
@@ -484,9 +386,9 @@ export async function GET(
       );
       const scoreItems: ScoreItem[] = exam.questions.map(
         (question: { idx?: number; type?: string; options?: string[]; correctOptionIndex?: number }, index: number) => {
-          const gradeQIdx = typeof question.idx === "number" ? question.idx : index;
+          const qIdx = typeof question.idx === "number" ? question.idx : index;
           if (isObjectiveQuestion(question.type)) {
-            const submission = submissionsByQuestion[index] as
+            const submission = submissionsByQuestion[qIdx] as
               | { answer?: string }
               | undefined;
             const objective = gradeObjectiveAnswer({
@@ -494,10 +396,10 @@ export async function GET(
               options: question.options,
               correctOptionIndex: question.correctOptionIndex,
             });
-            return { qIdx: gradeQIdx, type: question.type, score: objective?.score };
+            return { qIdx, type: question.type, score: objective?.score };
           }
-          const grade = gradeByQ.get(gradeQIdx);
-          return { qIdx: gradeQIdx, type: question.type, score: grade?.score };
+          const grade = gradeByQ.get(qIdx);
+          return { qIdx, type: question.type, score: grade?.score };
         }
       );
       const scoreResult = calculateScoreFromItems(scoreItems, scoreWeights);

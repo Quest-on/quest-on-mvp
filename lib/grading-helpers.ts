@@ -194,27 +194,6 @@ export function normalizeQuestions(questions: unknown): NormalizedQuestion[] {
   }));
 }
 
-/**
- * Submissions and exam-time messages use the question's array position in
- * exams.questions at submit time. Grades and case-grade APIs use question.idx.
- */
-export function resolveSubmissionQIdx(
-  questions: unknown,
-  gradeQIdx: number,
-): number {
-  if (!questions || !Array.isArray(questions)) return gradeQIdx;
-
-  const arrayIndex = questions.findIndex((q: Record<string, unknown>) => {
-    const idx =
-      q.idx !== undefined && !Number.isNaN(Number(q.idx))
-        ? Number(q.idx)
-        : null;
-    return idx === gradeQIdx;
-  });
-  if (arrayIndex !== -1) return arrayIndex;
-  return gradeQIdx;
-}
-
 /** True when a question is graded deterministically (no LLM): 객관식/OX. */
 export function isObjectiveQuestion(type?: string): boolean {
   return type === "multiple-choice" || type === "true-false";
@@ -227,6 +206,10 @@ export function isCaseQuestion(type?: string): boolean {
 
 /**
  * True when an exam row is an assignment-style task (과제), not a timed exam.
+ * Assignments are persisted with `exams.type` ∈ {report, code, erd, mindmap, assignment}
+ * (the create form sends "report"), while exams use "exam" (or null default).
+ * The whole non-exam family shares the assignment dashboard + final_answer flow,
+ * so detect by "anything that isn't an exam" rather than a single literal.
  */
 export function isAssignmentType(type?: string | null): boolean {
   return type != null && type !== "exam";
@@ -234,6 +217,9 @@ export function isAssignmentType(type?: string | null): boolean {
 
 /**
  * 강사 채점을 시작할 수 있는 시점인지 판정한다(시험/과제 통일 게이트).
+ * - 과제(isAssignmentType): 마감(deadline) 경과 후. deadline 미설정이면 아직 불가.
+ * - 시험: status === "closed" (대기실 종료 흐름).
+ * bulk-grade-access의 requireGradable 분기와 동일한 규약 — case-grade·grade 라우트가 공유한다.
  */
 export function isGradingOpen(exam: {
   type?: string | null;
@@ -246,7 +232,12 @@ export function isGradingOpen(exam: {
   return exam.status === "closed";
 }
 
-/** 과제 대시보드 학생 목록용 session_id → score 맵. */
+/**
+ * 과제 대시보드 학생 목록용: 확정(grade_type="manual", q_idx 0) grade row들을
+ * session_id → score 맵으로 만든다. 호출 측에서 q_idx/grade_type 필터를 끝낸 행만 넘긴다.
+ * score가 유한한 숫자가 아닌 행은 제외해, 채점되지 않은(또는 손상된) 항목이 0점으로
+ * 잘못 노출되지 않게 한다.
+ */
 export function buildAssignmentScoreMap(
   rows: ReadonlyArray<{ session_id: string; score: unknown }>,
 ): Map<string, number> {
@@ -260,7 +251,17 @@ export function buildAssignmentScoreMap(
 }
 
 /**
- * Resolve a per-question record by trying several candidate q_idx keys in order.
+ * Resolve a per-question record (submissions/messages/grades) by trying several
+ * candidate q_idx keys in order, returning the first defined value.
+ *
+ * Why: the storage layer (submissions/messages/grades tables) keys rows by the
+ * question's *array position* (0-based). Most exams have `question.idx` equal to
+ * that position, but exams edited during authoring can leave `question.idx`
+ * diverged from the array position (e.g. essays at positions 17/18 carry idx
+ * 22/23). The grade page historically looked up data by `question.idx` only,
+ * so those answers/chats silently went missing. Passing
+ * `[question.idx, arrayPosition]` lets the lookup fall back to the storage
+ * truth without changing behaviour for aligned exams.
  */
 export function resolveByQIdx<T>(
   record: Record<string | number, T> | undefined | null,
@@ -335,83 +336,6 @@ export function formatSummaryScoreLabel(params: {
 
   if (isUngradedCase) return "미채점";
   return `${params.score ?? 0}점`;
-}
-
-/** 학생이 최종 답안·정답 작성을 AI에 직접 요청하는 표현 */
-const ANSWER_WRITE_REQUEST_PATTERNS = [
-  /답\s*써\s*줘/,
-  /답안\s*(을\s*)?(작성해\s*줘|(작성|써)\s*줘)/,
-  /제출용\s*(으로\s*)?(답|작성|써)/,
-  /정답\s*알려\s*줘/,
-  /그대로\s*제출/,
-  /이걸\s*바탕으로\s*답/,
-  /바탕으로\s*답\s*써/,
-];
-
-/** 답안 위임 요청 탐지 전 흔한 오타·띄어쓰기 변형을 정규화 */
-function normalizeAnswerDelegationText(content: string): string {
-  let normalized = content.replace(/\s+/g, " ").trim();
-  // 키보드 인접 오타: 탑/단 → 답 (예: "탑 써줘")
-  normalized = normalized.replace(
-    /(^|\s)([탑단])(\s*[써서])/g,
-    "$1답$3",
-  );
-  // 써→서 오타 (예: "답 서줘", "답안 서줘")
-  normalized = normalized.replace(/답\s*서/g, "답 써");
-  normalized = normalized.replace(/답안\s*서/g, "답안 써");
-  // 줘→조 오타 (예: "답 써조", "작성해조", "알려조")
-  normalized = normalized.replace(
-    /([써작성]|알려)\s*조(?=\s|$|[.!?~])/g,
-    "$1줘",
-  );
-  normalized = normalized.replace(/답안\s*(을\s*)?작성해\s*조/g, "답안 작성해줘");
-  // 써+줘 합쳐진 오타 (예: "답썾", "탑썾")
-  normalized = normalized.replace(/([답탑단])썾/g, "$1 써줘");
-  // "줘" 생략 (예: "답써"만 입력)
-  normalized = normalized.replace(/^([답탑단])써$/g, "$1 써줘");
-  return normalized;
-}
-
-function isAnswerWriteRequest(content: string): boolean {
-  const normalized = normalizeAnswerDelegationText(content);
-  return ANSWER_WRITE_REQUEST_PATTERNS.some((pattern) => pattern.test(normalized));
-}
-
-/**
- * 답안 작성 위임 단축 평가 경로 적용 여부.
- * "답 써줘"류(오타 포함)가 있고, 그 전에 학생 스스로의 분석·가정·판단이 거의 없을 때만 true.
- */
-export function detectAnswerDelegationSuspected(
-  userMessages: string[],
-): boolean {
-  if (userMessages.length === 0) return false;
-
-  const writeRequestIdx = userMessages.findIndex((content) =>
-    isAnswerWriteRequest(content),
-  );
-  if (writeRequestIdx < 0) return false;
-
-  const prior = userMessages.slice(0, writeRequestIdx);
-  const priorSelfDriven = prior.filter((content) => {
-    if (isAnswerWriteRequest(content)) {
-      return false;
-    }
-    if (content.length >= 80) return true;
-    return /(?:내가|나는|a안|b안|가정|기준|생각|선택|비교|계산|설정|전략|판단)/i.test(
-      content,
-    );
-  }).length;
-
-  return priorSelfDriven < 2;
-}
-
-export function buildSummaryDelegationPreCheckHint(
-  userMessages: string[],
-): string {
-  if (detectAnswerDelegationSuspected(userMessages)) {
-    return `[판정 힌트 — 단축 경로 적용] 학생 채팅에 최종 답안 작성 직접 요청(또는 그 오타·띄어쓰기 변형)이 있고, 그 이전 자기 분석·가정·판단이 거의 없습니다. **답안 작성 위임 단축 경로만** 적용하세요.`;
-  }
-  return `[판정 힌트 — 일반 평가] 학생 채팅에 "답 써줘", "답안 작성해줘", "이걸 바탕으로 답 써줘" 등 **최종 답안 작성 직접 요청(및 동일 의도의 오타)이 없습니다.** "알려줘", "예를 들어줘", "어떻게 풀면", "설명해줘", 가정·판단 제시는 단축 경로가 아닙니다. **일반 종합 평가**를 작성하세요 (상세 summary, 필요 시 강점·개선점).`;
 }
 
 /** Calculate weighted score from chat and answer stages. */

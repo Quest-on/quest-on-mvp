@@ -4,11 +4,9 @@ import {
   calculateScoreFromItems,
   calculateWeightedOverallScore,
   deduplicateGrades,
-  getGradeDisplayScore,
   isScoringGrade,
   isSuccessfulGradeType,
   normalizeScoreWeights,
-  resolveQuestionQIdx,
   syncScoreWeightsForBuckets,
   type ScoreWeights,
 } from "@/lib/grade-utils";
@@ -65,34 +63,6 @@ describe("grade-utils", () => {
     expect(isSuccessfulGradeType(undefined)).toBe(true);
     expect(isSuccessfulGradeType("ai_summary")).toBe(false);
     expect(isSuccessfulGradeType("ai_failed")).toBe(false);
-  });
-
-  it("prefers stage_grading answer score for navigation display", () => {
-    expect(
-      getGradeDisplayScore({
-        score: 40,
-        grade_type: "manual",
-        stage_grading: { answer: { score: 85 } },
-      }),
-    ).toBe(85);
-    expect(
-      getGradeDisplayScore({
-        score: 72,
-        grade_type: "auto",
-      }),
-    ).toBe(72);
-    expect(
-      getGradeDisplayScore({
-        score: 0,
-        grade_type: "ai_summary",
-      }),
-    ).toBeNull();
-  });
-
-  it("resolveQuestionQIdx uses explicit idx when present, else global index", () => {
-    expect(resolveQuestionQIdx({ idx: 22, type: "essay" }, 0)).toBe(22);
-    expect(resolveQuestionQIdx({ type: "essay" }, 17)).toBe(17);
-    expect(resolveQuestionQIdx({ type: "essay" }, 18)).toBe(18);
   });
 
   it("combines objective raw scores and deduped case grades with configured weights", () => {

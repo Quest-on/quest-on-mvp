@@ -26,6 +26,7 @@ import type {
   ExamStudentSummary,
 } from "@/lib/types/student-summary";
 import type { GradingProgress } from "@/lib/types/grading";
+import { fetchAllPaged } from "@/lib/supabase-paged";
 
 function getSupabase() {
   return getSupabaseServer();
@@ -41,8 +42,9 @@ export function isCaseGraded(gradeType?: string | null): boolean {
 
 /**
  * 케이스(서술형) 문항 채점 집계.
- * grade 조회 키는 q.idx ?? pos — 일부 시험은 문항에 idx가 없어 grades가
- * 배열 위치(pos)로 저장된다.
+ * grade 조회 키는 q.idx ?? pos — 일부 시험은 문항에 idx가 없어(undefined) grades가
+ * 배열 위치(pos)로 저장된다. export(loadExamResultData)와 동일한 규약으로 맞춰
+ * 대시보드 채점 상태와 엑셀 결과가 어긋나지 않게 한다.
  */
 export function computeCaseGrades<
   G extends { grade_type?: string | null; score?: number | null },
@@ -163,6 +165,11 @@ function hasNonEmptyAnswer(answer: string | undefined): boolean {
   return typeof answer === "string" && answer.trim().length > 0;
 }
 
+/**
+ * Supabase(PostgREST)는 기본 1000행 제한이 있어, .in(...) 조회가 1000행을 넘으면
+ * 조용히 잘린다(예: 55명 × 19문항 = 1045 submissions → 45개 누락 → 답안이 있는데도
+ * caseProgress가 "미제출/일부 제출"로 오집계). 안정 정렬(.order) 후 .range()로 전부 가져온다.
+ */
 function isValidProposedGrade(value: unknown): value is ProposedGrade {
   if (!value || typeof value !== "object") return false;
   const score = (value as { score?: unknown }).score;
@@ -223,6 +230,8 @@ export function deriveOverallStatus(params: {
 
   const gpStatus = gradingProgress?.status;
 
+  // 전 케이스 문항이 실제로 채점 완료(grades 존재)면, 채점 후 진행상태가 정리되지 않아
+  // grading_progress가 running/queued로 stale하게 남아 있어도 완료로 본다.
   if (caseTotal > 0 && caseGraded === caseTotal) {
     return hasManualCase ? "manually_graded" : "ai_graded";
   }
@@ -311,14 +320,20 @@ export async function GET(
     const questions = normalizeQuestions(exam.questions);
     const scoreWeights = normalizeScoreWeights(exam.score_weights);
     const canShowFinalScores = exam.status === "closed";
-    const questionEntries = questions.map((q, globalIndex) => ({ q, globalIndex }));
-    const mcqEntries = questionEntries.filter(
-      ({ q }) => q.type === "multiple-choice",
-    );
-    const oxEntries = questionEntries.filter(({ q }) => q.type === "true-false");
-    const caseEntries = questionEntries.filter(({ q }) =>
-      isCaseQuestion(q.type),
-    );
+    // 제출물(submissions/messages)은 배열 위치(q_idx = findIndex)로 저장되므로
+    // 문항을 "배열 위치(pos)"와 함께 들고 다닌다. 일부 시험은 question.idx ≠ 배열
+    // 위치라(출제 중 문항 삭제), 제출 조회는 반드시 pos로 해야 한다.
+    // grades/proposed 조회는 q.idx ?? pos — 문항에 idx가 없는(undefined) 시험은
+    // grades가 배열 위치로 저장되며, export(loadExamResultData)와 규약을 일치시킨다.
+    const mcqEntries = questions
+      .map((q, pos) => ({ q, pos }))
+      .filter(({ q }) => q.type === "multiple-choice");
+    const oxEntries = questions
+      .map((q, pos) => ({ q, pos }))
+      .filter(({ q }) => q.type === "true-false");
+    const caseEntries = questions
+      .map((q, pos) => ({ q, pos }))
+      .filter(({ q }) => isCaseQuestion(q.type));
 
     const { data: sessions, error: sessionsError } = await supabase
       .from("sessions")
@@ -359,14 +374,22 @@ export async function GET(
 
     const [submissionsResult, gradesResult, profilesResult, clerkMap, gradingSessionResult] =
       await Promise.all([
-        supabase
-          .from("submissions")
-          .select("id, session_id, q_idx, answer, compressed_answer_data, created_at")
-          .in("session_id", sessionIds),
-        supabase
-          .from("grades")
-          .select("session_id, q_idx, score, grade_type")
-          .in("session_id", sessionIds),
+        fetchAllPaged((from, to) =>
+          supabase
+            .from("submissions")
+            .select("id, session_id, q_idx, answer, compressed_answer_data, created_at")
+            .in("session_id", sessionIds)
+            .order("id", { ascending: true })
+            .range(from, to),
+        ),
+        fetchAllPaged((from, to) =>
+          supabase
+            .from("grades")
+            .select("id, session_id, q_idx, score, grade_type")
+            .in("session_id", sessionIds)
+            .order("id", { ascending: true })
+            .range(from, to),
+        ),
         supabase
           .from("student_profiles")
           .select("student_id, name, student_number, school")
@@ -466,20 +489,20 @@ export async function GET(
 
       let mcqCorrect = 0;
       const mcqScores: number[] = [];
-      for (const { q, globalIndex } of mcqEntries) {
-        const sub = subsByQ.get(globalIndex);
+      for (const { q, pos } of mcqEntries) {
+        const sub = subsByQ.get(pos);
         const rawAnswer = (sub?.answer as string) ?? "";
         const correct = isObjectiveCorrect({
-          qIdx: q.idx,
+          qIdx: pos,
           rawAnswer,
-          options: q?.options,
-          correctOptionIndex: q?.correctOptionIndex,
+          options: q.options,
+          correctOptionIndex: q.correctOptionIndex,
         });
         if (correct) mcqCorrect += 1;
         const rawScore = objectiveScoreFromRawAnswer({
           rawAnswer,
-          options: q?.options,
-          correctOptionIndex: q?.correctOptionIndex,
+          options: q.options,
+          correctOptionIndex: q.correctOptionIndex,
         });
         if (sub && rawScore !== undefined) {
           mcqScores.push(rawScore);
@@ -488,45 +511,40 @@ export async function GET(
 
       let oxCorrect = 0;
       const oxScores: number[] = [];
-      for (const { q, globalIndex } of oxEntries) {
-        const sub = subsByQ.get(globalIndex);
+      for (const { q, pos } of oxEntries) {
+        const sub = subsByQ.get(pos);
         const rawAnswer = (sub?.answer as string) ?? "";
         const correct = isObjectiveCorrect({
-          qIdx: q.idx,
+          qIdx: pos,
           rawAnswer,
-          options: q?.options,
-          correctOptionIndex: q?.correctOptionIndex,
+          options: q.options,
+          correctOptionIndex: q.correctOptionIndex,
         });
         if (correct) oxCorrect += 1;
         const rawScore = objectiveScoreFromRawAnswer({
           rawAnswer,
-          options: q?.options,
-          correctOptionIndex: q?.correctOptionIndex,
+          options: q.options,
+          correctOptionIndex: q.correctOptionIndex,
         });
         if (sub && rawScore !== undefined) {
           oxScores.push(rawScore);
         }
       }
 
+      // 제출 여부는 배열 위치(pos)로 조회한 답안 기준
       let caseSubmitted = 0;
-      for (const { globalIndex } of caseEntries) {
+      for (const { pos } of caseEntries) {
         if (
-          hasNonEmptyAnswer(decompressedSubsByQ[globalIndex]?.answer) ||
-          hasNonEmptySubmission(subsByQ.get(globalIndex))
+          hasNonEmptyAnswer(decompressedSubsByQ[pos]?.answer) ||
+          hasNonEmptySubmission(subsByQ.get(pos))
         ) {
           caseSubmitted += 1;
         }
       }
-
-      const {
-        caseGraded,
-        hasManualCase,
-        hasFailed,
-        caseScores,
-      } = computeCaseGrades(
-        caseEntries.map(({ q, globalIndex }) => ({ q, pos: globalIndex })),
-        gradeByQ,
-      );
+      // 채점 집계(grade 조회 q.idx ?? pos)는 computeCaseGrades로 일원화한다.
+      // dedupedGrades(gradeByQ)는 이미 manual>auto>ai_failed 우선순위로 중복 제거됨.
+      const { caseGraded, hasManualCase, hasFailed, caseScores } =
+        computeCaseGrades(caseEntries, gradeByQ);
 
       const overallStatus = deriveOverallStatus({
         sessionStatus,
@@ -542,11 +560,11 @@ export async function GET(
           ? Math.round(caseScores.reduce((a, b) => a + b, 0) / caseScores.length)
           : undefined;
 
-      const scoreItems: ScoreItem[] = questionEntries.map(({ q, globalIndex }) => {
+      const scoreItems: ScoreItem[] = questions.map((q, pos) => {
         if (q.type === "multiple-choice" || q.type === "true-false") {
-          const sub = subsByQ.get(globalIndex);
+          const sub = subsByQ.get(pos);
           return {
-            qIdx: q.idx,
+            qIdx: q.idx ?? pos,
             type: q.type,
             score: objectiveScoreFromRawAnswer({
               rawAnswer: (sub?.answer as string) ?? "",
@@ -556,9 +574,9 @@ export async function GET(
           };
         }
 
-        const best = gradeByQ.get(q.idx);
+        const best = gradeByQ.get(q.idx ?? pos);
         return {
-          qIdx: q.idx,
+          qIdx: q.idx ?? pos,
           type: q.type,
           // grade_type이 null인 legacy grade는 포함하되 ai_failed/ai_summary는 제외
           score: isScoringGrade(best) ? best.score : undefined,
@@ -578,20 +596,19 @@ export async function GET(
         caseEntries.length > 0 && caseSubmitted === caseEntries.length;
       const hasCompleteProposedCaseGrades =
         caseEntries.length > 0 &&
-        caseEntries.every(({ q }) =>
-          getProposedGrade(proposedGrades, session.id, q.idx),
+        caseEntries.every(({ q, pos }) =>
+          getProposedGrade(proposedGrades, session.id, q.idx ?? pos),
         );
       const studentBulkGradeStatus = deriveStudentBulkGradeStatus(
         bulkGradeStatus,
         hasCompleteCaseSubmissions,
         hasCompleteProposedCaseGrades,
       );
-      const proposedScoreItems: ScoreItem[] = questionEntries.map(
-        ({ q, globalIndex }) => {
+      const proposedScoreItems: ScoreItem[] = questions.map((q, pos) => {
         if (q.type === "multiple-choice" || q.type === "true-false") {
-          const sub = subsByQ.get(globalIndex);
+          const sub = subsByQ.get(pos);
           return {
-            qIdx: q.idx,
+            qIdx: q.idx ?? pos,
             type: q.type,
             score: objectiveScoreFromRawAnswer({
               rawAnswer: (sub?.answer as string) ?? "",
@@ -603,13 +620,13 @@ export async function GET(
 
         if (isCaseQuestion(q.type)) {
           return {
-            qIdx: q.idx,
+            qIdx: q.idx ?? pos,
             type: q.type,
-            score: getProposedGrade(proposedGrades, session.id, q.idx)?.score,
+            score: getProposedGrade(proposedGrades, session.id, q.idx ?? pos)?.score,
           };
         }
 
-        return { qIdx: q.idx, type: q.type, score: undefined };
+        return { qIdx: q.idx ?? pos, type: q.type, score: undefined };
       });
       const proposedScoreResult =
         canShowProposedScores &&
@@ -638,11 +655,7 @@ export async function GET(
         submittedAt: session.submitted_at ?? undefined,
         mcq: { correct: mcqCorrect, total: mcqEntries.length },
         ox: { correct: oxCorrect, total: oxEntries.length },
-        caseProgress: {
-          submitted: caseSubmitted,
-          graded: caseGraded,
-          total: caseEntries.length,
-        },
+        caseProgress: { submitted: caseSubmitted, graded: caseGraded, total: caseEntries.length },
         overallStatus,
         caseScore: canShowSessionFinalScores ? caseScore : undefined,
         overallScore: canShowSessionFinalScores ? overallScore : undefined,
