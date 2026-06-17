@@ -47,6 +47,12 @@ function normalizeFilter(raw?: string): FilterType {
   return "all";
 }
 
+function questionFilterBucket(type: string): Exclude<FilterType, "all"> {
+  if (type === "multiple-choice") return "multiple-choice";
+  if (type === "true-false") return "true-false";
+  return "case";
+}
+
 /** 문제 유형별 번호를 붙인 레이블 배열 반환. 예: ["사지선다 1", "사지선다 2", "OX 1", "CASE 1"] */
 function buildQuestionLabels(questions: Question[]): string[] {
   const counters: Record<string, number> = {};
@@ -94,6 +100,13 @@ export function QuestionNavigation({
     );
   });
 
+  // 유형이 하나뿐이면 "모두" vs "Case" 등 필터 탭이 동일 집합만 보여줘 의미 없음
+  const distinctTypeBuckets = new Set(
+    questions.map((q) => questionFilterBucket(q.type))
+  );
+  const showFilterTabs =
+    distinctTypeBuckets.size > 1 && availableTabs.length > 1;
+
   // 필터에 맞는 (배열 인덱스, question) 쌍
   const visibleQuestions = questions
     .map((q, arrIdx) => ({ q, arrIdx, label: labels[arrIdx] }))
@@ -105,7 +118,7 @@ export function QuestionNavigation({
 
   return (
     <div className="mb-6 space-y-3">
-      {availableTabs.length > 1 && (
+      {showFilterTabs && (
         <div className="flex gap-1 flex-wrap">
           {availableTabs.map((tab) => (
             <Button
