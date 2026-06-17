@@ -226,6 +226,55 @@ export function isCaseQuestion(type?: string): boolean {
 }
 
 /**
+ * True when an exam row is an assignment-style task (과제), not a timed exam.
+ */
+export function isAssignmentType(type?: string | null): boolean {
+  return type != null && type !== "exam";
+}
+
+/**
+ * 강사 채점을 시작할 수 있는 시점인지 판정한다(시험/과제 통일 게이트).
+ */
+export function isGradingOpen(exam: {
+  type?: string | null;
+  status?: string | null;
+  deadline?: string | null;
+}): boolean {
+  if (isAssignmentType(exam.type)) {
+    return exam.deadline != null && new Date() > new Date(exam.deadline);
+  }
+  return exam.status === "closed";
+}
+
+/** 과제 대시보드 학생 목록용 session_id → score 맵. */
+export function buildAssignmentScoreMap(
+  rows: ReadonlyArray<{ session_id: string; score: unknown }>,
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    if (typeof row.score === "number" && Number.isFinite(row.score)) {
+      map.set(row.session_id, row.score);
+    }
+  }
+  return map;
+}
+
+/**
+ * Resolve a per-question record by trying several candidate q_idx keys in order.
+ */
+export function resolveByQIdx<T>(
+  record: Record<string | number, T> | undefined | null,
+  keys: Array<number | string>,
+): T | undefined {
+  if (!record) return undefined;
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
+/**
  * Deterministically grade an objective (mcq/true-false) question.
  *
  * The student's submitted answer is stored as the chosen option index in

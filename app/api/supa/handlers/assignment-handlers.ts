@@ -324,7 +324,7 @@ export async function updateAssignment(data: {
       if (nodeSyncError) {
         logError("[updateAssignment] Failed to sync exam node name", nodeSyncError, {
           path: "/api/supa/assignment-handlers",
-          assignmentId: data.id,
+          additionalData: { assignmentId: data.id },
         });
       }
     }

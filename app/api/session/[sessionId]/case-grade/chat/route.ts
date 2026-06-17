@@ -158,7 +158,7 @@ export async function GET(
 
     const user = await currentUser();
     const access = await requireCaseGradeAccess(sessionId, user, qIdx, {
-      requireClosed: true,
+      requireGradable: true,
     });
     if (!access.ok) return access.response;
 
@@ -211,7 +211,7 @@ export async function POST(
     const { qIdx, message, clientMessageId } = validation.data;
 
     const access = await requireCaseGradeAccess(sessionId, user, qIdx, {
-      requireClosed: true,
+      requireGradable: true,
     });
     if (!access.ok) return access.response;
 

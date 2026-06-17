@@ -480,7 +480,7 @@ export async function updateExam(data: {
       if (nodeSyncError) {
         logError("[updateExam] Failed to sync exam node name", nodeSyncError, {
           path: "/api/supa/exam-handlers",
-          examId: data.id,
+          additionalData: { examId: data.id },
         });
       }
     }

@@ -35,8 +35,35 @@ function isCaseQuestion(type?: string): boolean {
   return type === "case" || type === "essay" || type === "short-answer";
 }
 
-function isCaseGraded(gradeType?: string): boolean {
+export function isCaseGraded(gradeType?: string | null): boolean {
   return gradeType === "manual" || gradeType === "auto";
+}
+
+/**
+ * 케이스(서술형) 문항 채점 집계.
+ * grade 조회 키는 q.idx ?? pos — 일부 시험은 문항에 idx가 없어 grades가
+ * 배열 위치(pos)로 저장된다.
+ */
+export function computeCaseGrades<
+  G extends { grade_type?: string | null; score?: number | null },
+>(
+  caseEntries: ReadonlyArray<{ q: { idx?: number }; pos: number }>,
+  gradeByQ: Map<number, G>,
+): { caseGraded: number; hasManualCase: boolean; hasFailed: boolean; caseScores: number[] } {
+  let caseGraded = 0;
+  let hasManualCase = false;
+  let hasFailed = false;
+  const caseScores: number[] = [];
+  for (const { q, pos } of caseEntries) {
+    const best = gradeByQ.get(q.idx ?? pos);
+    if (best?.grade_type === "ai_failed") hasFailed = true;
+    if (best && isCaseGraded(best.grade_type)) {
+      caseGraded += 1;
+      if (best.grade_type === "manual") hasManualCase = true;
+      if (typeof best.score === "number") caseScores.push(best.score);
+    }
+  }
+  return { caseGraded, hasManualCase, hasFailed, caseScores };
 }
 
 /** Session statuses that should appear on the instructor dashboard. */
@@ -179,7 +206,7 @@ function deriveStudentBulkGradeStatus(
   return globalStatus;
 }
 
-function deriveOverallStatus(params: {
+export function deriveOverallStatus(params: {
   sessionStatus: ExamStudentSessionStatus;
   caseTotal: number;
   caseGraded: number;
@@ -195,6 +222,11 @@ function deriveOverallStatus(params: {
   if (hasFailed) return "failed";
 
   const gpStatus = gradingProgress?.status;
+
+  if (caseTotal > 0 && caseGraded === caseTotal) {
+    return hasManualCase ? "manually_graded" : "ai_graded";
+  }
+
   if (gpStatus === "running" || gpStatus === "queued") {
     return "grading";
   }
@@ -203,8 +235,6 @@ function deriveOverallStatus(params: {
     return gpStatus === "failed" ? "failed" : "grading";
   }
 
-  if (hasManualCase) return "manually_graded";
-  if (caseTotal > 0 && caseGraded === caseTotal) return "ai_graded";
   if (caseTotal === 0) return "ai_graded";
 
   return "pending";
@@ -478,36 +508,25 @@ export async function GET(
         }
       }
 
-      let caseGraded = 0;
       let caseSubmitted = 0;
-      let hasManualCase = false;
-      let hasFailed = false;
-      const caseScores: number[] = [];
-
-      // dedupedGrades(gradeByQ)는 이미 manual>auto>ai_failed 우선순위로 중복 제거됨
-      for (const { q, globalIndex } of caseEntries) {
+      for (const { globalIndex } of caseEntries) {
         if (
           hasNonEmptyAnswer(decompressedSubsByQ[globalIndex]?.answer) ||
           hasNonEmptySubmission(subsByQ.get(globalIndex))
         ) {
           caseSubmitted += 1;
         }
-
-        const best = gradeByQ.get(q.idx);
-
-        if (best?.grade_type === "ai_failed") {
-          hasFailed = true;
-        }
-        if (best && isCaseGraded(best.grade_type)) {
-          caseGraded += 1;
-          if (best.grade_type === "manual") {
-            hasManualCase = true;
-          }
-          if (best.score !== undefined) {
-            caseScores.push(best.score);
-          }
-        }
       }
+
+      const {
+        caseGraded,
+        hasManualCase,
+        hasFailed,
+        caseScores,
+      } = computeCaseGrades(
+        caseEntries.map(({ q, globalIndex }) => ({ q, pos: globalIndex })),
+        gradeByQ,
+      );
 
       const overallStatus = deriveOverallStatus({
         sessionStatus,

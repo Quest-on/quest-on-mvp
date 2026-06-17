@@ -421,9 +421,7 @@ export default function GradeStudentPage({
       ? !hasCurrentQuestionSummary &&
         (gp?.status === "queued" ||
           gp?.status === "running") &&
-        (gp?.phase === "qsummary" ||
-          gp?.phase === "grade" ||
-          gp?.phase === "question_summary")
+        (gp?.phase === "qsummary" || gp?.phase === "grade")
       : !hasSessionSummary &&
         (gp?.status === "queued" ||
           gp?.status === "running") &&

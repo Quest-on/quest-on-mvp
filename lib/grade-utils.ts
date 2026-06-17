@@ -103,13 +103,14 @@ type GradeDisplaySource = {
 export function getGradeDisplayScore(
   grade: GradeDisplaySource | null | undefined,
 ): number | null {
-  if (!grade || !isScoringGrade(grade)) return null;
+  if (!grade || EXCLUDED_GRADE_TYPES.has(grade.grade_type ?? "")) return null;
 
   const stageScore = grade.stage_grading?.answer?.score;
   if (typeof stageScore === "number" && Number.isFinite(stageScore)) {
     return Math.round(stageScore);
   }
 
+  if (!isScoringGrade(grade)) return null;
   return Math.round(grade.score);
 }
 
