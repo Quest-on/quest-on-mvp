@@ -450,7 +450,6 @@ export default function GradeStudentPage({
                       if (target) setSelectedQuestionIdx(target.arrIdx);
                     }}
                     grades={sessionData.grades}
-                    initialFilter="case"
                   />
                 )
               }
