@@ -68,7 +68,7 @@ test.describe("GET/POST /api/exam/[examId]/bulk-grade/chat", () => {
       "기존 안내 메시지",
       "기준을 다시 설명해줘.",
     ]);
-    expect(body.canStartGrading).toBe(true);
+    expect(body.canStartGrading).toBe(false);
     expect(after.status).toBe("grading_done");
     expect(after.proposed_grades).toEqual({
       "session-a": { 0: { score: 88, comment: "기존 제안" } },
