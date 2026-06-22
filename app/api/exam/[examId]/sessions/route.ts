@@ -7,6 +7,7 @@ import { validateUUID } from "@/lib/validate-params";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
 import { buildAssignmentScoreMap, isAssignmentType } from "@/lib/grading-helpers";
+import { autoSubmitEligibleSessionsForExam } from "@/lib/assignment-deadline-sweep";
 
 export const maxDuration = 30;
 
@@ -48,7 +49,7 @@ export async function GET(
     // Get exam to verify instructor owns it
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("id, title, instructor_id, type")
+      .select("id, title, instructor_id, type, deadline")
       .eq("id", examId)
       .single();
 
@@ -59,6 +60,22 @@ export async function GET(
     // Check if instructor owns the exam
     if (exam.instructor_id !== user.id) {
       return errorJson("FORBIDDEN", "Forbidden", 403);
+    }
+
+    // Past-deadline assignments: auto-submit any started-but-unsubmitted sessions
+    // so the instructor list reflects deadline submissions without waiting for cron.
+    if (
+      isAssignmentType(exam.type as string | null) &&
+      exam.deadline &&
+      new Date(exam.deadline as string).getTime() < Date.now()
+    ) {
+      try {
+        await autoSubmitEligibleSessionsForExam(examId);
+      } catch (sweepError) {
+        logError("sessions: assignment deadline sweep failed", sweepError, {
+          path: `/api/exam/${examId}/sessions`,
+        });
+      }
     }
 
     // Parse pagination params (default: page 1, pageSize 50, max 100)
@@ -97,7 +114,8 @@ export async function GET(
         status,
         is_active,
         last_heartbeat_at,
-        grading_progress
+        grading_progress,
+        auto_submitted
       `,
       )
       .eq("exam_id", examId);
@@ -210,6 +228,7 @@ export async function GET(
         grading_progress: session.grading_progress || null,
         score: scoreBySession.get(session.id) ?? null,
         is_graded: scoreBySession.has(session.id),
+        auto_submitted: session.auto_submitted === true,
       };
     });
 

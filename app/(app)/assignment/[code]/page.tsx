@@ -118,32 +118,20 @@ export default function AssignmentPage({
     if (isSubmitted || isSubmitting) return;
     if (!session?.id || !exam?.id || !userId) return;
     toast("마감 시간이 지났습니다. 자동 제출합니다.", { icon: "\u23F0" });
-    // Trigger submit directly
     setIsSubmitting(true);
     try {
-      // Best-effort: flush any pending typing before auto-submit so the last
-      // 0~2.5s of input lands in DB. We don't await failure; deadline already passed.
       try {
         await finalAnswer.flush();
       } catch {
-        // ignore — server will accept empty final_answer past deadline
+        // ignore — server accepts partial work past deadline
       }
-      const res = await fetch("/api/supa", {
+      const res = await fetch(`/api/student/session/${session.id}/deadline-auto-submit`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "submit_assignment",
-          data: {
-            sessionId: session.id,
-            examId: exam.id,
-            studentId: userId,
-          },
-        }),
       });
       if (res.ok || res.status === 409) {
         setIsSubmitted(true);
         toast.success("과제가 자동 제출되었습니다.");
-        router.push(`/student/session/${session.id}/quiz`);
+        router.push(`/student/report/${session.id}`);
       }
     } catch {
       // Silent — deadline already passed

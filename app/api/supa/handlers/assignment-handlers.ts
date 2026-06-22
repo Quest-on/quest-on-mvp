@@ -377,6 +377,7 @@ export async function submitAssignment(data: {
   sessionId: string;
   examId: string;
   studentId: string;
+  deadlineAutoSubmit?: boolean;
 }) {
   try {
     const user = await currentUser();
@@ -443,8 +444,12 @@ export async function submitAssignment(data: {
       is_active: false,
       last_heartbeat_at: now,
     };
-    // 마감 후 빈 답안이면 auto_submitted=true 표시 (마감 자동제출 경로)
-    if (deadlinePassed && !finalAnswer) {
+    if (data.deadlineAutoSubmit) {
+      if (!deadlinePassed) {
+        return errorJson("BAD_REQUEST", "Deadline has not passed yet", 400);
+      }
+      updatePayload.auto_submitted = true;
+    } else if (deadlinePassed && !finalAnswer) {
       updatePayload.auto_submitted = true;
     }
 
