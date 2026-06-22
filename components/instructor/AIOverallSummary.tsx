@@ -4,17 +4,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, Minus, Quote, Plus } from "lucide-react";
 import { LoadingMessage } from "@/components/ui/loading-message";
 import type { SummaryData } from "@/lib/types/grading";
+import {
+  FinalAnswerIntegrityNote,
+  type FinalAnswerIntegrityDisplay,
+} from "@/components/instructor/FinalAnswerIntegrityNote";
 
 export type { SummaryData } from "@/lib/types/grading";
 
 interface AIOverallSummaryProps {
   summary: SummaryData | null;
   loading: boolean;
+  /** 과제 최종답안 무결성 — 종합 평가 상단 참고 배지 */
+  finalAnswerIntegrity?: FinalAnswerIntegrityDisplay | null;
 }
 
 export function AIOverallSummary({
   summary,
   loading,
+  finalAnswerIntegrity,
 }: AIOverallSummaryProps) {
   if (!summary && !loading) {
     return (
@@ -69,6 +76,10 @@ export function AIOverallSummary({
         </div>
       </CardHeader>
       <CardContent className="pt-6 grid gap-6 md:grid-cols-2">
+        <FinalAnswerIntegrityNote
+          integrity={finalAnswerIntegrity}
+          className="md:col-span-2"
+        />
         <div className="space-y-6">
           <div>
             <h4 className="font-semibold mb-2 text-sm text-muted-foreground uppercase tracking-wider">

@@ -388,6 +388,7 @@ export async function cleanupTestData() {
     "messages",
     "submissions",
     "paste_logs",
+    "final_answer_input_telemetry",
     "sessions",
     "exam_material_chunks",
     "exam_nodes",

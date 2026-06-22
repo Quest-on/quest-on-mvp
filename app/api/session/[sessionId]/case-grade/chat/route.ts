@@ -27,6 +27,11 @@ import {
 } from "@/lib/case-grade-access";
 import { isAssignmentType } from "@/lib/grading-helpers";
 import { stripEmoji } from "@/lib/sanitize";
+import {
+  formatAnswerIntegrityForPrompt,
+  assignmentIntegrityScope,
+} from "@/lib/answer-integrity";
+import { loadAnswerIntegritySnapshot } from "@/lib/answer-integrity-server";
 
 type GradingChatRow = {
   id: string;
@@ -281,10 +286,22 @@ export async function POST(
     const examLanguage: "ko" | "en" = exam.language === "en" ? "en" : "ko";
     const questionPrompt = questionPromptByQIdx(exam.questions, qIdx);
 
+    const answerIntegrityNote = isAssignmentType(exam.type)
+      ? formatAnswerIntegrityForPrompt(
+          await loadAnswerIntegritySnapshot(
+            supabase,
+            sessionId,
+            assignmentIntegrityScope()
+          ),
+          examLanguage
+        )
+      : undefined;
+
     const systemPrompt = buildCaseGradingChatSystemPrompt({
       questionPrompt,
       studentAnswer,
       studentChatSummary,
+      answerIntegrityNote,
       language: examLanguage,
     });
 

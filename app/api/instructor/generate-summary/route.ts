@@ -16,6 +16,11 @@ import {
   buildAiTextMetadata,
   callTrackedChatCompletion,
 } from "@/lib/ai-tracking";
+import {
+  formatAnswerIntegrityForPrompt,
+  assignmentIntegrityScope,
+} from "@/lib/answer-integrity";
+import { loadAnswerIntegritySnapshot } from "@/lib/answer-integrity-server";
 
 const supabase = getSupabaseServer();
 
@@ -47,7 +52,7 @@ export async function POST(request: NextRequest) {
     // Fetch session
     const { data: session, error: sessionError } = await supabase
       .from("sessions")
-      .select("id, exam_id, student_id")
+      .select("id, exam_id, student_id, final_answer")
       .eq("id", sessionId)
       .single();
 
@@ -117,6 +122,24 @@ export async function POST(request: NextRequest) {
     }
 
     const isAssignment = exam.type && exam.type !== "exam";
+
+    let assignmentExtras = "";
+    if (isAssignment) {
+      const finalAnswerText =
+        typeof session.final_answer === "string" ? session.final_answer.trim() : "";
+      const integrity = await loadAnswerIntegritySnapshot(
+        supabase,
+        sessionId,
+        assignmentIntegrityScope()
+      );
+      assignmentExtras = `
+
+[학생 최종 제출 답안]
+${finalAnswerText || "(작성 없음)"}
+
+${formatAnswerIntegrityForPrompt(integrity, "ko")}`;
+    }
+
     const systemPrompt = isAssignment
       ? buildAssignmentResearchSummarySystemPrompt()
       : buildSummaryGenerationSystemPrompt();
@@ -158,6 +181,7 @@ ${rubricText}
 
 [학생의 채팅 기반 리서치 과정]
 ${questionsText}
+${assignmentExtras}
 
 위 내용을 바탕으로 학생의 리서치 대화 과정을 상세하게 분석하여 요약 평가해주세요.
 다음 항목을 반드시 포함해야 합니다:

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, type RefObject } from "react";
 import { cn } from "@/lib/utils";
 
 interface AnswerTextareaProps {
@@ -8,6 +8,9 @@ interface AnswerTextareaProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  disabled?: boolean;
+  maxLength?: number;
+  textareaRef?: RefObject<HTMLTextAreaElement | null>;
   onFocus?: () => void;
   onPaste?: (e: {
     pastedText: string;
@@ -29,10 +32,14 @@ export function AnswerTextarea({
   onChange,
   placeholder = "여기에 상세한 답안을 작성하세요...",
   className = "",
+  disabled = false,
+  maxLength,
+  textareaRef: externalRef,
   onFocus,
   onPaste,
 }: AnswerTextareaProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const internalRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = externalRef ?? internalRef;
 
   // Copy 이벤트 핸들러 - 내부 복사 마커 추가
   const handleCopy = useCallback(
@@ -161,6 +168,8 @@ export function AnswerTextarea({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onFocus={onFocus}
+      disabled={disabled}
+      maxLength={maxLength}
       placeholder={placeholder}
       className={cn(
         "w-full min-h-[300px] sm:min-h-[400px] p-4",

@@ -420,6 +420,10 @@ function hasIndependentReasoning(text: string): boolean {
   return matches >= 1 && normalized.split(/\s+/).length >= 5;
 }
 
+export function calculateTextOverlapScore(answer: string, referenceTexts: string[]): number {
+  return calculateOverlapScore(answer, referenceTexts);
+}
+
 function calculateOverlapScore(answer: string, aiMessages: string[]): number {
   const answerTokens = new Set(tokenizeForOverlap(answer));
   if (answerTokens.size === 0 || aiMessages.length === 0) return 0;
@@ -438,6 +442,14 @@ function calculateOverlapScore(answer: string, aiMessages: string[]): number {
   }
 
   return Number(maxScore.toFixed(2));
+}
+
+/** 최종 답안과 AI 응답 간 토큰 겹침 비율 (0~1) */
+export function calculateAnswerAiOverlapScore(
+  answer: string,
+  aiMessages: string[]
+): number {
+  return calculateOverlapScore(answer, aiMessages);
 }
 
 export function calculateAiDependencyPenalty(

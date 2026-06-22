@@ -5,8 +5,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { FileText, AlertTriangle } from "lucide-react";
+import { FileText, AlertTriangle, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  FINAL_ANSWER_SPEED_ANALYSIS_ENABLED,
+  describeAbnormalBurstReason,
+  getExternalPasteSuspicionReason,
+  getInternalPasteReason,
+  excerptPastedText,
+  type AbnormalBurst,
+} from "@/lib/answer-integrity";
+import { PasteAnalyzerVerdict } from "@/components/instructor/PasteAnalyzerVerdict";
+import type { PasteAssessment } from "@/lib/answer-integrity";
 
 // HTML 태그를 제거하고 순수 텍스트만 반환
 function stripHtml(html: string): string {
@@ -260,6 +270,49 @@ function highlightPastedContent(answer: string, pasteLogs: PasteLog[]): string {
   return highlightedAnswer;
 }
 
+function highlightAbnormalBursts(answer: string, bursts: AbnormalBurst[]): string {
+  if (!answer || bursts.length === 0) return textToHtml(answer);
+
+  let htmlAnswer = textToHtml(answer);
+  const sorted = [...bursts].sort((a, b) => b.startOffset - a.startOffset);
+
+  for (const burst of sorted) {
+    const start = Math.max(0, Math.min(burst.startOffset, answer.length));
+    const end = Math.max(start, Math.min(burst.endOffset, answer.length));
+    if (end <= start) continue;
+
+    const plainSlice = answer.substring(start, end);
+    if (!plainSlice.trim()) continue;
+
+    const escapedSlice = escapeHtml(plainSlice);
+    const idx = htmlAnswer.indexOf(escapedSlice);
+    if (idx === -1) continue;
+
+    const title = `비정상 입력 속도 (${burst.cps}자/초)`;
+    htmlAnswer =
+      htmlAnswer.substring(0, idx) +
+      `<mark class="bg-amber-200 text-amber-900 font-semibold px-1 rounded" title="${title}">` +
+      escapedSlice +
+      "</mark>" +
+      htmlAnswer.substring(idx + escapedSlice.length);
+  }
+
+  return htmlAnswer;
+}
+
+function renderHighlightedAnswer(answer: string, pasteLogs: PasteLog[], bursts: AbnormalBurst[]): string {
+  const withPaste = highlightPastedContent(answer, pasteLogs);
+  if (!FINAL_ANSWER_SPEED_ANALYSIS_ENABLED || bursts.length === 0) {
+    return withPaste || textToHtml("답안이 없습니다.");
+  }
+  // paste 하이라이트 후 plain 기준 burst — assignment plain text 흐름
+  const plainAfterPaste = stripHtml(withPaste);
+  if (plainAfterPaste === answer) {
+    return highlightAbnormalBursts(answer, bursts);
+  }
+  return withPaste;
+}
+
 interface Submission {
   id: string;
   q_idx: number;
@@ -286,10 +339,120 @@ interface FinalAnswerCardProps {
   questionId?: string;
   /**
    * 과제(assignment) 흐름의 sessions.final_answer 본문.
-   * 주어지면 paste 하이라이트/`dangerouslySetInnerHTML` 분기를 타지 않고
-   * plain text로 안전하게 렌더한다. (XSS 안전)
+   * submission 대신 사용한다.
    */
   finalAnswerText?: string;
+  /** 입력 타임라인 분석 결과 (속도 분석 feature flag 가 켜져 있을 때만) */
+  abnormalBursts?: AbnormalBurst[];
+  /** 작성 과정 분석기의 붙여넣기 복합 판단 */
+  pasteAssessment?: PasteAssessment | null;
+  pasteAssessmentPending?: boolean;
+}
+
+function IntegrityAlerts({
+  suspiciousLogs,
+  internalLogs,
+  abnormalBursts,
+}: {
+  suspiciousLogs: PasteLog[];
+  internalLogs: PasteLog[];
+  abnormalBursts: AbnormalBurst[];
+}) {
+  return (
+    <>
+      {suspiciousLogs.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-red-800 mb-1">
+                외부 붙여넣기 의심
+              </p>
+              <p className="text-xs text-red-700 mb-2">
+                공통 판단 기준: {getExternalPasteSuspicionReason("ko")}
+              </p>
+              <div className="text-xs text-red-700 space-y-2">
+                {suspiciousLogs.map((log) => (
+                  <div key={log.id} className="space-y-0.5">
+                    <p>
+                      • {log.length.toLocaleString()}자 (
+                      {new Date(log.timestamp).toLocaleString("ko-KR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })}
+                      {typeof log.paste_start === "number" && log.paste_start >= 0
+                        ? ` · 답안 ${log.paste_start}번째 글자 위치`
+                        : ""}
+                      )
+                    </p>
+                    {log.pasted_text && excerptPastedText(log.pasted_text) && (
+                      <p className="pl-3 italic text-red-700/90">
+                        미리보기: 「{excerptPastedText(log.pasted_text)}」
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {internalLogs.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+          <div className="flex items-start gap-2">
+            <FileText className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-blue-800 mb-1">
+                앱 내 복사 (AI 채팅 등)
+              </p>
+              <p className="text-xs text-blue-700 mb-2">
+                판단 근거: {getInternalPasteReason("ko")}
+              </p>
+              <div className="text-xs text-blue-700 space-y-1">
+                {internalLogs.map((log) => (
+                  <p key={log.id}>
+                    • {log.length.toLocaleString()}자 내부 복사 (
+                    {new Date(log.timestamp).toLocaleString("ko-KR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}
+                    )
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {FINAL_ANSWER_SPEED_ANALYSIS_ENABLED && abnormalBursts.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
+          <div className="flex items-start gap-2">
+            <Zap className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-amber-900 mb-1">
+                비정상 입력 속도 구간 (참고)
+              </p>
+              <div className="text-xs text-amber-800 space-y-1">
+                {abnormalBursts.map((burst, i) => (
+                  <p key={`${burst.startTs}-${i}`}>
+                    • {new Date(burst.startTs).toLocaleString("ko-KR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}
+                    {" — "}
+                    {describeAbnormalBurstReason(burst, "ko")}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 export function FinalAnswerCard({
@@ -297,25 +460,119 @@ export function FinalAnswerCard({
   pasteLogs,
   questionId,
   finalAnswerText,
+  abnormalBursts = [],
+  pasteAssessment = null,
+  pasteAssessmentPending = false,
 }: FinalAnswerCardProps) {
-  // assignment(plain text) 분기 — paste log 미적용
-  if (finalAnswerText !== undefined) {
-    const text = finalAnswerText.trim();
+  const isAssignmentFlow = finalAnswerText !== undefined;
+  const answerBody = isAssignmentFlow
+    ? (finalAnswerText ?? "").trim()
+    : submission?.answer || "";
+
+  const relevantLogs =
+    pasteLogs?.filter((log) => !questionId || log.question_id === questionId) ||
+    [];
+  const suspiciousLogs = relevantLogs.filter(
+    (log) => log.is_internal !== true && log.suspicious
+  );
+  const internalLogs = relevantLogs.filter((log) => log.is_internal === true);
+  const hasIntegritySignals =
+    suspiciousLogs.length > 0 ||
+    internalLogs.length > 0 ||
+    (FINAL_ANSWER_SPEED_ANALYSIS_ENABLED && abnormalBursts.length > 0);
+
+  if (isAssignmentFlow) {
     return (
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-green-600" />
-            <CardTitle>최종 답안</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-green-600" />
+              <CardTitle>최종 답안</CardTitle>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {suspiciousLogs.length > 0 && (
+                <Badge variant="destructive" className="flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  외부 붙여넣기 {suspiciousLogs.length}건
+                </Badge>
+              )}
+              {internalLogs.length > 0 && (
+                <Badge
+                  variant="secondary"
+                  className="flex items-center gap-1 bg-blue-100 text-blue-900 hover:bg-blue-200"
+                >
+                  <FileText className="w-3 h-3" />
+                  내부 복사 {internalLogs.length}건
+                </Badge>
+              )}
+              {FINAL_ANSWER_SPEED_ANALYSIS_ENABLED && abnormalBursts.length > 0 && (
+                <Badge
+                  variant="secondary"
+                  className="flex items-center gap-1 bg-amber-100 text-amber-900 hover:bg-amber-200"
+                >
+                  <Zap className="w-3 h-3" />
+                  속도 이상 {abnormalBursts.length}건
+                </Badge>
+              )}
+            </div>
           </div>
           <CardDescription>학생이 작성한 최종답안입니다</CardDescription>
         </CardHeader>
         <CardContent>
-          {text ? (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <pre className="text-sm whitespace-pre-wrap break-words font-sans">
-                {text}
-              </pre>
+          {answerBody ? (
+            <div className="space-y-3">
+              <PasteAnalyzerVerdict
+                assessment={pasteAssessment}
+                pending={pasteAssessmentPending}
+              />
+              {hasIntegritySignals && (
+                <IntegrityAlerts
+                  suspiciousLogs={suspiciousLogs}
+                  internalLogs={internalLogs}
+                  abnormalBursts={abnormalBursts}
+                />
+              )}
+              {hasIntegritySignals && (
+                <div className="flex items-center gap-4 text-xs text-muted-foreground px-1 flex-wrap">
+                  {suspiciousLogs.length > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-3 rounded bg-red-200" />
+                      외부 복사
+                    </span>
+                  )}
+                  {internalLogs.length > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-3 rounded bg-blue-200" />
+                      내부 복사 (AI 채팅)
+                    </span>
+                  )}
+                  {FINAL_ANSWER_SPEED_ANALYSIS_ENABLED && abnormalBursts.length > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-3 rounded bg-amber-200" />
+                      비정상 입력 속도
+                    </span>
+                  )}
+                </div>
+              )}
+              <div className="bg-gray-50 rounded-lg p-4">
+                {hasIntegritySignals ? (
+                  <div
+                    className="text-sm prose max-w-none whitespace-pre-wrap break-words"
+                    dangerouslySetInnerHTML={{
+                      __html: renderHighlightedAnswer(
+                        answerBody,
+                        relevantLogs,
+                        abnormalBursts
+                      ),
+                    }}
+                  />
+                ) : (
+                  <pre className="text-sm whitespace-pre-wrap break-words font-sans">
+                    {answerBody}
+                  </pre>
+                )}
+              </div>
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
@@ -327,15 +584,7 @@ export function FinalAnswerCard({
     );
   }
 
-  // 현재 문제에 해당하는 로그만 필터링
-  const relevantLogs =
-    pasteLogs?.filter((log) => !questionId || log.question_id === questionId) ||
-    [];
-  const suspiciousLogs = relevantLogs.filter(
-    (log) => log.is_internal !== true && log.suspicious
-  );
-  const internalLogs = relevantLogs.filter((log) => log.is_internal === true);
-
+  // exam flow — submission 기반
   return (
     <Card>
       <CardHeader>
@@ -367,56 +616,11 @@ export function FinalAnswerCard({
       <CardContent>
         {submission ? (
           <div className="space-y-3">
-            {suspiciousLogs.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-red-800 mb-1">
-                      부정행위 의심 활동 감지
-                    </p>
-                    <div className="text-xs text-red-700 space-y-1">
-                      {suspiciousLogs.map((log) => (
-                        <p key={log.id}>
-                          • {log.length.toLocaleString()}자 외부 붙여넣기 (
-                          {new Date(log.timestamp).toLocaleString("ko-KR", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
-                          })}
-                          )
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {internalLogs.length > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                <div className="flex items-start gap-2">
-                  <FileText className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-blue-800 mb-1">
-                      내부 복사 활동
-                    </p>
-                    <div className="text-xs text-blue-700 space-y-1">
-                      {internalLogs.map((log) => (
-                        <p key={log.id}>
-                          • {log.length.toLocaleString()}자 내부 복사 (
-                          {new Date(log.timestamp).toLocaleString("ko-KR", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
-                          })}
-                          )
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            <IntegrityAlerts
+              suspiciousLogs={suspiciousLogs}
+              internalLogs={internalLogs}
+              abnormalBursts={abnormalBursts}
+            />
             {relevantLogs.length > 0 && (
               <div className="flex items-center gap-4 text-xs text-muted-foreground px-1">
                 {suspiciousLogs.length > 0 && (

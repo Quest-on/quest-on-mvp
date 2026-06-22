@@ -19,6 +19,7 @@ import {
   AIOverallSummary,
   SummaryData,
 } from "@/components/instructor/AIOverallSummary";
+import { AnswerIntegrityCard } from "@/components/instructor/AnswerIntegrityCard";
 import { AiDependencySummaryCard } from "@/components/grading/AiDependencySummaryCard";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import {
@@ -28,6 +29,12 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { StageGrading, QuestionSummaryData, GradingProgress } from "@/lib/types/grading";
+import type {
+  AbnormalBurst,
+  ExternalPasteSuspicionDetail,
+  PasteAssessment,
+} from "@/lib/answer-integrity";
+import { FINAL_ANSWER_LOG_ID } from "@/lib/answer-integrity";
 
 interface Conversation {
   id: string;
@@ -128,6 +135,15 @@ interface SessionData {
   messages: Record<string, Conversation[]>;
   grades: Record<string, Grade>;
   pasteLogs?: Record<string, PasteLog[]>;
+  finalAnswerIntegrity?: {
+    abnormalBursts: AbnormalBurst[];
+    externalPasteCount: number;
+    externalPasteChars: number;
+    internalPasteCount: number;
+    internalPasteChars: number;
+    externalPasteDetails: ExternalPasteSuspicionDetail[];
+    pasteLogs: PasteLog[];
+  };
   overallScore: number | null;
   gradingProgress?: GradingProgress | null;
   assignmentQuiz?: AssignmentQuiz | null;
@@ -158,6 +174,8 @@ export default function AssignmentGradePage({
 
   const [selectedQuestionIdx, setSelectedQuestionIdx] = useState<number>(0);
   const [overallSummary, setOverallSummary] = useState<SummaryData | null>(null);
+  const [pasteAssessment, setPasteAssessment] = useState<PasteAssessment | null>(null);
+  const [pasteAnalysisPending, setPasteAnalysisPending] = useState(false);
 
   useEffect(() => {
     if (
@@ -487,8 +505,18 @@ export default function AssignmentGradePage({
             );
           })()}
 
-          <div className="mb-6">
-            <AIOverallSummary summary={overallSummary} loading={summaryLoading} />
+          <div className="mb-6 space-y-4">
+            <AIOverallSummary
+              summary={overallSummary}
+              loading={summaryLoading}
+              finalAnswerIntegrity={sessionData?.finalAnswerIntegrity}
+            />
+            <AnswerIntegrityCard
+              sessionId={resolvedParams.sessionId}
+              hidePasteVerdict
+              onPasteAssessmentChange={setPasteAssessment}
+              onAnalyzingChange={setPasteAnalysisPending}
+            />
           </div>
 
           <QuestionNavigation
@@ -515,6 +543,17 @@ export default function AssignmentGradePage({
               {/* Assignment 최종답안 — sessions.final_answer (plain text, XSS 안전) */}
               <FinalAnswerCard
                 finalAnswerText={sessionData.session.final_answer ?? ""}
+                pasteLogs={
+                  sessionData.finalAnswerIntegrity?.pasteLogs ??
+                  sessionData.pasteLogs?.[FINAL_ANSWER_LOG_ID] ??
+                  []
+                }
+                questionId={FINAL_ANSWER_LOG_ID}
+                abnormalBursts={
+                  sessionData.finalAnswerIntegrity?.abnormalBursts ?? []
+                }
+                pasteAssessment={pasteAssessment}
+                pasteAssessmentPending={pasteAnalysisPending}
               />
             </div>
 

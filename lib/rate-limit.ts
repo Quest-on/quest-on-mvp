@@ -231,6 +231,8 @@ export const RATE_LIMITS = {
   submission: { limit: 30, windowSec: 60 } satisfies RateLimitConfig,
   /** Paste log endpoints: 120 requests per minute per user (high frequency during exams) */
   pasteLog: { limit: 120, windowSec: 60 } satisfies RateLimitConfig,
+  /** Final answer input telemetry batches: 60 per minute */
+  finalAnswerInput: { limit: 60, windowSec: 60 } satisfies RateLimitConfig,
   /** Final answer auto-save (assignment): 60 saves per minute (debounced 2.5s on client) */
   finalAnswerSave: { limit: 60, windowSec: 60 } satisfies RateLimitConfig,
   /** AI 일괄 문제 생성용 (유형별 병렬 3콜 × 최대 제한): 5 requests per minute per user */

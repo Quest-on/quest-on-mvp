@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   Sheet,
   SheetContent,
@@ -9,10 +9,12 @@ import {
   SheetDescription,
   SheetFooter,
 } from "@/components/ui/sheet";
-import { Textarea } from "@/components/ui/textarea";
+import { AnswerTextarea } from "@/components/ui/answer-textarea";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FINAL_ANSWER_LOG_ID } from "@/lib/answer-integrity";
+import { useFinalAnswerInputTelemetry } from "@/hooks/useFinalAnswerInputTelemetry";
 
 const MAX_LENGTH = 50_000;
 
@@ -27,6 +29,8 @@ interface FinalAnswerSheetProps {
   error: string | null;
   savedValue: string;
   disabled?: boolean;
+  sessionId?: string;
+  examCode?: string;
 }
 
 function formatTime(ts: number): string {
@@ -41,7 +45,7 @@ function formatTime(ts: number): string {
  * 우측에서 슬라이드되는 최종답안 작성 Sheet.
  * - 입력 시 useFinalAnswer 훅이 2.5s 디바운스 자동저장
  * - 닫힐 때 flush() 즉시 저장
- * - 글자수 카운터(50,000자) + 마지막 저장 시각 표시
+ * - 외부 붙여넣기 로그 + 입력 타임라인 수집
  */
 export function FinalAnswerSheet({
   open,
@@ -54,14 +58,60 @@ export function FinalAnswerSheet({
   error,
   savedValue,
   disabled,
+  sessionId,
+  examCode,
 }: FinalAnswerSheetProps) {
   const dirty = value !== savedValue;
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // 시트가 열릴 때 textarea에 포커스
+  const { flushTelemetry, recordPaste } = useFinalAnswerInputTelemetry({
+    sessionId,
+    textareaRef,
+    enabled: open && !disabled,
+  });
+
+  const handlePasteLog = useCallback(
+    async (pasteData: {
+      pastedText: string;
+      pasteStart: number;
+      pasteEnd: number;
+      answerLengthBefore: number;
+      isInternal: boolean;
+    }) => {
+      recordPaste({
+        pastedText: pasteData.pastedText,
+        lenAfter: pasteData.pasteEnd,
+        isInternal: pasteData.isInternal,
+      });
+
+      if (!sessionId) return;
+
+      try {
+        await fetch("/api/log/paste", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            length: pasteData.pastedText.length,
+            pasted_text: pasteData.pastedText,
+            paste_start: pasteData.pasteStart,
+            paste_end: pasteData.pasteEnd,
+            answer_length_before: pasteData.answerLengthBefore,
+            isInternal: pasteData.isInternal,
+            ts: Date.now(),
+            examCode,
+            questionId: FINAL_ANSWER_LOG_ID,
+            sessionId,
+          }),
+        });
+      } catch {
+        // non-critical
+      }
+    },
+    [sessionId, examCode, recordPaste]
+  );
+
   useEffect(() => {
     if (open) {
-      // 슬라이드 애니메이션이 끝난 뒤 포커스
       const t = setTimeout(() => textareaRef.current?.focus(), 250);
       return () => clearTimeout(t);
     }
@@ -69,7 +119,7 @@ export function FinalAnswerSheet({
 
   const handleOpenChange = async (next: boolean) => {
     if (!next) {
-      // 닫힐 때 즉시 저장 시도 (실패해도 시트는 닫는다 — beforeunload backup이 있음)
+      await flushTelemetry();
       void onFlush();
     }
     onOpenChange(next);
@@ -92,15 +142,19 @@ export function FinalAnswerSheet({
         </SheetHeader>
 
         <div className="flex-1 flex flex-col gap-3 px-4 py-4 overflow-hidden">
-          <Textarea
-            ref={textareaRef}
+          <AnswerTextarea
+            textareaRef={textareaRef}
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={onChange}
+            onPaste={handlePasteLog}
             disabled={disabled}
+            maxLength={MAX_LENGTH + 1000}
             placeholder="여기에 최종답안을 작성하세요..."
-            className="flex-1 min-h-[300px] resize-none text-sm leading-relaxed"
-            maxLength={MAX_LENGTH + 1000 /* 약간 여유 — 서버에서 최종 검증 */}
-            aria-label="최종답안"
+            className={cn(
+              "flex-1 min-h-[300px] resize-none text-sm leading-relaxed",
+              "border-input rounded-md bg-background shadow-xs",
+              "focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+            )}
           />
 
           <div className="flex items-center justify-between text-xs">

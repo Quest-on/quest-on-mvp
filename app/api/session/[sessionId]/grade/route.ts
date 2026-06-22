@@ -20,6 +20,11 @@ import {
 } from "@/lib/grade-utils";
 import { hasQuestionWithQIdx } from "@/lib/case-grade-access";
 import { gradeObjectiveAnswer, isObjectiveQuestion, isGradingOpen, isAssignmentType } from "@/lib/grading-helpers";
+import {
+  FINAL_ANSWER_LOG_ID,
+  assignmentIntegrityScope,
+} from "@/lib/answer-integrity";
+import { loadAnswerIntegritySnapshot } from "@/lib/answer-integrity-server";
 
 // Auto-grading (PUT) calls AI_MODEL_HEAVY multiple times — needs 300s
 export const maxDuration = 300;
@@ -102,8 +107,14 @@ export async function GET(
       }));
     }
 
-    // Optimized: Fetch submissions, messages, grades, paste_logs, and assignment quiz in parallel
-    const [submissionsResult, messagesResult, gradesResult, pasteLogsResult, quizResult] =
+    // Optimized: Fetch submissions, messages, grades, paste_logs, telemetry, and assignment quiz in parallel
+    const [
+      submissionsResult,
+      messagesResult,
+      gradesResult,
+      pasteLogsResult,
+      quizResult,
+    ] =
       await Promise.all([
         supabase
           .from("submissions")
@@ -410,6 +421,14 @@ export async function GET(
           : null;
     }
 
+    const finalAnswerIntegrity = isAssignmentType(exam.type)
+      ? await loadAnswerIntegritySnapshot(
+          supabase,
+          sessionId,
+          assignmentIntegrityScope()
+        )
+      : null;
+
     const responseData = {
       session: {
         id: session.id,
@@ -431,6 +450,17 @@ export async function GET(
       messages: messagesByQuestion,
       grades: gradesByQuestion, // 서버 사이드 자동 채점 점수
       pasteLogs: pasteLogsByQuestion, // 부정행위 의심 로그 (question_id별로 그룹화)
+      finalAnswerIntegrity: finalAnswerIntegrity
+        ? {
+            abnormalBursts: finalAnswerIntegrity.abnormalBursts,
+            externalPasteCount: finalAnswerIntegrity.externalPasteCount,
+            externalPasteChars: finalAnswerIntegrity.externalPasteChars,
+            internalPasteCount: finalAnswerIntegrity.internalPasteCount,
+            internalPasteChars: finalAnswerIntegrity.internalPasteChars,
+            externalPasteDetails: finalAnswerIntegrity.externalPasteDetails,
+            pasteLogs: pasteLogsByQuestion[FINAL_ANSWER_LOG_ID] ?? [],
+          }
+        : null,
       overallScore,
       aiSummary: session.ai_summary || null, // 하위 호환성을 위해 유지
       assignmentQuiz: quizAttempt || null,

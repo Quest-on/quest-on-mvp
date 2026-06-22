@@ -27,6 +27,11 @@ import {
   callTrackedChatCompletion,
 } from "@/lib/ai-tracking";
 import { sanitizeUserInput } from "@/lib/sanitize";
+import {
+  formatAnswerIntegrityForPrompt,
+  assignmentIntegrityScope,
+} from "@/lib/answer-integrity";
+import { loadAnswerIntegritySnapshot } from "@/lib/answer-integrity-server";
 import { upsertGradesBySessionQuestion } from "@/lib/grades-upsert";
 import {
   normalizeAssignmentGradeScore,
@@ -1599,6 +1604,31 @@ ${
       })
       .join("\n---\n\n");
 
+    let assignmentFinalAnswerBlock = "";
+    let assignmentIntegrityBlock = "";
+    if (isAssignment) {
+      const { data: sessionRow } = await supabase
+        .from("sessions")
+        .select("final_answer")
+        .eq("id", sessionId)
+        .single();
+      const finalAnswerText =
+        typeof sessionRow?.final_answer === "string" ? sessionRow.final_answer : "";
+      assignmentFinalAnswerBlock = `
+
+[학생 최종 제출 답안]
+${finalAnswerText.trim() || "(작성 없음)"}`;
+
+      const integrity = await loadAnswerIntegritySnapshot(
+        supabase,
+        sessionId,
+        assignmentIntegrityScope()
+      );
+      assignmentIntegrityBlock = `
+
+${formatAnswerIntegrityForPrompt(integrity, "ko")}`;
+    }
+
     const systemPrompt = isAssignment
       ? buildAssignmentResearchSummarySystemPrompt()
       : buildSummaryEvaluationSystemPrompt();
@@ -1611,6 +1641,8 @@ ${
 
       [학생의 채팅 기반 리서치 과정 및 평가 등급]
       ${questionsText}
+      ${assignmentFinalAnswerBlock}
+      ${assignmentIntegrityBlock}
 
       위 내용을 바탕으로 학생의 전체적인 과제 수행을 요약 평가해주세요.
       **중요**: AI 채팅 기록 자체가 평가 자료입니다. 이 대화형 수행 방식을 부족한 점으로 쓰지 말고, 학생이 채팅을 통해 리서치 내용을 얼마나 잘 탐색·검증·이해했는지 평가하세요.

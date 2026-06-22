@@ -13,6 +13,7 @@ import { QuestionNavigation } from "@/components/instructor/QuestionNavigation";
 import { QuestionPromptCard } from "@/components/instructor/QuestionPromptCard";
 import { AIConversationsCard } from "@/components/instructor/AIConversationsCard";
 import { FinalAnswerCard } from "@/components/instructor/FinalAnswerCard";
+import { AnswerIntegrityCard } from "@/components/instructor/AnswerIntegrityCard";
 import { ObjectiveGradeCard } from "@/components/instructor/ObjectiveGradeCard";
 import { CaseGradingChat } from "@/components/instructor/CaseGradingChat";
 import {
@@ -52,6 +53,7 @@ import {
   GradingProgress,
   QuestionSummaryData,
 } from "@/lib/types/grading";
+import type { PasteAssessment } from "@/lib/answer-integrity";
 
 interface Conversation {
   id: string;
@@ -186,6 +188,13 @@ export default function GradeStudentPage({
   const qIdxParam = searchParams.get("qIdx");
   const initialSelectionAppliedRef = useRef<string | null>(null);
   const [selectedQuestionIdx, setSelectedQuestionIdx] = useState<number>(0);
+  const [pasteAssessment, setPasteAssessment] = useState<PasteAssessment | null>(null);
+  const [pasteAnalysisPending, setPasteAnalysisPending] = useState(false);
+
+  useEffect(() => {
+    setPasteAssessment(null);
+    setPasteAnalysisPending(false);
+  }, [selectedQuestionIdx, resolvedParams.studentId]);
   // Redirect non-instructors
   useEffect(() => {
     if (
@@ -691,6 +700,8 @@ export default function GradeStudentPage({
                         : undefined
                     }
                     questionId={currentQuestion?.id}
+                    pasteAssessment={pasteAssessment}
+                    pasteAssessmentPending={pasteAnalysisPending}
                   />
                 </>
               )}
@@ -701,6 +712,20 @@ export default function GradeStudentPage({
                 <SessionQuizResultsCard
                   quiz={sessionData.assignmentQuiz}
                   compact
+                />
+              )}
+
+              {!isObjectiveQuestion(currentQuestion?.type) && currentQuestion && (
+                <AnswerIntegrityCard
+                  key={currentQuestion.id}
+                  sessionId={sessionData.session.id}
+                  questionId={currentQuestion.id}
+                  qIdx={selectedQuestionQIdx}
+                  hidePasteVerdict
+                  autoAnalyze={false}
+                  compact
+                  onPasteAssessmentChange={setPasteAssessment}
+                  onAnalyzingChange={setPasteAnalysisPending}
                 />
               )}
 

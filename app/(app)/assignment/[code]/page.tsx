@@ -297,6 +297,8 @@ export default function AssignmentPage({
         error={finalAnswer.error}
         savedValue={finalAnswer.savedValue}
         disabled={isSubmitted}
+        sessionId={session?.id}
+        examCode={code}
       />
 
       <AssignmentSubmitDialog
