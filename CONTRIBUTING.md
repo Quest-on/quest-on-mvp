@@ -57,6 +57,7 @@
    ```bash
    npm install
    ```
+   > `npm install` 시 **안전장치(git hook)가 자동 설치**됩니다. 이후 `main`에 실수로 커밋·push하려 하면 git이 막아주고, 작업 브랜치로 안내합니다. (메인테이너 @jcmaker는 면제)
 5. @jcmaker에게 받은 **개발용 환경변수**를 `.env.local`에 넣기.
 
 ---
