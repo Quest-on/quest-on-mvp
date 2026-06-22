@@ -21,6 +21,8 @@ export type SendModeState = {
   gradingDone: boolean;
   gradingFailed: boolean;
   regradeArmed: boolean;
+  /** Criteria interview finished and score range confirmed */
+  interviewReady: boolean;
 };
 
 export type SendMode = "start" | "discuss";
@@ -31,13 +33,15 @@ export type SendMode = "start" | "discuss";
  *  - isGrading              → "discuss"
  *  - regradeArmed           → "start"
  *  - gradingDone || gradingFailed (and !regradeArmed) → "discuss"
- *  - else (no run yet)      → "start"
+ *  - !interviewReady        → "discuss" (AI-led interview phase)
+ *  - else                   → "start"
  */
 export function resolveSendMode(state: SendModeState): SendMode {
   if (state.committed) return "discuss";
   if (state.isGrading) return "discuss";
   if (state.regradeArmed) return "start";
   if (state.gradingDone || state.gradingFailed) return "discuss";
+  if (!state.interviewReady) return "discuss";
   return "start";
 }
 

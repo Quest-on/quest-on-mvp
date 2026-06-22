@@ -89,10 +89,26 @@ describe("grading chat prompt style", () => {
       language: "ko",
     });
 
-    expect(prompt).toContain("이모지를 사용하지 마세요");
-    expect(prompt).toContain("후속 질문 1개만");
-    expect(prompt).toContain("300자 이내");
+    expect(prompt).toContain("당신이 먼저 말합니다");
+    expect(prompt).toContain("CRITERIA_READY");
+    expect(prompt).toContain("점수 Range");
+    expect(prompt).toContain("우수/평범/미흡 3단계");
     expect(prompt).not.toContain("샘플 가채점 시작");
+  });
+
+  it("frames assignment interview around question quality", () => {
+    const prompt = buildCriteriaDiscussionSystemPrompt({
+      examTitle: "리서치 과제",
+      caseQuestions: [{ qIdx: 0, questionPrompt: "조사하시오" }],
+      sampleStudents: [],
+      isAssignment: true,
+      totalSubmittedCount: 12,
+      language: "ko",
+    });
+
+    expect(prompt).toContain("질문의 질");
+    expect(prompt).toContain("질문→자기 답 연결");
+    expect(prompt).toContain("총 12명 제출");
   });
 
   it("keeps individual case grading chat compact and emoji-free", () => {
@@ -323,6 +339,8 @@ describe("buildAssignmentGradingPrompt", () => {
     expect(prompt).toContain("우수 / 평범 / 미흡");
     expect(prompt).toContain("우수: 85");
     expect(prompt).toContain("overall_score는 반드시 85, 70, 45 중 하나만 반환하세요");
+    expect(prompt).toContain("점수 인플레이션 방지");
+    expect(prompt).toContain("기본값(베이스라인)은 평범(70)");
     expect(prompt).toContain("AI 채팅 기록 자체가 평가 자료");
     expect(prompt).toContain("반드시 JSON 객체만 반환하세요");
     expect(prompt).toContain("overall_score");
@@ -382,10 +400,26 @@ describe("buildPerStudentGradingSystemPrompt", () => {
     expect(prompt).toContain('"score":<0-100 정수>');
   });
 
-  it("점수 변별 밴드와 전체 범위 사용 지시를 포함한다", () => {
+  it("점수 분포 지시를 포함한다", () => {
     const prompt = build();
-    expect(prompt).toContain("점수 변별 기준");
+    expect(prompt).toContain("점수 분포");
     expect(prompt).toContain("0-100");
-    expect(prompt).toContain("같은 점수를 주지 마세요");
+  });
+
+  it("과제 모드에서는 리서치 점수 인플레이션 방지 지시를 포함한다", () => {
+    const prompt = buildPerStudentGradingSystemPrompt({
+      criteria: {
+        criteria_summary: "리서치",
+        per_question: [],
+        score_range: { min: 0, max: 100, typical_min: 50, typical_max: 72, excellent_min: 85 },
+      },
+      studentSessionId: "sess-1",
+      answers: [{ qIdx: 0, questionPrompt: "과제", answer: "답안", chatSummary: "" }],
+      caseQuestions: [{ qIdx: 0, questionPrompt: "과제" }],
+      isAssignment: true,
+    });
+    expect(prompt).toContain("점수 분포(강사 확정)");
+    expect(prompt).toContain("50–72");
+    expect(prompt).toContain("질문 많음만으로");
   });
 });

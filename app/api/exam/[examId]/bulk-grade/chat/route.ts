@@ -25,6 +25,11 @@ import {
   uuidFromSeed,
 } from "@/lib/chat-idempotency";
 import { buildCriteriaDiscussionSystemPrompt } from "@/lib/prompts";
+import {
+  isInterviewReady,
+  parseCriteriaReadyMarker,
+  stripCriteriaReadyMarker,
+} from "@/lib/bulk-grading-criteria";
 import { stripEmoji } from "@/lib/sanitize";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
@@ -57,8 +62,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 function canStartFromMessages(
-  messages: Array<Pick<BulkGradingMessageRow, "role">>,
-  session: Pick<BulkGradingSessionRow, "status"> | null,
+  session: Pick<BulkGradingSessionRow, "status" | "calibration_status"> | null,
 ): boolean {
   if (!session) return false;
   if (
@@ -68,7 +72,7 @@ function canStartFromMessages(
   ) {
     return false;
   }
-  return messages.some((m) => m.role === "user");
+  return isInterviewReady(session.calibration_status);
 }
 
 function buildDiscussionOnlyPhaseInstructions(
@@ -81,7 +85,9 @@ function buildDiscussionOnlyPhaseInstructions(
 - This chat is always discussion-only. Never claim that you directly changed a score, grading status, proposed grade, final grade, progress counter, or commit state.
 - If the instructor wants score changes, direct them to use the result table controls, rerun grading, or commit controls shown in the UI.
 - Do not use emoji.
-- Keep replies compact: 1-2 short sentences, and ask only one interview question when collecting criteria.
+- Keep replies compact: 1-3 short sentences, and ask only one interview question when collecting criteria.
+- During interviewing: you lead the interview using sample data; the instructor responds. Do NOT ask them to paste criteria first.
+- When calibration_status=sample_review: criteria and score range are confirmed — the instructor can start bulk grading from the UI.
 - Keep the response aligned with the current phase:
   - draft/interviewing: discuss grading criteria and expectations before bulk grading starts.
   - grading/sample_grading/committing: explain what is happening and what can be reviewed while processing continues.
@@ -97,7 +103,9 @@ Current phase: status=${session.status}, calibration_status=${session.calibratio
 - 이 채팅은 항상 토론 전용입니다. 점수, 채점 상태, 가채점 결과, 최종 점수, 진행률, 확정 상태를 직접 변경했다고 말하지 마세요.
 - 강사가 점수 변경을 원하면 화면의 결과 표 입력, 재가채점, 확정 버튼을 사용해야 한다고 안내하세요.
 - 이모지를 사용하지 마세요.
-- 답변은 1~2개의 짧은 문장으로 유지하고, 기준 수집 단계에서는 인터뷰 질문 1개만 하세요.
+- 답변은 1~3개의 짧은 문장으로 유지하고, 기준 수집 단계에서는 인터뷰 질문 1개만 하세요.
+- interviewing 단계: 샘플 데이터를 바탕으로 당신이 먼저 인터뷰합니다. 강사에게 기준을 먼저 입력하라고 요구하지 마세요.
+- calibration_status=sample_review: 기준과 점수 Range가 확정됨 — 강사가 UI에서 가채점을 시작할 수 있습니다.
 - 현재 단계에 맞춰 답하세요:
   - draft/interviewing: 가채점 시작 전 채점 기준과 기대 수준을 논의합니다.
   - grading/sample_grading/committing: 처리 중인 상태를 설명하고, 진행 중 검토 가능한 내용을 안내합니다.
@@ -257,7 +265,7 @@ export async function GET(
         calibration_status: session.calibration_status,
       },
       messages,
-      canStartGrading: canStartFromMessages(messages, session),
+      canStartGrading: canStartFromMessages(session),
     });
   } catch (error) {
     logError("bulk-grade chat GET handler error", error, {
@@ -379,7 +387,7 @@ export async function POST(
             calibration_status: gradingSession.calibration_status,
           },
           messages: existingMessages,
-          canStartGrading: canStartFromMessages(existingMessages, gradingSession),
+          canStartGrading: canStartFromMessages(gradingSession),
         });
       }
     }
@@ -420,7 +428,7 @@ export async function POST(
               },
               assistantMessage: existingAssistant,
               messages: existingMessages,
-              canStartGrading: canStartFromMessages(existingMessages, gradingSession),
+              canStartGrading: canStartFromMessages(gradingSession),
             });
           }
           return errorJson("CONFLICT", "Message is already being processed", 409);
@@ -464,6 +472,7 @@ export async function POST(
         examDescription: examMeta.examDescription,
         caseQuestions: examMeta.caseQuestions,
         sampleStudents: sampleStudentsWithPrompts,
+        totalSubmittedCount: submittedIds.length,
         language: examMeta.examLanguage,
         isAssignment: examMeta.isAssignment,
       }),
@@ -484,7 +493,7 @@ export async function POST(
         getOpenAI().chat.completions.create({
           model: AI_MODEL,
           messages: openAiMessages,
-          max_completion_tokens: 500,
+          max_completion_tokens: isInit ? 900 : 600,
         }),
       {
         feature: "bulk_grading_chat",
@@ -504,11 +513,31 @@ export async function POST(
       },
     );
 
-    const aiContent = stripEmoji(
+    const rawAiContent = stripEmoji(
       tracked.data.choices[0]?.message?.content?.trim() ?? "",
     ).trim();
+    if (!rawAiContent) {
+      return errorJson("INTERNAL_ERROR", "AI 응답을 받지 못했습니다.", 500);
+    }
+
+    const criteriaReadyRange = parseCriteriaReadyMarker(rawAiContent);
+    const aiContent = stripCriteriaReadyMarker(rawAiContent);
     if (!aiContent) {
       return errorJson("INTERNAL_ERROR", "AI 응답을 받지 못했습니다.", 500);
+    }
+
+    if (criteriaReadyRange) {
+      await supabase
+        .from("exam_grading_sessions")
+        .update({
+          calibration_status: "sample_review",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", gradingSessionId);
+      gradingSession = {
+        ...gradingSession,
+        calibration_status: "sample_review",
+      };
     }
 
     // Save assistant message
@@ -552,7 +581,7 @@ export async function POST(
           },
           assistantMessage: existingAssistant,
           messages: existingMessages,
-          canStartGrading: canStartFromMessages(existingMessages, gradingSession),
+          canStartGrading: canStartFromMessages(gradingSession),
         });
       }
       logError("bulk-grade chat: save assistant message failed", assistantError, {
@@ -582,7 +611,7 @@ export async function POST(
         created_at: assistantRow.created_at,
       },
       messages,
-      canStartGrading: canStartFromMessages(messages, gradingSession),
+      canStartGrading: canStartFromMessages(gradingSession),
     });
   } catch (error) {
     logError("bulk-grade chat POST handler error", error, {
