@@ -1,0 +1,33 @@
+#!/bin/sh
+# main 브랜치로 직접 push 차단 (메인테이너 제외).
+DIR="$(dirname "$0")"
+. "$DIR/_lib.sh"
+
+if is_maintainer; then
+  exit 0
+fi
+
+# stdin 형식: <local ref> <local sha> <remote ref> <remote sha>
+blocked=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/"$PROTECTED_BRANCH")
+      blocked=1
+      ;;
+  esac
+done
+
+if [ "$blocked" = "1" ]; then
+  echo ""
+  echo "⛔  main 브랜치로 직접 push 할 수 없습니다."
+  echo ""
+  echo "    자기 포크의 작업 브랜치로 push 하고 Pull Request 를 올리세요:"
+  echo ""
+  echo "        git push -u origin feat/내작업이름"
+  echo ""
+  echo "    (자세한 내용: CONTRIBUTING.md)"
+  echo ""
+  exit 1
+fi
+
+exit 0

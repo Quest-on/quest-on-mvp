@@ -6,6 +6,8 @@ import { batchGetUserInfo } from "@/lib/app-users";
 import { validateUUID } from "@/lib/validate-params";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
+import { buildAssignmentScoreMap, isAssignmentType } from "@/lib/grading-helpers";
+import { autoSubmitEligibleSessionsForExam } from "@/lib/assignment-deadline-sweep";
 
 export const maxDuration = 30;
 
@@ -47,7 +49,7 @@ export async function GET(
     // Get exam to verify instructor owns it
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("id, title, instructor_id")
+      .select("id, title, instructor_id, type, deadline")
       .eq("id", examId)
       .single();
 
@@ -58,6 +60,22 @@ export async function GET(
     // Check if instructor owns the exam
     if (exam.instructor_id !== user.id) {
       return errorJson("FORBIDDEN", "Forbidden", 403);
+    }
+
+    // Past-deadline assignments: auto-submit any started-but-unsubmitted sessions
+    // so the instructor list reflects deadline submissions without waiting for cron.
+    if (
+      isAssignmentType(exam.type as string | null) &&
+      exam.deadline &&
+      new Date(exam.deadline as string).getTime() < Date.now()
+    ) {
+      try {
+        await autoSubmitEligibleSessionsForExam(examId);
+      } catch (sweepError) {
+        logError("sessions: assignment deadline sweep failed", sweepError, {
+          path: `/api/exam/${examId}/sessions`,
+        });
+      }
     }
 
     // Parse pagination params (default: page 1, pageSize 50, max 100)
@@ -96,7 +114,8 @@ export async function GET(
         status,
         is_active,
         last_heartbeat_at,
-        grading_progress
+        grading_progress,
+        auto_submitted
       `,
       )
       .eq("exam_id", examId);
@@ -156,6 +175,31 @@ export async function GET(
       }
     }
 
+    // 과제(assignment)는 q_idx=0 단일 문항을 확정(grade_type="manual")했을 때만 점수를 노출한다.
+    // (가채점은 commit 전까지 grades에 기록되지 않으므로 manual row 존재 = 확정된 점수)
+    // 시험은 별도 인프라(student-summaries)가 점수를 집계하므로 여기서는 점수를 채우지 않는다.
+    let scoreBySession = new Map<string, number>();
+    if (isAssignmentType(exam.type as string | null)) {
+      const sessionIds = sessions.map((s) => s.id);
+      if (sessionIds.length > 0) {
+        const { data: gradeRows, error: gradesError } = await supabase
+          .from("grades")
+          .select("session_id, score")
+          .in("session_id", sessionIds)
+          .eq("q_idx", 0)
+          .eq("grade_type", "manual");
+        if (gradesError) {
+          logError("sessions: assignment grades fetch failed", gradesError, {
+            path: `/api/exam/${examId}/sessions`,
+          });
+        } else {
+          scoreBySession = buildAssignmentScoreMap(
+            (gradeRows ?? []) as Array<{ session_id: string; score: unknown }>,
+          );
+        }
+      }
+    }
+
     // Optimized: Process sessions without decompression (not needed for list view)
     const processedSessions = sessions.map((session) => {
       // Get student info from map
@@ -182,6 +226,9 @@ export async function GET(
         is_active: session.is_active ?? true,
         last_heartbeat_at: session.last_heartbeat_at,
         grading_progress: session.grading_progress || null,
+        score: scoreBySession.get(session.id) ?? null,
+        is_graded: scoreBySession.has(session.id),
+        auto_submitted: session.auto_submitted === true,
       };
     });
 

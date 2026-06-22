@@ -10,7 +10,114 @@ import {
   summarizeAiDependencyAssessments,
   formatSummaryScoreLabel,
   resolveByQIdx,
+  isAssignmentType,
+  buildAssignmentScoreMap,
+  isGradingOpen,
 } from "@/lib/grading-helpers";
+
+describe("isGradingOpen", () => {
+  // Fixed reference point: 2026-06-16 (today per MEMORY). Tests use relative
+  // ISO strings that are clearly in the past or future.
+  const PAST = "2024-01-01T00:00:00Z";   // well before today
+  const FUTURE = "2099-12-31T23:59:59Z"; // well after today
+
+  describe("assignment (type='report')", () => {
+    it("returns true when deadline is in the past", () => {
+      expect(isGradingOpen({ type: "report", deadline: PAST })).toBe(true);
+    });
+
+    it("returns false when deadline is in the future", () => {
+      expect(isGradingOpen({ type: "report", deadline: FUTURE })).toBe(false);
+    });
+
+    it("returns false when deadline is null (not yet set)", () => {
+      expect(isGradingOpen({ type: "report", deadline: null })).toBe(false);
+    });
+
+    it("returns false when deadline is undefined", () => {
+      expect(isGradingOpen({ type: "report" })).toBe(false);
+    });
+
+    it("ignores status field — assignment gate depends only on deadline", () => {
+      expect(isGradingOpen({ type: "report", status: "closed", deadline: FUTURE })).toBe(false);
+      expect(isGradingOpen({ type: "report", status: "draft",  deadline: PAST  })).toBe(true);
+    });
+  });
+
+  describe("exam (type='exam' or null/undefined)", () => {
+    it("returns true when status is 'closed'", () => {
+      expect(isGradingOpen({ type: "exam",  status: "closed" })).toBe(true);
+      expect(isGradingOpen({ type: null,    status: "closed" })).toBe(true);
+      expect(isGradingOpen({ type: undefined, status: "closed" })).toBe(true);
+    });
+
+    it("returns false when status is 'draft'", () => {
+      expect(isGradingOpen({ type: "exam", status: "draft" })).toBe(false);
+    });
+
+    it("returns false when status is 'open'", () => {
+      expect(isGradingOpen({ type: "exam", status: "open" })).toBe(false);
+    });
+
+    it("returns false when status is null", () => {
+      expect(isGradingOpen({ type: "exam", status: null })).toBe(false);
+    });
+
+    it("ignores deadline field — exam gate depends only on status", () => {
+      // Past deadline should not make a non-closed exam gradable
+      expect(isGradingOpen({ type: "exam", status: "open", deadline: PAST })).toBe(false);
+      // Future deadline should not block a closed exam
+      expect(isGradingOpen({ type: "exam", status: "closed", deadline: FUTURE })).toBe(true);
+    });
+  });
+});
+
+describe("isAssignmentType", () => {
+  it("treats every non-exam task type as an assignment", () => {
+    for (const type of ["report", "code", "erd", "mindmap", "assignment"]) {
+      expect(isAssignmentType(type)).toBe(true);
+    }
+  });
+
+  it("treats exam and empty/null type as not an assignment", () => {
+    expect(isAssignmentType("exam")).toBe(false);
+    expect(isAssignmentType(null)).toBe(false);
+    expect(isAssignmentType(undefined)).toBe(false);
+  });
+});
+
+describe("buildAssignmentScoreMap", () => {
+  it("maps session_id → score for valid numeric scores", () => {
+    const map = buildAssignmentScoreMap([
+      { session_id: "s1", score: 82 },
+      { session_id: "s2", score: 0 },
+      { session_id: "s3", score: 100 },
+    ]);
+    expect(map.get("s1")).toBe(82);
+    expect(map.get("s2")).toBe(0); // 0점도 유효한 확정 점수
+    expect(map.get("s3")).toBe(100);
+    expect(map.size).toBe(3);
+  });
+
+  it("preserves the raw AI score without rounding to grade bands (82 stays 82)", () => {
+    const map = buildAssignmentScoreMap([{ session_id: "s1", score: 82 }]);
+    expect(map.get("s1")).toBe(82);
+  });
+
+  it("excludes rows with non-finite or non-number scores so ungraded items never show as 0", () => {
+    const map = buildAssignmentScoreMap([
+      { session_id: "s1", score: null },
+      { session_id: "s2", score: undefined },
+      { session_id: "s3", score: "85" },
+      { session_id: "s4", score: NaN },
+    ]);
+    expect(map.size).toBe(0);
+  });
+
+  it("returns an empty map for no rows", () => {
+    expect(buildAssignmentScoreMap([]).size).toBe(0);
+  });
+});
 
 describe("resolveByQIdx", () => {
   // 회귀: 채점 페이지가 question.idx 로만 조회해, idx ≠ 배열 위치인 시험에서

@@ -19,7 +19,7 @@ import {
   type ScoreItem,
 } from "@/lib/grade-utils";
 import { hasQuestionWithQIdx } from "@/lib/case-grade-access";
-import { gradeObjectiveAnswer, isObjectiveQuestion } from "@/lib/grading-helpers";
+import { gradeObjectiveAnswer, isObjectiveQuestion, isGradingOpen, isAssignmentType } from "@/lib/grading-helpers";
 
 // Auto-grading (PUT) calls AI_MODEL_HEAVY multiple times — needs 300s
 export const maxDuration = 300;
@@ -73,7 +73,7 @@ export async function GET(
     // Get exam data
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("id, title, code, instructor_id, questions, rubric, status, score_weights")
+      .select("id, title, code, instructor_id, questions, rubric, status, score_weights, type, deadline")
       .eq("id", session.exam_id)
       .single();
 
@@ -377,7 +377,7 @@ export async function GET(
 
     // Calculate overall score if grades exist
     let overallScore = null;
-    if (exam.status === "closed" && Array.isArray(exam.questions)) {
+    if (isGradingOpen(exam) && Array.isArray(exam.questions)) {
       const scoreWeights = normalizeScoreWeights(exam.score_weights);
       const gradeByQ = new Map(
         deduplicateGrades(grades ?? [])
@@ -501,7 +501,7 @@ export async function POST(
     // Get exam to check instructor and validate q_idx upper bound
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("instructor_id, questions, status")
+      .select("instructor_id, questions, status, type, deadline")
       .eq("id", session.exam_id)
       .single();
 
@@ -514,12 +514,10 @@ export async function POST(
       return errorJson("FORBIDDEN", "Forbidden", 403);
     }
 
-    if (exam.status !== "closed") {
-      return errorJson(
-        "EXAM_NOT_CLOSED",
-        "시험 종료 후에 채점할 수 있습니다.",
-        409
-      );
+    if (!isGradingOpen(exam)) {
+      return isAssignmentType(exam.type)
+        ? errorJson("ASSIGNMENT_NOT_DUE", "과제 마감 후에 채점할 수 있습니다.", 409)
+        : errorJson("EXAM_NOT_CLOSED", "시험 종료 후에 채점할 수 있습니다.", 409);
     }
 
     // Validate q_idx bounds against exam questions (P1-2: also reject negative)
@@ -639,7 +637,7 @@ export async function PUT(
 
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("instructor_id, status")
+      .select("instructor_id, status, type, deadline")
       .eq("id", session.exam_id)
       .single();
 
@@ -647,12 +645,10 @@ export async function PUT(
       return errorJson("FORBIDDEN", "Forbidden", 403);
     }
 
-    if (exam.status !== "closed") {
-      return errorJson(
-        "EXAM_NOT_CLOSED",
-        "시험 종료 후에 채점할 수 있습니다.",
-        409
-      );
+    if (!isGradingOpen(exam)) {
+      return isAssignmentType(exam.type)
+        ? errorJson("ASSIGNMENT_NOT_DUE", "과제 마감 후에 채점할 수 있습니다.", 409)
+        : errorJson("EXAM_NOT_CLOSED", "시험 종료 후에 채점할 수 있습니다.", 409);
     }
 
     // Rate limit: expensive OpenAI auto-grading

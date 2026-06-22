@@ -13,6 +13,7 @@ import {
 } from "@/lib/ai-tracking";
 import {
   asStringArray,
+  getBulkGradableQuestions,
   hasGradesForEveryExpectedQuestion,
   loadSingleStudentCaseData,
   parseGradesFromAiResponse,
@@ -21,7 +22,7 @@ import {
   buildPerStudentGradingSystemPrompt,
   type ExtractedCriteria,
 } from "@/lib/prompts";
-import { normalizeQuestions, isCaseQuestion } from "@/lib/grading-helpers";
+import { isAssignmentType } from "@/lib/grading-helpers";
 import { stripEmoji } from "@/lib/sanitize";
 
 async function handler(request: NextRequest): Promise<NextResponse> {
@@ -49,7 +50,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
         grading_criteria,
         status,
         current_attempt_id,
-        exams!inner ( id, questions, language ),
+        exams!inner ( id, questions, language, type ),
         expected_session_ids
       `)
       .eq("id", gradingSessionId)
@@ -107,22 +108,28 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       criteria = { criteria_summary: gradingCriteriaRaw, per_question: [] };
     }
 
-    type ExamRow = { id: string; questions: unknown; language: string | null };
+    type ExamRow = { id: string; questions: unknown; language: string | null; type: string | null };
     const examData = (ownershipCheck.exams as unknown as ExamRow);
-    const questions = normalizeQuestions(examData.questions);
-    const caseQuestions = questions
-      .filter((q) => isCaseQuestion(q.type))
-      .map((q) => ({ qIdx: q.idx, questionPrompt: q.prompt ?? "" }));
+    const isAssignment = isAssignmentType(examData.type);
+    const caseQuestions = getBulkGradableQuestions({
+      type: examData.type,
+      questions: examData.questions,
+    });
 
     if (caseQuestions.length === 0) {
-      return NextResponse.json({ ok: false, reason: "no_case_questions" }, { status: 200 });
+      return NextResponse.json({ ok: false, reason: "no_gradable_questions" }, { status: 200 });
     }
 
     const caseQIdxes = caseQuestions.map((q) => q.qIdx);
     const examLanguage: "ko" | "en" = (examData.language as string) === "en" ? "en" : "ko";
 
     // Load student case answers
-    const studentData = await loadSingleStudentCaseData(supabase, studentSessionId, caseQIdxes);
+    const studentData = await loadSingleStudentCaseData(
+      supabase,
+      studentSessionId,
+      caseQIdxes,
+      isAssignment,
+    );
 
     // Enrich answer objects with question prompts
     const enrichedAnswers = studentData.answers.map((a) => ({
@@ -136,6 +143,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       answers: enrichedAnswers,
       caseQuestions,
       language: examLanguage,
+      isAssignment,
     });
 
     // [CRITICAL-3] Always 200 ack — AI failures recorded via RPC, not throw

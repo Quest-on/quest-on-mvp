@@ -205,6 +205,52 @@ export function isCaseQuestion(type?: string): boolean {
 }
 
 /**
+ * True when an exam row is an assignment-style task (과제), not a timed exam.
+ * Assignments are persisted with `exams.type` ∈ {report, code, erd, mindmap, assignment}
+ * (the create form sends "report"), while exams use "exam" (or null default).
+ * The whole non-exam family shares the assignment dashboard + final_answer flow,
+ * so detect by "anything that isn't an exam" rather than a single literal.
+ */
+export function isAssignmentType(type?: string | null): boolean {
+  return type != null && type !== "exam";
+}
+
+/**
+ * 강사 채점을 시작할 수 있는 시점인지 판정한다(시험/과제 통일 게이트).
+ * - 과제(isAssignmentType): 마감(deadline) 경과 후. deadline 미설정이면 아직 불가.
+ * - 시험: status === "closed" (대기실 종료 흐름).
+ * bulk-grade-access의 requireGradable 분기와 동일한 규약 — case-grade·grade 라우트가 공유한다.
+ */
+export function isGradingOpen(exam: {
+  type?: string | null;
+  status?: string | null;
+  deadline?: string | null;
+}): boolean {
+  if (isAssignmentType(exam.type)) {
+    return exam.deadline != null && new Date() > new Date(exam.deadline);
+  }
+  return exam.status === "closed";
+}
+
+/**
+ * 과제 대시보드 학생 목록용: 확정(grade_type="manual", q_idx 0) grade row들을
+ * session_id → score 맵으로 만든다. 호출 측에서 q_idx/grade_type 필터를 끝낸 행만 넘긴다.
+ * score가 유한한 숫자가 아닌 행은 제외해, 채점되지 않은(또는 손상된) 항목이 0점으로
+ * 잘못 노출되지 않게 한다.
+ */
+export function buildAssignmentScoreMap(
+  rows: ReadonlyArray<{ session_id: string; score: unknown }>,
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    if (typeof row.score === "number" && Number.isFinite(row.score)) {
+      map.set(row.session_id, row.score);
+    }
+  }
+  return map;
+}
+
+/**
  * Resolve a per-question record (submissions/messages/grades) by trying several
  * candidate q_idx keys in order, returning the first defined value.
  *

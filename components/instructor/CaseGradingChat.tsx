@@ -70,6 +70,8 @@ export function CaseGradingChat({
     initialScore !== undefined ? String(initialScore) : "",
   );
   const [comment, setComment] = useState(initialComment);
+  // AI가 응답에서 제안한 점수. 입력란에 자동 반영하지 않고, 강사가 [적용]으로 승인해야 들어간다.
+  const [suggestedScore, setSuggestedScore] = useState<number | null>(null);
 
   const { data, isLoading: historyLoading } = useQuery({
     queryKey: qk.instructor.caseGradeChat(sessionId, qIdx),
@@ -118,8 +120,10 @@ export function CaseGradingChat({
       const suggested = parseSuggestedScoreFromText(
         result.assistantMessage.content,
       );
+      // 추천 점수는 입력란에 바로 쓰지 않고 별도 칩으로 노출 — 강사 승인([적용]) 후 반영한다.
+      // (강사가 직접 입력한 점수를 AI 응답이 덮어쓰지 않도록)
       if (suggested !== null) {
-        setScore(String(suggested));
+        setSuggestedScore(suggested);
       }
       queryClient.invalidateQueries({
         queryKey: qk.instructor.caseGradeChat(sessionId, qIdx),
@@ -346,6 +350,40 @@ export function CaseGradingChat({
               value={score}
               onChange={(e) => setScore(e.target.value)}
             />
+            {suggestedScore !== null && (
+              <div
+                className="flex items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-2.5 py-1.5"
+                data-testid="suggested-score-chip"
+              >
+                <span className="flex items-center gap-1.5 text-xs text-foreground">
+                  <Bot className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                  AI 추천 점수 <strong className="font-semibold">{suggestedScore}점</strong>
+                </span>
+                <div className="flex shrink-0 gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => {
+                      setScore(String(suggestedScore));
+                      setSuggestedScore(null);
+                    }}
+                  >
+                    적용
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => setSuggestedScore(null)}
+                  >
+                    무시
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor={`case-grade-comment-${qIdx}`}>코멘트</Label>

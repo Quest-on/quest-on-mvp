@@ -31,7 +31,7 @@ export async function POST(
     const { qIdx, score, comment } = validation.data;
 
     const access = await requireCaseGradeAccess(sessionId, user, qIdx, {
-      requireClosed: true,
+      requireGradable: true,
     });
     if (!access.ok) return access.response;
 

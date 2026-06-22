@@ -5,9 +5,32 @@ import {
   decompressSubmissions,
   decompressMessages,
   isCaseQuestion,
+  isAssignmentType,
 } from "@/lib/grading-helpers";
 import { batchGetUserInfo } from "@/lib/app-users";
 import { logError } from "@/lib/logger";
+
+// ─── Gradable questions helper ──────────────────────────────────────────────
+
+/**
+ * Resolve which questions a bulk-grading run should grade.
+ * - Assignments (any non-exam `type`, see isAssignmentType) grade the single question at idx 0.
+ * - Exams grade every case question (`isCaseQuestion`).
+ */
+export function getBulkGradableQuestions(exam: {
+  type?: string | null;
+  questions: unknown;
+}): Array<{ qIdx: number; questionPrompt: string }> {
+  const qs = normalizeQuestions(exam.questions);
+  if (isAssignmentType(exam.type)) {
+    return qs
+      .filter((q) => q.idx === 0)
+      .map((q) => ({ qIdx: q.idx, questionPrompt: q.prompt ?? "" }));
+  }
+  return qs
+    .filter((q) => isCaseQuestion(q.type))
+    .map((q) => ({ qIdx: q.idx, questionPrompt: q.prompt ?? "" }));
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -83,7 +106,7 @@ export async function loadExamCaseData(
   // 1. Load exam
   const { data: exam, error: examError } = await supabase
     .from("exams")
-    .select("title, description, questions, language")
+    .select("title, description, questions, language, type")
     .eq("id", examId)
     .single();
 
@@ -91,20 +114,18 @@ export async function loadExamCaseData(
     throw new Error("Exam not found");
   }
 
-  const questions = normalizeQuestions(exam.questions);
-  const caseQuestions = questions
-    .filter((q) => isCaseQuestion(q.type))
-    .map((q) => ({
-      qIdx: q.idx,
-      questionPrompt: q.prompt ?? "",
-    }));
+  const isAssignment = isAssignmentType(exam.type as string | null);
+  const caseQuestions = getBulkGradableQuestions({
+    type: exam.type as string | null,
+    questions: exam.questions,
+  });
 
   const caseQIdxSet = new Set(caseQuestions.map((q) => q.qIdx));
 
   // 2. Load submitted sessions
   const { data: sessions, error: sessionsError } = await supabase
     .from("sessions")
-    .select("id, student_id")
+    .select("id, student_id, final_answer")
     .eq("exam_id", examId)
     .not("submitted_at", "is", null);
 
@@ -191,6 +212,7 @@ export async function loadExamCaseData(
   for (const session of sessions) {
     const sessionId = session.id as string;
     const studentId = session.student_id as string;
+    const sessionFinalAnswer = (session.final_answer as string | null) ?? "";
 
     const studentName =
       profileMap.get(studentId) ??
@@ -209,9 +231,11 @@ export async function loadExamCaseData(
       const sub = decompressedSubs[cq.qIdx];
       const msgs = decompressedMsgs[cq.qIdx] ?? [];
 
-      const answer = sub?.answer
-        ? sub.answer.slice(0, ANSWER_MAX_CHARS)
-        : "";
+      const answer = isAssignment
+        ? sessionFinalAnswer.slice(0, ANSWER_MAX_CHARS)
+        : sub?.answer
+          ? sub.answer.slice(0, ANSWER_MAX_CHARS)
+          : "";
 
       const chatLines = msgs
         .map((m) => {
@@ -371,6 +395,7 @@ export type ExamMeta = {
   examTitle: string;
   examDescription: string | null;
   examLanguage: "ko" | "en";
+  isAssignment: boolean;
   caseQuestions: Array<{ qIdx: number; questionPrompt: string }>;
 };
 
@@ -401,22 +426,24 @@ export async function loadExamMetaOnly(
 ): Promise<ExamMeta> {
   const { data: exam, error } = await supabase
     .from("exams")
-    .select("id, title, description, questions, language")
+    .select("id, title, description, questions, language, type")
     .eq("id", examId)
     .single();
 
   if (error || !exam) throw new Error("Exam not found");
 
-  const questions = normalizeQuestions(exam.questions);
-  const caseQuestions = questions
-    .filter((q) => isCaseQuestion(q.type))
-    .map((q) => ({ qIdx: q.idx, questionPrompt: q.prompt ?? "" }));
+  const isAssignment = isAssignmentType(exam.type as string | null);
+  const caseQuestions = getBulkGradableQuestions({
+    type: exam.type as string | null,
+    questions: exam.questions,
+  });
 
   return {
     examId: exam.id as string,
     examTitle: exam.title as string,
     examDescription: (exam.description as string | null) ?? null,
     examLanguage: (exam.language as string) === "en" ? "en" : "ko",
+    isAssignment,
     caseQuestions,
   };
 }
@@ -431,6 +458,7 @@ export async function loadSingleStudentCaseData(
   supabase: ReturnType<typeof getSupabaseServer>,
   studentSessionId: string,
   caseQIdxes: number[],
+  isAssignment = false,
 ): Promise<BulkGradingStudentData> {
   if (caseQIdxes.length === 0) {
     return { studentName: "Unknown", sessionId: studentSessionId, answers: [] };
@@ -451,7 +479,7 @@ export async function loadSingleStudentCaseData(
       .order("created_at", { ascending: true }),
     supabase
       .from("sessions")
-      .select("student_id, ai_summary")
+      .select("student_id, ai_summary, final_answer")
       .eq("id", studentSessionId)
       .single(),
   ]);
@@ -488,10 +516,16 @@ export async function loadSingleStudentCaseData(
     (messagesResult.data ?? []) as Array<Record<string, unknown>>,
   );
 
+  const sessionFinalAnswer = (sessionResult.data?.final_answer as string | null) ?? "";
+
   const answers: BulkGradingAnswer[] = caseQIdxes.map((qIdx) => {
     const sub = decompressedSubs[qIdx];
     const msgs = decompressedMsgs[qIdx] ?? [];
-    const answer = sub?.answer ? sub.answer.slice(0, ANSWER_MAX_CHARS) : "";
+    const answer = isAssignment
+      ? sessionFinalAnswer.slice(0, ANSWER_MAX_CHARS)
+      : sub?.answer
+        ? sub.answer.slice(0, ANSWER_MAX_CHARS)
+        : "";
     const chatLines = msgs
       .map((m) => {
         const roleLabel = m.role === "user" ? "Student" : m.role === "ai" ? "AI" : m.role;
@@ -518,9 +552,12 @@ export async function loadCalibrationSampleData(
   supabase: ReturnType<typeof getSupabaseServer>,
   sampleSessionIds: string[],
   caseQIdxes: number[],
+  isAssignment = false,
 ): Promise<BulkGradingStudentData[]> {
   const students = await Promise.all(
-    sampleSessionIds.map((sid) => loadSingleStudentCaseData(supabase, sid, caseQIdxes)),
+    sampleSessionIds.map((sid) =>
+      loadSingleStudentCaseData(supabase, sid, caseQIdxes, isAssignment),
+    ),
   );
   return students;
 }

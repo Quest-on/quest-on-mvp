@@ -57,7 +57,7 @@ export async function GET(
     }
 
     const access = await requireBulkGradeAccess(examId, user, {
-      requireClosed: true,
+      requireGradable: true,
     });
     if (!access.ok) return access.response;
 
