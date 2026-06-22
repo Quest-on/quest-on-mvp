@@ -78,7 +78,7 @@ export function useExamDetail({
 
       const sessionsByStudent = new Map<string, Array<Record<string, unknown>>>();
 
-      const ACTIVE_STATUSES = ["in_progress", "submitted", "auto_submitted"];
+      const ACTIVE_STATUSES = ["in_progress", "quiz_pending", "submitted", "auto_submitted"];
       allSessions
         .filter((session: Record<string, unknown>) => {
           const status = typeof session.status === "string" ? session.status : "";
@@ -149,6 +149,7 @@ export function useExamDetail({
               ? selectedSession.score
               : undefined;
           const isGraded = selectedSession.is_graded === true;
+          const autoSubmitted = selectedSession.auto_submitted === true;
 
           return {
             id: sessionId,
@@ -159,6 +160,7 @@ export function useExamDetail({
             finalScore: confirmedScore,
             submittedAt: submittedAt as string | undefined,
             createdAt: createdAt as string | undefined,
+            autoSubmitted,
             student_number:
               typeof selectedSession.student_number === "string"
                 ? selectedSession.student_number

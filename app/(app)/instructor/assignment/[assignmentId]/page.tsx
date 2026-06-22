@@ -63,9 +63,19 @@ type BulkGradeStatusData = {
   studentCount: number;
 };
 
-function getStatusBadge(status: string, submittedAt?: string, isGraded?: boolean) {
+function getStatusBadge(
+  status: string,
+  submittedAt?: string,
+  isGraded?: boolean,
+  autoSubmitted?: boolean
+) {
   if (isGraded) {
     return <Badge className="bg-blue-100 text-blue-800 text-xs">채점완료</Badge>;
+  }
+  if (status === "completed" && submittedAt && autoSubmitted) {
+    return (
+      <Badge className="bg-amber-100 text-amber-800 text-xs">마감 자동제출</Badge>
+    );
   }
   if (status === "completed" && submittedAt) {
     return <Badge className="bg-green-100 text-green-800 text-xs">제출완료</Badge>;
@@ -654,7 +664,7 @@ function StudentRow({
 
       {/* Status */}
       <div>
-        {getStatusBadge(student.status, student.submittedAt, student.isGraded)}
+        {getStatusBadge(student.status, student.submittedAt, student.isGraded, student.autoSubmitted)}
       </div>
 
       {/* Action */}

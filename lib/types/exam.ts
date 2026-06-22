@@ -93,6 +93,7 @@ export interface InstructorStudent {
   questionCount?: number;
   answerLength?: number;
   isGraded?: boolean;
+  autoSubmitted?: boolean;
   gradeType?: GradeStatus;
   aiComment?: string;
   gradingProgress?: import("./grading").GradingProgress | null;

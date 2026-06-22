@@ -382,6 +382,20 @@ export default function AssignmentGradePage({
             </div>
           </div>
 
+          {sessionData.session.auto_submitted && (
+            <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <div>
+                <p className="font-medium text-amber-800 dark:text-amber-200">
+                  마감 시 자동 제출된 과제
+                </p>
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  학생이 직접 제출하지 않았으며, 마감 시점에 진행 중이던 내용이 자동으로 제출되었습니다.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* AI 채점 상태 배너: 진행 중 / 실패 / 부재 3가지 경우 처리 */}
           {(() => {
             const gp = sessionData.gradingProgress;

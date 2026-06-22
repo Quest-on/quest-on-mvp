@@ -5,7 +5,10 @@ import { buildAssignmentQuizGenerationPrompt } from "@/lib/prompts";
 import { buildAiTextMetadata, callTrackedChatCompletion } from "@/lib/ai-tracking";
 import { compressData } from "@/lib/compression";
 import { triggerGradingIfNeeded } from "@/lib/grading-trigger";
+import { isAssignmentType } from "@/lib/grading-helpers";
 import { logError } from "@/lib/logger";
+
+export const DEADLINE_AUTO_SUBMIT_STATUSES = ["in_progress", "quiz_pending"] as const;
 
 export const ASSIGNMENT_QUIZ_TIME_LIMIT_SECONDS = 15;
 const ASSIGNMENT_QUIZ_QUESTION_COUNT = 3;
@@ -548,4 +551,219 @@ export async function submitQuizAttempt(params: {
     score,
     grading: triggerResult,
   };
+}
+
+async function ensureDeadlineQuizAttempt(params: {
+  sessionId: string;
+  examId: string;
+  studentId: string;
+  questions: AssignmentQuizQuestion[];
+}): Promise<QuizAttemptRow | null> {
+  const supabase = getSupabaseServer();
+  const existing = await supabase
+    .from("session_quiz_attempts")
+    .select("*")
+    .eq("session_id", params.sessionId)
+    .maybeSingle();
+
+  if (existing.error) {
+    logError("[assignment-quiz] Failed to load quiz for deadline auto-submit", existing.error, {
+      path: "lib/assignment-quiz.ts",
+      additionalData: { sessionId: params.sessionId },
+    });
+    return null;
+  }
+
+  if (existing.data) {
+    return existing.data as QuizAttemptRow;
+  }
+
+  const insert = await supabase
+    .from("session_quiz_attempts")
+    .insert({
+      session_id: params.sessionId,
+      exam_id: params.examId,
+      student_id: params.studentId,
+      questions: params.questions,
+      total_questions: params.questions.length,
+      time_limit_seconds: ASSIGNMENT_QUIZ_TIME_LIMIT_SECONDS,
+      status: "pending",
+    })
+    .select("*")
+    .single();
+
+  if (insert.error || !insert.data) {
+    logError("[assignment-quiz] Failed to create quiz for deadline auto-submit", insert.error, {
+      path: "lib/assignment-quiz.ts",
+      additionalData: { sessionId: params.sessionId },
+    });
+    return null;
+  }
+
+  return insert.data as QuizAttemptRow;
+}
+
+export type DeadlineAutoSubmitResult =
+  | { ok: true; alreadySubmitted?: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Server-side deadline auto-submit for assignment sessions that started but
+ * never completed submission (in_progress or quiz_pending) before the deadline.
+ */
+export async function autoSubmitAssignmentAtDeadline(
+  sessionId: string
+): Promise<DeadlineAutoSubmitResult> {
+  const supabase = getSupabaseServer();
+
+  const { data: session, error: sessionError } = await supabase
+    .from("sessions")
+    .select("id, exam_id, student_id, status, submitted_at")
+    .eq("id", sessionId)
+    .single();
+
+  if (sessionError || !session) {
+    return { ok: false, error: "SESSION_NOT_FOUND" };
+  }
+
+  if (session.submitted_at) {
+    return { ok: true, alreadySubmitted: true };
+  }
+
+  const status = session.status || "";
+  if (!DEADLINE_AUTO_SUBMIT_STATUSES.includes(status as (typeof DEADLINE_AUTO_SUBMIT_STATUSES)[number])) {
+    return { ok: false, error: "INELIGIBLE_STATUS" };
+  }
+
+  const { data: exam, error: examError } = await supabase
+    .from("exams")
+    .select("id, title, code, type, assignment_prompt, questions, language, deadline")
+    .eq("id", session.exam_id)
+    .single();
+
+  if (examError || !exam || !isAssignmentType(exam.type)) {
+    return { ok: false, error: "NOT_ASSIGNMENT" };
+  }
+
+  if (!exam.deadline || new Date(exam.deadline).getTime() >= Date.now()) {
+    return { ok: false, error: "DEADLINE_NOT_PASSED" };
+  }
+
+  const now = new Date().toISOString();
+
+  if (status === "in_progress") {
+    const { error: promoteError } = await supabase
+      .from("sessions")
+      .update({
+        status: "quiz_pending",
+        is_active: false,
+        auto_submitted: true,
+        last_heartbeat_at: now,
+      })
+      .eq("id", sessionId)
+      .is("submitted_at", null);
+
+    if (promoteError) {
+      return { ok: false, error: "PROMOTE_FAILED" };
+    }
+  } else {
+    const { error: flagError } = await supabase
+      .from("sessions")
+      .update({ auto_submitted: true, is_active: false })
+      .eq("id", sessionId)
+      .is("submitted_at", null);
+
+    if (flagError) {
+      return { ok: false, error: "FLAG_FAILED" };
+    }
+  }
+
+  const attempt = await ensureDeadlineQuizAttempt({
+    sessionId,
+    examId: exam.id,
+    studentId: session.student_id,
+    questions: fallbackQuestions(),
+  });
+
+  if (!attempt) {
+    return { ok: false, error: "QUIZ_ENSURE_FAILED" };
+  }
+
+  if (!attempt.submitted_at) {
+    const normalizedAnswers = Object.fromEntries(
+      Object.entries(attempt.answers || {}).filter(
+        ([, value]) => Number.isInteger(value) && value >= 0 && value <= 3
+      )
+    ) as AssignmentQuizAnswerMap;
+    const startedAt = attempt.started_at ? new Date(attempt.started_at).getTime() : Date.now();
+    const isExpired = Date.now() > startedAt + attempt.time_limit_seconds * 1000;
+    const { correctCount, score } = scoreAnswers(attempt.questions, normalizedAnswers);
+    const snapshot = await buildSubmissionSnapshot({
+      sessionId,
+      quiz: attempt,
+      answers: normalizedAnswers,
+      score,
+    });
+    const compressed = compressData({
+      chatHistory: snapshot,
+      quiz: {
+        answers: normalizedAnswers,
+        score,
+        correctCount,
+        totalQuestions: attempt.questions.length,
+        expired: isExpired,
+      },
+    });
+
+    const [quizUpdate, submissionUpsert, sessionUpdate] = await Promise.all([
+      supabase
+        .from("session_quiz_attempts")
+        .update({
+          answers: normalizedAnswers,
+          score,
+          submitted_at: now,
+          status: "submitted",
+          updated_at: now,
+          ...(attempt.started_at ? {} : { started_at: now }),
+        })
+        .eq("id", attempt.id)
+        .is("submitted_at", null),
+      supabase
+        .from("submissions")
+        .upsert(
+          {
+            session_id: sessionId,
+            q_idx: 0,
+            answer: snapshot,
+            updated_at: now,
+          },
+          { onConflict: "session_id,q_idx" }
+        ),
+      supabase
+        .from("sessions")
+        .update({
+          status: "submitted",
+          submitted_at: now,
+          is_active: false,
+          auto_submitted: true,
+          compressed_session_data: compressed.data,
+          compression_metadata: compressed.metadata,
+        })
+        .eq("id", sessionId)
+        .is("submitted_at", null),
+    ]);
+
+    if (quizUpdate.error || submissionUpsert.error || sessionUpdate.error) {
+      logError("[assignment-quiz] Deadline auto-submit finalize failed", {
+        quizError: quizUpdate.error,
+        submissionError: submissionUpsert.error,
+        sessionError: sessionUpdate.error,
+      });
+      return { ok: false, error: "FINALIZE_FAILED" };
+    }
+
+    await triggerGradingIfNeeded(sessionId, "submit_assignment");
+  }
+
+  return { ok: true };
 }
