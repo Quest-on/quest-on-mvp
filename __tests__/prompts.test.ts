@@ -105,6 +105,21 @@ describe("grading chat prompt style", () => {
 
     expect(prompt).toContain("이모지를 사용하지 마세요");
     expect(prompt).toContain("질문 1개만");
+    expect(prompt).toContain("사례형 시험");
+  });
+
+  it("uses research framing for assignment case grading chat", () => {
+    const prompt = buildCaseGradingChatSystemPrompt({
+      questionPrompt: "과제",
+      studentAnswer: "답안",
+      studentChatSummary: "대화",
+      language: "ko",
+      isAssignment: true,
+    });
+
+    expect(prompt).toContain("리서치 과제");
+    expect(prompt).not.toContain("사례형 시험");
+    expect(prompt).toContain("질문이 많은 것 자체는 감점 사유가 아닙니다");
   });
 });
 

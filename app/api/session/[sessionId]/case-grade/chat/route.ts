@@ -286,6 +286,7 @@ export async function POST(
       studentAnswer,
       studentChatSummary,
       language: examLanguage,
+      isAssignment: isAssignmentType(exam.type),
     });
 
     const openAiMessages: Array<{
