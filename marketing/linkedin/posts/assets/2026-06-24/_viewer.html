@@ -1,0 +1,133 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"/>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:-apple-system,'Pretendard','Apple SD Gothic Neo',sans-serif;background:#fff;color:#0f172a;}
+  .mono{font-family:'SF Mono','Geist Mono','JetBrains Mono',ui-monospace,monospace;}
+
+  /* ===== shared card ===== */
+  .card{width:1080px;height:1080px;background:#fff;padding:70px 76px;display:flex;flex-direction:column;overflow:hidden;}
+  .h{font-size:25px;color:#3559C4;font-weight:800;letter-spacing:.3px;}
+  h2{font-size:50px;font-weight:800;letter-spacing:-1.2px;line-height:1.2;margin-top:10px;}
+  .sub{font-size:23px;color:#64748b;margin-top:12px;}
+  .src{margin-top:auto;font-size:18px;color:#94a3b8;}
+
+  /* KPI strip */
+  .strip{display:flex;gap:18px;margin:40px 0 0;}
+  .stat{flex:1;border:1px solid #e5e7eb;border-radius:16px;padding:26px 24px;}
+  .stat .n{font-size:62px;font-weight:800;letter-spacing:-2px;color:#0f172a;line-height:1;}
+  .stat .n.p{color:#3559C4;}
+  .stat .l{font-size:21px;color:#64748b;margin-top:10px;}
+
+  /* compare bars (subject) */
+  .blk{margin-top:40px;}
+  .blk .cap{font-size:24px;color:#334155;font-weight:700;margin-bottom:20px;}
+  .cmp{display:flex;align-items:center;gap:18px;margin:16px 0;}
+  .cmp .k{width:230px;font-size:26px;color:#0f172a;font-weight:600;}
+  .cmp .track{flex:1;height:52px;background:#f1f5f9;border-radius:9px;overflow:hidden;}
+  .cmp .fill{height:100%;border-radius:9px;background:#3559C4;display:flex;align-items:center;justify-content:flex-end;padding-right:18px;color:#fff;font-weight:800;font-size:26px;}
+  .cmp.alt .fill{background:#9db4e8;color:#16204a;}
+
+  /* distribution bars */
+  .bars{margin-top:34px;}
+  .bars .cap{font-size:23px;color:#334155;font-weight:600;margin-bottom:14px;}
+  .brow{display:flex;align-items:center;gap:18px;margin:13px 0;}
+  .brow .k{width:96px;text-align:right;font-size:22px;color:#475569;}
+  .brow .track{flex:1;height:34px;background:#f1f5f9;border-radius:7px;overflow:hidden;}
+  .brow .fill{height:100%;border-radius:7px;background:#3559C4;}
+  .brow.peak .fill{background:#57CDFF;}
+  .brow .v{width:60px;font-size:22px;color:#475569;}
+
+  /* card B: big callout + list */
+  .callout{margin-top:38px;border-radius:20px;padding:40px 44px;background:linear-gradient(120deg,#eef3ff,#f7f9ff);border:1px solid #dbe4fb;display:flex;align-items:baseline;gap:24px;}
+  .callout .big{font-size:108px;font-weight:800;color:#3559C4;letter-spacing:-3px;line-height:.9;}
+  .callout .ct{font-size:30px;color:#1e293b;font-weight:600;line-height:1.4;}
+  .twostat{display:flex;gap:18px;margin-top:24px;}
+  .twostat .stat .n{font-size:54px;}
+  .qlist{margin-top:40px;}
+  .qlist .cap{font-size:23px;color:#334155;font-weight:700;margin-bottom:18px;}
+  .q{display:flex;gap:16px;align-items:flex-start;margin:16px 0;font-size:29px;color:#0f172a;line-height:1.4;}
+  .q .dot{flex:none;margin-top:4px;width:14px;height:14px;border-radius:50%;background:#57CDFF;}
+  .qnote{margin-top:18px;font-size:19px;color:#94a3b8;}
+
+  /* ===== masked log console ===== */
+  #table{width:1080px;height:1080px;background:#0b1020;color:#e6edf6;padding:0;display:flex;flex-direction:column;overflow:hidden;}
+  .bar{height:64px;display:flex;align-items:center;gap:10px;padding:0 26px;background:#0e1530;border-bottom:1px solid #1e2748;font-size:20px;}
+  .bar .d{width:13px;height:13px;border-radius:50%;}
+  .bar .d.r{background:#ff5f56;}.bar .d.y{background:#ffbd2e;}.bar .d.g{background:#27c93f;}
+  .bar .path{margin-left:14px;color:#8aa0c6;}
+  .bar .lock{margin-left:auto;color:#7c8db0;font-size:18px;}
+  .qline{padding:14px 26px;background:#0a1228;border-bottom:1px solid #1e2748;color:#9bb0d6;font-size:19px;}
+  .qline b{color:#cfe0ff;}
+  table{width:100%;border-collapse:collapse;font-size:19px;}
+  thead td{background:#11193a;color:#92a6cf;font-weight:600;padding:16px 20px;border-bottom:1px solid #243059;}
+  tbody td{padding:15px 20px;border-bottom:1px solid #161f3e;vertical-align:top;}
+  tbody tr:nth-child(even){background:#0d1530;}
+  .sid{color:#6fa8ff;}
+  .badge{display:inline-block;padding:3px 11px;border-radius:999px;font-size:15px;font-weight:700;}
+  .b-stu{background:rgba(53,89,196,.25);color:#9cc0ff;border:1px solid rgba(87,205,255,.35);}
+  .b-ai{background:rgba(255,255,255,.06);color:#aab8d4;border:1px solid #2a3760;}
+  .msg{color:#dbe6fb;line-height:1.45;max-width:560px;}
+  .blur{filter:blur(6px);}
+  .foot{margin-top:auto;padding:18px 26px;background:#0e1530;border-top:1px solid #1e2748;color:#7c8db0;font-size:18px;display:flex;justify-content:space-between;}
+</style></head>
+<body>
+
+  <!-- CARD A: usage -->
+  <section id="cardA" class="card">
+    <div class="h">전자기기 다 끄는 시험엔 안 남는 데이터</div>
+    <h2>AI를 켜줘도 다 매달리진 않았습니다</h2>
+    <div class="sub">학점 걸린 실제 시험 441번을 그대로 열어봤습니다 · 2개 대학 · 시험 11개</div>
+    <div class="strip">
+      <div class="stat"><div class="n p" id="s_used">—</div><div class="l">AI를 한 번이라도 쓴 학생</div></div>
+      <div class="stat"><div class="n" id="s_never">—</div><div class="l">써도 되는데 안 쓴 학생</div></div>
+      <div class="stat"><div class="n" id="s_med">—</div><div class="l">한 명이 보통 물어본 횟수</div></div>
+    </div>
+    <div class="blk">
+      <div class="cap">과목에 따라 갈렸습니다 · AI를 쓴 학생 비율</div>
+      <div class="cmp"><div class="k">서술형(케이스) 시험</div><div class="track"><div class="fill" id="cmpCase" style="width:0">—</div></div></div>
+      <div class="cmp alt"><div class="k">프로그래밍 실습 시험</div><div class="track"><div class="fill" id="cmpProg" style="width:0">—</div></div></div>
+    </div>
+    <div class="bars">
+      <div class="cap">시험 한 번에 AI한테 물어본 횟수 (전체 441응시)</div>
+      <div id="bk"></div>
+    </div>
+    <div class="src mono">source: Quest-On production DB · read-only aggregate · 내부 테스트 계정 제외</div>
+  </section>
+
+  <!-- CARD B: intent -->
+  <section id="cardB" class="card">
+    <div class="h">2,000건이 넘는 실제 질문을 열어봤습니다</div>
+    <h2>그런데 “답 대신 써줘”는 거의 없었습니다</h2>
+    <div class="sub">서술형 시험에서 학생이 AI한테 보낸 질문을 전부 분류했습니다</div>
+    <div class="callout">
+      <div class="big">&lt;1%</div>
+      <div class="ct">“답안을 대신 작성해줘”라는 요청<br/>2,000건이 넘는데 손에 꼽았습니다</div>
+    </div>
+    <div class="twostat">
+      <div class="stat"><div class="n p" id="s_deep">—</div><div class="l">4번 이상 주고받은 ‘진짜 대화’ (서술형)</div></div>
+      <div class="stat"><div class="n">97%</div><div class="l">서술형에서 AI와 한 번이라도 대화</div></div>
+    </div>
+    <div class="qlist">
+      <div class="cap">대신, 대부분 이런 걸 물었습니다</div>
+      <div class="q"><span class="dot"></span><span>“이 개념(이론)이 무슨 뜻이죠?”</span></div>
+      <div class="q"><span class="dot"></span><span>“제 논리는 이런데, 약점 좀 짚어줘요”</span></div>
+      <div class="q"><span class="dot"></span><span>“이 접근이 맞을까요? 레드팀처럼 반박해줘요”</span></div>
+      <div class="qnote mono">※ 실제 질문을 일반화한 예시 · 원문 비공개 · read-only 집계</div>
+    </div>
+    <div class="src mono">source: Quest-On production DB · 서술형 코호트 약 2,240개 질문 분류</div>
+  </section>
+
+  <!-- masked log console -->
+  <section id="table">
+    <div class="bar"><span class="d r"></span><span class="d y"></span><span class="d g"></span>
+      <span class="path mono">quest-on · graded_exam · ai_tutor_messages</span>
+      <span class="lock">🔒 student content masked</span>
+    </div>
+    <div class="qline mono">SELECT q_idx, role, content FROM messages WHERE exam ∈ (graded, AI-allowed) ORDER BY ts;  <b>— rows shown: <span id="rown">0</span> / <span id="rowtot">—</span></b></div>
+    <table>
+      <thead><tr><td style="width:150px">session</td><td style="width:60px">q#</td><td style="width:120px">role</td><td>message</td></tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+    <div class="foot mono"><span>2 universities · 11 graded exams · 441 sittings · read-only</span><span id="ts"></span></div>
+  </section>
+</body></html>
