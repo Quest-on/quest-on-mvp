@@ -2,6 +2,13 @@ export type StageKey = "chat" | "answer";
 
 export type AiDependencyRiskLevel = "low" | "medium" | "high";
 
+export interface AssignmentResearchMetrics {
+  followUpQuestionCount: number;
+  verificationQuestionCount: number;
+  conceptExplorationCount: number;
+  answerDelegationCount: number;
+}
+
 export interface AiDependencyAssessment {
   delegationRequestCount: number;
   startingPointDependencyCount: number;
@@ -14,6 +21,9 @@ export interface AiDependencyAssessment {
   overallRisk: AiDependencyRiskLevel;
   penaltyApplied: number;
   summary: string;
+  /** exam: 시험 풀이 의존 신호. assignment: 리서치 참여 신호 해석 */
+  evaluationMode?: "exam" | "assignment";
+  assignmentMetrics?: AssignmentResearchMetrics;
 }
 
 export interface StageGrade {
@@ -38,6 +48,7 @@ export interface AiDependencySummary {
   summary: string;
   triggerEvidence: string[];
   recoveryEvidence: string[];
+  evaluationMode?: "exam" | "assignment";
   questionBreakdown: Array<{
     q_idx: number;
     overallRisk: AiDependencyRiskLevel;

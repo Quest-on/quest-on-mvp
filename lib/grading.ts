@@ -13,8 +13,12 @@ import {
   decompressMessages,
   normalizeQuestions,
   analyzeAiDependency,
+  analyzeAssignmentResearchEngagement,
   formatAiDependencyForPrompt,
+  formatAssignmentResearchForPrompt,
+  formatChatAssessmentForPrompt,
   summarizeAiDependencyAssessments,
+  summarizeAssignmentResearchAssessments,
   isCaseQuestion,
   isObjectiveQuestion,
   gradeObjectiveAnswer,
@@ -230,10 +234,15 @@ async function gradeSingleQuestion(params: {
 
   // 과제 모드에선 학생이 직접 작성한 최종답안과 AI 응답의 유사도를 비교해야 한다.
   // 기존엔 submission.answer(채팅 스냅샷)가 들어가서 사실상 "채팅 vs 채팅"이 됐었음 — 정정.
-  const aiDependencyAssessment = analyzeAiDependency({
-    messages: questionMessages,
-    finalAnswer: sessionFinalAnswer ?? "",
-  });
+  const aiDependencyAssessment = isAssignment
+    ? analyzeAssignmentResearchEngagement({
+        messages: questionMessages,
+        finalAnswer: sessionFinalAnswer ?? "",
+      })
+    : analyzeAiDependency({
+        messages: questionMessages,
+        finalAnswer: sessionFinalAnswer ?? "",
+      });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ws = submission.workspace_state as any;
@@ -525,7 +534,7 @@ async function generateQuestionSummary(params: {
         : "";
 
     const aiDependencyText = grade.stage_grading?.chat?.ai_dependency
-      ? `\nAI 활용/의존 신호:\n${formatAiDependencyForPrompt(grade.stage_grading.chat.ai_dependency)}`
+      ? `\nAI 활용 신호:\n${formatChatAssessmentForPrompt(grade.stage_grading.chat.ai_dependency)}`
       : "";
 
     const stageInfoText = [
@@ -1592,7 +1601,7 @@ ${grade?.stage_grading?.chat ? `채팅 단계 점수: ${grade.stage_grading.chat
 ${grade?.stage_grading?.answer ? `답안 단계 점수: ${grade.stage_grading.answer.score}점` : ""}
 ${
   grade?.stage_grading?.chat?.ai_dependency
-    ? `AI 활용/의존 신호:\n${formatAiDependencyForPrompt(grade.stage_grading.chat.ai_dependency)}`
+    ? `AI 활용 신호:\n${formatChatAssessmentForPrompt(grade.stage_grading.chat.ai_dependency)}`
     : ""
 }
 `;
@@ -1743,12 +1752,19 @@ ${
     }
     const result: SummaryData = summaryValidation.data;
 
-    const aiDependencySummary = summarizeAiDependencyAssessments(
-      grades.map((grade) => ({
-        q_idx: grade.q_idx,
-        assessment: grade.stage_grading?.chat?.ai_dependency,
-      }))
-    );
+    const aiDependencySummary = isAssignment
+      ? summarizeAssignmentResearchAssessments(
+          grades.map((grade) => ({
+            q_idx: grade.q_idx,
+            assessment: grade.stage_grading?.chat?.ai_dependency,
+          }))
+        )
+      : summarizeAiDependencyAssessments(
+          grades.map((grade) => ({
+            q_idx: grade.q_idx,
+            assessment: grade.stage_grading?.chat?.ai_dependency,
+          }))
+        );
     const summaryWithDependency: SummaryData = {
       ...result,
       aiDependency: aiDependencySummary,
