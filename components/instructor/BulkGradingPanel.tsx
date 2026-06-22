@@ -124,6 +124,8 @@ type BulkGradeChatData = {
   } | null;
   messages: BulkGradeChatMessage[];
   canStartGrading: boolean;
+  canProceedToGrading?: boolean;
+  interviewQuestionCount?: number;
 };
 
 type GradeRow = {
@@ -340,6 +342,31 @@ export function BulkGradingPanel({
     onSettled: releaseSendLock,
   });
 
+  const completeInterviewMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/exam/${examId}/bulk-grade/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completeInterview: true }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(
+          extractErrorMessage(err, "인터뷰를 마무리하지 못했습니다", res.status),
+        );
+      }
+      return res.json() as Promise<BulkGradeChatData>;
+    },
+    onSuccess: (result) => {
+      setChatOptions([]);
+      queryClient.setQueryData(qk.instructor.bulkGradeChat(examId), result);
+      toast.success("지금까지의 기준으로 가채점을 시작할 수 있습니다.");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
   const sessionStatus = data?.session?.status ?? null;
   const isGrading = sessionStatus === "grading";
   const gradingDone = sessionStatus === "grading_done";
@@ -533,6 +560,7 @@ export function BulkGradingPanel({
   //  - pending: not yet processed (still running) → "대기 중"
   const gradingAttempted = isGrading || gradingDone || gradingFailed;
   const interviewReady = chatData?.canStartGrading ?? false;
+  const canProceedToGrading = chatData?.canProceedToGrading ?? false;
   const interviewInProgress =
     !gradingAttempted && !committed && (chatData?.messages?.length ?? 0) > 0;
   const missingStudents = useMemo(
@@ -1310,9 +1338,36 @@ export function BulkGradingPanel({
           </div>
         )}
 
+        {canProceedToGrading && !interviewReady && !gradingAttempted && !committed && (
+          <div className="mb-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => completeInterviewMutation.mutate()}
+              disabled={
+                completeInterviewMutation.isPending ||
+                chatMutation.isPending ||
+                initChatMutation.isPending
+              }
+              data-testid="bulk-grade-proceed-to-scoring"
+              className="w-full justify-center"
+            >
+              {completeInterviewMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  준비 중...
+                </>
+              ) : (
+                "여기까지만 질문받고 일단 채점 진행"
+              )}
+            </Button>
+          </div>
+        )}
+
         {interviewReady && !gradingAttempted && !committed && (
           <p className="mb-2 text-xs text-muted-foreground">
-            점수 Range가 확정되었습니다. 전송하면 전체 {gradeNoun} 가채점을 시작합니다.
+            점수 범위가 확정되었습니다. 전송하면 전체 {gradeNoun} 가채점을 시작합니다.
           </p>
         )}
 

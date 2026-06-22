@@ -59,7 +59,7 @@ function parseCriteria(body: unknown): ExtractedCriteria | null {
         "AI 기본 기준: CASE 답안의 정확성, 논리적 완성도, 근거의 구체성, 문제 요구사항 충족도, 학생-AI 채팅에서 드러난 이해 과정을 종합해 평가합니다."
       }\n\n${approvalHint}`,
       per_question: [],
-      score_range: { min: 0, max: 100, typical_min: 55, typical_max: 75, excellent_min: 85 },
+      score_range: { min: 0, max: 100 },
     };
   }
 

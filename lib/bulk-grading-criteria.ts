@@ -10,6 +10,11 @@ import {
   type GradingScoreRange,
 } from "@/lib/prompts";
 
+import {
+  countInterviewQuestions,
+  MIN_BULK_GRADE_INTERVIEW_QUESTIONS,
+} from "@/lib/bulk-grade-thread";
+
 export type { GradingScoreRange };
 
 const CRITERIA_READY_RE =
@@ -36,12 +41,6 @@ export function parseCriteriaReadyMarker(content: string): GradingScoreRange | n
       return {
         min: Math.round(range.min),
         max: Math.round(range.max),
-        typical_min:
-          typeof range.typical_min === "number" ? Math.round(range.typical_min) : undefined,
-        typical_max:
-          typeof range.typical_max === "number" ? Math.round(range.typical_max) : undefined,
-        excellent_min:
-          typeof range.excellent_min === "number" ? Math.round(range.excellent_min) : undefined,
         notes: typeof range.notes === "string" ? range.notes : undefined,
       };
     }
@@ -57,6 +56,24 @@ export function stripCriteriaReadyMarker(content: string): string {
 
 export function isInterviewReady(calibrationStatus: string | null | undefined): boolean {
   return calibrationStatus === "sample_review";
+}
+
+export function buildInterviewChatMeta(
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  calibrationStatus: string | null | undefined,
+): {
+  interviewQuestionCount: number;
+  canProceedToGrading: boolean;
+  canStartGrading: boolean;
+} {
+  const interviewQuestionCount = countInterviewQuestions(messages);
+  const ready = isInterviewReady(calibrationStatus);
+  return {
+    interviewQuestionCount,
+    canProceedToGrading:
+      !ready && interviewQuestionCount >= MIN_BULK_GRADE_INTERVIEW_QUESTIONS,
+    canStartGrading: ready,
+  };
 }
 
 function normalizeExtractedCriteria(raw: unknown): ExtractedCriteria | null {
@@ -94,12 +111,6 @@ function normalizeExtractedCriteria(raw: unknown): ExtractedCriteria | null {
       scoreRange = {
         min: Math.round(r.min),
         max: Math.round(r.max),
-        typical_min:
-          typeof r.typical_min === "number" ? Math.round(r.typical_min) : undefined,
-        typical_max:
-          typeof r.typical_max === "number" ? Math.round(r.typical_max) : undefined,
-        excellent_min:
-          typeof r.excellent_min === "number" ? Math.round(r.excellent_min) : undefined,
         notes: typeof r.notes === "string" ? r.notes : undefined,
       };
     }

@@ -29,7 +29,12 @@ import {
   isInterviewReady,
   parseCriteriaReadyMarker,
   stripCriteriaReadyMarker,
+  buildInterviewChatMeta,
 } from "@/lib/bulk-grading-criteria";
+import {
+  countInterviewQuestions,
+  MIN_BULK_GRADE_INTERVIEW_QUESTIONS,
+} from "@/lib/bulk-grade-thread";
 import { stripEmoji } from "@/lib/sanitize";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
@@ -75,6 +80,13 @@ function canStartFromMessages(
   return isInterviewReady(session.calibration_status);
 }
 
+function chatResponseMeta(
+  messages: BulkGradingMessageRow[],
+  calibrationStatus: string,
+) {
+  return buildInterviewChatMeta(messages, calibrationStatus);
+}
+
 function buildDiscussionOnlyPhaseInstructions(
   session: Pick<BulkGradingSessionRow, "status" | "calibration_status">,
   language: "ko" | "en",
@@ -105,7 +117,8 @@ Current phase: status=${session.status}, calibration_status=${session.calibratio
 - 이모지를 사용하지 마세요.
 - 답변은 1~3개의 짧은 문장으로 유지하고, 기준 수집 단계에서는 인터뷰 질문 1개만 하세요.
 - interviewing 단계: 샘플 데이터를 바탕으로 당신이 먼저 인터뷰합니다. 강사에게 기준을 먼저 입력하라고 요구하지 마세요.
-- calibration_status=sample_review: 기준과 점수 Range가 확정됨 — 강사가 UI에서 가채점을 시작할 수 있습니다.
+- interviewing 단계: 강사 답이 ${MIN_BULK_GRADE_INTERVIEW_QUESTIONS}번 미만이면 [CRITERIA_READY] 마커를 출력하지 마세요. 강사는 UI에서 "여기까지만 질문받고 일단 채점 진행"으로 건너뛸 수 있습니다.
+- calibration_status=sample_review: 기준과 점수 범위(min/max)가 확정됨 — 강사가 UI에서 가채점을 시작할 수 있습니다.
 - 현재 단계에 맞춰 답하세요:
   - draft/interviewing: 가채점 시작 전 채점 기준과 기대 수준을 논의합니다.
   - grading/sample_grading/committing: 처리 중인 상태를 설명하고, 진행 중 검토 가능한 내용을 안내합니다.
@@ -244,6 +257,8 @@ export async function GET(
         session: null,
         messages: [] as BulkGradingMessageRow[],
         canStartGrading: false,
+        canProceedToGrading: false,
+        interviewQuestionCount: 0,
       });
     }
 
@@ -265,7 +280,7 @@ export async function GET(
         calibration_status: session.calibration_status,
       },
       messages,
-      canStartGrading: canStartFromMessages(session),
+      ...chatResponseMeta(messages, session.calibration_status),
     });
   } catch (error) {
     logError("bulk-grade chat GET handler error", error, {
@@ -305,10 +320,23 @@ export async function POST(
     }
 
     const isInit = "init" in validation.data && validation.data.init === true;
-    const message = isInit ? "" : (validation.data as { message: string }).message;
+    const isCompleteInterview =
+      "completeInterview" in validation.data &&
+      validation.data.completeInterview === true;
+    const message = isInit || isCompleteInterview
+      ? ""
+      : (validation.data as { message: string }).message;
     const clientMessageId =
-      !isInit && "clientMessageId" in validation.data
+      !isInit && !isCompleteInterview && "clientMessageId" in validation.data
         ? validation.data.clientMessageId
+        : undefined;
+    const completeScoreMin =
+      isCompleteInterview && "scoreMin" in validation.data
+        ? validation.data.scoreMin
+        : undefined;
+    const completeScoreMax =
+      isCompleteInterview && "scoreMax" in validation.data
+        ? validation.data.scoreMax
         : undefined;
 
     const supabase = getSupabaseServer();
@@ -371,6 +399,105 @@ export async function POST(
 
     const gradingSessionId = gradingSession.id as string;
 
+    if (isCompleteInterview) {
+      if (canStartFromMessages(gradingSession)) {
+        const { messages: existingMessages, error: existingMessagesError } =
+          await loadBulkChatMessages(supabase, gradingSessionId);
+        if (existingMessagesError) {
+          return errorJson("INTERNAL_ERROR", "Failed to load messages", 500);
+        }
+        return successJson({
+          session: {
+            id: gradingSession.id,
+            status: gradingSession.status,
+            calibration_status: gradingSession.calibration_status,
+          },
+          messages: existingMessages,
+          ...chatResponseMeta(existingMessages, gradingSession.calibration_status),
+        });
+      }
+
+      const { messages: priorMessages, error: priorMessagesError } =
+        await loadBulkChatMessages(supabase, gradingSessionId);
+      if (priorMessagesError) {
+        return errorJson("INTERNAL_ERROR", "Failed to load messages", 500);
+      }
+
+      const interviewQuestionCount = countInterviewQuestions(priorMessages);
+      if (interviewQuestionCount < MIN_BULK_GRADE_INTERVIEW_QUESTIONS) {
+        return errorJson(
+          "VALIDATION_ERROR",
+          `인터뷰 질문이 ${MIN_BULK_GRADE_INTERVIEW_QUESTIONS}개 이상 필요합니다.`,
+          400,
+        );
+      }
+
+      let scoreMin = completeScoreMin;
+      let scoreMax = completeScoreMax;
+      if (scoreMin == null || scoreMax == null) {
+        for (const msg of [...priorMessages].reverse()) {
+          const parsed = parseCriteriaReadyMarker(msg.content);
+          if (parsed) {
+            scoreMin = scoreMin ?? parsed.min;
+            scoreMax = scoreMax ?? parsed.max;
+            break;
+          }
+        }
+      }
+      if (scoreMin == null) scoreMin = 0;
+      if (scoreMax == null) scoreMax = 100;
+      if (scoreMin > scoreMax) {
+        return errorJson("VALIDATION_ERROR", "최저점은 최고점보다 클 수 없습니다.", 400);
+      }
+
+      const completeNote =
+        examMeta.examLanguage === "en"
+          ? `Understood. We will grade using the criteria discussed so far (score range ${scoreMin}–${scoreMax}). You can start bulk grading from the UI.`
+          : `알겠습니다. 지금까지 말씀해 주신 기준으로 가채점을 진행할 수 있습니다 (점수 범위 ${scoreMin}~${scoreMax}점). 전송하면 가채점을 시작하세요.`;
+
+      const completePayload: Record<string, unknown> = {
+        session_id: gradingSessionId,
+        role: "assistant",
+        content: completeNote,
+        created_by: access.ctx.user.id,
+        id: uuidFromSeed(`bulk-grade-chat:complete-interview:${gradingSessionId}`),
+      };
+
+      await supabase.from("bulk_grading_messages").upsert(completePayload, {
+        onConflict: "id",
+        ignoreDuplicates: true,
+      });
+
+      await supabase
+        .from("exam_grading_sessions")
+        .update({
+          calibration_status: "sample_review",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", gradingSessionId);
+
+      gradingSession = {
+        ...gradingSession,
+        calibration_status: "sample_review",
+      };
+
+      const { messages: finalMessages, error: finalMessagesError } =
+        await loadBulkChatMessages(supabase, gradingSessionId);
+      if (finalMessagesError) {
+        return errorJson("INTERNAL_ERROR", "Failed to load messages", 500);
+      }
+
+      return successJson({
+        session: {
+          id: gradingSession.id,
+          status: gradingSession.status,
+          calibration_status: gradingSession.calibration_status,
+        },
+        messages: finalMessages,
+        ...chatResponseMeta(finalMessages, gradingSession.calibration_status),
+      });
+    }
+
     // init mode is idempotent: if the thread already exists, return it without
     // touching grading state or calling AI again.
     if (isInit) {
@@ -387,13 +514,13 @@ export async function POST(
             calibration_status: gradingSession.calibration_status,
           },
           messages: existingMessages,
-          canStartGrading: canStartFromMessages(gradingSession),
+          ...chatResponseMeta(existingMessages, gradingSession.calibration_status),
         });
       }
     }
 
-    // init 모드가 아닐 때만 강사 메시지 저장
-    if (!isInit) {
+    // init/completeInterview 모드가 아닐 때만 강사 메시지 저장
+    if (!isInit && !isCompleteInterview) {
       const userMessagePayload: Record<string, unknown> = {
         session_id: gradingSessionId,
         role: "user",
@@ -428,7 +555,7 @@ export async function POST(
               },
               assistantMessage: existingAssistant,
               messages: existingMessages,
-              canStartGrading: canStartFromMessages(gradingSession),
+              ...chatResponseMeta(existingMessages, gradingSession.calibration_status),
             });
           }
           return errorJson("CONFLICT", "Message is already being processed", 409);
@@ -521,12 +648,22 @@ export async function POST(
     }
 
     const criteriaReadyRange = parseCriteriaReadyMarker(rawAiContent);
+    const priorQuestionCount = countInterviewQuestions(
+      (historyRows ?? []).filter(
+        (r): r is { role: "user" | "assistant"; content: string } =>
+          r.role === "user" || r.role === "assistant",
+      ),
+    );
+    const allowCriteriaReady =
+      criteriaReadyRange != null &&
+      priorQuestionCount >= MIN_BULK_GRADE_INTERVIEW_QUESTIONS;
+
     const aiContent = stripCriteriaReadyMarker(rawAiContent);
     if (!aiContent) {
       return errorJson("INTERNAL_ERROR", "AI 응답을 받지 못했습니다.", 500);
     }
 
-    if (criteriaReadyRange) {
+    if (allowCriteriaReady && criteriaReadyRange) {
       await supabase
         .from("exam_grading_sessions")
         .update({
@@ -581,7 +718,7 @@ export async function POST(
           },
           assistantMessage: existingAssistant,
           messages: existingMessages,
-          canStartGrading: canStartFromMessages(gradingSession),
+          ...chatResponseMeta(existingMessages, gradingSession.calibration_status),
         });
       }
       logError("bulk-grade chat: save assistant message failed", assistantError, {
@@ -611,7 +748,7 @@ export async function POST(
         created_at: assistantRow.created_at,
       },
       messages,
-      canStartGrading: canStartFromMessages(gradingSession),
+      ...chatResponseMeta(messages, gradingSession.calibration_status),
     });
   } catch (error) {
     logError("bulk-grade chat POST handler error", error, {

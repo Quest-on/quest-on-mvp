@@ -219,7 +219,13 @@ export const bulkGradeChatPostSchema = z.union([
     message: z.undefined().optional(),
   }),
   z.object({
+    completeInterview: z.literal(true),
+    scoreMin: z.number().int().min(0).max(100).optional(),
+    scoreMax: z.number().int().min(0).max(100).optional(),
+  }),
+  z.object({
     init: z.undefined().optional(),
+    completeInterview: z.undefined().optional(),
     message: sanitizedString(z.string().min(1, "Message is required").max(10000)),
     clientMessageId: z.string().uuid("Invalid clientMessageId"),
   }),
