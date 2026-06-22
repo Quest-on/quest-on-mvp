@@ -334,12 +334,15 @@ export async function GET(
 
     // 정답 누출 방지: 점수 계산은 끝났으므로 응답에서 correctOptionIndex를 제거한다.
     // 학생은 정오답을 문항별 점수(공개 후에만 노출)로 확인하고, 정답 선택지는 보지 않는다.
+    // ai_context(강사가 AI 채점에 제공하는 비공개 배경 맥락)도 학생 응답에서 제거한다 —
+    // 화면에 렌더되지 않더라도 JSON 페이로드로 노출되면 안 된다.
     const examForClient = {
       ...exam,
       questions: Array.isArray(exam.questions)
         ? exam.questions.map((q: Record<string, unknown>) => {
             const rest = { ...q };
             delete rest.correctOptionIndex;
+            delete rest.ai_context;
             return rest;
           })
         : exam.questions,
