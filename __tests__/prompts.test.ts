@@ -91,8 +91,8 @@ describe("grading chat prompt style", () => {
 
     expect(prompt).toContain("당신이 먼저 말합니다");
     expect(prompt).toContain("CRITERIA_READY");
-    expect(prompt).toContain("점수 Range");
-    expect(prompt).toContain("우수/평범/미흡 3단계");
+    expect(prompt).toContain("점수 범위");
+    expect(prompt).toContain("쉬운 말");
     expect(prompt).not.toContain("샘플 가채점 시작");
   });
 
@@ -106,8 +106,8 @@ describe("grading chat prompt style", () => {
       language: "ko",
     });
 
-    expect(prompt).toContain("질문의 질");
-    expect(prompt).toContain("질문→자기 답 연결");
+    expect(prompt).toContain("질문이 도움이 됐는지");
+    expect(prompt).toContain("질문과 최종 답이 연결");
     expect(prompt).toContain("총 12명 제출");
   });
 
@@ -411,7 +411,7 @@ describe("buildPerStudentGradingSystemPrompt", () => {
       criteria: {
         criteria_summary: "리서치",
         per_question: [],
-        score_range: { min: 0, max: 100, typical_min: 50, typical_max: 72, excellent_min: 85 },
+        score_range: { min: 70, max: 92 },
       },
       studentSessionId: "sess-1",
       answers: [{ qIdx: 0, questionPrompt: "과제", answer: "답안", chatSummary: "" }],
@@ -419,7 +419,7 @@ describe("buildPerStudentGradingSystemPrompt", () => {
       isAssignment: true,
     });
     expect(prompt).toContain("점수 분포(강사 확정)");
-    expect(prompt).toContain("50–72");
+    expect(prompt).toContain("70~92");
     expect(prompt).toContain("질문 많음만으로");
   });
 });
