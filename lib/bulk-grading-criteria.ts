@@ -106,11 +106,15 @@ function normalizeExtractedCriteria(raw: unknown): ExtractedCriteria | null {
   }
 
   const edgeCases = Array.isArray(record.edge_case_rules)
-    ? record.edge_case_rules.filter((v): v is string => typeof v === "string" && v.trim())
+    ? record.edge_case_rules.filter(
+        (v): v is string => typeof v === "string" && v.trim().length > 0,
+      )
     : undefined;
 
   const tradeoffs = Array.isArray(record.priority_tradeoffs)
-    ? record.priority_tradeoffs.filter((v): v is string => typeof v === "string" && v.trim())
+    ? record.priority_tradeoffs.filter(
+        (v): v is string => typeof v === "string" && v.trim().length > 0,
+      )
     : undefined;
 
   return {
