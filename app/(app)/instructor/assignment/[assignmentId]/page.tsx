@@ -573,7 +573,7 @@ export default function AssignmentDashboard({
                   <p>제출한 학생이 없습니다.</p>
                 </div>
               ) : (
-                <div className="divide-y max-h-[calc(100vh-400px)] min-h-[400px] overflow-y-auto">
+                <div className="divide-y">
                   {allStudents.map((student) => (
                     <StudentRow
                       key={student.id}
