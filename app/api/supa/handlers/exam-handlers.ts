@@ -470,6 +470,30 @@ export async function updateExam(data: {
       throw error;
     }
 
+    if (typeof updateWithoutRubric.title === "string") {
+      const nodeUpdate: Record<string, unknown> = {
+        name: updateWithoutRubric.title,
+      };
+      if (typeof updateWithoutRubric.updated_at === "string") {
+        nodeUpdate.updated_at = updateWithoutRubric.updated_at;
+      }
+
+      const { error: nodeTitleError } = await getSupabase()
+        .from("exam_nodes")
+        .update(nodeUpdate)
+        .eq("exam_id", data.id)
+        .eq("instructor_id", user.id)
+        .eq("kind", "exam");
+
+      if (nodeTitleError) {
+        logError("[updateExam] Failed to sync exam node title", nodeTitleError, {
+          path: "/api/supa/exam-handlers",
+          user_id: user.id,
+          additionalData: { examId: data.id },
+        });
+      }
+    }
+
     // Audit log: exam status change (awaited for critical operations)
     if (data.update.status) {
       await auditLog({
