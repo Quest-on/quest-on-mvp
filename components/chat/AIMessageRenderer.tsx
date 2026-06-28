@@ -238,10 +238,12 @@ const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({
       </div>
 
       {isPlain && (
-        <CopyMessageButton
-          text={content}
-          className="absolute top-0 right-0"
-        />
+        <div className="mt-2 flex justify-end">
+          <CopyMessageButton
+            text={content}
+            className="opacity-60 sm:opacity-60 sm:group-hover:opacity-100"
+          />
+        </div>
       )}
 
       {!isPlain && (

@@ -21,9 +21,17 @@ import {
 import {
   buildPerStudentGradingSystemPrompt,
   type ExtractedCriteria,
+  type GradingScoreRange,
 } from "@/lib/prompts";
 import { isAssignmentType } from "@/lib/grading-helpers";
+import { buildScoreAntiClusterBlock } from "@/lib/bulk-grade-score-cluster";
 import { stripEmoji } from "@/lib/sanitize";
+
+function clampScore(score: number, range?: GradingScoreRange): number {
+  const min = range?.min ?? 0;
+  const max = range?.max ?? 100;
+  return Math.min(max, Math.max(min, Math.round(score)));
+}
 
 async function handler(request: NextRequest): Promise<NextResponse> {
   try {
@@ -137,14 +145,17 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       questionPrompt: caseQuestions.find((q) => q.qIdx === a.qIdx)?.questionPrompt ?? "",
     }));
 
-    const systemPrompt = buildPerStudentGradingSystemPrompt({
-      criteria,
-      studentSessionId,
-      answers: enrichedAnswers,
-      caseQuestions,
-      language: examLanguage,
-      isAssignment,
-    });
+    const systemPrompt = [
+      buildPerStudentGradingSystemPrompt({
+        criteria,
+        studentSessionId,
+        answers: enrichedAnswers,
+        caseQuestions,
+        language: examLanguage,
+        isAssignment,
+      }),
+      buildScoreAntiClusterBlock(examLanguage, criteria.score_range),
+    ].join("\n\n");
 
     // [CRITICAL-3] Always 200 ack — AI failures recorded via RPC, not throw
     let success = false;
@@ -157,6 +168,8 @@ async function handler(request: NextRequest): Promise<NextResponse> {
             model: AI_MODEL_BULK_GRADING_WORKER,
             messages: [{ role: "system", content: systemPrompt }],
             max_completion_tokens: 1500,
+            temperature: 0,
+            response_format: { type: "json_object" },
           }),
         {
           feature: "bulk_grading_chat",
@@ -191,7 +204,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       if (parsed && hasGradesForEveryExpectedQuestion(parsed, caseQIdxes)) {
         for (const g of parsed) {
           gradesMap[g.q_idx] = {
-            score: g.score,
+            score: clampScore(g.score, criteria.score_range),
             comment: stripEmoji(g.comment).trim(),
           };
         }

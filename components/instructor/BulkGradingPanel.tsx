@@ -124,6 +124,8 @@ type BulkGradeChatData = {
   } | null;
   messages: BulkGradeChatMessage[];
   canStartGrading: boolean;
+  canProceedToGrading?: boolean;
+  interviewQuestionCount?: number;
 };
 
 type GradeRow = {
@@ -258,6 +260,38 @@ export function BulkGradingPanel({
     },
   });
 
+  const initChatMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/exam/${examId}/bulk-grade/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ init: true }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(extractErrorMessage(err, "채점 인터뷰를 시작하지 못했습니다", res.status));
+      }
+      return res.json() as Promise<BulkGradeChatData>;
+    },
+    onSuccess: (result) => {
+      queryClient.setQueryData(qk.instructor.bulkGradeChat(examId), result);
+      const msgs = result.messages ?? [];
+      const lastMsg = msgs[msgs.length - 1];
+      const sessionId = result.session?.id;
+      if (lastMsg?.role === "assistant" && sessionId) {
+        setChatOptions([]);
+        lastFetchedMsgIdRef.current = lastMsg.id;
+        chatOptionsMutation.mutate({
+          questionText: lastMsg.content,
+          gradingSessionId: sessionId,
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
   const chatMutation = useMutation({
     mutationFn: async ({
       message,
@@ -306,6 +340,31 @@ export function BulkGradingPanel({
       toast.error(error.message);
     },
     onSettled: releaseSendLock,
+  });
+
+  const completeInterviewMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/exam/${examId}/bulk-grade/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completeInterview: true }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(
+          extractErrorMessage(err, "인터뷰를 마무리하지 못했습니다", res.status),
+        );
+      }
+      return res.json() as Promise<BulkGradeChatData>;
+    },
+    onSuccess: (result) => {
+      setChatOptions([]);
+      queryClient.setQueryData(qk.instructor.bulkGradeChat(examId), result);
+      toast.success("지금까지의 기준으로 가채점을 시작할 수 있습니다.");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
   });
 
   const sessionStatus = data?.session?.status ?? null;
@@ -393,10 +452,7 @@ export function BulkGradingPanel({
 
   const startGradingMutation = useMutation({
     mutationFn: async () => {
-      // NOTE: formatPickedQACriteria is called EXACTLY ONCE here at send time.
-      // The re-grade arm path keeps draft = base only (no pre-baked Q&A) to
-      // prevent double-appending. Truncated to 8000 chars total.
-      const base = criteriaMode === "ai_default" ? "" : draft.trim();
+      const base = regradeArmed && criteriaMode !== "ai_default" ? draft.trim() : "";
       const enriched = (base + formatPickedQACriteria(pickedQA)).slice(0, 8000);
       const res = await fetch(`/api/exam/${examId}/bulk-grade/start`, {
         method: "POST",
@@ -503,6 +559,10 @@ export function BulkGradingPanel({
   //  - failed:  worker already processed them but produced no grade (AI error/parse) → "채점 실패"
   //  - pending: not yet processed (still running) → "대기 중"
   const gradingAttempted = isGrading || gradingDone || gradingFailed;
+  const interviewReady = chatData?.canStartGrading ?? false;
+  const canProceedToGrading = chatData?.canProceedToGrading ?? false;
+  const interviewInProgress =
+    !gradingAttempted && !committed && (chatData?.messages?.length ?? 0) > 0;
   const missingStudents = useMemo(
     () =>
       computeMissingBulkGradeStudents({
@@ -597,13 +657,14 @@ export function BulkGradingPanel({
     gradingDone,
     gradingFailed,
     regradeArmed,
+    interviewReady,
   });
   const startPending = startGradingMutation.isPending;
   const chatPending = chatMutation.isPending;
   const trimmedDraft = draft.trim();
 
   const sendDisabled =
-    (sendMode === "start" && !trimmedDraft && criteriaMode !== "ai_default") ||
+    (sendMode === "start" && !interviewReady && !regradeArmed) ||
     (sendMode === "discuss" && !trimmedDraft) ||
     (sendMode === "start" ? startPending || isGrading : chatPending);
   const sendBusy = sendMode === "start" ? startPending || isGrading : chatPending;
@@ -821,7 +882,19 @@ export function BulkGradingPanel({
 
   const chatMessageCount = chatData?.messages?.length ?? 0;
   const hasThreadContent =
-    chatMessageCount > 0 || gradingAttempted || committed;
+    chatMessageCount > 0 || gradingAttempted || committed || initChatMutation.isPending;
+
+  // Auto-start AI-led criteria interview when the panel opens.
+  useEffect(() => {
+    if (!open || !examId) return;
+    if (gradingAttempted || committed) return;
+    if (chatLoading || initChatMutation.isPending || chatMutation.isPending) return;
+    if ((data?.studentCount ?? 0) === 0) return;
+    const hasAssistant = chatData?.messages?.some((m) => m.role === "assistant");
+    if (hasAssistant) return;
+    initChatMutation.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, examId, chatLoading, chatData?.messages, data?.studentCount, gradingAttempted, committed]);
 
   // ─── Stick-to-bottom ─────────────────────────────────────────────────────────
   const handleThreadScroll = () => {
@@ -1195,28 +1268,11 @@ export function BulkGradingPanel({
               불러오는 중...
             </div>
           ) : !hasThreadContent ? (
-            <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                채점 기준을 알려주세요
+                제출 데이터를 분석하고 채점 인터뷰를 준비하는 중…
               </p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {EXAMPLE_CRITERIA.map((example) => (
-                  <Button
-                    key={example}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-auto max-w-[260px] whitespace-normal py-1.5 text-left text-xs"
-                    onClick={() => {
-                      setCriteriaMode("custom");
-                      setDraft(example);
-                      focusComposer();
-                    }}
-                  >
-                    {example}
-                  </Button>
-                ))}
-              </div>
             </div>
           ) : (
             <div className="space-y-3" data-testid="bulk-grade-thread">
@@ -1282,6 +1338,39 @@ export function BulkGradingPanel({
           </div>
         )}
 
+        {canProceedToGrading && !interviewReady && !gradingAttempted && !committed && (
+          <div className="mb-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => completeInterviewMutation.mutate()}
+              disabled={
+                completeInterviewMutation.isPending ||
+                chatMutation.isPending ||
+                initChatMutation.isPending
+              }
+              data-testid="bulk-grade-proceed-to-scoring"
+              className="w-full justify-center"
+            >
+              {completeInterviewMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  준비 중...
+                </>
+              ) : (
+                "여기까지만 질문받고 일단 채점 진행"
+              )}
+            </Button>
+          </div>
+        )}
+
+        {interviewReady && !gradingAttempted && !committed && (
+          <p className="mb-2 text-xs text-muted-foreground">
+            점수 범위가 확정되었습니다. 전송하면 전체 {gradeNoun} 가채점을 시작합니다.
+          </p>
+        )}
+
         {/* Quick-reply 보기 칩 — AI가 질문하면 phase 무관하게 표시 */}
         {canShowChips &&
           (chatOptionsMutation.isPending || displayedOptions.length > 0) && (
@@ -1334,8 +1423,10 @@ export function BulkGradingPanel({
             onKeyDown={handleComposerKeyDown}
             placeholder={
               sendMode === "start"
-                ? "예: 핵심 개념 중심으로 봐줘"
-                : "질문 입력"
+                ? "추가 메모(선택). 전송하면 가채점을 시작합니다"
+                : interviewInProgress
+                  ? "인터뷰 질문에 답변하세요"
+                  : "질문 입력"
             }
             data-testid="bulk-grade-composer-input"
             className="max-h-48 min-h-[44px] resize-none border-0 p-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
@@ -1378,7 +1469,11 @@ export function BulkGradingPanel({
             <Button
               type="button"
               size="icon"
-              aria-label={sendMode === "start" ? `전체 ${gradeNoun} 가채점 시작` : "가채점 대화 전송"}
+              aria-label={
+                sendMode === "start"
+                  ? `전체 ${gradeNoun} 가채점 시작`
+                  : "인터뷰 답변 전송"
+              }
               onClick={send}
               disabled={sendDisabled}
               data-testid="bulk-grade-send"

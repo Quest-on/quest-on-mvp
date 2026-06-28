@@ -550,6 +550,241 @@ function buildAiDependencySummary(params: {
   return fragments.join(", ");
 }
 
+const assignmentAnswerDelegationPatterns = [
+  /풀어\s*줘/i,
+  /대신\s*.+해\s*줘/i,
+  /답\s*만/i,
+  /그냥\s*(써|답)/i,
+  /완성.*해\s*줘/i,
+  /보고서\s*써/i,
+  /모르겠.*(써|답|해\s*줘)/i,
+  /알려\s*줘.*(답|정답)/i,
+];
+
+const assignmentFollowUpPatterns = [
+  /그러면|그럼|이어서|추가로|더\s*자세|다음/i,
+  /비교|차이|다른\s*점|vs/i,
+  /왜\s|어떻게\s|무엇이\s|어떤\s/i,
+];
+
+const assignmentVerificationPatterns = [
+  /근거|출처|맞아|확인|검증|반례|한계|사실/i,
+  /정말|진짜|타당|신뢰/i,
+];
+
+const assignmentConceptExplorationPatterns = [
+  /개념|의미|설명|예시|쉽게|이해|정리/i,
+  /어디서부터|뭐부터|무엇부터|어떤\s*(개념|방법|프레임|관점)/i,
+  /과제|요구|조건|범위|포함/i,
+];
+
+/**
+ * 리서치 과제용 채팅 분석. 시험용 analyzeAiDependency 와 달리
+ * 질문·탐색·검증을 긍정 신호로 해석하고, 답안 위임만 의존 신호로 본다.
+ */
+export function analyzeAssignmentResearchEngagement(params: {
+  messages: Array<{ role: string; content: string }>;
+  finalAnswer?: string;
+}): AiDependencyAssessment {
+  const { messages, finalAnswer = "" } = params;
+
+  let followUpQuestionCount = 0;
+  let verificationQuestionCount = 0;
+  let conceptExplorationCount = 0;
+  let answerDelegationCount = 0;
+
+  const researchEvidence: string[] = [];
+  const verificationEvidence: string[] = [];
+  const assistantMessages: string[] = [];
+
+  messages.forEach((message) => {
+    const normalized = normalizeTextForAnalysis(message.content);
+    if (!normalized) return;
+
+    if (message.role === "assistant" || message.role === "ai") {
+      assistantMessages.push(normalized);
+      return;
+    }
+
+    if (message.role !== "user" && message.role !== "student") return;
+
+    const isDelegation = assignmentAnswerDelegationPatterns.some((p) => p.test(normalized));
+    const isFollowUp = assignmentFollowUpPatterns.some((p) => p.test(normalized));
+    const isVerification = assignmentVerificationPatterns.some((p) => p.test(normalized));
+    const isConceptExploration = assignmentConceptExplorationPatterns.some((p) => p.test(normalized));
+
+    if (isDelegation) {
+      answerDelegationCount += 1;
+    }
+    if (isFollowUp) {
+      followUpQuestionCount += 1;
+      pushUniqueEvidence(researchEvidence, normalized);
+    }
+    if (isVerification) {
+      verificationQuestionCount += 1;
+      pushUniqueEvidence(verificationEvidence, normalized);
+    }
+    if (isConceptExploration) {
+      conceptExplorationCount += 1;
+      pushUniqueEvidence(researchEvidence, normalized);
+    }
+  });
+
+  const finalAnswerOverlapScore = calculateOverlapScore(finalAnswer, assistantMessages);
+  const totalResearchSignals =
+    followUpQuestionCount + verificationQuestionCount + conceptExplorationCount;
+  const recoveryObserved = verificationQuestionCount > 0 || followUpQuestionCount >= 2;
+
+  let overallRisk: AiDependencyRiskLevel = "low";
+  if (answerDelegationCount >= 3 || (answerDelegationCount >= 2 && totalResearchSignals === 0)) {
+    overallRisk = "high";
+  } else if (answerDelegationCount >= 1 && totalResearchSignals <= 1) {
+    overallRisk = "medium";
+  }
+
+  const summaryParts: string[] = [];
+  if (followUpQuestionCount > 0) {
+    summaryParts.push(`후속·확장 질문 ${followUpQuestionCount}회`);
+  }
+  if (verificationQuestionCount > 0) {
+    summaryParts.push(`검증·확인 질문 ${verificationQuestionCount}회`);
+  }
+  if (conceptExplorationCount > 0) {
+    summaryParts.push(`개념·범위 탐색 질문 ${conceptExplorationCount}회`);
+  }
+  if (answerDelegationCount > 0) {
+    summaryParts.push(`답안 위임 요청 ${answerDelegationCount}회`);
+  }
+  if (summaryParts.length === 0) {
+    summaryParts.push("뚜렷한 리서치 질문 패턴이 제한적");
+  } else if (recoveryObserved) {
+    summaryParts.push("질문 흐름이 이어지며 탐색·검증이 관찰됨");
+  }
+
+  return {
+    evaluationMode: "assignment",
+    assignmentMetrics: {
+      followUpQuestionCount,
+      verificationQuestionCount,
+      conceptExplorationCount,
+      answerDelegationCount,
+    },
+    delegationRequestCount: answerDelegationCount,
+    startingPointDependencyCount: 0,
+    directAnswerRequestCount: answerDelegationCount,
+    directAnswerRelianceCount:
+      answerDelegationCount > 0 && finalAnswerOverlapScore >= 0.45 ? answerDelegationCount : 0,
+    recoveryObserved,
+    recoveryEvidence: verificationEvidence,
+    triggerEvidence: researchEvidence,
+    finalAnswerOverlapScore,
+    overallRisk,
+    penaltyApplied: 0,
+    summary: summaryParts.join(", "),
+  };
+}
+
+export function formatAssignmentResearchForPrompt(
+  assessment: AiDependencyAssessment
+): string {
+  const metrics = assessment.assignmentMetrics;
+  return [
+    `- 후속·확장 질문: ${metrics?.followUpQuestionCount ?? 0}회`,
+    `- 검증·확인 질문: ${metrics?.verificationQuestionCount ?? 0}회`,
+    `- 개념·범위 탐색 질문: ${metrics?.conceptExplorationCount ?? 0}회`,
+    `- 답안 위임 요청: ${metrics?.answerDelegationCount ?? assessment.delegationRequestCount}회`,
+    `- 최종 답안-AI 응답 유사도 근사치: ${(assessment.finalAnswerOverlapScore * 100).toFixed(0)}%`,
+    `- 질문 흐름 연결: ${assessment.recoveryObserved ? "관찰됨" : "제한적"}`,
+    `- 핵심 요약: ${assessment.summary}`,
+    assessment.triggerEvidence.length > 0
+      ? `- 리서치 질문 예시: ${assessment.triggerEvidence.join(" / ")}`
+      : "- 리서치 질문 예시: 없음",
+    assessment.recoveryEvidence.length > 0
+      ? `- 검증·확인 예시: ${assessment.recoveryEvidence.join(" / ")}`
+      : "- 검증·확인 예시: 없음",
+  ].join("\n");
+}
+
+export function formatChatAssessmentForPrompt(
+  assessment: AiDependencyAssessment
+): string {
+  return assessment.evaluationMode === "assignment"
+    ? formatAssignmentResearchForPrompt(assessment)
+    : formatAiDependencyForPrompt(assessment);
+}
+
+export function summarizeAssignmentResearchAssessments(
+  assessments: Array<{ q_idx: number; assessment?: AiDependencyAssessment }>
+) {
+  const validAssessments = assessments.filter(
+    (item): item is { q_idx: number; assessment: AiDependencyAssessment } =>
+      !!item.assessment && item.assessment.evaluationMode === "assignment"
+  );
+
+  if (validAssessments.length === 0) {
+    return null;
+  }
+
+  const totals = validAssessments.reduce(
+    (acc, item) => {
+      const m = item.assessment.assignmentMetrics;
+      return {
+        followUp: acc.followUp + (m?.followUpQuestionCount ?? 0),
+        verification: acc.verification + (m?.verificationQuestionCount ?? 0),
+        exploration: acc.exploration + (m?.conceptExplorationCount ?? 0),
+        delegation: acc.delegation + (m?.answerDelegationCount ?? 0),
+      };
+    },
+    { followUp: 0, verification: 0, exploration: 0, delegation: 0 }
+  );
+
+  const riskOrder: Record<AiDependencyRiskLevel, number> = {
+    low: 0,
+    medium: 1,
+    high: 2,
+  };
+
+  const overallRisk = validAssessments.reduce<AiDependencyRiskLevel>(
+    (current, item) =>
+      riskOrder[item.assessment.overallRisk] > riskOrder[current]
+        ? item.assessment.overallRisk
+        : current,
+    "low"
+  );
+
+  const recoveryObserved = validAssessments.some((item) => item.assessment.recoveryObserved);
+
+  const triggerEvidence = validAssessments
+    .flatMap((item) => item.assessment.triggerEvidence.slice(0, 1))
+    .filter((value, index, array) => array.indexOf(value) === index)
+    .slice(0, 3);
+
+  const recoveryEvidence = validAssessments
+    .flatMap((item) => item.assessment.recoveryEvidence.slice(0, 1))
+    .filter((value, index, array) => array.indexOf(value) === index)
+    .slice(0, 3);
+
+  const triggerCount = totals.followUp + totals.verification + totals.exploration;
+
+  return {
+    evaluationMode: "assignment" as const,
+    overallRisk,
+    recoveryObserved,
+    triggerCount,
+    summary: recoveryObserved
+      ? `리서치 질문 ${triggerCount}회(후속 ${totals.followUp}, 검증 ${totals.verification}, 탐색 ${totals.exploration}). 질문 흐름이 이어지며 탐색·검증이 관찰됨.`
+      : `리서치 질문 ${triggerCount}회. 답안 위임 ${totals.delegation}회 — 질문 연결·검증 흔적은 제한적.`,
+    triggerEvidence,
+    recoveryEvidence,
+    questionBreakdown: validAssessments.map((item) => ({
+      q_idx: item.q_idx,
+      overallRisk: item.assessment.overallRisk,
+      recoveryObserved: item.assessment.recoveryObserved,
+      summary: item.assessment.summary,
+    })),
+  };
+}
+
 export function analyzeAiDependency(params: {
   messages: Array<{ role: string; content: string }>;
   finalAnswer?: string;
@@ -699,6 +934,7 @@ export function analyzeAiDependency(params: {
     finalAnswerOverlapScore,
     overallRisk,
     penaltyApplied,
+    evaluationMode: "exam",
     summary: buildAiDependencySummary({
       delegationRequestCount,
       startingPointDependencyCount,

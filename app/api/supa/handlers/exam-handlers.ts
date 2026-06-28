@@ -9,6 +9,7 @@ import {
   validateScoreWeightsForQuestions,
   type ScoreWeights,
 } from "@/lib/grade-utils";
+import { buildCopiedExamPayload, type CopyableExamSource } from "@/lib/exam-copy";
 
 // Lazy Supabase client getter — creates a fresh client per invocation
 // to avoid stale connections in serverless environments
@@ -682,7 +683,7 @@ export async function copyExam(data: { exam_id: string }) {
     // Get the original exam
     const { data: originalExam, error: examError } = await getSupabase()
       .from("exams")
-      .select("id, title, code, description, duration, questions, materials, materials_text, rubric, rubric_public, chat_weight, score_weights, status, instructor_id, created_at, updated_at, language")
+      .select("id, title, code, description, duration, questions, materials, materials_text, rubric, rubric_public, chat_weight, score_weights, status, instructor_id, created_at, updated_at, language, type, assignment_prompt, initial_state, canvas_config")
       .eq("id", data.exam_id)
       .eq("instructor_id", user.id)
       .single();
@@ -738,33 +739,13 @@ export async function copyExam(data: { exam_id: string }) {
     const newTitle = `${originalExam.title} (복사본)`;
     const now = new Date().toISOString();
 
-    // Sanitize questions (remove core_ability if present)
-    const sanitizedQuestions = Array.isArray(originalExam.questions)
-      ? originalExam.questions.map((q: QuestionData & { core_ability?: unknown }) => {
-          const rest = { ...q };
-          delete rest.core_ability;
-          return rest;
-        })
-      : [];
-
-    const examData = {
-      title: newTitle,
-      code: newCode,
-      description: originalExam.description || null,
-      duration: originalExam.duration,
-      questions: sanitizedQuestions,
-      materials: originalExam.materials || [],
-      materials_text: originalExam.materials_text || [], // 복사본도 materials_text 포함
-      rubric: originalExam.rubric || [],
-      rubric_public: originalExam.rubric_public || false,
-      chat_weight: originalExam.chat_weight ?? 50,
-      score_weights: normalizeScoreWeights(originalExam.score_weights),
-      status: "draft", // 복사본은 초안 상태로 시작
-      instructor_id: user.id,
-      created_at: now,
-      updated_at: now,
-      language: (originalExam as { language?: string }).language === "en" ? "en" : "ko",
-    };
+    // 복사본 페이로드 — 원본 type(과제 정체성: assignment_prompt/initial_state/canvas_config)을
+    // 보존한다. 이 보존이 빠지면 과제 복사본이 시험으로 생성되어 편집 시 시험 편집기로 잘못 라우팅된다.
+    // (deadline/close_at은 의도적으로 복사하지 않음 — 복사본은 draft로 시작)
+    const examData = buildCopiedExamPayload(
+      originalExam as unknown as CopyableExamSource,
+      { code: newCode, instructorId: user.id, now },
+    );
 
     // Create the new exam
     const { data: newExam, error: createError } = await getSupabase()

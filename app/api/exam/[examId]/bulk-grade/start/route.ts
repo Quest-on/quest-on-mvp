@@ -19,6 +19,7 @@ import {
 } from "@/lib/bulk-grading";
 import type { ExtractedCriteria } from "@/lib/prompts";
 import { isUniqueViolation } from "@/lib/chat-idempotency";
+import { extractGradingCriteriaFromChat, isInterviewReady } from "@/lib/bulk-grading-criteria";
 
 const BULK_GRADE_START_RATE_LIMIT = { limit: 3, windowSec: 60 };
 const STALE_GRADING_MS = 10 * 60 * 1000;
@@ -30,7 +31,7 @@ function parseScope(body: unknown): BulkGradingScope {
   return "full";
 }
 
-function parseCriteria(body: unknown): ExtractedCriteria {
+function parseCriteria(body: unknown): ExtractedCriteria | null {
   const criteriaText =
     body && typeof body === "object" && typeof (body as { criteriaText?: unknown }).criteriaText === "string"
       ? (body as { criteriaText: string }).criteriaText.trim()
@@ -52,14 +53,32 @@ function parseCriteria(body: unknown): ExtractedCriteria {
     return { criteria_summary: `${criteriaText}\n\n${approvalHint}`, per_question: [] };
   }
 
-  return {
-    criteria_summary: `${
-      criteriaMode === "ai_default"
-        ? "AI 기본 기준: CASE 답안의 정확성, 논리적 완성도, 근거의 구체성, 문제 요구사항 충족도, 학생-AI 채팅에서 드러난 이해 과정을 종합해 평가합니다."
-        : "전반적인 논리적 완성도와 개념 이해를 기준으로 채점"
-    }\n\n${approvalHint}`,
-    per_question: [],
-  };
+  if (criteriaMode === "ai_default") {
+    return {
+      criteria_summary: `${
+        "AI 기본 기준: CASE 답안의 정확성, 논리적 완성도, 근거의 구체성, 문제 요구사항 충족도, 학생-AI 채팅에서 드러난 이해 과정을 종합해 평가합니다."
+      }\n\n${approvalHint}`,
+      per_question: [],
+      score_range: { min: 0, max: 100 },
+    };
+  }
+
+  return null;
+}
+
+async function loadInterviewChatMessages(
+  supabase: ReturnType<typeof getSupabaseServer>,
+  gradingSessionId: string,
+): Promise<Array<{ role: string; content: string }>> {
+  const { data } = await supabase
+    .from("bulk_grading_messages")
+    .select("role, content")
+    .eq("session_id", gradingSessionId)
+    .order("created_at", { ascending: true });
+  return (data ?? []).filter(
+    (m): m is { role: string; content: string } =>
+      (m.role === "user" || m.role === "assistant") && typeof m.content === "string",
+  );
 }
 
 export async function POST(
@@ -181,7 +200,40 @@ export async function POST(
     }
 
     const gradingSessionId = startSession.id as string;
-    const criteria = parseCriteria(body);
+
+    const manualCriteria = parseCriteria(body);
+    let criteria: ExtractedCriteria;
+
+    if (manualCriteria?.criteria_summary && manualCriteria.criteria_summary.length > 0) {
+      // Re-grade path: instructor edited criteria text directly.
+      criteria = manualCriteria;
+    } else {
+      if (!isInterviewReady(startSession.calibration_status as string)) {
+        return errorJson(
+          "VALIDATION_ERROR",
+          "채점 기준 인터뷰를 완료하고 점수 범위(Range)를 확정해주세요.",
+          400,
+        );
+      }
+
+      const chatMessages = await loadInterviewChatMessages(supabase, gradingSessionId);
+      const extracted = await extractGradingCriteriaFromChat({
+        messages: chatMessages,
+        language: examMeta.examLanguage,
+        isAssignment: examMeta.isAssignment,
+        userId: access.ctx.user.id,
+        examId,
+      });
+
+      if (!extracted?.score_range) {
+        return errorJson(
+          "VALIDATION_ERROR",
+          "점수 범위(Range)를 확인할 수 없습니다. 인터뷰를 마무리해주세요.",
+          400,
+        );
+      }
+      criteria = extracted;
+    }
 
     const attemptId = globalThis.crypto.randomUUID();
     const updatePayload: Record<string, unknown> = {

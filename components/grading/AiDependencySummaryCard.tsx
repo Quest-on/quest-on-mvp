@@ -16,7 +16,17 @@ interface AiDependencySummaryCardProps {
   loading?: boolean;
 }
 
-function getRiskLabel(risk: AiDependencyRiskLevel) {
+function getRiskLabel(risk: AiDependencyRiskLevel, isAssignment: boolean) {
+  if (isAssignment) {
+    switch (risk) {
+      case "high":
+        return "의존 우려 높음";
+      case "medium":
+        return "의존 우려 있음";
+      default:
+        return "양호";
+    }
+  }
   switch (risk) {
     case "high":
       return "높음";
@@ -44,13 +54,17 @@ export function AiDependencySummaryCard({
   overallSummary,
   loading,
 }: AiDependencySummaryCardProps) {
+  const isAssignment =
+    questionAssessment?.evaluationMode === "assignment" ||
+    overallSummary?.evaluationMode === "assignment";
+
   if (loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Bot className="h-4 w-4 text-primary" />
-            AI 의존 신호
+            {isAssignment ? "리서치 참여 신호" : "AI 의존 신호"}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -67,7 +81,16 @@ export function AiDependencySummaryCard({
     return null;
   }
 
-  const title = mode === "instructor" ? "AI 의존 신호" : "AI 활용 평가";
+  const title =
+    mode === "instructor"
+      ? isAssignment
+        ? "리서치 참여 신호"
+        : "AI 의존 신호"
+      : isAssignment
+        ? "리서치 참여 평가"
+        : "AI 활용 평가";
+
+  const metrics = questionAssessment?.assignmentMetrics;
 
   return (
     <Card>
@@ -83,14 +106,22 @@ export function AiDependencySummaryCard({
             <div className="flex items-center justify-between gap-3">
               <span className="font-medium">전체 세션 해석</span>
               <Badge variant={getRiskVariant(overallSummary.overallRisk)}>
-                위험도 {getRiskLabel(overallSummary.overallRisk)}
+                {isAssignment ? "AI 의존 " : "위험도 "}
+                {getRiskLabel(overallSummary.overallRisk, isAssignment)}
               </Badge>
             </div>
             <p className="text-muted-foreground">{overallSummary.summary}</p>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span>트리거 {overallSummary.triggerCount}회</span>
               <span>
-                회복 {overallSummary.recoveryObserved ? "관찰됨" : "근거 약함"}
+                {isAssignment ? "리서치 질문" : "트리거"} {overallSummary.triggerCount}회
+              </span>
+              <span>
+                {isAssignment
+                  ? questionAssessment?.recoveryObserved ||
+                    overallSummary.recoveryObserved
+                    ? "질문 흐름 연결됨"
+                    : "질문 연결 제한적"
+                  : `회복 ${overallSummary.recoveryObserved ? "관찰됨" : "근거 약함"}`}
               </span>
             </div>
           </div>
@@ -101,27 +132,41 @@ export function AiDependencySummaryCard({
             <div className="flex items-center justify-between gap-3">
               <span className="font-medium">현재 문항 해석</span>
               <Badge variant={getRiskVariant(questionAssessment.overallRisk)}>
-                위험도 {getRiskLabel(questionAssessment.overallRisk)}
+                {isAssignment ? "AI 의존 " : "위험도 "}
+                {getRiskLabel(questionAssessment.overallRisk, isAssignment)}
               </Badge>
             </div>
 
             <p className="text-muted-foreground">{questionAssessment.summary}</p>
 
-            <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-              <div>풀이 위임형 요청 {questionAssessment.delegationRequestCount}회</div>
-              <div>출발점 의존 {questionAssessment.startingPointDependencyCount}회</div>
-              <div>직접 답 요구 {questionAssessment.directAnswerRequestCount}회</div>
-              <div>
-                답안 유사도 {(questionAssessment.finalAnswerOverlapScore * 100).toFixed(0)}%
+            {isAssignment && metrics ? (
+              <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                <div>후속·확장 질문 {metrics.followUpQuestionCount}회</div>
+                <div>검증·확인 질문 {metrics.verificationQuestionCount}회</div>
+                <div>개념·범위 탐색 {metrics.conceptExplorationCount}회</div>
+                <div>답안 위임 요청 {metrics.answerDelegationCount}회</div>
               </div>
-            </div>
+            ) : (
+              <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                <div>풀이 위임형 요청 {questionAssessment.delegationRequestCount}회</div>
+                <div>출발점 의존 {questionAssessment.startingPointDependencyCount}회</div>
+                <div>직접 답 요구 {questionAssessment.directAnswerRequestCount}회</div>
+                <div>
+                  답안 유사도 {(questionAssessment.finalAnswerOverlapScore * 100).toFixed(0)}%
+                </div>
+              </div>
+            )}
 
             <div className="rounded-lg border border-border/60 bg-background p-3">
               <div className="flex items-center gap-2 font-medium">
                 <RotateCcw className="h-4 w-4 text-primary" />
-                {questionAssessment.recoveryObserved
-                  ? "독립 추론 회복이 확인됨"
-                  : "독립 추론 회복 근거가 제한적임"}
+                {isAssignment
+                  ? questionAssessment.recoveryObserved
+                    ? "질문 흐름이 이어지며 탐색·검증이 관찰됨"
+                    : "질문 연결·검증 흔적이 제한적임"
+                  : questionAssessment.recoveryObserved
+                    ? "독립 추론 회복이 확인됨"
+                    : "독립 추론 회복 근거가 제한적임"}
               </div>
               {questionAssessment.recoveryEvidence.length > 0 && (
                 <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
@@ -135,7 +180,13 @@ export function AiDependencySummaryCard({
             {questionAssessment.triggerEvidence.length > 0 && (
               <div>
                 <p className="mb-2 text-xs font-medium text-muted-foreground">
-                  {mode === "instructor" ? "근거 문장" : "평가에 반영된 대화 근거"}
+                  {mode === "instructor"
+                    ? isAssignment
+                      ? "리서치 질문 예시"
+                      : "근거 문장"
+                    : isAssignment
+                      ? "평가에 반영된 리서치 질문"
+                      : "평가에 반영된 대화 근거"}
                 </p>
                 <ul className="space-y-1 text-xs text-muted-foreground">
                   {questionAssessment.triggerEvidence.slice(0, 3).map((evidence, index) => (

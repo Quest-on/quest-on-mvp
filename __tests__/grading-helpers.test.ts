@@ -7,6 +7,7 @@ import {
   calculateWeightedScore,
   calculateAiDependencyPenalty,
   analyzeAiDependency,
+  analyzeAssignmentResearchEngagement,
   summarizeAiDependencyAssessments,
   formatSummaryScoreLabel,
   resolveByQIdx,
@@ -447,6 +448,43 @@ describe("analyzeAiDependency", () => {
     expect(assessment.recoveryObserved).toBe(true);
     expect(assessment.recoveryEvidence.length).toBeGreaterThan(0);
     expect(["low", "medium"]).toContain(assessment.overallRisk);
+  });
+});
+
+describe("analyzeAssignmentResearchEngagement", () => {
+  it("treats follow-up and verification questions as positive research signals", () => {
+    const assessment = analyzeAssignmentResearchEngagement({
+      messages: [
+        { role: "user", content: "A와 B의 차이가 뭐야?" },
+        { role: "assistant", content: "A는 ... B는 ..." },
+        { role: "user", content: "그 근거는 실제로 맞아? 반례는 없어?" },
+        { role: "assistant", content: "일반적으로는 ..." },
+        { role: "user", content: "그러면 과제 요구사항에 맞추면 핵심은 뭐야?" },
+      ],
+      finalAnswer: "핵심은 ...",
+    });
+
+    expect(assessment.evaluationMode).toBe("assignment");
+    expect(assessment.assignmentMetrics?.followUpQuestionCount).toBeGreaterThan(0);
+    expect(assessment.assignmentMetrics?.verificationQuestionCount).toBeGreaterThan(0);
+    expect(assessment.startingPointDependencyCount).toBe(0);
+    expect(assessment.penaltyApplied).toBe(0);
+    expect(assessment.overallRisk).toBe("low");
+    expect(assessment.recoveryObserved).toBe(true);
+  });
+
+  it("flags answer-delegation without research flow", () => {
+    const assessment = analyzeAssignmentResearchEngagement({
+      messages: [
+        { role: "user", content: "모르겠어 그냥 답 써줘" },
+        { role: "assistant", content: "..." },
+        { role: "user", content: "완성된 보고서 써줘" },
+      ],
+      finalAnswer: "...",
+    });
+
+    expect(assessment.assignmentMetrics?.answerDelegationCount).toBeGreaterThan(0);
+    expect(["medium", "high"]).toContain(assessment.overallRisk);
   });
 });
 

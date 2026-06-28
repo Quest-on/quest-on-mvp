@@ -14,6 +14,7 @@ const baseState: SendModeState = {
   gradingDone: false,
   gradingFailed: false,
   regradeArmed: false,
+  interviewReady: false,
 };
 
 describe("resolveSendMode", () => {
@@ -43,8 +44,12 @@ describe("resolveSendMode", () => {
     expect(resolveSendMode({ ...baseState, gradingFailed: true })).toBe("discuss");
   });
 
-  it("cold start (no run yet) → start", () => {
-    expect(resolveSendMode(baseState)).toBe("start");
+  it("cold start before interview complete → discuss", () => {
+    expect(resolveSendMode(baseState)).toBe("discuss");
+  });
+
+  it("interview complete (score range set) → start", () => {
+    expect(resolveSendMode({ ...baseState, interviewReady: true })).toBe("start");
   });
 });
 

@@ -10,7 +10,7 @@ export type AssignmentGradeLabel = "우수" | "평범" | "미흡";
 
 export function scoreToAssignmentLabel(score: number | null | undefined): AssignmentGradeLabel {
   if (typeof score !== "number" || !Number.isFinite(score)) return "미흡";
-  if (score >= 78) return "우수";
+  if (score >= 82) return "우수";
   if (score >= 58) return "평범";
   return "미흡";
 }

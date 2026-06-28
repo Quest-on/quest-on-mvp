@@ -11,9 +11,13 @@
  *  - isNearBottom: stick-to-bottom detection for the single scroll area.
  *  - countInterviewQuestions: counts AI questions posed AFTER the first user
  *    turn (excludes the welcome/init assistant message).
+ *  - MIN_BULK_GRADE_INTERVIEW_QUESTIONS: minimum Q&A rounds before "proceed to grade".
  *  - formatPickedQACriteria: formats Q&A pairs collected via quick-reply chips
  *    into an appendable criteria block.
  */
+
+/** Minimum AI↔instructor Q&A rounds before the instructor may skip to grading. */
+export const MIN_BULK_GRADE_INTERVIEW_QUESTIONS = 5;
 
 export type SendModeState = {
   committed: boolean;
@@ -21,6 +25,8 @@ export type SendModeState = {
   gradingDone: boolean;
   gradingFailed: boolean;
   regradeArmed: boolean;
+  /** Criteria interview finished and score range confirmed */
+  interviewReady: boolean;
 };
 
 export type SendMode = "start" | "discuss";
@@ -31,13 +37,15 @@ export type SendMode = "start" | "discuss";
  *  - isGrading              → "discuss"
  *  - regradeArmed           → "start"
  *  - gradingDone || gradingFailed (and !regradeArmed) → "discuss"
- *  - else (no run yet)      → "start"
+ *  - !interviewReady        → "discuss" (AI-led interview phase)
+ *  - else                   → "start"
  */
 export function resolveSendMode(state: SendModeState): SendMode {
   if (state.committed) return "discuss";
   if (state.isGrading) return "discuss";
   if (state.regradeArmed) return "start";
   if (state.gradingDone || state.gradingFailed) return "discuss";
+  if (!state.interviewReady) return "discuss";
   return "start";
 }
 
@@ -78,8 +86,7 @@ export function isNearBottom(
  * message in the conversation.
  *
  * This intentionally excludes the init/welcome assistant message (which
- * precedes any user turn). The result is used to cap the interview at 3
- * AI questions before forcing a re-grade.
+ * precedes any user turn). Used to gate the "proceed to grading" button.
  */
 export function countInterviewQuestions(
   messages: { role: "user" | "assistant"; content: string }[],
