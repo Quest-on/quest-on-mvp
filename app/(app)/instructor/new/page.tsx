@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { extractErrorMessage } from "@/lib/error-messages";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDateTime } from "@/lib/i18n/format";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/query-keys";
@@ -60,6 +61,7 @@ export default function CreateExam() {
   const router = useRouter();
   const { user, isLoaded, isSignedIn } = useAppUser();
   const t = useTranslations("instructor");
+  const locale = useLocale() as "ko" | "en";
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -1022,7 +1024,7 @@ export default function CreateExam() {
                       <p>{t("newExam.restoreQuestions", { count: savedDraft.questions.length })}</p>
                     )}
                     <p className="text-xs">
-                      {t("newExam.restoreSavedAt", { time: new Date(savedDraft.savedAt).toLocaleString("ko-KR") })}
+                      {t("newExam.restoreSavedAt", { time: formatDateTime(savedDraft.savedAt, locale) })}
                     </p>
                   </div>
                 )}

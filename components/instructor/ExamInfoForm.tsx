@@ -33,8 +33,10 @@ import {
 } from "@/components/ui/select";
 import { HelpCircle, AlertTriangle, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
-import { ko } from "date-fns/locale";
+import { ko, enUS } from "date-fns/locale";
 import { useState, useEffect } from "react";
+import { useLocale } from "next-intl";
+import { formatDate } from "@/lib/i18n/format";
 
 interface ExamInfoFormProps {
   title: string;
@@ -79,6 +81,8 @@ export function ExamInfoForm({
   codeReadOnly = false,
 }: ExamInfoFormProps) {
   const t = useTranslations("authoring");
+  const locale = useLocale() as "ko" | "en";
+  const dateFnsLocale = locale === "ko" ? ko : enUS;
   const [durationInput, setDurationInput] = useState<string>(
     duration === 0 ? "" : duration.toString()
   );
@@ -279,13 +283,13 @@ export function ExamInfoForm({
                   className={`w-full max-w-xs justify-start font-normal ${!deadline ? "text-muted-foreground" : ""} ${deadlineError ? "border-red-500" : ""}`}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {deadline ? format(new Date(deadline), "PPP", { locale: ko }) : t("examInfoForm.deadlinePlaceholder")}
+                  {deadline ? formatDate(new Date(deadline), locale) : t("examInfoForm.deadlinePlaceholder")}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
-                  locale={ko}
+                  locale={dateFnsLocale}
                   selected={deadline ? new Date(deadline) : undefined}
                   onSelect={(date) => {
                     if (date) {

@@ -13,8 +13,8 @@ import { MessageSquare, RefreshCw, Play, Pause } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 // ScrollArea will be replaced with div for now
 import { formatDistanceToNow } from "date-fns";
-import { ko } from "date-fns/locale";
-import { useTranslations } from "next-intl";
+import { ko, enUS } from "date-fns/locale";
+import { useTranslations, useLocale } from "next-intl";
 
 interface LiveMessage {
   id: string;
@@ -38,6 +38,8 @@ interface LiveMonitoringCardProps {
 
 export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
   const t = useTranslations("grading");
+  const locale = useLocale() as "ko" | "en";
+  const dateFnsLocale = locale === "ko" ? ko : enUS;
   const [messages, setMessages] = useState<LiveMessage[]>([]);
   const [isMonitoring, setIsMonitoring] = useState(true);
   const [lastFetchTime, setLastFetchTime] = useState<string | null>(() => {
@@ -257,7 +259,7 @@ export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
                     <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
                       {formatDistanceToNow(new Date(message.created_at), {
                         addSuffix: true,
-                        locale: ko,
+                        locale: dateFnsLocale,
                       })}
                     </span>
                   </div>

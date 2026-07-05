@@ -87,7 +87,8 @@ import {
   AlertDialogPopup,
   AlertDialogTitle,
 } from "@/components/animate-ui/components/base/alert-dialog";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDate as i18nFormatDate } from "@/lib/i18n/format";
 
 interface ExamNode {
   id: string;
@@ -151,6 +152,7 @@ export default function InstructorHome() {
   const { isSignedIn, isLoaded, user, profile } = useAppUser();
   const queryClient = useQueryClient();
   const t = useTranslations("instructor");
+  const locale = useLocale() as "ko" | "en";
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -366,26 +368,19 @@ export default function InstructorHome() {
     });
   }, [queryClient, currentFolderId, user?.id]);
 
-  // 날짜 포맷터를 한 번만 생성 (성능 최적화)
-  const dateFormatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat("ko-KR", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      }),
-    []
-  );
-
   const formatDate = useCallback(
     (dateString: string) => {
       try {
-        return dateFormatter.format(new Date(dateString));
+        return i18nFormatDate(dateString, locale, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
       } catch {
         return "";
       }
     },
-    [dateFormatter]
+    [locale]
   );
 
   const handleCopyExamCode = async (code?: string) => {

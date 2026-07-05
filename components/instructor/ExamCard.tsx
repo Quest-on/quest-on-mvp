@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Copy, Clock, Calendar, Eye, Edit, Trash2, Users } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDate as fmtDate } from "@/lib/i18n/format";
 
 interface ExamCardProps {
   exam: {
@@ -31,6 +32,7 @@ export function ExamCard({
   showStudentCount = true,
 }: ExamCardProps) {
   const t = useTranslations("authoring");
+  const locale = useLocale() as "ko" | "en";
   const getStatusBadgeProps = (status: string) => {
     if (status === "published") {
       return {
@@ -47,7 +49,7 @@ export function ExamCard({
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("ko-KR", {
+    return fmtDate(dateString, locale, {
       year: "numeric",
       month: "short",
       day: "numeric",

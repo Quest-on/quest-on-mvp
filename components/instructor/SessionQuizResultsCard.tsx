@@ -8,7 +8,8 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ShieldQuestion } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDateTime } from "@/lib/i18n/format";
 
 export interface SessionQuizQuestion {
   id: string;
@@ -39,6 +40,7 @@ export function SessionQuizResultsCard({
   compact = false,
 }: SessionQuizResultsCardProps) {
   const t = useTranslations("grading");
+  const locale = useLocale() as "ko" | "en";
   return (
     <Card>
       <CardHeader className={compact ? "pb-2" : undefined}>
@@ -61,7 +63,7 @@ export function SessionQuizResultsCard({
           {quiz.submitted_at && (
             <span className="text-xs text-muted-foreground">
               {t("sessionQuiz.completedLabel")}{" "}
-              {new Date(quiz.submitted_at).toLocaleString("ko-KR", {
+              {formatDateTime(quiz.submitted_at, locale, {
                 month: "short",
                 day: "numeric",
                 hour: "2-digit",

@@ -15,7 +15,8 @@ import {
   overallScoreLabel,
   type ExamStudentSummary,
 } from "@/lib/types/student-summary";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDateTime } from "@/lib/i18n/format";
 
 interface ExamStudentCardProps {
   student: ExamStudentSummary;
@@ -53,6 +54,7 @@ export function ExamStudentCard({
   onLiveMonitoring,
 }: ExamStudentCardProps) {
   const t = useTranslations("authoring");
+  const locale = useLocale() as "ko" | "en";
   const subInfo = [student.studentNumber, student.school].filter(Boolean).join(" · ");
   const status = dashboardStatus(student);
 
@@ -92,7 +94,7 @@ export function ExamStudentCard({
             {student.submittedAt && (
               <p className="text-xs text-muted-foreground mt-1">
                 {t("examStudentCard.labelSubmitted")}{" "}
-                {new Date(student.submittedAt).toLocaleString("ko-KR", {
+                {formatDateTime(student.submittedAt, locale, {
                   month: "short",
                   day: "numeric",
                   hour: "2-digit",

@@ -14,7 +14,8 @@ import {
   overallScoreLabel,
   type ExamStudentSummary,
 } from "@/lib/types/student-summary";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDateTime } from "@/lib/i18n/format";
 
 function formatProgress(correct: number, total: number): string {
   if (total === 0) return "—";
@@ -66,6 +67,7 @@ export function ExamStudentRow({
   onLiveMonitoring,
 }: ExamStudentRowProps) {
   const t = useTranslations("authoring");
+  const locale = useLocale() as "ko" | "en";
   const subInfo = [student.studentNumber, student.school]
     .filter(Boolean)
     .join(" · ");
@@ -147,7 +149,7 @@ export function ExamStudentRow({
 
       <div className="text-xs text-muted-foreground">
         {student.submittedAt
-          ? new Date(student.submittedAt).toLocaleString("ko-KR", {
+          ? formatDateTime(student.submittedAt, locale, {
               month: "short",
               day: "numeric",
               hour: "2-digit",

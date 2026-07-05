@@ -11,11 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { MessageSquare } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { ko } from "date-fns/locale";
+import { ko, enUS } from "date-fns/locale";
 import { createSupabaseClient } from "@/lib/supabase-client";
 import { decompressData } from "@/lib/compression";
 import { RealtimeChannel } from "@supabase/supabase-js";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 
 interface LiveMessage {
   id: string;
@@ -51,6 +51,8 @@ export function StudentLiveMonitoring({
   school,
 }: StudentLiveMonitoringProps) {
   const t = useTranslations("grading");
+  const locale = useLocale() as "ko" | "en";
+  const dateFnsLocale = locale === "ko" ? ko : enUS;
   const [messages, setMessages] = useState<LiveMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -287,7 +289,7 @@ export function StudentLiveMonitoring({
                       <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
                         {formatDistanceToNow(new Date(message.created_at), {
                           addSuffix: true,
-                          locale: ko,
+                          locale: dateFnsLocale,
                         })}
                       </span>
                     </div>

@@ -47,7 +47,8 @@ import { cn } from "@/lib/utils";
 import { getScoreColor } from "@/lib/grading-utils";
 import type { InstructorStudent } from "@/lib/types/exam";
 import type { StudentFilterSortOption } from "@/hooks/useStudentFiltering";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDate, formatDateTime } from "@/lib/i18n/format";
 
 type BulkGradeProgress = {
   total: number;
@@ -104,6 +105,7 @@ export default function AssignmentDashboard({
   const resolvedParams = use(params);
   const { isSignedIn, isLoaded, user, profile } = useAppUser();
   const t = useTranslations("instructor");
+  const locale = useLocale() as "ko" | "en";
 
   const [examInfoOpen, setExamInfoOpen] = useState(false);
   const [questionsOpen, setQuestionsOpen] = useState(false);
@@ -429,7 +431,7 @@ export default function AssignmentDashboard({
                       {exam.createdAt && (
                         <div className="text-sm text-muted-foreground">
                           {t("assignmentDetail.createdAt")}{" "}
-                          {new Date(exam.createdAt).toLocaleDateString("ko-KR")}
+                          {formatDate(exam.createdAt, locale)}
                         </div>
                       )}
                     </div>
@@ -623,6 +625,7 @@ function StudentRow({
   analyticsData?: Record<string, unknown> | null;
 }) {
   const t = useTranslations("instructor");
+  const locale = useLocale() as "ko" | "en";
   return (
     <div className="grid grid-cols-[1fr_130px_70px_90px_70px] gap-4 items-center px-4 py-3 hover:bg-muted/50 transition-colors">
       {/* Student info */}
@@ -648,7 +651,7 @@ function StudentRow({
       {/* Submitted at */}
       <div className="text-xs text-muted-foreground">
         {student.submittedAt
-          ? new Date(student.submittedAt).toLocaleString("ko-KR", {
+          ? formatDateTime(student.submittedAt, locale, {
               month: "short",
               day: "numeric",
               hour: "2-digit",

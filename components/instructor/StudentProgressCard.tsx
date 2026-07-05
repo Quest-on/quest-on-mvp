@@ -13,7 +13,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { FileText, Activity } from "lucide-react";
 import { StudentLiveMonitoring } from "./StudentLiveMonitoring";
 import { useState, useEffect } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDate } from "@/lib/i18n/format";
 
 interface Student {
   id: string; // session ID
@@ -117,6 +118,7 @@ export function StudentProgressCard({
   examId,
 }: StudentProgressCardProps) {
   const t = useTranslations("grading");
+  const locale = useLocale() as "ko" | "en";
   const [monitoringSessionId, setMonitoringSessionId] = useState<string | null>(
     null
   );
@@ -205,9 +207,7 @@ export function StudentProgressCard({
                         {student.status === "completed" &&
                           student.submittedAt && (
                             <span className="text-xs text-muted-foreground">
-                              {new Date(student.submittedAt).toLocaleDateString(
-                                "ko-KR"
-                              )}
+                              {formatDate(student.submittedAt, locale)}
                             </span>
                           )}
                         {student.status === "in-progress" &&

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDateTime } from "@/lib/i18n/format";
 import {
   Bot,
   Clock,
@@ -80,6 +81,7 @@ function formatPercent(numerator: number, denominator: number): string {
 
 export default function AdminDashboard() {
   const t = useTranslations("admin");
+  const locale = useLocale() as "ko" | "en";
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [mutationError, setMutationError] = useState("");
@@ -219,14 +221,13 @@ export default function AdminDashboard() {
   };
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString("ko-KR", {
+    formatDateTime(dateString, locale, {
       year: "numeric",
       month: "short",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
     });
-  // NOTE: formatDate uses hardcoded "ko-KR" — locale-aware migration tracked separately.
 
   if (isLoading) {
     return (
@@ -349,7 +350,7 @@ export default function AdminDashboard() {
                     <p className="font-medium">{instructor.name || t("dashboard.pending.noName")}</p>
                     <p className="text-sm text-muted-foreground">{instructor.email}</p>
                     <p className="text-xs text-muted-foreground">
-                      {t("dashboard.pending.appliedAt", { date: new Date(instructor.created_at).toLocaleDateString("ko-KR") })}
+                      {t("dashboard.pending.appliedAt", { date: formatDateTime(instructor.created_at, locale, { year: "numeric", month: "short", day: "numeric" }) })}
                     </p>
                   </div>
                   <Button

@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDateTime as fmtDateTime, formatDate as fmtDate } from "@/lib/i18n/format";
 import {
   Activity,
   Bot,
@@ -143,8 +144,8 @@ function formatPercent(numerator: number, denominator: number): string {
   return `${((numerator / denominator) * 100).toFixed(1)}%`;
 }
 
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString("ko-KR", {
+function formatDateTime(value: string, locale: "ko" | "en"): string {
+  return fmtDateTime(value, locale, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -152,8 +153,8 @@ function formatDateTime(value: string): string {
   });
 }
 
-function formatCompactDate(value: string): string {
-  return new Date(value).toLocaleDateString("ko-KR", {
+function formatCompactDate(value: string, locale: "ko" | "en"): string {
+  return fmtDate(value, locale, {
     month: "short",
     day: "numeric",
   });
@@ -201,6 +202,7 @@ const featureChartConfig = {
 
 export default function AdminAiUsagePage() {
   const t = useTranslations("admin");
+  const locale = useLocale() as "ko" | "en";
   const router = useRouter();
   const [range, setRange] = useState<RangeValue>("7d");
   const [feature, setFeature] = useState<string>("all");
@@ -525,7 +527,7 @@ export default function AdminAiUsagePage() {
                 <CartesianGrid vertical={false} />
                 <XAxis
                   dataKey="date"
-                  tickFormatter={formatCompactDate}
+                  tickFormatter={(value: string) => formatCompactDate(value, locale)}
                   tickLine={false}
                   axisLine={false}
                 />
@@ -725,7 +727,7 @@ export default function AdminAiUsagePage() {
                       onClick={() => setSelectedEvent(event)}
                     >
                       <TableCell className="font-mono text-xs">
-                        {formatDateTime(event.createdAt)}
+                        {formatDateTime(event.createdAt, locale)}
                       </TableCell>
                       <TableCell>{event.feature}</TableCell>
                       <TableCell className="font-mono text-xs">{event.model}</TableCell>
@@ -784,7 +786,7 @@ export default function AdminAiUsagePage() {
           <DialogHeader>
             <DialogTitle>{t("aiUsage.detail.title")}</DialogTitle>
             <DialogDescription>
-              {selectedEvent ? formatDateTime(selectedEvent.createdAt) : ""}
+              {selectedEvent ? formatDateTime(selectedEvent.createdAt, locale) : ""}
             </DialogDescription>
           </DialogHeader>
 

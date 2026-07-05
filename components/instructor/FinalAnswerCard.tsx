@@ -9,7 +9,8 @@ import {
 } from "@/components/ui/card";
 import { FileText, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { formatTime } from "@/lib/i18n/format";
 
 // HTML 태그를 제거하고 순수 텍스트만 반환
 function stripHtml(html: string): string {
@@ -302,6 +303,7 @@ export function FinalAnswerCard({
   finalAnswerText,
 }: FinalAnswerCardProps) {
   const t = useTranslations("authoring");
+  const locale = useLocale() as "ko" | "en";
   // assignment(plain text) 분기 — paste log 미적용
   if (finalAnswerText !== undefined) {
     const text = finalAnswerText.trim();
@@ -382,7 +384,7 @@ export function FinalAnswerCard({
                     <div className="text-xs text-red-700 space-y-1">
                       {suspiciousLogs.map((log) => (
                         <p key={log.id}>
-                          {t("finalAnswerCard.suspiciousLog", { chars: log.length.toLocaleString(), time: new Date(log.timestamp).toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) })}
+                          {t("finalAnswerCard.suspiciousLog", { chars: log.length.toLocaleString(), time: formatTime(log.timestamp, locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" }) })}
                         </p>
                       ))}
                     </div>
@@ -401,7 +403,7 @@ export function FinalAnswerCard({
                     <div className="text-xs text-blue-700 space-y-1">
                       {internalLogs.map((log) => (
                         <p key={log.id}>
-                          {t("finalAnswerCard.internalLog", { chars: log.length.toLocaleString(), time: new Date(log.timestamp).toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) })}
+                          {t("finalAnswerCard.internalLog", { chars: log.length.toLocaleString(), time: formatTime(log.timestamp, locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" }) })}
                         </p>
                       ))}
                     </div>
