@@ -316,30 +316,12 @@ export async function GET(
         (messagesByQuestion[qIdx] as Array<Record<string, unknown>>).push(
           messageData
         );
-
-        // Also try to map q_idx to question index for backward compatibility
-        // Find the question with matching id (considering the conversion formula)
-        if (exam.questions && Array.isArray(exam.questions)) {
-          const questionIndex = exam.questions.findIndex(
-            (q: { id?: string | number }) => {
-              if (!q.id) return false;
-              // Check if q_idx matches the converted question.id
-              const convertedId = Math.abs(parseInt(String(q.id)) % 2147483647);
-              return convertedId === qIdx || String(q.id) === String(qIdx);
-            }
-          );
-
-          if (questionIndex !== -1 && questionIndex !== qIdx) {
-            if (!messagesByQuestion[questionIndex]) {
-              messagesByQuestion[questionIndex] = [];
-            }
-            (
-              messagesByQuestion[questionIndex] as Array<
-                Record<string, unknown>
-              >
-            ).push(messageData);
-          }
-        }
+        // NOTE: 과거엔 여기서 question.id 를 parseInt 로 정수화해 q_idx 와 매칭하는
+        // "backward compatibility" 블록이 있었으나, question.id 가 crypto.randomUUID()
+        // 라 UUID 앞자리 숫자가 우연히 다른 q_idx 와 충돌하면(실측 ~27%) A 문항의 대화가
+        // B 문항에 복제되어 강사가 엉뚱한 대화를 보고 채점하는 데이터 오염을 유발했다.
+        // 메시지는 위에서 q_idx(배열 위치)로 정확히 저장되고, 프론트는 resolveByQIdx
+        // fallback 으로 idx/배열위치를 모두 커버하므로 해당 추측성 매핑을 제거한다.
       });
 
       // Sort messages by created_at within each question
