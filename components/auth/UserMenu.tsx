@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LogOut, User, Settings } from "lucide-react";
 import Link from "next/link";
 import { ThemeTogglerButton } from "@/components/animate-ui/components/buttons/theme-toggler";
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 
 export function UserMenu() {
   const { user, profile, isLoaded } = useAppUser();
@@ -88,6 +89,12 @@ export function UserMenu() {
           <div className="flex items-center justify-between w-full cursor-default">
             <span className="text-sm">테마</span>
             <ThemeTogglerButton modes={["light", "dark"]} variant="outline" size="sm" />
+          </div>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
+          <div className="flex items-center justify-between w-full cursor-default">
+            <span className="text-sm">Language</span>
+            <LanguageSwitcher variant="inline" />
           </div>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

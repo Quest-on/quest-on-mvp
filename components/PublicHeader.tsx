@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 
 export function PublicHeader() {
   return (
@@ -20,6 +21,7 @@ export function PublicHeader() {
         </Link>
 
         <div className="flex items-center gap-2">
+          <LanguageSwitcher variant="compact" />
           <Link href="/sign-in">
             <Button variant="outline" size="sm">
               로그인
