@@ -2,19 +2,20 @@ import type { LucideIcon } from "lucide-react";
 import { Shield, Bot } from "lucide-react";
 
 export interface AdminNavigationItem {
-  title: string;
+  /** i18n key under the "admin" namespace, e.g. "nav.dashboard". */
+  titleKey: string;
   href: string;
   icon: LucideIcon;
 }
 
 export const ADMIN_NAVIGATION_ITEMS: AdminNavigationItem[] = [
   {
-    title: "대시보드",
+    titleKey: "nav.dashboard",
     href: "/admin",
     icon: Shield,
   },
   {
-    title: "AI 사용량",
+    titleKey: "nav.aiUsage",
     href: "/admin/ai-usage",
     icon: Bot,
   },
