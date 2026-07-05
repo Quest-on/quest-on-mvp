@@ -114,3 +114,20 @@ runs:
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -c "NOTIFY pgrst, 'reload schema';"
       shell: bash
+
+    # Tables created via `prisma db push` and the raw CREATE TABLE block are owned by
+    # `postgres` and carry no grants for the Supabase API roles. Without these grants the
+    # running app (which queries through PostgREST as service_role/authenticated) hits
+    # "permission denied for table ..." on audit_logs, ai_events, exam_grading_sessions,
+    # bulk_grading_messages, etc. Grant the standard Supabase roles on everything now that
+    # all tables/sequences/routines exist. Run last so nothing is missed.
+    - name: Grant privileges to Supabase API roles
+      run: |
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -c "
+          GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+          GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+          GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+          GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+          NOTIFY pgrst, 'reload schema';
+        "
+      shell: bash
