@@ -33,7 +33,8 @@
     "theme": "Theme",
     "signOut": "Sign out",
     "roleInstructor": "Instructor",
-    "roleStudent": "Student"
+    "roleStudent": "Student",
+    "language": "Language"
   },
   "fileTree": {
     "loading": "Loading...",

@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeTogglerButton } from "@/components/animate-ui/components/buttons/theme-toggler";
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { useTranslations } from "next-intl";
 
 export function SidebarFooter() {
@@ -85,6 +86,10 @@ export function SidebarFooter() {
       <div className="flex items-center justify-between px-2 py-1.5 text-sm">
         <span className="text-foreground/80">{t("footer.theme")}</span>
         <ThemeTogglerButton modes={["light", "dark"]} variant="outline" size="sm" />
+      </div>
+      <div className="flex items-center justify-between px-2 py-1.5 text-sm">
+        <span className="text-foreground/80">{t("footer.language")}</span>
+        <LanguageSwitcher variant="inline" />
       </div>
       <DropdownMenuSeparator />
       <DropdownMenuItem
