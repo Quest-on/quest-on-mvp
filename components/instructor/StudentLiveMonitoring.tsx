@@ -11,10 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { MessageSquare } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { ko } from "date-fns/locale";
+import { ko, enUS } from "date-fns/locale";
 import { createSupabaseClient } from "@/lib/supabase-client";
 import { decompressData } from "@/lib/compression";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import { useTranslations, useLocale } from "next-intl";
 
 interface LiveMessage {
   id: string;
@@ -49,6 +50,9 @@ export function StudentLiveMonitoring({
   studentNumber,
   school,
 }: StudentLiveMonitoringProps) {
+  const t = useTranslations("grading");
+  const locale = useLocale() as "ko" | "en";
+  const dateFnsLocale = locale === "ko" ? ko : enUS;
   const [messages, setMessages] = useState<LiveMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -223,11 +227,11 @@ export function StudentLiveMonitoring({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageSquare className="w-5 h-5" />
-            {studentName} 학생 실시간 모니터링
+            {t("studentLiveMonitoring.dialogTitle", { studentName })}
           </DialogTitle>
           <DialogDescription>
-            {studentNumber && `학번: ${studentNumber}`}
-            {school && ` | 학교: ${school}`}
+            {studentNumber && t("studentLiveMonitoring.dialogDescNumber", { number: studentNumber })}
+            {school && t("studentLiveMonitoring.dialogDescSchool", { school })}
           </DialogDescription>
         </DialogHeader>
 
@@ -245,14 +249,14 @@ export function StudentLiveMonitoring({
             {isLoading && messages.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50 animate-pulse" />
-                <p>메시지를 불러오는 중...</p>
+                <p>{t("studentLiveMonitoring.loading")}</p>
               </div>
             ) : messages.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>아직 질문이 없습니다.</p>
+                <p>{t("studentLiveMonitoring.empty")}</p>
                 <p className="text-sm mt-2">
-                  학생이 질문하면 여기에 실시간으로 표시됩니다.
+                  {t("studentLiveMonitoring.emptyDesc")}
                 </p>
               </div>
             ) : (
@@ -275,17 +279,17 @@ export function StudentLiveMonitoring({
                                 : ""
                             }`}
                           >
-                            {message.role === "ai" ? "AI 답변" : "학생 질문"}
+                            {message.role === "ai" ? t("studentLiveMonitoring.badgeAiReply") : t("studentLiveMonitoring.badgeStudentQuestion")}
                           </Badge>
                           <Badge variant="outline" className="text-xs">
-                            문제 {message.q_idx + 1}
+                            {t("studentLiveMonitoring.questionBadge", { number: message.q_idx + 1 })}
                           </Badge>
                         </div>
                       </div>
                       <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
                         {formatDistanceToNow(new Date(message.created_at), {
                           addSuffix: true,
-                          locale: ko,
+                          locale: dateFnsLocale,
                         })}
                       </span>
                     </div>

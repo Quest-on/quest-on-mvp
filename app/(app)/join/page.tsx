@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,6 +23,7 @@ import { ErrorAlert } from "@/components/ui/error-alert";
 import { CenteredViewportShell } from "@/components/layout/CenteredViewportShell";
 
 export default function ExamCodeEntry() {
+  const t = useTranslations("auth.join");
   const [examCode, setExamCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,22 +36,18 @@ export default function ExamCodeEntry() {
     if (!errorParam) return;
 
     const errorMessages: Record<string, string> = {
-      already_submitted: "이미 제출한 시험입니다. 재시험은 불가능합니다.",
-      exam_not_found: "시험을 찾을 수 없습니다. 시험 코드를 확인해주세요.",
-      exam_not_available:
-        "현재 응시할 수 없는 시험입니다. 시험이 종료되었거나 비공개 상태입니다.",
-      entry_window_closed:
-        "시험 입장 시간이 마감되었습니다. 강사에게 문의해주세요.",
-      unauthorized: "로그인이 필요합니다. 다시 로그인해주세요.",
-      server_error:
-        "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-      network_error:
-        "네트워크 오류가 발생했습니다. 인터넷 연결을 확인하고 다시 시도해주세요.",
+      already_submitted: t("alreadySubmitted"),
+      exam_not_found: t("examNotFound"),
+      exam_not_available: t("examNotAvailable"),
+      entry_window_closed: t("entryWindowClosed"),
+      unauthorized: t("unauthorized"),
+      server_error: t("serverError"),
+      network_error: t("networkError"),
     };
 
     setError(
       errorMessages[errorParam] ||
-        "알 수 없는 오류가 발생했습니다. 다시 시도해주세요."
+        t("unknownError")
     );
   }, []);
 
@@ -64,7 +62,7 @@ export default function ExamCodeEntry() {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "코드를 확인할 수 없습니다.");
+        throw new Error(errData.message || t("codeCheckFailed"));
       }
       const data = await res.json();
       const examType = data.exam?.type;
@@ -74,7 +72,7 @@ export default function ExamCodeEntry() {
         router.push(`/exam/${code}`);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "오류가 발생했습니다.");
+      setError(err instanceof Error ? err.message : t("genericError"));
       setIsLoading(false);
     }
   };
@@ -97,9 +95,9 @@ export default function ExamCodeEntry() {
               <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
                 <FileText className="w-8 h-8 text-primary-foreground" />
               </div>
-              <CardTitle className="text-2xl">코드 입력</CardTitle>
+              <CardTitle className="text-2xl">{t("cardTitle")}</CardTitle>
               <CardDescription className="text-base">
-                강사가 제공한 코드를 입력하여 시험 또는 과제를 시작하세요
+                {t("cardDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -138,7 +136,7 @@ export default function ExamCodeEntry() {
                     </InputOTP>
                   </div>
                   <p className="text-sm text-muted-foreground text-center">
-                    영문자와 숫자만 입력 가능합니다 (예: MATH01)
+                    {t("inputHint")}
                   </p>
                 </div>
                 <Button
@@ -146,7 +144,7 @@ export default function ExamCodeEntry() {
                   className="w-full"
                   disabled={isLoading || examCode.length !== 6}
                 >
-                  {isLoading ? "입력 중..." : "입장"}
+                  {isLoading ? t("loadingBtn") : t("enterBtn")}
                 </Button>
               </form>
             </CardContent>
@@ -155,10 +153,10 @@ export default function ExamCodeEntry() {
 
         <div className="text-center mt-8">
           <p className="text-muted-foreground mb-4">
-            도움이 필요하신가요? 강사에게 문의하세요
+            {t("helpText")}
           </p>
           <Link href="/">
-            <Button variant="outline">홈으로 돌아가기</Button>
+            <Button variant="outline">{t("homeBtn")}</Button>
           </Link>
         </div>
       </div>

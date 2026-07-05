@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import { createSupabaseClient } from "@/lib/supabase-client";
@@ -10,6 +11,7 @@ import { useState } from "react";
 const CONTACT_EMAIL = "questonkr@gmail.com";
 
 export default function InstructorPendingPage() {
+  const t = useTranslations("auth.instructorPending");
   const { profile } = useAppUser();
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -26,23 +28,9 @@ export default function InstructorPendingPage() {
     router.push("/sign-in");
   };
 
-  const emailSubject = encodeURIComponent("[Quest-On 강사 승인 요청]");
+  const emailSubject = encodeURIComponent(t("emailSubject"));
   const emailBody = encodeURIComponent(
-`안녕하십니까,
-
-Quest-On 서비스에 관심 가져주셔서 감사합니다.
-
-강사 계정 승인을 요청드립니다.
-
-아래 정보를 함께 보내주시면 빠르게 처리해드리겠습니다:
-
-- 성함:
-- 소속 기관 (대학교/회사명):
-- 담당 과목:
-- 사용 목적:
-- 가입 이메일: ${profile?.email || ""}
-
-감사합니다.`
+    t("emailBody", { email: profile?.email || "" })
   );
 
   const mailtoLink = `mailto:${CONTACT_EMAIL}?subject=${emailSubject}&body=${emailBody}`;
@@ -57,11 +45,9 @@ Quest-On 서비스에 관심 가져주셔서 감사합니다.
 
         {/* 제목 */}
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold">승인 대기 중입니다</h1>
+          <h1 className="text-2xl font-bold">{t("heading")}</h1>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            강사 계정은 관리자 승인 후 사용 가능합니다.
-            <br />
-            아래 이메일로 문의해 주시면 빠르게 처리해드리겠습니다.
+            {t("desc")}
           </p>
         </div>
 
@@ -69,7 +55,7 @@ Quest-On 서비스에 관심 가져주셔서 감사합니다.
         <div className="bg-muted rounded-xl p-5 space-y-3">
           <div className="flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground">
             <Mail className="w-4 h-4" />
-            <span>문의 이메일</span>
+            <span>{t("contactEmailLabel")}</span>
           </div>
           <div className="flex items-center justify-center gap-2">
             <span className="text-primary font-semibold text-lg">
@@ -78,7 +64,7 @@ Quest-On 서비스에 관심 가져주셔서 감사합니다.
             <button
               onClick={handleCopyEmail}
               className="p-1.5 rounded-md hover:bg-background transition-colors text-muted-foreground hover:text-foreground"
-              title="이메일 복사"
+              title={t("copyEmailTitle")}
             >
               {copied ? (
                 <Check className="w-4 h-4 text-green-500" />
@@ -88,7 +74,7 @@ Quest-On 서비스에 관심 가져주셔서 감사합니다.
             </button>
           </div>
           {copied && (
-            <p className="text-xs text-green-600">이메일이 복사되었습니다!</p>
+            <p className="text-xs text-green-600">{t("copiedMsg")}</p>
           )}
         </div>
 
@@ -96,16 +82,16 @@ Quest-On 서비스에 관심 가져주셔서 감사합니다.
         <a href={mailtoLink} className="block">
           <Button className="w-full h-12 gap-2">
             <Mail className="w-4 h-4" />
-            문의하기 (이메일 작성)
+            {t("contactBtn")}
           </Button>
         </a>
 
         {/* 안내 */}
         <div className="text-sm text-muted-foreground border rounded-lg p-4 text-left space-y-1.5">
-          <p className="font-medium text-foreground mb-2">📋 이메일에 포함해주세요</p>
-          <p>• 소속 기관 (대학교/회사명)</p>
-          <p>• 담당 과목</p>
-          <p>• 사용 목적</p>
+          <p className="font-medium text-foreground mb-2">{t("emailIncludeTitle")}</p>
+          <p>{t("emailIncludeOrg")}</p>
+          <p>{t("emailIncludeSubject")}</p>
+          <p>{t("emailIncludePurpose")}</p>
         </div>
 
         {/* 승인 확인 버튼 */}
@@ -114,7 +100,7 @@ Quest-On 서비스에 관심 가져주셔서 감사합니다.
           onClick={() => window.location.reload()}
           className="w-full"
         >
-          승인 여부 확인하기
+          {t("checkApprovalBtn")}
         </Button>
 
         {/* 로그아웃 */}
@@ -124,7 +110,7 @@ Quest-On 서비스에 관심 가져주셔서 감사합니다.
           className="w-full text-muted-foreground gap-2"
         >
           <LogOut className="w-4 h-4" />
-          로그아웃
+          {t("signOutBtn")}
         </Button>
       </div>
     </div>

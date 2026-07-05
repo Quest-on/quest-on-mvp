@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import {
   Sheet,
   SheetContent,
@@ -55,6 +56,7 @@ export function FinalAnswerSheet({
   savedValue,
   disabled,
 }: FinalAnswerSheetProps) {
+  const t = useTranslations("assignment");
   const dirty = value !== savedValue;
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -85,9 +87,9 @@ export function FinalAnswerSheet({
         className="sm:max-w-lg w-full flex flex-col gap-0 p-0"
       >
         <SheetHeader className="border-b">
-          <SheetTitle>최종답안 작성</SheetTitle>
+          <SheetTitle>{t("finalAnswerSheet.title")}</SheetTitle>
           <SheetDescription>
-            리서치 내용을 자신의 언어로 정리하세요. 채팅 기록과 함께 채점에 사용됩니다.
+            {t("finalAnswerSheet.description")}
           </SheetDescription>
         </SheetHeader>
 
@@ -97,10 +99,10 @@ export function FinalAnswerSheet({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
-            placeholder="여기에 최종답안을 작성하세요..."
+            placeholder={t("finalAnswerSheet.placeholder")}
             className="flex-1 min-h-[300px] resize-none text-sm leading-relaxed"
             maxLength={MAX_LENGTH + 1000 /* 약간 여유 — 서버에서 최종 검증 */}
-            aria-label="최종답안"
+            aria-label={t("finalAnswerSheet.ariaLabel")}
           />
 
           <div className="flex items-center justify-between text-xs">
@@ -112,29 +114,29 @@ export function FinalAnswerSheet({
             >
               {overLimit && <AlertCircle className="w-3.5 h-3.5" />}
               <span>
-                {value.length.toLocaleString()} / {MAX_LENGTH.toLocaleString()}자
+                {t("finalAnswerSheet.charCount", { current: value.length.toLocaleString(), max: MAX_LENGTH.toLocaleString() })}
               </span>
             </div>
 
             <div className="flex items-center gap-1.5 text-muted-foreground">
               {disabled ? (
-                <span>제출됨 — 수정 불가</span>
+                <span>{t("finalAnswerSheet.statusSubmitted")}</span>
               ) : isSaving ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>저장 중...</span>
+                  <span>{t("finalAnswerSheet.statusSaving")}</span>
                 </>
               ) : error ? (
                 <span className="text-destructive">{error}</span>
               ) : lastSavedAt ? (
                 <>
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>마지막 저장: {formatTime(lastSavedAt)}</span>
+                  <span>{t("finalAnswerSheet.statusLastSaved", { time: formatTime(lastSavedAt) })}</span>
                 </>
               ) : dirty ? (
-                <span>저장되지 않음</span>
+                <span>{t("finalAnswerSheet.statusUnsaved")}</span>
               ) : (
-                <span>변경사항 없음</span>
+                <span>{t("finalAnswerSheet.statusNoChanges")}</span>
               )}
             </div>
           </div>
@@ -146,7 +148,7 @@ export function FinalAnswerSheet({
             onClick={() => handleOpenChange(false)}
             disabled={isSaving}
           >
-            닫기
+            {t("finalAnswerSheet.closeButton")}
           </Button>
         </SheetFooter>
       </SheetContent>

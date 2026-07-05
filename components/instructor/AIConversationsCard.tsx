@@ -10,6 +10,7 @@ import {
 import { MessageSquare } from "lucide-react";
 import AIMessageRenderer from "@/components/chat/AIMessageRenderer";
 import { CopyMessageButton } from "@/components/chat/CopyMessageButton";
+import { useTranslations } from "next-intl";
 
 interface Conversation {
   id: string;
@@ -25,14 +26,15 @@ interface AIConversationsCardProps {
 export function AIConversationsCard({
   messages,
 }: AIConversationsCardProps) {
+  const t = useTranslations("grading");
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5 text-blue-600" />
-          AI와의 대화 기록
+          {t("aiConversations.title")}
         </CardTitle>
-        <CardDescription>학생이 AI와 나눈 대화 내용입니다</CardDescription>
+        <CardDescription>{t("aiConversations.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         {messages.length > 0 ? (
@@ -70,7 +72,7 @@ export function AIConversationsCard({
           </div>
         ) : (
           <div className="text-center py-8 text-muted-foreground">
-            <p>AI와의 대화 기록이 없습니다.</p>
+            <p>{t("aiConversations.empty")}</p>
           </div>
         )}
       </CardContent>

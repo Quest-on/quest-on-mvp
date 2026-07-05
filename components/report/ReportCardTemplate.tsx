@@ -1,5 +1,10 @@
+"use client";
+
 import React, { forwardRef } from "react";
+import { useTranslations, useLocale } from "next-intl";
 import type { QuestionSummaryData, StageGrading, SummaryData } from "@/lib/types/grading";
+import { formatDateTime, formatDate } from "@/lib/i18n/format";
+import type { Locale } from "@/lib/i18n/config";
 
 interface Question {
   id: string;
@@ -45,14 +50,6 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-function getGrade(score: number): string {
-  if (score >= 90) return "A (최우수)";
-  if (score >= 80) return "B (우수)";
-  if (score >= 70) return "C (보통)";
-  if (score >= 60) return "D (노력 필요)";
-  return "F (재평가 필요)";
-}
-
 export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
   (
     {
@@ -70,7 +67,18 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
     },
     ref
   ) => {
-    const formattedDate = new Date(submittedAt).toLocaleString("ko-KR", {
+    const t = useTranslations("report.reportCard");
+    const locale = useLocale() as Locale;
+
+    function getGrade(score: number): string {
+      if (score >= 90) return t("gradeA");
+      if (score >= 80) return t("gradeB");
+      if (score >= 70) return t("gradeC");
+      if (score >= 60) return t("gradeD");
+      return t("gradeF");
+    }
+
+    const formattedDate = formatDateTime(submittedAt, locale, {
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -109,7 +117,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/qlogo_icon.png"
-            alt="Logo"
+            alt={t("logoAlt")}
             style={{
               width: "50px",
               height: "50px",
@@ -127,7 +135,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                 margin: "0 0 4px 0",
               }}
             >
-              평가 결과 리포트
+              {t("heading")}
             </h1>
             <p style={{ fontSize: "14px", color: "#64748b", margin: 0 }}>
               {examTitle}
@@ -165,7 +173,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                 margin: "0 0 16px 0",
               }}
             >
-              학생 정보
+              {t("studentInfo.title")}
             </h3>
             <div style={{ display: "flex", marginBottom: "8px" }}>
               <span
@@ -176,7 +184,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                   color: "#64748b",
                 }}
               >
-                이름
+                {t("studentInfo.name")}
               </span>
               <span
                 style={{
@@ -198,7 +206,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                     color: "#64748b",
                   }}
                 >
-                  학번
+                  {t("studentInfo.studentNumber")}
                 </span>
                 <span
                   style={{
@@ -221,7 +229,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                     color: "#64748b",
                   }}
                 >
-                  학교
+                  {t("studentInfo.school")}
                 </span>
                 <span
                   style={{
@@ -243,7 +251,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                   color: "#64748b",
                 }}
               >
-                제출일
+                {t("studentInfo.submittedAt")}
               </span>
               <span
                 style={{
@@ -278,7 +286,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                 margin: "0 0 16px 0",
               }}
             >
-              시험 정보
+              {t("examInfo.title")}
             </h3>
             <div style={{ display: "flex", marginBottom: "8px" }}>
               <span
@@ -289,7 +297,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                   color: "#64748b",
                 }}
               >
-                시험 코드
+                {t("examInfo.examCode")}
               </span>
               <span
                 style={{
@@ -310,7 +318,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                   color: "#64748b",
                 }}
               >
-                설명
+                {t("examInfo.description")}
               </span>
               <span
                 style={{
@@ -322,7 +330,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                 {examDescription
                   ? stripHtml(examDescription).substring(0, 30) +
                     (examDescription.length > 30 ? "..." : "")
-                  : "설명 없음"}
+                  : t("examInfo.noDescription")}
               </span>
             </div>
           </div>
@@ -352,7 +360,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                 margin: "0 0 8px 0",
               }}
             >
-              종합 점수
+              {t("overallScore.title")}
             </h3>
             <div
               style={{
@@ -363,7 +371,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                 margin: "0 0 8px 0",
               }}
             >
-              {overallScore}점
+              {t("overallScore.scorePoints", { score: overallScore })}
             </div>
             <div
               style={{
@@ -395,7 +403,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                 margin: "0 0 16px 0",
               }}
             >
-              CASE 종합 평가
+              {t("aiSummary.title")}
             </h3>
             <div
               style={{
@@ -430,7 +438,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                       margin: "0 0 8px 0",
                     }}
                   >
-                    주요 강점
+                    {t("aiSummary.strengths")}
                   </h4>
                   <ul style={{ listStyle: "disc inside", padding: 0, margin: 0 }}>
                     {aiSummary.strengths.map((strength, idx) => (
@@ -460,7 +468,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                       margin: "0 0 8px 0",
                     }}
                   >
-                    개선점
+                    {t("aiSummary.weaknesses")}
                   </h4>
                   <ul style={{ listStyle: "disc inside", padding: 0, margin: 0 }}>
                     {aiSummary.weaknesses.map((weakness, idx) => (
@@ -497,7 +505,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                       margin: "0 0 6px 0",
                     }}
                   >
-                    AI 의존도 종합 평가
+                    {t("aiSummary.aiDependency")}
                   </h4>
                   <p
                     style={{
@@ -557,7 +565,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
               margin: "0 0 16px 0",
             }}
           >
-            문제별 상세 평가
+            {t("questionsDetail.title")}
           </h3>
           <div>
             {questions.map((question, idx) => {
@@ -592,7 +600,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                         color: "#334155",
                       }}
                     >
-                      문제 {idx + 1}
+                      {t("questionsDetail.questionLabel", { index: idx + 1 })}
                     </span>
                     <span
                       style={{
@@ -601,7 +609,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                         color: "#2563eb",
                       }}
                     >
-                      {grade.score}점
+                      {t("questionsDetail.scorePoints", { score: grade.score })}
                     </span>
                   </div>
                   <div style={{ padding: "16px" }}>
@@ -634,7 +642,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                             margin: "0 0 4px 0",
                           }}
                         >
-                          평가 코멘트
+                          {t("questionsDetail.evaluationComment")}
                         </h4>
                         <p
                           style={{
@@ -668,7 +676,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                             margin: "0 0 8px 0",
                           }}
                         >
-                          AI 평가
+                          {t("questionsDetail.aiEvaluation.title")}
                         </h4>
                         {grade.stage_grading?.chat && (
                           <p
@@ -679,7 +687,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                               margin: "0 0 8px 0",
                             }}
                           >
-                            <strong>AI 대화 평가:</strong>{" "}
+                            <strong>{t("questionsDetail.aiEvaluation.chatLabel")}</strong>{" "}
                             {grade.stage_grading.chat.score}점
                             {grade.stage_grading.chat.comment
                               ? ` - ${stripHtml(grade.stage_grading.chat.comment)}`
@@ -695,7 +703,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                               margin: "0 0 8px 0",
                             }}
                           >
-                            <strong>최종 답안 평가:</strong>{" "}
+                            <strong>{t("questionsDetail.aiEvaluation.answerLabel")}</strong>{" "}
                             {grade.stage_grading.answer.score}점
                             {grade.stage_grading.answer.comment
                               ? ` - ${stripHtml(grade.stage_grading.answer.comment)}`
@@ -711,7 +719,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                               margin: "0 0 8px 0",
                             }}
                           >
-                            <strong>AI 의존도:</strong>{" "}
+                            <strong>{t("questionsDetail.aiEvaluation.aiDependency")}</strong>{" "}
                             {stripHtml(
                               grade.stage_grading.answer.ai_dependency.summary
                             )}
@@ -726,7 +734,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                               margin: 0,
                             }}
                           >
-                            <strong>문항 요약:</strong>{" "}
+                            <strong>{t("questionsDetail.aiEvaluation.aiSummary")}</strong>{" "}
                             {stripHtml(grade.ai_summary.summary)}
                           </p>
                         )}
@@ -751,8 +759,7 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
             marginTop: "48px",
           }}
         >
-          Quest-On 평가 리포트 | 생성일:{" "}
-          {new Date().toLocaleDateString("ko-KR")}
+          {t("footer", { date: formatDate(new Date(), locale) })}
         </div>
       </div>
     );

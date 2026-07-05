@@ -18,23 +18,24 @@ import {
   Loader2,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import type {
   GeneratedQuestion,
   ChatMessage,
 } from "@/hooks/useQuestionGeneration";
 import { QuestionAdjustSheet } from "./QuestionAdjustSheet";
 
-const BASE_PRESETS = [
-  { label: "더 어렵게", instruction: "난이도를 높여주세요. 더 복잡한 조건과 깊은 분석을 요구하도록 수정해주세요." },
-  { label: "더 쉽게", instruction: "난이도를 낮춰주세요. 조건을 단순화하고 질문을 더 명확하게 만들어주세요." },
-  { label: "더 길게", instruction: "시나리오를 더 상세하게 만들고 하위 질문을 추가해주세요." },
-  { label: "보기 추가", instruction: "각 하위 질문에 4개의 선택지(보기)를 추가하여 객관식으로 변환해주세요." },
+const BASE_PRESET_INSTRUCTIONS = [
+  "난이도를 높여주세요. 더 복잡한 조건과 깊은 분석을 요구하도록 수정해주세요.",
+  "난이도를 낮춰주세요. 조건을 단순화하고 질문을 더 명확하게 만들어주세요.",
+  "시나리오를 더 상세하게 만들고 하위 질문을 추가해주세요.",
+  "각 하위 질문에 4개의 선택지(보기)를 추가하여 객관식으로 변환해주세요.",
 ];
 
-const ASSIGNMENT_PRESETS = [
-  { label: "더 어렵게", instruction: "리서치 범위와 비교 기준을 더 정교하게 만들어주세요." },
-  { label: "더 쉽게", instruction: "조사 대상과 요구 기준을 더 단순하고 명확하게 만들어주세요." },
-  { label: "더 구체적으로", instruction: "학생이 조사해야 할 대상, 기간, 비교 기준을 더 구체적으로 제시해주세요." },
+const ASSIGNMENT_PRESET_INSTRUCTIONS = [
+  "리서치 범위와 비교 기준을 더 정교하게 만들어주세요.",
+  "조사 대상과 요구 기준을 더 단순하고 명확하게 만들어주세요.",
+  "학생이 조사해야 할 대상, 기간, 비교 기준을 더 구체적으로 제시해주세요.",
 ];
 
 interface AdjustResult {
@@ -77,12 +78,26 @@ export function GeneratedQuestionCard({
   const [isEnglish, setIsEnglish] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
+  const t = useTranslations("authoring");
   const isAssignmentMode = generationMode === "research-assignment";
   const PREVIEW_HEIGHT = 300;
 
+  const BASE_PRESETS = [
+    { label: t("generatedQuestionCard.presetHarder"), instruction: BASE_PRESET_INSTRUCTIONS[0] },
+    { label: t("generatedQuestionCard.presetEasier"), instruction: BASE_PRESET_INSTRUCTIONS[1] },
+    { label: t("generatedQuestionCard.presetLonger"), instruction: BASE_PRESET_INSTRUCTIONS[2] },
+    { label: t("generatedQuestionCard.presetAddOptions"), instruction: BASE_PRESET_INSTRUCTIONS[3] },
+  ];
+
+  const ASSIGNMENT_PRESETS = [
+    { label: t("generatedQuestionCard.presetHarder"), instruction: ASSIGNMENT_PRESET_INSTRUCTIONS[0] },
+    { label: t("generatedQuestionCard.presetEasier"), instruction: ASSIGNMENT_PRESET_INSTRUCTIONS[1] },
+    { label: t("generatedQuestionCard.presetMoreSpecific"), instruction: ASSIGNMENT_PRESET_INSTRUCTIONS[2] },
+  ];
+
   const langPreset = isEnglish
-    ? { label: "한국어로", instruction: isAssignmentMode ? "이 리서치 과제를 한국어로 번역해주세요." : "이 문제를 한국어로 번역해주세요. 시나리오와 질문 모두 한국어로 작성해주세요." }
-    : { label: "영어로", instruction: isAssignmentMode ? "이 리서치 과제를 영어로 번역해주세요." : "이 문제를 영어로 번역해주세요. 시나리오와 질문 모두 영어로 작성해주세요." };
+    ? { label: t("generatedQuestionCard.presetToKorean"), instruction: isAssignmentMode ? "이 리서치 과제를 한국어로 번역해주세요." : "이 문제를 한국어로 번역해주세요. 시나리오와 질문 모두 한국어로 작성해주세요." }
+    : { label: t("generatedQuestionCard.presetToEnglish"), instruction: isAssignmentMode ? "이 리서치 과제를 영어로 번역해주세요." : "이 문제를 영어로 번역해주세요. 시나리오와 질문 모두 영어로 작성해주세요." };
 
   const presets = isAssignmentMode
     ? [...ASSIGNMENT_PRESETS, langPreset]
@@ -103,7 +118,7 @@ export function GeneratedQuestionCard({
           <div className="absolute inset-0 bg-card/80 backdrop-blur-[2px] rounded-lg z-10 flex items-center justify-center">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <RefreshCw className="w-4 h-4 animate-spin" />
-              재생성 중...
+              {t("generatedQuestionCard.overlayRegenerating")}
             </div>
           </div>
         )}
@@ -111,8 +126,8 @@ export function GeneratedQuestionCard({
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h4 className="font-medium text-sm">AI 생성 미리보기 {index + 1}</h4>
-            <span className="text-xs text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">미리보기</span>
+            <h4 className="font-medium text-sm">{t("generatedQuestionCard.headerPreview", { index: index + 1 })}</h4>
+            <span className="text-xs text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">{t("generatedQuestionCard.labelPreview")}</span>
           </div>
         </div>
 
@@ -146,12 +161,12 @@ export function GeneratedQuestionCard({
             {isExpanded ? (
               <>
                 <ChevronUp className="w-3 h-3 mr-1" />
-                접기
+                {t("generatedQuestionCard.buttonCollapse")}
               </>
             ) : (
               <>
                 <ChevronDown className="w-3 h-3 mr-1" />
-                더 보기
+                {t("generatedQuestionCard.buttonExpand")}
               </>
             )}
           </Button>
@@ -174,12 +189,12 @@ export function GeneratedQuestionCard({
                   const result = await onAdjust(preset.instruction);
                   if (result) {
                     onApplyAdjustment(result.questionText);
-                    if (preset.label === "영어로") setIsEnglish(true);
-                    if (preset.label === "한국어로") setIsEnglish(false);
-                    toast.success(`"${preset.label}" 수정이 적용되었습니다.`);
+                    if (preset.label === t("generatedQuestionCard.presetToEnglish")) setIsEnglish(true);
+                    if (preset.label === t("generatedQuestionCard.presetToKorean")) setIsEnglish(false);
+                    toast.success(t("generatedQuestionCard.toastPresetApplied", { label: preset.label }));
                   }
                 } catch {
-                  toast.error("수정에 실패했습니다.");
+                  toast.error(t("generatedQuestionCard.toastAdjustFailed"));
                 } finally {
                   setQuickAdjustingPreset(null);
                 }
@@ -210,7 +225,7 @@ export function GeneratedQuestionCard({
               className="relative overflow-hidden gap-1.5 rounded-full"
             >
               <MessageSquare className="w-3.5 h-3.5" />
-              AI로 문제 다듬기
+              {t("generatedQuestionCard.buttonAIRefine")}
             </Button>
           </Shine>
           <Button
@@ -224,7 +239,7 @@ export function GeneratedQuestionCard({
             <RefreshCw
               className={`w-3.5 h-3.5 ${isRegenerating ? "animate-spin" : ""}`}
             />
-            재생성
+            {t("generatedQuestionCard.buttonRegenerate")}
           </Button>
           <div className="ml-auto">
             <Tooltip>
@@ -239,7 +254,7 @@ export function GeneratedQuestionCard({
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>삭제</TooltipContent>
+              <TooltipContent>{t("generatedQuestionCard.tooltipDelete")}</TooltipContent>
             </Tooltip>
           </div>
         </div>

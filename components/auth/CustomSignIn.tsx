@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { createSupabaseClient } from "@/lib/supabase-client";
+import { useTranslations } from "next-intl";
 
 export function CustomSignIn() {
+  const t = useTranslations("auth.signIn");
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,7 +33,7 @@ export function CustomSignIn() {
     });
 
     if (signInError) {
-      setError("이메일 또는 비밀번호가 올바르지 않습니다.");
+      setError(t("invalidCredentials"));
       setLoading(false);
       return;
     }
@@ -63,7 +65,7 @@ export function CustomSignIn() {
         >
           <Image
             src="/qstn_logo_svg.svg"
-            alt="Quest-On Logo"
+            alt={t("logoAlt")}
             width={30}
             height={30}
             className="w-8 h-8"
@@ -77,10 +79,10 @@ export function CustomSignIn() {
         <div className="w-full max-w-md space-y-8">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Quest-On에 오신 것을 환영합니다
+              {t("welcome")}
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Quest-On 계정에 로그인하세요
+              {t("subtitle")}
             </p>
           </div>
 
@@ -104,7 +106,7 @@ export function CustomSignIn() {
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                   </svg>
                 )}
-                <span className="font-medium">Google로 계속하기</span>
+                <span className="font-medium">{t("googleBtn")}</span>
               </Button>
 
               <Button
@@ -121,9 +123,9 @@ export function CustomSignIn() {
                   <path d="M11.5 11.5H23V23H11.5V11.5z" fill="#FFB900" />
                 </svg>
                 <span className="flex items-center gap-2 font-medium">
-                  Microsoft로 계속하기
+                  {t("microsoftBtn")}
                   <Badge variant="secondary" className="text-[10px]">
-                    준비중
+                    {t("comingSoon")}
                   </Badge>
                 </span>
               </Button>
@@ -136,7 +138,7 @@ export function CustomSignIn() {
               </div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-background px-2 text-muted-foreground">
-                  또는
+                  {t("divider")}
                 </span>
               </div>
             </div>
@@ -144,11 +146,11 @@ export function CustomSignIn() {
             {/* 이메일/비밀번호 폼 */}
             <form onSubmit={handleEmailSignIn} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">이메일 주소</Label>
+                <Label htmlFor="email">{t("emailLabel")}</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="이메일 주소를 입력하세요"
+                  placeholder={t("emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -156,11 +158,11 @@ export function CustomSignIn() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">비밀번호</Label>
+                <Label htmlFor="password">{t("passwordLabel")}</Label>
                 <Input
                   id="password"
                   type="password"
-                  placeholder="비밀번호를 입력하세요"
+                  placeholder={t("passwordPlaceholder")}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -180,19 +182,19 @@ export function CustomSignIn() {
                 {loading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
-                  <span className="font-bold">로그인</span>
+                  <span className="font-bold">{t("submitBtn")}</span>
                 )}
               </Button>
             </form>
           </div>
 
           <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-            계정이 없으신가요?{" "}
+            {t("noAccount")}{" "}
             <Link
               href="/sign-up"
               className="font-medium text-black dark:text-white hover:underline"
             >
-              회원가입
+              {t("signUpLink")}
             </Link>
           </div>
         </div>
@@ -206,7 +208,7 @@ export function CustomSignIn() {
         <div className="relative w-full h-full flex items-center justify-center">
           <Image
             src="/wqstn.png"
-            alt="Quest-On"
+            alt={t("logoAltRight")}
             width={400}
             height={400}
             className="w-auto h-auto max-w-[51%] max-h-[51%] object-contain"

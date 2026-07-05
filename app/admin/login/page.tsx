@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   Card,
   CardContent,
@@ -17,6 +18,7 @@ import { ErrorAlert } from "@/components/ui/error-alert";
 import { CenteredViewportShell } from "@/components/layout/CenteredViewportShell";
 
 export default function AdminLoginPage() {
+  const t = useTranslations("admin");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -43,10 +45,10 @@ export default function AdminLoginPage() {
       if (response.ok) {
         router.push("/admin");
       } else {
-        setError(data.message || data.error || "로그인에 실패했습니다.");
+        setError(data.message || data.error || t("login.error.loginFail"));
       }
     } catch {
-      setError("서버 오류가 발생했습니다.");
+      setError(t("login.error.serverError"));
     } finally {
       setIsLoading(false);
     }
@@ -62,34 +64,34 @@ export default function AdminLoginPage() {
           <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
             <Shield className="w-8 h-8 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl">관리자 로그인</CardTitle>
+          <CardTitle className="text-2xl">{t("login.title")}</CardTitle>
           <CardDescription className="text-base">
-            Quest-On 관리자 페이지에 접근하려면 로그인해주세요
+            {t("login.description")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">사용자명</Label>
+              <Label htmlFor="username">{t("login.username")}</Label>
               <Input
                 id="username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="관리자 사용자명을 입력하세요"
+                placeholder={t("login.usernamePlaceholder")}
                 required
                 disabled={isLoading}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">비밀번호</Label>
+              <Label htmlFor="password">{t("login.password")}</Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="비밀번호를 입력하세요"
+                  placeholder={t("login.passwordPlaceholder")}
                   required
                   disabled={isLoading}
                 />
@@ -115,7 +117,7 @@ export default function AdminLoginPage() {
               className="w-full h-12 text-lg"
               disabled={isLoading}
             >
-              {isLoading ? "로그인 중..." : "로그인"}
+              {isLoading ? t("login.submitting") : t("login.submit")}
             </Button>
           </form>
         </CardContent>

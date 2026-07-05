@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Geist, Geist_Mono, Roboto_Mono } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale } from "next-intl/server";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -52,19 +54,20 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
   return (
     // suppressHydrationWarning on <html> is required by next-themes (class/style injection)
-    <html lang="ko" suppressHydrationWarning={true}>
+    <html lang={locale} suppressHydrationWarning={true}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${robotoMono.variable} antialiased`}
         suppressHydrationWarning={true}
       >
-        {children}
+        <NextIntlClientProvider>{children}</NextIntlClientProvider>
         <SpeedInsights />
       </body>
     </html>

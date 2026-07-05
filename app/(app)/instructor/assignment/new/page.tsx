@@ -27,11 +27,13 @@ import {
   ScrollProgress,
 } from "@/components/animate-ui/primitives/animate/scroll-progress";
 import { isQuestionContentEmpty } from "@/lib/authoring-validation";
+import { useTranslations } from "next-intl";
 
 export default function CreateAssignment() {
   const router = useRouter();
   const { user, isLoaded, isSignedIn } = useAppUser();
   const queryClient = useQueryClient();
+  const t = useTranslations("instructor");
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [createdExamCode, setCreatedExamCode] = useState("");
@@ -85,7 +87,7 @@ export default function CreateAssignment() {
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(extractErrorMessage(errorData, "과제 생성에 실패했습니다", response.status));
+        throw new Error(extractErrorMessage(errorData, t("newAssignment.toastCreateFail"), response.status));
       }
       return await response.json();
     },
@@ -104,14 +106,14 @@ export default function CreateAssignment() {
     isSubmittingRef.current = true;
 
     const errors: { title?: string; deadline?: string; questions?: string } = {};
-    if (!examData.title.trim()) errors.title = "과제 제목을 입력해주세요";
-    if (!examData.deadline) errors.deadline = "제출 기한을 선택해주세요";
+    if (!examData.title.trim()) errors.title = t("newAssignment.fieldErrorTitle");
+    if (!examData.deadline) errors.deadline = t("newAssignment.fieldErrorDeadline");
     if (questions.length === 0) {
-      errors.questions = "최소 1개 이상의 문제를 추가해주세요";
+      errors.questions = t("newAssignment.fieldErrorQuestionsMin");
     } else {
       const emptyIndices = questions.map((q, i) => (isQuestionContentEmpty(q.text) ? i + 1 : -1)).filter((i) => i !== -1);
       if (emptyIndices.length > 0) {
-        errors.questions = emptyIndices.length === questions.length ? "문제 내용을 입력해주세요" : `${emptyIndices.join(", ")}번 문제가 비어있습니다`;
+        errors.questions = emptyIndices.length === questions.length ? t("newAssignment.fieldErrorQuestionsContent") : t("newAssignment.fieldErrorQuestionsEmpty", { indices: emptyIndices.join(", ") });
       }
     }
 
@@ -155,7 +157,7 @@ export default function CreateAssignment() {
       setCreatedExamCode(examData.code);
       setIsDialogOpen(true);
     } catch {
-      toast.error("과제 생성 중 오류가 발생했습니다.");
+      toast.error(t("newAssignment.toastCreateError"));
     } finally {
       setIsLoading(false);
       isSubmittingRef.current = false;
@@ -177,13 +179,13 @@ export default function CreateAssignment() {
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2 w-full justify-between">
-              <h1 className="text-3xl font-bold">새로운 과제 만들기</h1>
+              <h1 className="text-3xl font-bold">{t("newAssignment.pageTitle")}</h1>
               <Button type="button" variant="outline" onClick={() => router.push("/instructor")} className="min-h-[44px] gap-2 border-border hover:bg-muted hover:text-foreground">
                 <ArrowLeft className="w-4 h-4" />
-                대시보드
+                {t("newAssignment.backToDashboard")}
               </Button>
             </div>
-            <p className="text-muted-foreground">AI 리서치 채팅 기반 과제를 구성하세요</p>
+            <p className="text-muted-foreground">{t("newAssignment.pageDesc")}</p>
           </div>
 
           <form onSubmit={handleSubmit} onKeyDown={(e) => { if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "TEXTAREA") e.preventDefault(); }} className="space-y-6">
@@ -241,9 +243,9 @@ export default function CreateAssignment() {
 
             <div className="space-y-2">
               <div className="flex gap-4">
-                <Button type="button" variant="outline" onClick={() => router.push("/instructor")}>취소</Button>
+                <Button type="button" variant="outline" onClick={() => router.push("/instructor")}>{t("newAssignment.cancel")}</Button>
                 <Button type="submit" disabled={isLoading}>
-                  {isLoading ? "생성 중..." : "과제 출제하기"}
+                  {isLoading ? t("newAssignment.submitting") : t("newAssignment.submit")}
                 </Button>
               </div>
             </div>
@@ -252,24 +254,28 @@ export default function CreateAssignment() {
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>과제 생성 완료</DialogTitle>
-                <DialogDescription>과제가 성공적으로 생성되었습니다.</DialogDescription>
+                <DialogTitle>{t("newAssignment.dialogTitle")}</DialogTitle>
+                <DialogDescription>{t("newAssignment.dialogDesc")}</DialogDescription>
               </DialogHeader>
               <div className="py-4">
                 <div className="space-y-3">
                   <div>
-                    <Label className="text-sm font-medium">과제 코드</Label>
+                    <Label className="text-sm font-medium">{t("newAssignment.dialogAssignmentCode")}</Label>
                     <div className="flex items-center gap-2 mt-1">
                       <code className="px-4 py-2 bg-muted rounded-md exam-code text-lg font-semibold">{createdExamCode}</code>
-                      <Button type="button" variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(createdExamCode); toast.success("과제 코드가 복사되었습니다.", { id: "copy-code" }); }}>
-                        복사
+                      <Button type="button" variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(createdExamCode); toast.success(t("newAssignment.dialogCopied"), { id: "copy-code" }); }}>
+                        {t("newAssignment.dialogCopy")}
                       </Button>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-2">이 코드를 학생들에게 공유하세요.</p>
+                    <p className="text-sm text-muted-foreground mt-2">{t("newAssignment.dialogShare")}</p>
                   </div>
                   <div className="text-sm text-muted-foreground space-y-1 border-t pt-3">
-                    <p>문제 {questions.length}개</p>
-                    <p>제출 기한: {examData.deadline ? `${examData.deadline} 23:59까지` : "-"}</p>
+                    <p>{t("newAssignment.dialogSummaryQuestions", { count: questions.length })}</p>
+                    <p>
+                      {examData.deadline
+                        ? t("newAssignment.dialogSummaryDeadline", { date: examData.deadline })
+                        : t("newAssignment.dialogSummaryNoDeadline")}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -278,7 +284,7 @@ export default function CreateAssignment() {
                   queryClient.refetchQueries({ queryKey: ["drive-folder-contents"], type: "all" });
                   setIsDialogOpen(false);
                   router.push("/instructor");
-                }}>확인</Button>
+                }}>{t("newAssignment.dialogConfirm")}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

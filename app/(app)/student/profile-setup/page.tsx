@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import { useRouter } from "next/navigation";
 import {
@@ -27,6 +28,7 @@ interface University {
 }
 
 export default function ProfileSetupPage() {
+  const t = useTranslations("onboarding.profileSetup");
   const { user, profile, isLoaded } = useAppUser();
   const router = useRouter();
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
@@ -157,15 +159,15 @@ export default function ProfileSetupPage() {
 
     // Validation
     if (!name.trim()) {
-      setError("이름을 입력해주세요.");
+      setError(t("nameRequired"));
       return;
     }
     if (!studentNumber.trim()) {
-      setError("학번을 입력해주세요.");
+      setError(t("studentNumberRequired"));
       return;
     }
     if (!school.trim()) {
-      setError("학교를 선택해주세요.");
+      setError(t("schoolRequired"));
       return;
     }
 
@@ -191,10 +193,10 @@ export default function ProfileSetupPage() {
         sessionStorage.setItem("profile-setup-complete", "true");
         window.location.href = redirectUrl || "/student";
       } else {
-        setError(data.error || "프로필 저장에 실패했습니다.");
+        setError(data.error || t("saveFailed"));
       }
     } catch (error) {
-      setError("서버 오류가 발생했습니다.");
+      setError(t("serverError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -218,11 +220,11 @@ export default function ProfileSetupPage() {
           <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto">
             <User className="w-8 h-8 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl">프로필 설정</CardTitle>
+          <CardTitle className="text-2xl">{t("cardTitle")}</CardTitle>
           <CardDescription className="text-base">
             {isLoadingProfile
-              ? "프로필 정보를 불러오는 중..."
-              : "학생 정보를 입력하거나 수정해주세요. 시험 참여를 위해 필수 정보입니다."}
+              ? t("cardDescLoading")
+              : t("cardDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -231,12 +233,12 @@ export default function ProfileSetupPage() {
             <div className="space-y-2">
               <Label htmlFor="name" className="flex items-center gap-2">
                 <User className="w-4 h-4" />
-                이름
+                {t("nameLabel")}
               </Label>
               <Input
                 id="name"
                 type="text"
-                placeholder="이름을 입력하세요"
+                placeholder={t("namePlaceholder")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -251,12 +253,12 @@ export default function ProfileSetupPage() {
                 className="flex items-center gap-2"
               >
                 <Hash className="w-4 h-4" />
-                학번
+                {t("studentNumberLabel")}
               </Label>
               <Input
                 id="studentNumber"
                 type="text"
-                placeholder="학번을 입력하세요"
+                placeholder={t("studentNumberPlaceholder")}
                 value={studentNumber}
                 onChange={(e) => setStudentNumber(e.target.value)}
                 required
@@ -268,14 +270,14 @@ export default function ProfileSetupPage() {
             <div className="space-y-2">
               <Label htmlFor="school" className="flex items-center gap-2">
                 <GraduationCap className="w-4 h-4" />
-                학교
+                {t("schoolLabel")}
               </Label>
               <div className="relative">
                 <Input
                   ref={inputRef}
                   id="school"
                   type="text"
-                  placeholder="학교명을 검색하세요"
+                  placeholder={t("schoolPlaceholder")}
                   value={schoolSearchQuery}
                   onChange={(e) => {
                     setSchoolSearchQuery(e.target.value);
@@ -315,7 +317,7 @@ export default function ProfileSetupPage() {
               </div>
               {school && (
                 <p className="text-sm text-muted-foreground">
-                  선택된 학교: <span className="font-medium">{school}</span>
+                  {t("selectedSchool", { school })}
                 </p>
               )}
             </div>
@@ -332,10 +334,10 @@ export default function ProfileSetupPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  저장 중...
+                  {t("saving")}
                 </>
               ) : (
-                "프로필 저장"
+                t("saveBtn")
               )}
             </Button>
           </form>

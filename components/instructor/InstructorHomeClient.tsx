@@ -87,6 +87,8 @@ import {
   AlertDialogPopup,
   AlertDialogTitle,
 } from "@/components/animate-ui/components/base/alert-dialog";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDate as i18nFormatDate } from "@/lib/i18n/format";
 
 interface ExamNode {
   id: string;
@@ -123,13 +125,8 @@ type ExamFilterType =
   | "deadline"
   | "in-progress";
 
-const EXAM_FILTER_OPTIONS: Array<{ value: ExamFilterType; label: string }> = [
-  { value: "all", label: "전체" },
-  { value: "exam", label: "시험" },
-  { value: "assignment", label: "과제" },
-  { value: "deadline", label: "마감" },
-  { value: "in-progress", label: "진행 중" },
-];
+// Labels are resolved inside the component using t()
+const EXAM_FILTER_OPTION_VALUES: ExamFilterType[] = ["all", "exam", "assignment", "deadline", "in-progress"];
 
 const FOLDER_CARD_STEP_PX = 226; // folder card width (210) + gap (16)
 
@@ -140,20 +137,22 @@ function getFolderCardsPerStep(viewportWidth: number) {
 }
 
 const FOLDER_COLORS = [
-  { value: "blue",   label: "파랑",  back: "hsl(215 60% 72%)", body: "hsl(214 80% 96%)", darkBack: "hsl(215 50% 40%)", darkBody: "hsl(214 28% 19%)" },
-  { value: "teal",   label: "청록",  back: "hsl(172 45% 60%)", body: "hsl(172 50% 95%)", darkBack: "hsl(172 40% 32%)", darkBody: "hsl(172 22% 18%)" },
-  { value: "green",  label: "초록",  back: "hsl(145 40% 62%)", body: "hsl(145 45% 95%)", darkBack: "hsl(145 35% 32%)", darkBody: "hsl(145 20% 18%)" },
-  { value: "yellow", label: "노랑",  back: "hsl(45 65% 65%)",  body: "hsl(45 75% 95%)",  darkBack: "hsl(45 55% 36%)",  darkBody: "hsl(45 20% 18%)" },
-  { value: "red",    label: "빨강",  back: "hsl(0 55% 68%)",   body: "hsl(0 65% 96%)",   darkBack: "hsl(0 48% 38%)",   darkBody: "hsl(0 20% 18%)" },
-  { value: "purple", label: "보라",  back: "hsl(270 40% 70%)", body: "hsl(270 50% 96%)", darkBack: "hsl(270 35% 38%)", darkBody: "hsl(270 20% 18%)" },
-  { value: "pink",   label: "핑크",  back: "hsl(330 50% 72%)", body: "hsl(330 55% 96%)", darkBack: "hsl(330 42% 40%)", darkBody: "hsl(330 20% 18%)" },
-  { value: "gray",   label: "회색",  back: "hsl(220 10% 72%)", body: "hsl(220 8% 96%)",  darkBack: "hsl(220 8% 35%)",  darkBody: "hsl(220 8% 18%)" },
+  { value: "blue",   labelKey: "drive.colorBlue"   as const, back: "hsl(215 60% 72%)", body: "hsl(214 80% 96%)", darkBack: "hsl(215 50% 40%)", darkBody: "hsl(214 28% 19%)" },
+  { value: "teal",   labelKey: "drive.colorTeal"   as const, back: "hsl(172 45% 60%)", body: "hsl(172 50% 95%)", darkBack: "hsl(172 40% 32%)", darkBody: "hsl(172 22% 18%)" },
+  { value: "green",  labelKey: "drive.colorGreen"  as const, back: "hsl(145 40% 62%)", body: "hsl(145 45% 95%)", darkBack: "hsl(145 35% 32%)", darkBody: "hsl(145 20% 18%)" },
+  { value: "yellow", labelKey: "drive.colorYellow" as const, back: "hsl(45 65% 65%)",  body: "hsl(45 75% 95%)",  darkBack: "hsl(45 55% 36%)",  darkBody: "hsl(45 20% 18%)" },
+  { value: "red",    labelKey: "drive.colorRed"    as const, back: "hsl(0 55% 68%)",   body: "hsl(0 65% 96%)",   darkBack: "hsl(0 48% 38%)",   darkBody: "hsl(0 20% 18%)" },
+  { value: "purple", labelKey: "drive.colorPurple" as const, back: "hsl(270 40% 70%)", body: "hsl(270 50% 96%)", darkBack: "hsl(270 35% 38%)", darkBody: "hsl(270 20% 18%)" },
+  { value: "pink",   labelKey: "drive.colorPink"   as const, back: "hsl(330 50% 72%)", body: "hsl(330 55% 96%)", darkBack: "hsl(330 42% 40%)", darkBody: "hsl(330 20% 18%)" },
+  { value: "gray",   labelKey: "drive.colorGray"   as const, back: "hsl(220 10% 72%)", body: "hsl(220 8% 96%)",  darkBack: "hsl(220 8% 35%)",  darkBody: "hsl(220 8% 18%)" },
 ];
 
 export default function InstructorHome() {
   const router = useRouter();
   const { isSignedIn, isLoaded, user, profile } = useAppUser();
   const queryClient = useQueryClient();
+  const t = useTranslations("instructor");
+  const locale = useLocale() as "ko" | "en";
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -369,40 +368,33 @@ export default function InstructorHome() {
     });
   }, [queryClient, currentFolderId, user?.id]);
 
-  // 날짜 포맷터를 한 번만 생성 (성능 최적화)
-  const dateFormatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat("ko-KR", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      }),
-    []
-  );
-
   const formatDate = useCallback(
     (dateString: string) => {
       try {
-        return dateFormatter.format(new Date(dateString));
+        return i18nFormatDate(dateString, locale, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
       } catch {
         return "";
       }
     },
-    [dateFormatter]
+    [locale]
   );
 
   const handleCopyExamCode = async (code?: string) => {
     if (!code) {
-      toast.error("시험 코드가 없습니다.");
+      toast.error(t("drive.toastExamCodeMissing"));
       return;
     }
     try {
       await navigator.clipboard.writeText(code);
-      toast.success("시험 코드가 복사되었습니다.", {
+      toast.success(t("drive.toastExamCodeCopied"), {
         id: "copy-exam-code", // 중복 방지
       });
     } catch (error) {
-      toast.error("시험 코드를 복사하지 못했습니다.", {
+      toast.error(t("drive.toastExamCodeCopyFail"), {
         id: "copy-exam-code-error",
       });
     }
@@ -410,7 +402,7 @@ export default function InstructorHome() {
 
   const handleCopyExam = async (node: ExamNode) => {
     if (node.kind !== "exam" || !node.exam_id) {
-      toast.error("시험을 복사할 수 없습니다.");
+      toast.error(t("drive.toastCannotCopyExam"));
       return;
     }
 
@@ -431,14 +423,14 @@ export default function InstructorHome() {
         const errorMessage =
           errorData.error ||
           errorData.details ||
-          "시험 복사에 실패했습니다.";
+          t("drive.toastCannotCopyExam");
         toast.error(errorMessage, {
           duration: 5000,
         });
         return;
       }
 
-      toast.success("시험이 복사되었습니다.", {
+      toast.success(t("drive.toastExamCopied"), {
         id: "copy-exam-success",
       });
 
@@ -446,7 +438,7 @@ export default function InstructorHome() {
       refetchFolderContents();
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "시험 복사에 실패했습니다.";
+        error instanceof Error ? error.message : t("drive.toastCannotCopyExam");
       toast.error(errorMessage, {
         duration: 5000,
       });
@@ -474,7 +466,7 @@ export default function InstructorHome() {
       });
 
       if (response.ok) {
-        toast.success("삭제되었습니다.");
+        toast.success(t("drive.toastDeleted"));
         setDeleteDialogOpen(false);
         setNodeToDelete(null);
         setDeleteConfirmInput("");
@@ -493,8 +485,8 @@ export default function InstructorHome() {
           errorMsg && /[a-zA-Z]/.test(errorMsg) && !/[가-힣]/.test(errorMsg);
         toast.error(
           isEnglish
-            ? `삭제에 실패했습니다. (${errorMsg})`
-            : errorMsg || "삭제에 실패했습니다.",
+            ? `${t("drive.toastMoveFail")}. (${errorMsg})`
+            : errorMsg || t("drive.toastMoveFail"),
           {
             duration: 5000, // 에러 메시지가 길 수 있으므로 더 길게 표시
           }
@@ -507,8 +499,8 @@ export default function InstructorHome() {
         /[a-zA-Z]/.test(errorMessage) && !/[가-힣]/.test(errorMessage);
       toast.error(
         isEnglish
-          ? `삭제에 실패했습니다. (${errorMessage})`
-          : errorMessage || "삭제에 실패했습니다.",
+          ? `${t("drive.toastMoveFail")}. (${errorMessage})`
+          : errorMessage || t("drive.toastMoveFail"),
         {
           duration: 5000,
         }
@@ -535,20 +527,20 @@ export default function InstructorHome() {
       if (deadline && now > deadline) {
         return (
           <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-slate-200 text-slate-700 dark:bg-slate-700/40 dark:text-slate-300">
-            마감됨
+            {t("drive.statusDeadlinePassed")}
           </span>
         );
       }
       if (!openAt || now >= openAt) {
         return (
           <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-            활성
+            {t("drive.statusActive")}
           </span>
         );
       }
       return (
         <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
-          예정
+          {t("drive.statusScheduled")}
         </span>
       );
     }
@@ -556,10 +548,10 @@ export default function InstructorHome() {
     // Existing exam logic
     const statusLabel =
       node.exams.status === "active"
-        ? "활성"
+        ? t("drive.statusActive")
         : node.exams.status === "draft"
-        ? "초안"
-        : "완료";
+        ? t("drive.statusDraft")
+        : t("drive.statusCompleted");
 
     if (node.exams.status === "draft") {
       return null;
@@ -586,7 +578,7 @@ export default function InstructorHome() {
     const studentCount = node.student_count ?? 0;
     return (
       <span className="text-xs text-muted-foreground">
-        학생 {studentCount}명
+        {t("drive.studentCount", { count: studentCount })}
       </span>
     );
   };
@@ -611,7 +603,7 @@ export default function InstructorHome() {
 
   const handleUpdateNode = async () => {
     if (!nodeToEdit || !editName.trim()) {
-      toast.error("이름을 입력해주세요.");
+      toast.error(t("drive.toastNameRequired"));
       return;
     }
 
@@ -637,7 +629,7 @@ export default function InstructorHome() {
       });
 
       if (response.ok) {
-        toast.success("이름이 변경되었습니다.");
+        toast.success(t("drive.toastRenamed"));
         setIsEditDialogOpen(false);
         setNodeToEdit(null);
         setEditName("");
@@ -649,7 +641,7 @@ export default function InstructorHome() {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = extractErrorMessage(
           errorData,
-          "이름 변경에 실패했습니다",
+          t("drive.toastMoveFail"),
           response.status
         );
         toast.error(errorMessage, {
@@ -657,7 +649,7 @@ export default function InstructorHome() {
         });
       }
     } catch (error) {
-      const errorMessage = getErrorMessage(error, "이름 변경에 실패했습니다");
+      const errorMessage = getErrorMessage(error, t("drive.toastMoveFail"));
       toast.error(errorMessage, {
         duration: 5000,
       });
@@ -697,11 +689,11 @@ export default function InstructorHome() {
 
       if (!response.ok) {
         queryClient.setQueryData(queryKey, previousData);
-        toast.error("색상 변경에 실패했습니다.");
+        toast.error(t("drive.toastColorChangeFail"));
       }
     } catch {
       queryClient.setQueryData(queryKey, previousData);
-      toast.error("색상 변경에 실패했습니다.");
+      toast.error(t("drive.toastColorChangeFail"));
     }
   };
 
@@ -713,7 +705,7 @@ export default function InstructorHome() {
           size="icon"
           className="opacity-40 group-hover:opacity-100 transition-opacity min-h-[44px] min-w-[44px]"
           onClick={(e) => e.stopPropagation()}
-          aria-label="메뉴 열기"
+          aria-label={t("drive.menuOpen")}
         >
           <MoreVertical className="w-4 h-4" aria-hidden="true" />
         </Button>
@@ -726,13 +718,13 @@ export default function InstructorHome() {
           }}
         >
           <Edit className="w-4 h-4 mr-2" aria-hidden="true" />
-          편집하기
+          {t("drive.menuEdit")}
         </DropdownMenuItem>
         {node.kind === "folder" && (
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className="[&>svg:last-child]:hidden">
               <Palette className="w-4 h-4 mr-2" aria-hidden="true" />
-              색상 변경
+              {t("drive.menuColorChange")}
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="p-2 min-w-0">
               <div className="grid grid-cols-5 gap-1.5">
@@ -750,7 +742,7 @@ export default function InstructorHome() {
                         : "border-transparent"
                     )}
                     style={{ background: c.back }}
-                    title={c.label}
+                    title={t(c.labelKey)}
                   />
                 ))}
               </div>
@@ -766,7 +758,7 @@ export default function InstructorHome() {
               }}
             >
               <Copy className="w-4 h-4 mr-2" aria-hidden="true" />
-              시험 코드
+              {t("drive.menuExamCode")}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={(e) => {
@@ -775,7 +767,7 @@ export default function InstructorHome() {
               }}
             >
               <FilesIcon className="w-4 h-4 mr-2" aria-hidden="true" />
-              복사본
+              {t("drive.menuCopy")}
             </DropdownMenuItem>
           </>
         )}
@@ -787,7 +779,7 @@ export default function InstructorHome() {
           className="text-destructive focus:text-destructive"
         >
           <Trash2 className="w-4 h-4 mr-2" aria-hidden="true" />
-          삭제
+          {t("drive.menuDelete")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -887,14 +879,14 @@ export default function InstructorHome() {
         body: JSON.stringify({
           action: "create_folder",
           data: {
-            name: "새 폴더",
+            name: t("drive.newFolder"),
             parent_id: currentFolderId,
           },
         }),
       });
 
       if (response.ok) {
-        toast.success("폴더가 생성되었습니다.");
+        toast.success(t("drive.toastFolderCreated"));
         // Invalidate folder contents query
         queryClient.invalidateQueries({
           queryKey: qk.drive.folderContents(currentFolderId, user?.id),
@@ -903,7 +895,7 @@ export default function InstructorHome() {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = extractErrorMessage(
           errorData,
-          "폴더 생성에 실패했습니다",
+          t("drive.toastFolderCreateFail"),
           response.status
         );
         toast.error(errorMessage, {
@@ -911,7 +903,7 @@ export default function InstructorHome() {
         });
       }
     } catch (error) {
-      const errorMessage = getErrorMessage(error, "폴더 생성에 실패했습니다");
+      const errorMessage = getErrorMessage(error, t("drive.toastFolderCreateFail"));
       toast.error(errorMessage, {
         duration: 5000,
       });
@@ -930,7 +922,7 @@ export default function InstructorHome() {
           "folder-card folder-card--empty group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:scale-[1.01]",
           "disabled:cursor-not-allowed disabled:opacity-70"
         )}
-        aria-label="새 폴더 만들기"
+        aria-label={t("drive.newFolder")}
       >
         <div className="folder-card__back" aria-hidden />
         <div className="folder-card__body">
@@ -940,7 +932,7 @@ export default function InstructorHome() {
             ) : (
               <Plus className="h-6 w-6 text-primary/80" strokeWidth={1.75} />
             )}
-            <p className="text-sm font-semibold text-primary/85">+ 새 폴더</p>
+            <p className="text-sm font-semibold text-primary/85">{t("drive.newFolderButton")}</p>
           </div>
         </div>
       </button>
@@ -1091,7 +1083,7 @@ export default function InstructorHome() {
 
     if (draggedNode.kind === "folder") {
       if (targetNode.parent_id === draggedNode.id) {
-        toast.error("자기 자신의 하위 폴더로는 이동할 수 없습니다.");
+        toast.error(t("drive.toastMoveSelfError"));
         return;
       }
     }
@@ -1114,7 +1106,7 @@ export default function InstructorHome() {
 
       if (response.ok) {
         toast.success(
-          `"${draggedNode.name}"이(가) "${targetNode.name}" 폴더로 이동되었습니다.`
+          t("drive.toastMovedTo", { name: draggedNode.name, target: targetNode.name })
         );
         queryClient.invalidateQueries({
           queryKey: qk.drive.folderContents(currentFolderId, user?.id),
@@ -1123,7 +1115,7 @@ export default function InstructorHome() {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = extractErrorMessage(
           errorData,
-          "이동에 실패했습니다",
+          t("drive.toastMoveFail"),
           response.status
         );
         toast.error(errorMessage, {
@@ -1131,7 +1123,7 @@ export default function InstructorHome() {
         });
       }
     } catch (error) {
-      const errorMessage = getErrorMessage(error, "이동에 실패했습니다");
+      const errorMessage = getErrorMessage(error, t("drive.toastMoveFail"));
       toast.error(errorMessage, {
         duration: 5000,
       });
@@ -1172,7 +1164,7 @@ export default function InstructorHome() {
       });
 
       if (response.ok) {
-        toast.success(`"${draggedNode.name}"이(가) 루트로 이동되었습니다.`);
+        toast.success(t("drive.toastMovedToRoot", { name: draggedNode.name }));
         queryClient.invalidateQueries({
           queryKey: qk.drive.folderContents(currentFolderId, user?.id),
         });
@@ -1180,7 +1172,7 @@ export default function InstructorHome() {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = extractErrorMessage(
           errorData,
-          "이동에 실패했습니다",
+          t("drive.toastMoveFail"),
           response.status
         );
         toast.error(errorMessage, {
@@ -1188,7 +1180,7 @@ export default function InstructorHome() {
         });
       }
     } catch (error) {
-      const errorMessage = getErrorMessage(error, "이동에 실패했습니다");
+      const errorMessage = getErrorMessage(error, t("drive.toastMoveFail"));
       toast.error(errorMessage, {
         duration: 5000,
       });
@@ -1305,7 +1297,7 @@ export default function InstructorHome() {
             {/* Type badge for exams/assignments */}
             {!isFolder && node.exams?.type && node.exams.type !== "exam" && (
               <span className="absolute left-2 top-2 inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
-                과제
+                {t("drive.assignmentBadge")}
               </span>
             )}
             {/* Three-dot menu */}
@@ -1323,7 +1315,7 @@ export default function InstructorHome() {
             </h3>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {isFolder ? (
-                <span>폴더 · {formatDate(node.updated_at)}</span>
+                <span>{t("drive.folderLabel")} · {formatDate(node.updated_at)}</span>
               ) : (
                 <>
                   {node.exams?.code && (
@@ -1333,7 +1325,7 @@ export default function InstructorHome() {
                   {node.exams?.type && node.exams.type !== "exam" && node.exams?.deadline ? (
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      마감: {formatDate(node.exams.deadline)}
+                      {t("drive.deadline", { date: formatDate(node.exams.deadline) })}
                     </span>
                   ) : (
                     <span>{formatDate(node.created_at)}</span>
@@ -1440,7 +1432,7 @@ export default function InstructorHome() {
             <FolderContent className="pl-2">
               {isLoading ? (
                 <div className="py-1 text-xs text-muted-foreground">
-                  로딩 중...
+                  {t("sidebar.folderLoading")}
                 </div>
               ) : (
                 <>
@@ -1546,7 +1538,7 @@ export default function InstructorHome() {
       if (isLoading) {
         return (
           <div className="pl-12 py-2 text-xs text-muted-foreground">
-            로딩 중...
+            {t("sidebar.folderLoading")}
           </div>
         );
       }
@@ -1554,7 +1546,7 @@ export default function InstructorHome() {
       if (children.length === 0) {
         return (
           <div className="pl-12 py-2 text-xs text-muted-foreground">
-            폴더가 비어있습니다
+            {t("fileTree.noFolders")}
           </div>
         );
       }
@@ -1647,7 +1639,7 @@ export default function InstructorHome() {
                     </p>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <span>{formatDate(node.updated_at)}</span>
-                      <span>· 폴더</span>
+                      <span>· {t("drive.folderLabel")}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1703,7 +1695,7 @@ export default function InstructorHome() {
                 </p>
                 {node.exams?.type && node.exams.type !== "exam" && (
                   <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 shrink-0">
-                    과제
+                    {t("drive.assignmentBadge")}
                   </span>
                 )}
               </div>
@@ -1711,10 +1703,10 @@ export default function InstructorHome() {
                 {node.exams?.code && <span>{node.exams.code}</span>}
                 {node.exams?.type && node.exams.type !== "exam" && node.exams?.deadline ? (
                   <span className="flex items-center gap-1">
-                    · <Clock className="w-3 h-3" /> 마감: {formatDate(node.exams.deadline)}
+                    · <Clock className="w-3 h-3" /> {t("drive.deadline", { date: formatDate(node.exams.deadline) })}
                   </span>
                 ) : (
-                  <span>· 생성 {formatDate(node.created_at)}</span>
+                  <span>· {t("drive.created", { date: formatDate(node.created_at) })}</span>
                 )}
               </div>
             </div>
@@ -1751,7 +1743,7 @@ export default function InstructorHome() {
     <div className="w-full max-w-7xl mx-auto overflow-x-hidden px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
                   {/* Simple greeting */}
                   <p className="text-lg font-medium text-foreground">
-                    안녕하세요, {profile?.fullName || "강사"}님
+                    {t("home.greeting", { name: profile?.fullName || "강사" })}
                   </p>
 
                   {/* 시험 관리 */}
@@ -1762,7 +1754,7 @@ export default function InstructorHome() {
                         <DropdownMenuTrigger asChild>
                           <Button size="sm" className="gap-1.5 shrink-0">
                             <Plus className="w-4 h-4" />
-                            <span className="hidden sm:inline">새 항목</span>
+                            <span className="hidden sm:inline">{t("drive.newItem")}</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-48">
@@ -1771,17 +1763,17 @@ export default function InstructorHome() {
                               void handleCreateFolder();
                             }}
                           >
-                            <FolderPlus className="w-4 h-4 mr-2" />새 폴더
+                            <FolderPlus className="w-4 h-4 mr-2" />{t("drive.newFolder")}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onSelect={() => router.push("/instructor/new")}
                           >
-                            <FileText className="w-4 h-4 mr-2" />새 시험
+                            <FileText className="w-4 h-4 mr-2" />{t("drive.newExam")}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onSelect={() => router.push("/instructor/assignment/new")}
                           >
-                            <FileText className="w-4 h-4 mr-2" />새 과제
+                            <FileText className="w-4 h-4 mr-2" />{t("drive.newAssignment")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1791,7 +1783,7 @@ export default function InstructorHome() {
                         <Input
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder="시험 및 폴더 검색"
+                          placeholder={t("drive.searchPlaceholder")}
                           className="pl-9 h-9"
                         />
                       </div>
@@ -1802,7 +1794,7 @@ export default function InstructorHome() {
                           className={getViewButtonClasses("grid")}
                           onClick={() => setViewMode("grid")}
                           aria-pressed={viewMode === "grid"}
-                          aria-label="그리드 보기"
+                          aria-label={t("drive.gridView")}
                         >
                           <LayoutGrid className="w-4 h-4" />
                         </button>
@@ -1811,7 +1803,7 @@ export default function InstructorHome() {
                           className={getViewButtonClasses("list")}
                           onClick={() => setViewMode("list")}
                           aria-pressed={viewMode === "list"}
-                          aria-label="목록 보기"
+                          aria-label={t("drive.listView")}
                         >
                           <List className="w-4 h-4" />
                         </button>
@@ -1826,7 +1818,7 @@ export default function InstructorHome() {
                             className="flex items-center text-muted-foreground hover:text-foreground transition-colors min-h-[44px] px-2"
                           >
                             <Home className="w-4 h-4 mr-1" />
-                            루트
+                            {t("drive.rootBreadcrumb")}
                           </button>
                           {breadcrumb.map(
                             (item: { id: string; name: string }) => (
@@ -1852,7 +1844,7 @@ export default function InstructorHome() {
                         <>
                           <div className="space-y-3">
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                              폴더
+                              {t("drive.sectionFolders")}
                             </p>
                             <div className="overflow-x-auto pb-2">
                               <div className="flex gap-4 min-w-max">
@@ -1876,7 +1868,7 @@ export default function InstructorHome() {
                           </div>
                           <div className="space-y-3">
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                              시험
+                              {t("drive.sectionExams")}
                             </p>
                             {viewMode === "grid" ? (
                               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1898,13 +1890,13 @@ export default function InstructorHome() {
                           <Folder className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                           <p className="text-muted-foreground mb-2">
                             {isFiltering
-                              ? "검색 결과가 없습니다."
-                              : "아직 시험이나 폴더가 없습니다."}
+                              ? t("drive.noResults")
+                              : t("drive.empty")}
                           </p>
                           <p className="text-sm text-muted-foreground mb-6">
                             {isFiltering
-                              ? "다른 검색어를 시도해보세요."
-                              : "새 폴더를 만들거나 시험을 생성해보세요."}
+                              ? t("drive.noResultsHint")
+                              : t("drive.emptyHint")}
                           </p>
                           {!isFiltering && (
                             <div className="flex items-center justify-center space-x-2">
@@ -1922,18 +1914,18 @@ export default function InstructorHome() {
                                 ) : (
                                   <FolderPlus className="w-4 h-4 mr-2" />
                                 )}
-                                새 폴더
+                                {t("drive.newFolder")}
                               </Button>
                               <Link href="/instructor/new">
                                 <Button size="sm" className="min-h-[44px]">
                                   <Plus className="w-4 h-4 mr-2" />
-                                  시험 만들기
+                                  {t("drive.makeExam")}
                                 </Button>
                               </Link>
                               <Link href="/instructor/assignment/new">
                                 <Button size="sm" variant="outline" className="min-h-[44px]">
                                   <Plus className="w-4 h-4 mr-2" />
-                                  과제 만들기
+                                  {t("drive.makeAssignment")}
                                 </Button>
                               </Link>
                             </div>
@@ -1949,10 +1941,10 @@ export default function InstructorHome() {
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
                               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                폴더
+                                {t("drive.sectionFolders")}
                               </p>
                               <span className="text-xs text-muted-foreground">
-                                {folderNodes.length}개
+                                {t("drive.folderCount", { count: folderNodes.length })}
                               </span>
                             </div>
                             <div className="relative w-full max-w-full min-w-0 overflow-x-hidden group/folder-carousel">
@@ -1961,7 +1953,7 @@ export default function InstructorHome() {
                                 onClick={() => handleFolderRowSlide("left")}
                                 disabled={!canScrollFoldersLeft}
                                 className="absolute left-2 top-1/2 z-20 -translate-y-1/2 rounded-full border border-border/80 bg-background/95 p-2 text-foreground shadow-sm backdrop-blur transition hover:bg-accent opacity-0 pointer-events-none group-hover/folder-carousel:opacity-100 group-hover/folder-carousel:pointer-events-auto disabled:opacity-40 disabled:pointer-events-none"
-                                aria-label="이전 폴더 보기"
+                                aria-label={t("drive.prevFolders")}
                               >
                                 <ChevronLeft className="h-4 w-4" />
                               </button>
@@ -1970,7 +1962,7 @@ export default function InstructorHome() {
                                 onClick={() => handleFolderRowSlide("right")}
                                 disabled={!canScrollFoldersRight}
                                 className="absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-full border border-border/80 bg-background/95 p-2 text-foreground shadow-sm backdrop-blur transition hover:bg-accent opacity-0 pointer-events-none group-hover/folder-carousel:opacity-100 group-hover/folder-carousel:pointer-events-auto disabled:opacity-40 disabled:pointer-events-none"
-                                aria-label="다음 폴더 보기"
+                                aria-label={t("drive.nextFolders")}
                               >
                                 <ChevronRight className="h-4 w-4" />
                               </button>
@@ -1990,29 +1982,38 @@ export default function InstructorHome() {
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
                               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                시험 / 과제
+                                {t("drive.sectionExamsAssignments")}
                               </p>
                               <span className="text-xs text-muted-foreground">
-                                {filteredExamNodes.length}개
+                                {t("drive.examCount", { count: filteredExamNodes.length })}
                               </span>
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5">
-                              {EXAM_FILTER_OPTIONS.map((option) => (
+                              {EXAM_FILTER_OPTION_VALUES.map((value) => {
+                                const filterLabelKey: Record<ExamFilterType, string> = {
+                                  all: "drive.filterAll",
+                                  exam: "drive.filterExam",
+                                  assignment: "drive.filterAssignment",
+                                  deadline: "drive.filterDeadline",
+                                  "in-progress": "drive.filterInProgress",
+                                };
+                                return (
                                 <button
-                                  key={option.value}
+                                  key={value}
                                   type="button"
-                                  onClick={() => setExamFilter(option.value)}
+                                  onClick={() => setExamFilter(value)}
                                   className={cn(
                                     "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                                    examFilter === option.value
+                                    examFilter === value
                                       ? "border-primary bg-primary/10 text-primary"
                                       : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
                                   )}
-                                  aria-pressed={examFilter === option.value}
+                                  aria-pressed={examFilter === value}
                                 >
-                                  {option.label}
+                                  {t(filterLabelKey[value])}
                                 </button>
-                              ))}
+                                );
+                              })}
                             </div>
                             {filteredExamNodes.length > 0 ? (
                               viewMode === "grid" ? (
@@ -2049,8 +2050,8 @@ export default function InstructorHome() {
                                 <div ref={sentinelRef} />
                                 <div className="rounded-xl border border-dashed border-muted-foreground/30 bg-card/40 py-6 text-center text-sm text-muted-foreground">
                                   {isFiltering || isExamFilterActive
-                                    ? "선택한 조건에 맞는 시험/과제가 없습니다."
-                                    : "시험/과제가 없습니다."}
+                                    ? t("drive.noExamsFiltered")
+                                    : t("drive.noExams")}
                                 </div>
                               </>
                             )}
@@ -2074,20 +2075,17 @@ export default function InstructorHome() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
               <Trash2 className="h-4 w-4" />
-              {nodeToDelete?.kind === "exam" ? "시험 삭제" : "폴더 삭제"}
+              {nodeToDelete?.kind === "exam" ? t("drive.deleteExamTitle") : t("drive.deleteFolderTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              이 작업은 되돌릴 수 없습니다.{" "}
+              {t("drive.deleteConfirmIrreversible")}{" "}
               {nodeToDelete?.kind === "exam" ? (
                 <>
-                  계속하려면 시험 제목{" "}
-                  <strong>&quot;{nodeToDelete.name}&quot;</strong>을(를) 아래에
-                  입력하세요.
+                  {t("drive.deleteConfirmExam", { name: nodeToDelete.name })}
                 </>
               ) : (
                 <>
-                  <strong>&quot;{nodeToDelete?.name}&quot;</strong> 폴더를
-                  삭제하시겠습니까?
+                  {t("drive.deleteConfirmFolder", { name: nodeToDelete?.name ?? "" })}
                 </>
               )}
             </AlertDialogDescription>
@@ -2114,7 +2112,7 @@ export default function InstructorHome() {
           )}
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>취소</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>{t("drive.deleteCancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => nodeToDelete && handleDeleteNode(nodeToDelete)}
               disabled={
@@ -2127,10 +2125,10 @@ export default function InstructorHome() {
               {isDeleting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  삭제 중...
+                  {t("drive.deleteDeleting")}
                 </>
               ) : (
-                "삭제"
+                t("drive.deleteConfirmButton")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -2141,17 +2139,17 @@ export default function InstructorHome() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>이름 편집</DialogTitle>
+            <DialogTitle>{t("drive.editDialogTitle")}</DialogTitle>
             <DialogDescription>
               {nodeToEdit?.kind === "folder"
-                ? "폴더 이름을 수정해주세요."
-                : "이름을 수정해주세요."}
+                ? t("drive.editFolderDesc")
+                : t("drive.editNameDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="edit-name">
-                {nodeToEdit?.kind === "folder" ? "폴더 이름" : "이름"}
+                {nodeToEdit?.kind === "folder" ? t("drive.editFolderLabel") : t("drive.editNameLabel")}
               </Label>
               <Input
                 id="edit-name"
@@ -2159,8 +2157,8 @@ export default function InstructorHome() {
                 onChange={(e) => setEditName(e.target.value)}
                 placeholder={
                   nodeToEdit?.kind === "folder"
-                    ? "예: 2025-1학기"
-                    : "이름을 입력하세요"
+                    ? t("drive.editFolderPlaceholder")
+                    : t("drive.editNamePlaceholder")
                 }
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -2179,13 +2177,13 @@ export default function InstructorHome() {
                 setEditName("");
               }}
             >
-              취소
+              {t("drive.editCancel")}
             </Button>
             <Button
               onClick={handleUpdateNode}
               disabled={isUpdating || !editName.trim()}
             >
-              {isUpdating ? "저장 중..." : "저장"}
+              {isUpdating ? t("drive.editSaving") : t("drive.editSave")}
             </Button>
           </DialogFooter>
         </DialogContent>

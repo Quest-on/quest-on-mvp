@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ export function AssignmentSubmitDialog({
   finalAnswer = "",
   onEditFinalAnswer,
 }: AssignmentSubmitDialogProps) {
+  const t = useTranslations("assignment");
   const trimmed = finalAnswer.trim();
   const preview =
     trimmed.length > PREVIEW_LIMIT ? trimmed.slice(0, PREVIEW_LIMIT) + "…" : trimmed;
@@ -40,17 +42,17 @@ export function AssignmentSubmitDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-amber-500" />
-            과제를 제출하시겠습니까?
+            {t("submitDialog.title")}
           </DialogTitle>
           <DialogDescription>
-            제출하면 대화가 종료되고, 바로 타임어택 퀴즈가 시작됩니다. 퀴즈까지 완료해야 최종 제출됩니다.
+            {t("submitDialog.description")}
           </DialogDescription>
         </DialogHeader>
 
         {trimmed && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">최종답안 미리보기</span>
+              <span className="text-sm font-medium">{t("submitDialog.finalAnswerPreview")}</span>
               {onEditFinalAnswer && (
                 <Button
                   type="button"
@@ -61,7 +63,7 @@ export function AssignmentSubmitDialog({
                   className="h-7 px-2 gap-1 text-xs"
                 >
                   <Pencil className="w-3 h-3" />
-                  수정하기
+                  {t("submitDialog.editButton")}
                 </Button>
               )}
             </div>
@@ -77,10 +79,10 @@ export function AssignmentSubmitDialog({
             onClick={() => onOpenChange(false)}
             disabled={isSubmitting}
           >
-            취소
+            {t("submitDialog.cancelButton")}
           </Button>
           <Button onClick={onConfirm} disabled={isSubmitting}>
-            {isSubmitting ? "제출 중..." : "제출하기"}
+            {isSubmitting ? t("submitDialog.submittingButton") : t("submitDialog.submitButton")}
           </Button>
         </DialogFooter>
       </DialogContent>

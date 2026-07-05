@@ -1,15 +1,21 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import type { CodeLanguage } from "@/lib/types/workspace";
+
+function EditorLoadingFallback() {
+  const t = useTranslations("assignment");
+  return (
+    <div className="flex items-center justify-center h-full bg-muted/30 rounded-md">
+      <span className="text-sm text-muted-foreground">{t("codeEditor.loading")}</span>
+    </div>
+  );
+}
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react").then((mod) => mod.default), {
   ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-full bg-muted/30 rounded-md">
-      <span className="text-sm text-muted-foreground">Loading editor...</span>
-    </div>
-  ),
+  loading: () => <EditorLoadingFallback />,
 });
 
 interface CodeEditorProps {

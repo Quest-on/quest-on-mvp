@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ export function LateEntryWaiting({
   questionCount,
   onGateStart,
 }: LateEntryWaitingProps) {
+  const t = useTranslations("exam");
   const router = useRouter();
   const [isDenied, setIsDenied] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -94,21 +96,21 @@ export function LateEntryWaiting({
             <div className="flex justify-center mb-4">
               <XCircle className="h-12 w-12 text-destructive" />
             </div>
-            <CardTitle className="text-2xl">입장이 거부되었습니다</CardTitle>
+            <CardTitle className="text-2xl">{t("lateEntry.deniedTitle")}</CardTitle>
             <CardDescription className="text-base mt-2">
-              강사가 귀하의 입장을 허가하지 않았습니다.
+              {t("lateEntry.deniedDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                지각으로 인해 시험 입장이 거부되었습니다. 강사에게 문의하세요.
+                {t("lateEntry.deniedAlert")}
               </AlertDescription>
             </Alert>
             <div className="flex justify-center">
               <Button onClick={() => router.push("/student")} variant="outline">
-                학생 대시보드로 돌아가기
+                {t("lateEntry.deniedBack")}
               </Button>
             </div>
           </CardContent>
@@ -127,9 +129,9 @@ export function LateEntryWaiting({
               <Clock className="h-6 w-6 text-amber-500 absolute top-3 left-3" />
             </div>
           </div>
-          <CardTitle className="text-2xl">입장 승인 대기 중</CardTitle>
+          <CardTitle className="text-2xl">{t("lateEntry.pendingTitle")}</CardTitle>
           <CardDescription className="text-base mt-2">
-            강사가 귀하의 입장을 승인하면 시험이 시작됩니다.
+            {t("lateEntry.pendingDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -137,17 +139,17 @@ export function LateEntryWaiting({
           {examTitle && (
             <div className="border rounded-lg p-4 bg-muted/50">
               <div className="space-y-2">
-                <h3 className="font-semibold">시험 정보</h3>
+                <h3 className="font-semibold">{t("lateEntry.examInfoTitle")}</h3>
                 <div className="text-sm space-y-1">
-                  <p><span className="font-medium">시험명:</span> {examTitle}</p>
+                  <p><span className="font-medium">{t("lateEntry.examName")}</span> {examTitle}</p>
                   {examCode && (
-                    <p><span className="font-medium">시험 코드:</span> {examCode}</p>
+                    <p><span className="font-medium">{t("lateEntry.examCode")}</span> {examCode}</p>
                   )}
                   {examDuration != null && examDuration > 0 && (
-                    <p><span className="font-medium">시험 시간:</span> {examDuration}분</p>
+                    <p><span className="font-medium">{t("lateEntry.examDuration")}</span> {t("lateEntry.examDurationValue", { duration: examDuration })}</p>
                   )}
                   {questionCount != null && questionCount > 0 && (
-                    <p><span className="font-medium">문제 수:</span> {questionCount}문제</p>
+                    <p><span className="font-medium">{t("lateEntry.questionCount")}</span> {t("lateEntry.questionCountValue", { count: questionCount })}</p>
                   )}
                 </div>
               </div>
@@ -159,13 +161,12 @@ export function LateEntryWaiting({
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               <div className="space-y-2">
-                <p className="font-semibold text-amber-600 dark:text-amber-400">지각 입장 승인 대기 중</p>
+                <p className="font-semibold text-amber-600 dark:text-amber-400">{t("lateEntry.lateAlertTitle")}</p>
                 <p className="text-sm">
-                  시험이 이미 시작되었습니다. 강사의 승인이 필요합니다.
-                  승인 시 남은 시험 시간으로 응시하게 됩니다.
+                  {t("lateEntry.lateAlertDescription")}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  이 페이지를 닫지 마세요.
+                  {t("lateEntry.doNotClose")}
                 </p>
               </div>
             </AlertDescription>
@@ -175,10 +176,10 @@ export function LateEntryWaiting({
           <div className="flex flex-col items-center gap-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>강사 승인 대기 중...</span>
+              <span>{t("lateEntry.waitingApproval")}</span>
             </div>
             <div className="text-xs text-muted-foreground">
-              대기 시간: {Math.floor(elapsedSeconds / 60)}분 {(elapsedSeconds % 60).toString().padStart(2, "0")}초
+              {t("lateEntry.elapsedTime", { minutes: Math.floor(elapsedSeconds / 60), seconds: (elapsedSeconds % 60).toString().padStart(2, "0") })}
             </div>
           </div>
         </CardContent>

@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 export function AdminSidebarFooter() {
+  const t = useTranslations("admin");
   const router = useRouter();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
@@ -29,8 +31,8 @@ export function AdminSidebarFooter() {
             size="icon"
             className="h-9 w-9 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
             onClick={handleLogout}
-            aria-label="로그아웃"
-            title="로그아웃"
+            aria-label={t("sidebar.logoutAriaLabel")}
+            title={t("sidebar.logoutAriaLabel")}
           >
             <LogOut className="h-4 w-4" aria-hidden="true" />
           </Button>
@@ -42,7 +44,7 @@ export function AdminSidebarFooter() {
           onClick={handleLogout}
         >
           <LogOut className="mr-2 h-4 w-4" />
-          로그아웃
+          {t("sidebar.logout")}
         </Button>
       )}
     </div>

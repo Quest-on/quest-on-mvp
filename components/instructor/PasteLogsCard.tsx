@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, Copy, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useTranslations } from "next-intl";
 
 interface PasteLog {
   id: string;
@@ -20,6 +21,7 @@ interface PasteLogsCardProps {
 }
 
 export function PasteLogsCard({ pasteLogs, questionId }: PasteLogsCardProps) {
+  const t = useTranslations("grading");
   if (!pasteLogs || pasteLogs.length === 0) {
     return null;
   }
@@ -50,7 +52,7 @@ export function PasteLogsCard({ pasteLogs, questionId }: PasteLogsCardProps) {
             <Copy className="h-4 w-4 text-orange-600" />
           )}
           <span className={suspiciousCount > 0 ? "text-red-800" : ""}>
-            {suspiciousCount > 0 ? "부정행위 의심" : "붙여넣기 활동"}
+            {suspiciousCount > 0 ? t("pasteLogs.suspiciousTitle") : t("pasteLogs.pasteTitle")}
           </span>
         </CardTitle>
       </CardHeader>
@@ -60,20 +62,20 @@ export function PasteLogsCard({ pasteLogs, questionId }: PasteLogsCardProps) {
             <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0" />
             <div className="flex-1">
               <p className="text-sm font-semibold text-red-800">
-                외부 복사-붙여넣기 {suspiciousCount}건 감지
+                {t("pasteLogs.suspiciousDetected", { count: suspiciousCount })}
               </p>
             </div>
           </div>
         )}
 
         <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">전체:</span>
-          <Badge variant="outline" className="text-xs">{totalLogs}회</Badge>
+          <span className="text-muted-foreground">{t("pasteLogs.totalLabel")}</span>
+          <Badge variant="outline" className="text-xs">{t("pasteLogs.totalCount", { count: totalLogs })}</Badge>
         </div>
         {suspiciousCount > 0 && (
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">의심:</span>
-            <Badge variant="destructive" className="text-xs">{suspiciousCount}회</Badge>
+            <span className="text-muted-foreground">{t("pasteLogs.suspiciousLabel")}</span>
+            <Badge variant="destructive" className="text-xs">{t("pasteLogs.suspiciousCount", { count: suspiciousCount })}</Badge>
           </div>
         )}
       </CardContent>

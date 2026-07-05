@@ -21,6 +21,7 @@ import toast from "react-hot-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createSupabaseClient } from "@/lib/supabase-client";
 import { qk } from "@/lib/query-keys";
+import { useTranslations } from "next-intl";
 
 interface ExamControlButtonsProps {
   examId: string;
@@ -35,6 +36,7 @@ export function ExamControlButtons({
   hasGateFields = false,
   onStatusChange,
 }: ExamControlButtonsProps) {
+  const t = useTranslations("authoring");
   const [isStarting, setIsStarting] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
   const [showStartDialog, setShowStartDialog] = useState(false);
@@ -80,7 +82,7 @@ export function ExamControlButtons({
       if (!studentMap.has(session.student_id)) {
         studentMap.set(session.student_id, {
           student_id: session.student_id,
-          name: session.student_name || session.student_email || "이름 없음",
+          name: session.student_name || session.student_email || t("examControlButtons.studentNameFallback"),
           student_number: session.student_number,
           school: session.student_school,
         });
@@ -142,7 +144,7 @@ export function ExamControlButtons({
       });
 
       if (response.ok) {
-        toast.success("시험이 시작되었습니다.");
+        toast.success(t("examControlButtons.toastStarted"));
         setShowStartDialog(false);
         const now = new Date().toISOString();
         if (onStatusChange) {
@@ -153,11 +155,11 @@ export function ExamControlButtons({
       } else {
         const errorData = await response.json().catch(() => ({}));
         toast.error(
-          errorData.message || "시험 시작에 실패했습니다. 다시 시도해주세요."
+          errorData.message || t("examControlButtons.toastStartFailed")
         );
       }
     } catch (error) {
-      toast.error("시험 시작 중 오류가 발생했습니다.");
+      toast.error(t("examControlButtons.toastStartError"));
     } finally {
       setIsStarting(false);
     }
@@ -172,16 +174,16 @@ export function ExamControlButtons({
 
       if (response.ok) {
         setShowEndDialog(false);
-        toast.success("시험을 종료합니다. 백그라운드에서 AI 가채점이 곧 진행됩니다");
+        toast.success(t("examControlButtons.toastEnded"));
         router.push("/instructor");
       } else {
         const errorData = await response.json().catch(() => ({}));
         toast.error(
-          errorData.message || "시험 종료에 실패했습니다. 다시 시도해주세요."
+          errorData.message || t("examControlButtons.toastEndFailed")
         );
       }
     } catch (error) {
-      toast.error("시험 종료 중 오류가 발생했습니다.");
+      toast.error(t("examControlButtons.toastEndError"));
     } finally {
       setIsEnding(false);
     }
@@ -194,7 +196,7 @@ export function ExamControlButtons({
         return {
           badge: (
             <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-              예약됨
+              {t("examControlButtons.statusScheduled")}
             </Badge>
           ),
           button: (
@@ -204,7 +206,7 @@ export function ExamControlButtons({
               className="bg-green-600 hover:bg-green-700"
             >
               <Play className="h-4 w-4 mr-2" />
-              시험 시작
+              {t("examControlButtons.buttonStart")}
             </Button>
           ),
         };
@@ -213,7 +215,7 @@ export function ExamControlButtons({
         return {
           badge: (
             <Badge variant="secondary" className="bg-gray-100 text-gray-800">
-              초안
+              {t("examControlButtons.statusDraft")}
             </Badge>
           ),
           button: (
@@ -223,7 +225,7 @@ export function ExamControlButtons({
               className="bg-green-600 hover:bg-green-700"
             >
               <Play className="h-4 w-4 mr-2" />
-              시험 시작
+              {t("examControlButtons.buttonStart")}
             </Button>
           ),
         };
@@ -231,7 +233,7 @@ export function ExamControlButtons({
         return {
           badge: (
             <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-              입장 가능
+              {t("examControlButtons.statusJoinable")}
             </Badge>
           ),
           button: (
@@ -241,7 +243,7 @@ export function ExamControlButtons({
               className="bg-green-600 hover:bg-green-700"
             >
               <Play className="h-4 w-4 mr-2" />
-              시험 시작
+              {t("examControlButtons.buttonStart")}
             </Button>
           ),
         };
@@ -249,7 +251,7 @@ export function ExamControlButtons({
         return {
           badge: (
             <Badge variant="secondary" className="bg-green-100 text-green-800">
-              진행 중
+              {t("examControlButtons.statusRunning")}
             </Badge>
           ),
           button: (
@@ -261,12 +263,12 @@ export function ExamControlButtons({
               {isEnding ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  종료 중...
+                  {t("examControlButtons.buttonEnding")}
                 </>
               ) : (
                 <>
                   <Square className="h-4 w-4 mr-2" />
-                  시험 종료
+                  {t("examControlButtons.buttonEnd")}
                 </>
               )}
             </Button>
@@ -276,7 +278,7 @@ export function ExamControlButtons({
         return {
           badge: (
             <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-              입장 마감
+              {t("examControlButtons.statusEntryClosed")}
             </Badge>
           ),
           button: (
@@ -288,12 +290,12 @@ export function ExamControlButtons({
               {isEnding ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  종료 중...
+                  {t("examControlButtons.buttonEnding")}
                 </>
               ) : (
                 <>
                   <Square className="h-4 w-4 mr-2" />
-                  시험 종료
+                  {t("examControlButtons.buttonEnd")}
                 </>
               )}
             </Button>
@@ -303,7 +305,7 @@ export function ExamControlButtons({
         return {
           badge: (
             <Badge variant="secondary" className="bg-gray-100 text-gray-800">
-              종료됨
+              {t("examControlButtons.statusClosed")}
             </Badge>
           ),
           button: null,
@@ -312,7 +314,7 @@ export function ExamControlButtons({
         return {
           badge: (
             <Badge variant="secondary" className="bg-gray-100 text-gray-800">
-              {examStatus || "알 수 없음"}
+              {examStatus || t("examControlButtons.statusUnknown")}
             </Badge>
           ),
           button: null,
@@ -333,9 +335,9 @@ export function ExamControlButtons({
       <AlertDialog open={showStartDialog} onOpenChange={setShowStartDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>시험 시작 확인</AlertDialogTitle>
+            <AlertDialogTitle>{t("examControlButtons.startDialogTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              시험을 시작하시겠습니까? 시작하면 대기 중인 모든 학생의 시험이 동시에 시작됩니다.
+              {t("examControlButtons.startDialogDescription")}
             </AlertDialogDescription>
             <div className="mt-4 space-y-4">
               {/* 대기 중인 학생 목록 */}
@@ -343,19 +345,19 @@ export function ExamControlButtons({
                 <div className="flex items-center gap-2 mb-2">
                   <Users className="h-4 w-4 text-muted-foreground" />
                   <strong className="text-sm font-medium">
-                    대기 중인 학생 ({(waitingStudents?.length ?? 0)}명)
+                    {t("examControlButtons.waitingStudentsLabel", { count: waitingStudents?.length ?? 0 })}
                   </strong>
                 </div>
                 {loadingWaitingStudents ? (
                   <div className="flex items-center justify-center py-4">
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     <span className="ml-2 text-sm text-muted-foreground">
-                      학생 목록 불러오는 중...
+                      {t("examControlButtons.loadingStudents")}
                     </span>
                   </div>
                 ) : isWaitingError ? (
                   <div className="text-sm text-destructive py-2 px-3 border border-destructive/20 rounded-md bg-destructive/5">
-                    학생 목록을 불러오지 못했습니다. 새로고침해주세요.
+                    {t("examControlButtons.errorLoadingStudents")}
                   </div>
                 ) : (waitingStudents?.length ?? 0) > 0 ? (
                   <div className="max-h-48 overflow-y-auto border rounded-md p-3 bg-muted/30">
@@ -384,14 +386,14 @@ export function ExamControlButtons({
                   </div>
                 ) : (
                   <div className="text-sm text-muted-foreground py-2 px-3 border rounded-md bg-muted/30">
-                    대기 중인 학생이 없습니다.
+                    {t("examControlButtons.noWaitingStudents")}
                   </div>
                 )}
               </div>
 
               <div>
                 <Label htmlFor="close_at" className="text-sm font-medium">
-                  입장 마감 시간 (선택사항)
+                  {t("examControlButtons.closeAtLabel")}
                 </Label>
                 <Input
                   id="close_at"
@@ -399,24 +401,24 @@ export function ExamControlButtons({
                   value={closeAt}
                   onChange={(e) => setCloseAt(e.target.value)}
                   className="mt-1"
-                  placeholder="입장 마감 시간을 설정하세요"
+                  placeholder={t("examControlButtons.closeAtPlaceholder")}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  설정하지 않으면 입장 마감 시간이 없습니다. 이 시간 이후에는 새로운 학생이 입장할 수 없습니다.
+                  {t("examControlButtons.closeAtHint")}
                 </p>
               </div>
               <div>
-                <strong className="text-sm">주의사항:</strong>
+                <strong className="text-sm">{t("examControlButtons.warningTitle")}</strong>
                 <ul className="list-disc list-inside mt-2 space-y-1 text-sm text-muted-foreground">
-                  <li>시험 시작 후에는 되돌릴 수 없습니다.</li>
-                  <li>대기 중인 모든 학생의 타이머가 동시에 시작됩니다.</li>
-                  <li>시험 시간은 각 학생의 개별 타이머로 관리됩니다.</li>
+                  <li>{t("examControlButtons.warningCannotUndo")}</li>
+                  <li>{t("examControlButtons.warningAllStudents")}</li>
+                  <li>{t("examControlButtons.warningIndividualTimer")}</li>
                 </ul>
               </div>
             </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isStarting}>취소</AlertDialogCancel>
+            <AlertDialogCancel disabled={isStarting}>{t("examControlButtons.buttonCancelStart")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleStartExam}
               disabled={isStarting}
@@ -425,10 +427,10 @@ export function ExamControlButtons({
               {isStarting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  시작 중...
+                  {t("examControlButtons.buttonStarting")}
                 </>
               ) : (
-                "시험 시작"
+                t("examControlButtons.buttonConfirmStart")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -439,22 +441,22 @@ export function ExamControlButtons({
       <AlertDialog open={showEndDialog} onOpenChange={setShowEndDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>시험 종료 확인</AlertDialogTitle>
+            <AlertDialogTitle>{t("examControlButtons.endDialogTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              시험을 종료하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+              {t("examControlButtons.endDialogDescription")}
             </AlertDialogDescription>
             <div className="mt-4">
-              <strong className="text-sm text-destructive">⚠️ 주의사항:</strong>
+              <strong className="text-sm text-destructive">{t("examControlButtons.endWarningTitle")}</strong>
               <ul className="list-disc list-inside mt-2 space-y-1 text-sm text-muted-foreground">
-                <li>진행 중인 모든 학생의 시험이 <strong className="text-destructive">강제로 제출</strong>됩니다.</li>
-                <li>시험 종료 후에는 다시 시작할 수 없습니다.</li>
-                <li>학생들이 작성 중인 답안도 마지막 저장 상태로 제출됩니다.</li>
-                <li>이 작업은 <strong className="text-destructive">되돌릴 수 없습니다</strong>.</li>
+                <li><strong className="text-destructive">{t("examControlButtons.endWarningForceSubmit")}</strong></li>
+                <li>{t("examControlButtons.endWarningCannotRestart")}</li>
+                <li>{t("examControlButtons.endWarningAnswerSaved")}</li>
+                <li><strong className="text-destructive">{t("examControlButtons.endWarningCannotUndo")}</strong></li>
               </ul>
             </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isEnding}>취소</AlertDialogCancel>
+            <AlertDialogCancel disabled={isEnding}>{t("examControlButtons.buttonCancelEnd")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleEndExam}
               disabled={isEnding}
@@ -463,10 +465,10 @@ export function ExamControlButtons({
               {isEnding ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  종료 중...
+                  {t("examControlButtons.buttonEnding")}
                 </>
               ) : (
-                "시험 종료"
+                t("examControlButtons.buttonConfirmEnd")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

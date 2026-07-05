@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckCircle2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 export type ObjectiveAnswerVariant = "list" | "grid-2x2" | "row-1x2";
@@ -28,6 +29,7 @@ export function ObjectiveAnswerPanel({
   fullHeight = false,
   variant,
 }: ObjectiveAnswerPanelProps) {
+  const t = useTranslations("exam");
   const resolvedOptions =
     options && options.length > 0
       ? options
@@ -52,7 +54,7 @@ export function ObjectiveAnswerPanel({
     (type === "true-false" ? "row-1x2" : "list");
 
   const promptLabel =
-    type === "true-false" ? "참 / 거짓을 선택하세요" : "정답을 선택하세요";
+    type === "true-false" ? t("objectivePanel.promptTrueFalse") : t("objectivePanel.promptMultiple");
 
   return (
     <div
@@ -72,7 +74,7 @@ export function ObjectiveAnswerPanel({
 
           {resolvedOptions.length === 0 ? (
             <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-              선택지가 없는 문제입니다. 시험 출제자에게 문의하세요.
+              {t("objectivePanel.noOptions")}
             </p>
           ) : resolvedVariant === "grid-2x2" ? (
             <OptionGrid
@@ -98,7 +100,7 @@ export function ObjectiveAnswerPanel({
             />
           )}
 
-          <p className="text-xs text-muted-foreground">선택한 답안은 자동으로 저장됩니다.</p>
+          <p className="text-xs text-muted-foreground">{t("objectivePanel.autoSaveNotice")}</p>
         </div>
       </div>
     </div>
@@ -118,8 +120,9 @@ function OptionGrid({
   onChange: (value: string) => void;
   showNumberBadge: boolean;
 }) {
+  const t = useTranslations("exam");
   return (
-    <ul className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="답안 선택지">
+    <ul className="grid grid-cols-2 gap-3" role="radiogroup" aria-label={t("objectivePanel.optionsAriaLabel")}>
       {order.map((originalIndex, displayIndex) => (
         <li key={originalIndex}>
           <OptionButton
@@ -148,8 +151,9 @@ function OptionRow({
   selectedIndex: number | null;
   onChange: (value: string) => void;
 }) {
+  const t = useTranslations("exam");
   return (
-    <ul className="grid grid-cols-2 gap-4" role="radiogroup" aria-label="답안 선택지">
+    <ul className="grid grid-cols-2 gap-4" role="radiogroup" aria-label={t("objectivePanel.optionsAriaLabel")}>
       {order.map((originalIndex) => (
         <li key={originalIndex}>
           <OptionButton
@@ -178,8 +182,9 @@ function OptionList({
   selectedIndex: number | null;
   onChange: (value: string) => void;
 }) {
+  const t = useTranslations("exam");
   return (
-    <ul className="space-y-2.5" role="radiogroup" aria-label="답안 선택지">
+    <ul className="space-y-2.5" role="radiogroup" aria-label={t("objectivePanel.optionsAriaLabel")}>
       {order.map((originalIndex, displayIndex) => (
         <li key={originalIndex}>
           <OptionButton

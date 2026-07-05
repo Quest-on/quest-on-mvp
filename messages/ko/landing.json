@@ -1,0 +1,91 @@
+{
+  "hero": {
+    "headline": {
+      "cheating": "AI 부정행위",
+      "cannotStop": ", 막을 수 없다면",
+      "partOf": "평가의 일부",
+      "makePart": "로 만드세요."
+    },
+    "subheadline": {
+      "line1": "Quest-On은 생성형 AI를 '컨닝 도구'가 아닌 '사고력 파트너'로 전환시킵니다.",
+      "line2": "결과만 보는 시험이 아니라, 사고하는 과정 전체를 평가합니다."
+    },
+    "cta": {
+      "start": "지금 시작하기",
+      "watchDemo": "데모 영상 보기",
+      "demoVideoTitle": "데모 영상"
+    }
+  },
+  "cta": {
+    "badge": "교육의 새로운 패러다임",
+    "title": {
+      "line1": "지금 바로 Quest-On으로",
+      "line2": "교육 성과를 증명하세요."
+    },
+    "body": {
+      "line1": "암기 평가를 넘어 사고의 과정을 데이터로 기록합니다.",
+      "line2": "무료로 시작하고 혁신적인 평가 시스템을 경험해 보세요."
+    },
+    "button": "무료로 시작하기"
+  },
+  "demo": {
+    "finalAnswer": {
+      "heading": "최종 답안",
+      "subtitle": "학생이 제출한 최종 답안입니다"
+    },
+    "cheating": {
+      "externalPaste": "외부 붙여넣기 4건",
+      "internalCopy": "내부 복사 10건",
+      "suspiciousHeading": "부정행위 의심 활동 감지",
+      "internalCopyHeading": "내부 복사 활동"
+    },
+    "chat": {
+      "heading": "AI와의 대화 기록",
+      "subtitle": "학생이 AI와 나눈 대화 내용입니다",
+      "placeholder": "메시지를 입력하세요..."
+    },
+    "grading": {
+      "heading": "AI 종합 평가",
+      "opinionLabel": "종합 의견:",
+      "highlightLabel": "핵심 인용구 (Highlight)",
+      "strengthsLabel": "강점",
+      "improvementsLabel": "개선점"
+    }
+  },
+  "testimonial": {
+    "sectionTitle": {
+      "line1": "이미 수많은 교육 현장에서",
+      "line2": "혁신이 시작되었습니다."
+    }
+  },
+  "logoCloud": {
+    "caption": "함께하는 교수진"
+  },
+  "footer": {
+    "categories": {
+      "product": "제품",
+      "resources": "리소스",
+      "company": "회사",
+      "legal": "법적고지"
+    },
+    "links": {
+      "main": "메인",
+      "testimonials": "고객 후기",
+      "partnership": "파트너십",
+      "startFree": "무료로 시작하기",
+      "gettingStarted": "시작 가이드",
+      "changelog": "업데이트 소식",
+      "apiDocs": "API 문서",
+      "helpCenter": "도움말 센터",
+      "systemStatus": "시스템 현황",
+      "team": "팀 소개",
+      "blog": "블로그",
+      "careers": "채용 안내",
+      "contact": "문의하기",
+      "terms": "이용약관",
+      "privacy": "개인정보처리방침",
+      "security": "데이터 보안",
+      "cookies": "쿠키 정책"
+    }
+  }
+}

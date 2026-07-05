@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Clock, Send } from "lucide-react";
@@ -23,6 +24,7 @@ export function AssignmentHeader({
   isSubmitting,
   onDeadlineExpired,
 }: AssignmentHeaderProps) {
+  const t = useTranslations("assignment");
   const router = useRouter();
   const [timeLeft, setTimeLeft] = useState("");
   const [isOverdue, setIsOverdue] = useState(false);
@@ -37,7 +39,7 @@ export function AssignmentHeader({
       const diff = deadlineTime - now;
 
       if (diff <= 0) {
-        setTimeLeft("마감됨");
+        setTimeLeft(t("header.overdue"));
         setIsOverdue(true);
         // Trigger auto-submit on deadline expiry (once)
         if (!expiredCalledRef.current && !isSubmitted && onDeadlineExpired) {
@@ -53,13 +55,13 @@ export function AssignmentHeader({
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
       if (days > 0) {
-        setTimeLeft(`${days}일 ${hours}시간 남음`);
+        setTimeLeft(t("header.timeLeftDaysHours", { days, hours }));
       } else if (hours > 0) {
-        setTimeLeft(`${hours}시간 ${minutes}분 남음`);
+        setTimeLeft(t("header.timeLeftHoursMinutes", { hours, minutes }));
       } else if (minutes > 0) {
-        setTimeLeft(`${minutes}분 ${seconds}초 남음`);
+        setTimeLeft(t("header.timeLeftMinutesSeconds", { minutes, seconds }));
       } else {
-        setTimeLeft(`${seconds}초 남음`);
+        setTimeLeft(t("header.timeLeftSeconds", { seconds }));
       }
       setIsOverdue(false);
     };
@@ -82,7 +84,7 @@ export function AssignmentHeader({
         <h1 className="text-lg font-semibold truncate">{title}</h1>
         {isSubmitted && (
           <Badge variant="secondary" className="bg-green-100 text-green-700">
-            제출 완료
+            {t("header.submittedBadge")}
           </Badge>
         )}
       </div>
@@ -101,7 +103,7 @@ export function AssignmentHeader({
             className="gap-1.5"
           >
             <Send className="w-4 h-4" />
-            {isSubmitting ? "제출 중..." : "제출하기"}
+            {isSubmitting ? t("header.submittingButton") : t("header.submitButton")}
           </Button>
         )}
       </div>

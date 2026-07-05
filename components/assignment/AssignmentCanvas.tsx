@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   useEditor,
   EditorContent,
@@ -139,13 +140,14 @@ export function AssignmentCanvas({
   onClose,
   title,
 }: AssignmentCanvasProps) {
+  const t = useTranslations("assignment");
   const editor = useEditor({
     immediatelyRender: false,
     editable: !isSubmitted,
     extensions: [
       StarterKit.configure({ codeBlock: false }),
       Placeholder.configure({
-        placeholder: "AI와 대화하거나 직접 문서를 작성하세요...",
+        placeholder: t("canvas.placeholder"),
       }),
       TextAlign.configure({
         types: ["heading", "paragraph"],
@@ -193,7 +195,7 @@ export function AssignmentCanvas({
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
     pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`${title || "과제"}.pdf`);
+    pdf.save(t("canvas.pdfFilename", { title: title || t("canvas.pdfFallbackTitle") }));
   };
 
   // Prevent focus loss on toolbar button clicks
@@ -202,7 +204,7 @@ export function AssignmentCanvas({
   if (!editor) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
-        에디터 로딩 중...
+        {t("canvas.loading")}
       </div>
     );
   }
@@ -219,7 +221,7 @@ export function AssignmentCanvas({
       <div className="border-b bg-background px-4 py-2 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium">과제 문서</span>
+          <span className="text-sm font-medium">{t("canvas.headerLabel")}</span>
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -255,7 +257,7 @@ export function AssignmentCanvas({
             className={`h-8 w-8 ${editor.isActive("bold") ? activeClass : inactiveClass}`}
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().toggleBold().run()}
-            title="굵게 (Ctrl+B)"
+            title={t("canvas.toolBold")}
           >
             <Bold className="h-4 w-4" />
           </Button>
@@ -266,7 +268,7 @@ export function AssignmentCanvas({
             className={`h-8 w-8 ${editor.isActive("italic") ? activeClass : inactiveClass}`}
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().toggleItalic().run()}
-            title="기울임 (Ctrl+I)"
+            title={t("canvas.toolItalic")}
           >
             <Italic className="h-4 w-4" />
           </Button>
@@ -281,7 +283,7 @@ export function AssignmentCanvas({
             className={`h-8 w-8 ${editor.isActive("heading", { level: 1 }) ? activeClass : inactiveClass}`}
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            title="제목 1"
+            title={t("canvas.toolHeading1")}
           >
             <Heading1 className="h-4 w-4" />
           </Button>
@@ -292,7 +294,7 @@ export function AssignmentCanvas({
             className={`h-8 w-8 ${editor.isActive("heading", { level: 2 }) ? activeClass : inactiveClass}`}
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            title="제목 2"
+            title={t("canvas.toolHeading2")}
           >
             <Heading2 className="h-4 w-4" />
           </Button>
@@ -307,7 +309,7 @@ export function AssignmentCanvas({
             className={`h-8 w-8 ${editor.isActive("bulletList") ? activeClass : inactiveClass}`}
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().toggleBulletList().run()}
-            title="글머리 기호 목록"
+            title={t("canvas.toolBulletList")}
           >
             <List className="h-4 w-4" />
           </Button>
@@ -318,7 +320,7 @@ export function AssignmentCanvas({
             className={`h-8 w-8 ${editor.isActive("orderedList") ? activeClass : inactiveClass}`}
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            title="번호 매기기 목록"
+            title={t("canvas.toolOrderedList")}
           >
             <ListOrdered className="h-4 w-4" />
           </Button>
@@ -333,7 +335,7 @@ export function AssignmentCanvas({
             className={`h-8 w-8 ${editor.isActive({ textAlign: "left" }) ? activeClass : inactiveClass}`}
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().setTextAlign("left").run()}
-            title="왼쪽 정렬"
+            title={t("canvas.toolAlignLeft")}
           >
             <AlignLeft className="h-4 w-4" />
           </Button>
@@ -344,7 +346,7 @@ export function AssignmentCanvas({
             className={`h-8 w-8 ${editor.isActive({ textAlign: "center" }) ? activeClass : inactiveClass}`}
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().setTextAlign("center").run()}
-            title="가운데 정렬"
+            title={t("canvas.toolAlignCenter")}
           >
             <AlignCenter className="h-4 w-4" />
           </Button>
@@ -355,7 +357,7 @@ export function AssignmentCanvas({
             className={`h-8 w-8 ${editor.isActive({ textAlign: "right" }) ? activeClass : inactiveClass}`}
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().setTextAlign("right").run()}
-            title="오른쪽 정렬"
+            title={t("canvas.toolAlignRight")}
           >
             <AlignRight className="h-4 w-4" />
           </Button>
@@ -370,10 +372,10 @@ export function AssignmentCanvas({
             className={`h-8 gap-1.5 px-2.5 ${isInCodeBlock ? activeClass : inactiveClass}`}
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-            title="코드 블록"
+            title={t("canvas.toolCodeBlock")}
           >
             <Code className="h-3.5 w-3.5" />
-            <span className="text-xs">코드</span>
+            <span className="text-xs">{t("canvas.toolCodeLabel")}</span>
           </Button>
 
           {/* Code language selector in toolbar — visible when in code block */}
@@ -404,10 +406,10 @@ export function AssignmentCanvas({
             className={`h-8 gap-1.5 px-2.5 ${isInTable ? activeClass : inactiveClass}`}
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-            title="테이블 삽입"
+            title={t("canvas.toolTableInsert")}
           >
             <Table2 className="h-3.5 w-3.5" />
-            <span className="text-xs">테이블</span>
+            <span className="text-xs">{t("canvas.toolTableLabel")}</span>
           </Button>
         </div>
       )}
@@ -415,7 +417,7 @@ export function AssignmentCanvas({
       {/* Table sub-toolbar — only when cursor is in table */}
       {!isSubmitted && isInTable && (
         <div className="border-b bg-blue-50/50 dark:bg-blue-950/20 px-3 py-1 flex items-center gap-1 shrink-0">
-          <span className="text-[10px] font-medium text-muted-foreground mr-1.5">표 편집</span>
+          <span className="text-[10px] font-medium text-muted-foreground mr-1.5">{t("canvas.tableEditLabel")}</span>
           <div className="w-px h-4 bg-border mx-0.5" />
           <Button
             type="button"
@@ -424,10 +426,10 @@ export function AssignmentCanvas({
             className="h-7 gap-1 px-2 text-xs"
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().addColumnAfter().run()}
-            title="열 추가"
+            title={t("canvas.tableAddColumn")}
           >
             <Plus className="h-3 w-3" />
-            열
+            {t("canvas.tableAddColumnLabel")}
           </Button>
           <Button
             type="button"
@@ -436,10 +438,10 @@ export function AssignmentCanvas({
             className="h-7 gap-1 px-2 text-xs"
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().addRowAfter().run()}
-            title="행 추가"
+            title={t("canvas.tableAddRow")}
           >
             <Plus className="h-3 w-3" />
-            행
+            {t("canvas.tableAddRowLabel")}
           </Button>
           <div className="w-px h-4 bg-border mx-0.5" />
           <Button
@@ -449,10 +451,10 @@ export function AssignmentCanvas({
             className="h-7 gap-1 px-2 text-xs text-muted-foreground"
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().deleteColumn().run()}
-            title="열 삭제"
+            title={t("canvas.tableDeleteColumn")}
           >
             <Minus className="h-3 w-3" />
-            열
+            {t("canvas.tableDeleteColumnLabel")}
           </Button>
           <Button
             type="button"
@@ -461,10 +463,10 @@ export function AssignmentCanvas({
             className="h-7 gap-1 px-2 text-xs text-muted-foreground"
             onMouseDown={preventFocusLoss}
             onClick={() => editor.chain().focus().deleteRow().run()}
-            title="행 삭제"
+            title={t("canvas.tableDeleteRow")}
           >
             <Minus className="h-3 w-3" />
-            행
+            {t("canvas.tableDeleteRowLabel")}
           </Button>
           <div className="w-px h-4 bg-border mx-0.5" />
           <Button
@@ -480,10 +482,10 @@ export function AssignmentCanvas({
                 editor.commands.clearContent();
               }
             }}
-            title="테이블 삭제"
+            title={t("canvas.tableDelete")}
           >
             <Trash2 className="h-3 w-3" />
-            삭제
+            {t("canvas.tableDeleteLabel")}
           </Button>
         </div>
       )}

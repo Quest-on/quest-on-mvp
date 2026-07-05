@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, type KeyboardEvent, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Loader2, User, Bot } from "lucide-react";
@@ -27,6 +28,7 @@ export function AssignmentChatPanel({
   questions,
   citations,
 }: AssignmentChatPanelProps) {
+  const t = useTranslations("assignment");
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -67,7 +69,7 @@ export function AssignmentChatPanel({
         renderAssistantBubble(
           "assignment-prompt",
           <div className="prose prose-sm dark:prose-invert max-w-none">
-            <p className="text-xs font-medium text-muted-foreground">과제 안내</p>
+            <p className="text-xs font-medium text-muted-foreground">{t("chatPanel.promptLabel")}</p>
             <AIMessageRenderer
               content={assignmentPrompt}
               timestamp={new Date().toISOString()}
@@ -79,7 +81,7 @@ export function AssignmentChatPanel({
         renderAssistantBubble(
           `assignment-question-${q.id}`,
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">문제 {i + 1}</p>
+            <p className="text-xs font-medium text-muted-foreground">{t("chatPanel.questionLabel", { number: i + 1 })}</p>
             <RichTextViewer content={q.text} className="text-sm" />
           </div>
         )
@@ -141,7 +143,7 @@ export function AssignmentChatPanel({
               {msg.role === "assistant" && idx === messages.length - 1 && citations && citations.length > 0 && (
                 <div className="ml-11 mt-2">
                   <div className="pt-2 border-t border-border/40 max-w-[80%]">
-                    <p className="text-xs text-muted-foreground mb-1.5 font-medium">참고 출처</p>
+                    <p className="text-xs text-muted-foreground mb-1.5 font-medium">{t("chatPanel.citationsLabel")}</p>
                     <div className="flex flex-col gap-1">
                       {citations.map((citation, cidx) => (
                         <a
@@ -175,15 +177,15 @@ export function AssignmentChatPanel({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="과제에 대해 질문하거나 도움을 요청하세요..."
+                placeholder={t("chatPanel.inputPlaceholder")}
                 className="min-h-[80px] max-h-[160px] resize-none border-0 bg-transparent rounded-2xl px-4 pt-4 pb-12 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm"
                 disabled={isLoading}
               />
               <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
                 <p className="text-xs text-muted-foreground px-2">
                   {messages.length > 0
-                    ? "제출 후 대화/리서치 기반 타임어택 퀴즈가 진행됩니다."
-                    : "AI와 대화하며 리서치 내용을 정리하세요."}
+                    ? t("chatPanel.hintWithMessages")
+                    : t("chatPanel.hintNoMessages")}
                 </p>
                 <Button
                   onClick={handleSend}

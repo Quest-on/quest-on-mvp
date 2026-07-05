@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDateTime as fmtDateTime, formatDate as fmtDate } from "@/lib/i18n/format";
 import {
   Activity,
   Bot,
@@ -142,8 +144,8 @@ function formatPercent(numerator: number, denominator: number): string {
   return `${((numerator / denominator) * 100).toFixed(1)}%`;
 }
 
-function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString("ko-KR", {
+function formatDateTime(value: string, locale: "ko" | "en"): string {
+  return fmtDateTime(value, locale, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -151,8 +153,8 @@ function formatDateTime(value: string): string {
   });
 }
 
-function formatCompactDate(value: string): string {
-  return new Date(value).toLocaleDateString("ko-KR", {
+function formatCompactDate(value: string, locale: "ko" | "en"): string {
+  return fmtDate(value, locale, {
     month: "short",
     day: "numeric",
   });
@@ -181,6 +183,9 @@ function buildSearchParams(filters: {
   return params.toString();
 }
 
+// NOTE: ChartConfig labels are defined outside the component; they cannot call hooks.
+// "비용" is used as a chart legend label — left as-is per chart library constraints.
+// If locale-aware chart labels are needed, initialize chartConfig inside the component.
 const dailyChartConfig = {
   cost: {
     label: "비용",
@@ -196,6 +201,8 @@ const featureChartConfig = {
 } satisfies ChartConfig;
 
 export default function AdminAiUsagePage() {
+  const t = useTranslations("admin");
+  const locale = useLocale() as "ko" | "en";
   const router = useRouter();
   const [range, setRange] = useState<RangeValue>("7d");
   const [feature, setFeature] = useState<string>("all");
@@ -241,7 +248,7 @@ export default function AdminAiUsagePage() {
         })}`
       );
       handleUnauthorized(response);
-      if (!response.ok) throw new Error("AI 사용량 요약을 불러오는데 실패했습니다.");
+      if (!response.ok) throw new Error(t("aiUsage.error.summaryFail"));
       return response.json();
     },
   });
@@ -261,7 +268,7 @@ export default function AdminAiUsagePage() {
         })}`
       );
       handleUnauthorized(response);
-      if (!response.ok) throw new Error("AI 사용량 상세를 불러오는데 실패했습니다.");
+      if (!response.ok) throw new Error(t("aiUsage.error.breakdownFail"));
       return response.json();
     },
   });
@@ -286,7 +293,7 @@ export default function AdminAiUsagePage() {
         })}`
       );
       handleUnauthorized(response);
-      if (!response.ok) throw new Error("AI 이벤트를 불러오는데 실패했습니다.");
+      if (!response.ok) throw new Error(t("aiUsage.error.eventsFail"));
       return response.json();
     },
   });
@@ -313,12 +320,12 @@ export default function AdminAiUsagePage() {
     "";
 
   return (
-    <AdminShell title="AI 사용량" icon={Bot}>
+    <AdminShell title={t("aiUsage.title")} icon={Bot}>
       <Card>
         <CardHeader>
-          <CardTitle>필터</CardTitle>
+          <CardTitle>{t("aiUsage.filter.title")}</CardTitle>
           <CardDescription>
-            기간과 feature/model/exam 기준으로 AI 비용과 이벤트를 확인합니다.
+            {t("aiUsage.filter.description")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -331,12 +338,12 @@ export default function AdminAiUsagePage() {
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="기간" />
+                <SelectValue placeholder={t("aiUsage.filter.period")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="7d">최근 7일</SelectItem>
-                <SelectItem value="30d">최근 30일</SelectItem>
-                <SelectItem value="90d">최근 90일</SelectItem>
+                <SelectItem value="7d">{t("aiUsage.filter.last7d")}</SelectItem>
+                <SelectItem value="30d">{t("aiUsage.filter.last30d")}</SelectItem>
+                <SelectItem value="90d">{t("aiUsage.filter.last90d")}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -351,7 +358,7 @@ export default function AdminAiUsagePage() {
                 <SelectValue placeholder="Feature" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">모든 feature</SelectItem>
+                <SelectItem value="all">{t("aiUsage.filter.allFeatures")}</SelectItem>
                 {AI_FEATURES.map((item) => (
                   <SelectItem key={item} value={item}>
                     {item}
@@ -368,18 +375,18 @@ export default function AdminAiUsagePage() {
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="상태" />
+                <SelectValue placeholder={t("aiUsage.filter.status")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">모든 상태</SelectItem>
-                <SelectItem value="success">성공</SelectItem>
-                <SelectItem value="error">에러</SelectItem>
-                <SelectItem value="timeout">타임아웃</SelectItem>
+                <SelectItem value="all">{t("aiUsage.filter.allStatus")}</SelectItem>
+                <SelectItem value="success">{t("aiUsage.filter.success")}</SelectItem>
+                <SelectItem value="error">{t("aiUsage.filter.error")}</SelectItem>
+                <SelectItem value="timeout">{t("aiUsage.filter.timeout")}</SelectItem>
               </SelectContent>
             </Select>
 
             <Input
-              placeholder="모델명 exact match"
+              placeholder={t("aiUsage.filter.modelPlaceholder")}
               value={model}
               onChange={(e) => {
                 setModel(e.target.value);
@@ -387,7 +394,7 @@ export default function AdminAiUsagePage() {
               }}
             />
             <Input
-              placeholder="시험 ID"
+              placeholder={t("aiUsage.filter.examIdPlaceholder")}
               value={examId}
               onChange={(e) => {
                 setExamId(e.target.value);
@@ -395,7 +402,7 @@ export default function AdminAiUsagePage() {
               }}
             />
             <Input
-              placeholder="세션 ID"
+              placeholder={t("aiUsage.filter.sessionIdPlaceholder")}
               value={sessionId}
               onChange={(e) => {
                 setSessionId(e.target.value);
@@ -414,7 +421,7 @@ export default function AdminAiUsagePage() {
               }}
             >
               <RefreshCw className="mr-2 h-4 w-4" />
-              새로고침
+              {t("aiUsage.filter.refresh")}
             </Button>
             <Button
               variant="ghost"
@@ -428,7 +435,7 @@ export default function AdminAiUsagePage() {
                 setPage(1);
               }}
             >
-              초기화
+              {t("aiUsage.filter.reset")}
             </Button>
           </div>
 
@@ -439,7 +446,7 @@ export default function AdminAiUsagePage() {
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">총 비용</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("aiUsage.summary.totalCost")}</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -450,7 +457,7 @@ export default function AdminAiUsagePage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">총 요청</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("aiUsage.summary.totalRequests")}</CardTitle>
             <Bot className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -461,7 +468,7 @@ export default function AdminAiUsagePage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">총 토큰</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("aiUsage.summary.totalTokens")}</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -472,7 +479,7 @@ export default function AdminAiUsagePage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">평균 비용/요청</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("aiUsage.summary.avgCostPerRequest")}</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -492,7 +499,7 @@ export default function AdminAiUsagePage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">실패율</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("aiUsage.summary.failRate")}</CardTitle>
             <Timer className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -502,7 +509,7 @@ export default function AdminAiUsagePage() {
                 : "-"}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              p95 latency {summary?.totals.p95LatencyMs ?? 0}ms
+              {t("aiUsage.summary.p95LatencyNote", { ms: summary?.totals.p95LatencyMs ?? 0 })}
             </p>
           </CardContent>
         </Card>
@@ -511,8 +518,8 @@ export default function AdminAiUsagePage() {
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>일별 비용 추이</CardTitle>
-            <CardDescription>선택한 기간 내 일별 비용 흐름입니다.</CardDescription>
+            <CardTitle>{t("aiUsage.chart.dailyCostTitle")}</CardTitle>
+            <CardDescription>{t("aiUsage.chart.dailyCostDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={dailyChartConfig} className="h-[280px] w-full">
@@ -520,7 +527,7 @@ export default function AdminAiUsagePage() {
                 <CartesianGrid vertical={false} />
                 <XAxis
                   dataKey="date"
-                  tickFormatter={formatCompactDate}
+                  tickFormatter={(value: string) => formatCompactDate(value, locale)}
                   tickLine={false}
                   axisLine={false}
                 />
@@ -548,8 +555,8 @@ export default function AdminAiUsagePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Feature별 비용</CardTitle>
-            <CardDescription>비용 상위 8개 feature를 표시합니다.</CardDescription>
+            <CardTitle>{t("aiUsage.chart.featureCostTitle")}</CardTitle>
+            <CardDescription>{t("aiUsage.chart.featureCostDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={featureChartConfig} className="h-[280px] w-full">
@@ -576,18 +583,18 @@ export default function AdminAiUsagePage() {
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>모델별 집계</CardTitle>
-            <CardDescription>모델별 요청 수와 비용입니다.</CardDescription>
+            <CardTitle>{t("aiUsage.table.byModel.title")}</CardTitle>
+            <CardDescription>{t("aiUsage.table.byModel.description")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>모델</TableHead>
-                    <TableHead className="text-right">요청</TableHead>
-                    <TableHead className="text-right">토큰</TableHead>
-                    <TableHead className="text-right">비용</TableHead>
+                    <TableHead>{t("aiUsage.table.byModel.colModel")}</TableHead>
+                    <TableHead className="text-right">{t("aiUsage.table.byModel.colRequests")}</TableHead>
+                    <TableHead className="text-right">{t("aiUsage.table.byModel.colTokens")}</TableHead>
+                    <TableHead className="text-right">{t("aiUsage.table.byModel.colCost")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -609,18 +616,18 @@ export default function AdminAiUsagePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>시험별 집계</CardTitle>
-            <CardDescription>시험 기준 비용 hotspot입니다.</CardDescription>
+            <CardTitle>{t("aiUsage.table.byExam.title")}</CardTitle>
+            <CardDescription>{t("aiUsage.table.byExam.description")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>시험</TableHead>
-                    <TableHead className="text-right">요청</TableHead>
-                    <TableHead className="text-right">토큰</TableHead>
-                    <TableHead className="text-right">비용</TableHead>
+                    <TableHead>{t("aiUsage.table.byExam.colExam")}</TableHead>
+                    <TableHead className="text-right">{t("aiUsage.table.byExam.colRequests")}</TableHead>
+                    <TableHead className="text-right">{t("aiUsage.table.byExam.colTokens")}</TableHead>
+                    <TableHead className="text-right">{t("aiUsage.table.byExam.colCost")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -651,18 +658,18 @@ export default function AdminAiUsagePage() {
       {examId && breakdown?.bySession && breakdown.bySession.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>세션별 집계</CardTitle>
-            <CardDescription>선택한 시험 안에서 세션별 비용을 확인합니다.</CardDescription>
+            <CardTitle>{t("aiUsage.table.bySession.title")}</CardTitle>
+            <CardDescription>{t("aiUsage.table.bySession.description")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>세션</TableHead>
-                    <TableHead className="text-right">요청</TableHead>
-                    <TableHead className="text-right">토큰</TableHead>
-                    <TableHead className="text-right">비용</TableHead>
+                    <TableHead>{t("aiUsage.table.bySession.colSession")}</TableHead>
+                    <TableHead className="text-right">{t("aiUsage.table.bySession.colRequests")}</TableHead>
+                    <TableHead className="text-right">{t("aiUsage.table.bySession.colTokens")}</TableHead>
+                    <TableHead className="text-right">{t("aiUsage.table.bySession.colCost")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -692,9 +699,9 @@ export default function AdminAiUsagePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>최근 이벤트</CardTitle>
+          <CardTitle>{t("aiUsage.table.events.title")}</CardTitle>
           <CardDescription>
-            raw AI 이벤트 목록입니다. 행을 클릭하면 request/response id와 metadata를 확인합니다.
+            {t("aiUsage.table.events.description")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -702,13 +709,13 @@ export default function AdminAiUsagePage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>시간</TableHead>
-                  <TableHead>Feature</TableHead>
-                  <TableHead>모델</TableHead>
-                  <TableHead>상태</TableHead>
-                  <TableHead className="text-right">비용</TableHead>
-                  <TableHead className="text-right">토큰</TableHead>
-                  <TableHead className="text-right">지연</TableHead>
+                  <TableHead>{t("aiUsage.table.events.colTime")}</TableHead>
+                  <TableHead>{t("aiUsage.table.events.colFeature")}</TableHead>
+                  <TableHead>{t("aiUsage.table.events.colModel")}</TableHead>
+                  <TableHead>{t("aiUsage.table.events.colStatus")}</TableHead>
+                  <TableHead className="text-right">{t("aiUsage.table.events.colCost")}</TableHead>
+                  <TableHead className="text-right">{t("aiUsage.table.events.colTokens")}</TableHead>
+                  <TableHead className="text-right">{t("aiUsage.table.events.colLatency")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -720,7 +727,7 @@ export default function AdminAiUsagePage() {
                       onClick={() => setSelectedEvent(event)}
                     >
                       <TableCell className="font-mono text-xs">
-                        {formatDateTime(event.createdAt)}
+                        {formatDateTime(event.createdAt, locale)}
                       </TableCell>
                       <TableCell>{event.feature}</TableCell>
                       <TableCell className="font-mono text-xs">{event.model}</TableCell>
@@ -740,7 +747,7 @@ export default function AdminAiUsagePage() {
                   <TableRow>
                     <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                       <Search className="mx-auto mb-3 h-10 w-10 opacity-50" />
-                      이벤트가 없습니다.
+                      {t("aiUsage.table.events.empty")}
                     </TableCell>
                   </TableRow>
                 )}
@@ -756,10 +763,10 @@ export default function AdminAiUsagePage() {
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
                 disabled={page === 1}
               >
-                이전
+                {t("aiUsage.table.events.prev")}
               </Button>
               <div className="text-sm text-muted-foreground">
-                페이지 {page} / {totalPages}
+                {t("aiUsage.table.events.page", { page, total: totalPages })}
               </div>
               <Button
                 variant="outline"
@@ -767,7 +774,7 @@ export default function AdminAiUsagePage() {
                 onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
                 disabled={page >= totalPages}
               >
-                다음
+                {t("aiUsage.table.events.next")}
               </Button>
             </div>
           )}
@@ -777,9 +784,9 @@ export default function AdminAiUsagePage() {
       <Dialog open={!!selectedEvent} onOpenChange={(open) => !open && setSelectedEvent(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>AI 이벤트 상세</DialogTitle>
+            <DialogTitle>{t("aiUsage.detail.title")}</DialogTitle>
             <DialogDescription>
-              {selectedEvent ? formatDateTime(selectedEvent.createdAt) : ""}
+              {selectedEvent ? formatDateTime(selectedEvent.createdAt, locale) : ""}
             </DialogDescription>
           </DialogHeader>
 
@@ -787,41 +794,41 @@ export default function AdminAiUsagePage() {
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <p className="text-sm font-medium">Feature</p>
+                  <p className="text-sm font-medium">{t("aiUsage.detail.labelFeature")}</p>
                   <p className="text-sm text-muted-foreground">{selectedEvent.feature}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">모델</p>
+                  <p className="text-sm font-medium">{t("aiUsage.detail.labelModel")}</p>
                   <p className="font-mono text-sm text-muted-foreground">{selectedEvent.model}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">상태</p>
+                  <p className="text-sm font-medium">{t("aiUsage.detail.labelStatus")}</p>
                   <p className="text-sm text-muted-foreground">{selectedEvent.status}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">지연 시간</p>
+                  <p className="text-sm font-medium">{t("aiUsage.detail.labelLatency")}</p>
                   <p className="text-sm text-muted-foreground">{selectedEvent.latencyMs ?? 0}ms</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Request ID</p>
+                  <p className="text-sm font-medium">{t("aiUsage.detail.labelRequestId")}</p>
                   <p className="font-mono text-xs text-muted-foreground">
                     {selectedEvent.requestId || "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Response ID</p>
+                  <p className="text-sm font-medium">{t("aiUsage.detail.labelResponseId")}</p>
                   <p className="font-mono text-xs text-muted-foreground">
                     {selectedEvent.responseId || "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Exam</p>
+                  <p className="text-sm font-medium">{t("aiUsage.detail.labelExam")}</p>
                   <p className="text-sm text-muted-foreground">
                     {selectedEvent.examTitle || selectedEvent.examId || "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Session</p>
+                  <p className="text-sm font-medium">{t("aiUsage.detail.labelSession")}</p>
                   <p className="font-mono text-xs text-muted-foreground">
                     {selectedEvent.sessionId || "-"}
                   </p>
@@ -830,25 +837,25 @@ export default function AdminAiUsagePage() {
 
               <div className="grid gap-4 md:grid-cols-4">
                 <div>
-                  <p className="text-sm font-medium">Input</p>
+                  <p className="text-sm font-medium">{t("aiUsage.detail.labelInput")}</p>
                   <p className="text-sm text-muted-foreground">
                     {(selectedEvent.inputTokens ?? 0).toLocaleString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Output</p>
+                  <p className="text-sm font-medium">{t("aiUsage.detail.labelOutput")}</p>
                   <p className="text-sm text-muted-foreground">
                     {(selectedEvent.outputTokens ?? 0).toLocaleString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Total</p>
+                  <p className="text-sm font-medium">{t("aiUsage.detail.labelTotal")}</p>
                   <p className="text-sm text-muted-foreground">
                     {(selectedEvent.totalTokens ?? 0).toLocaleString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">비용</p>
+                  <p className="text-sm font-medium">{t("aiUsage.detail.labelCost")}</p>
                   <p className="text-sm text-muted-foreground">
                     {formatUsdMicros(selectedEvent.estimatedCostUsdMicros)}
                   </p>
@@ -856,7 +863,7 @@ export default function AdminAiUsagePage() {
               </div>
 
               <div>
-                <p className="mb-1 text-sm font-medium">Metadata</p>
+                <p className="mb-1 text-sm font-medium">{t("aiUsage.detail.labelMetadata")}</p>
                 <pre className="max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">
                   {JSON.stringify(selectedEvent.metadata ?? {}, null, 2)}
                 </pre>

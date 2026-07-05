@@ -8,10 +8,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { GraduationCap, Users, FilePlus, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 export function Header() {
   const { isSignedIn, isLoaded, profile } = useAppUser();
   const pathname = usePathname();
+  const t = useTranslations("common");
 
   const userRole = profile?.role ?? "student";
   const hasRole = Boolean(profile?.role);
@@ -48,13 +50,13 @@ export function Header() {
             <div className="flex items-center space-x-2">
               <Image
                 src="/qlogo_icon.png"
-                alt="Quest-On Logo"
+                alt={t("brand.logoAlt")}
                 width={32}
                 height={32}
                 className="h-8 w-8"
               />
               <span className="text-xl font-bold text-gray-900 dark:text-white">
-                Quest-On
+                {t("brand.name")}
               </span>
             </div>
           </Link>
@@ -76,7 +78,7 @@ export function Header() {
                   }
                 >
                   <Users className="h-4 w-4" />
-                  <span>대시보드</span>
+                  <span>{t("nav.dashboard")}</span>
                 </Link>
                 <Link
                   href="/instructor/new"
@@ -86,7 +88,7 @@ export function Header() {
                   }
                 >
                   <FilePlus className="h-4 w-4" />
-                  <span>시험 만들기</span>
+                  <span>{t("nav.newExam")}</span>
                 </Link>
               </>
             )}
@@ -98,7 +100,7 @@ export function Header() {
                   aria-current={isLinkActive("/student") ? "page" : undefined}
                 >
                   <GraduationCap className="h-4 w-4" />
-                  <span>내 시험</span>
+                  <span>{t("nav.myExams")}</span>
                 </Link>
                 <Link
                   href="/join"
@@ -106,7 +108,7 @@ export function Header() {
                   aria-current={isLinkActive("/join") ? "page" : undefined}
                 >
                   <UserPlus className="h-4 w-4" />
-                  <span>시험 참여</span>
+                  <span>{t("nav.joinExam")}</span>
                 </Link>
               </>
             )}
@@ -123,11 +125,11 @@ export function Header() {
                 <div className="flex items-center space-x-2">
                   <Link href="/sign-in">
                     <Button variant="outline" size="sm">
-                      로그인
+                      {t("auth.signIn")}
                     </Button>
                   </Link>
                   <Link href="/sign-up">
-                    <Button size="sm">회원가입</Button>
+                    <Button size="sm">{t("auth.signUp")}</Button>
                   </Link>
                 </div>
               )}

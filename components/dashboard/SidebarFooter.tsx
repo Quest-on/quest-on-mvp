@@ -15,11 +15,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeTogglerButton } from "@/components/animate-ui/components/buttons/theme-toggler";
+import { useTranslations } from "next-intl";
 
 export function SidebarFooter() {
   const { user, profile } = useAppUser();
   const router = useRouter();
   const { state } = useSidebar();
+  const t = useTranslations("instructor");
   const isCollapsed = state === "collapsed";
 
   const handleSignOut = async () => {
@@ -70,18 +72,18 @@ export function SidebarFooter() {
         className="cursor-pointer"
       >
         <User className="mr-2 h-4 w-4" />
-        프로필
+        {t("footer.profile")}
       </DropdownMenuItem>
       <DropdownMenuItem
         onClick={() => router.push("/settings")}
         className="cursor-pointer"
       >
         <Settings className="mr-2 h-4 w-4" />
-        설정
+        {t("footer.settings")}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <div className="flex items-center justify-between px-2 py-1.5 text-sm">
-        <span className="text-foreground/80">테마</span>
+        <span className="text-foreground/80">{t("footer.theme")}</span>
         <ThemeTogglerButton modes={["light", "dark"]} variant="outline" size="sm" />
       </div>
       <DropdownMenuSeparator />
@@ -90,7 +92,7 @@ export function SidebarFooter() {
         className="cursor-pointer text-destructive focus:text-destructive"
       >
         <LogOut className="mr-2 h-4 w-4" />
-        로그아웃
+        {t("footer.signOut")}
       </DropdownMenuItem>
     </DropdownMenuContent>
   );
@@ -103,7 +105,7 @@ export function SidebarFooter() {
             <DropdownMenuTrigger asChild>
               <button
                 className="rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-sidebar"
-                aria-label="프로필 메뉴"
+                aria-label={t("sidebar.profileMenu")}
               >
                 {avatarElement}
               </button>
@@ -121,7 +123,7 @@ export function SidebarFooter() {
                   {displayName}
                 </p>
                 <p className="text-xs text-sidebar-foreground/75 truncate">
-                  {userRole === "instructor" ? "강사" : "학생"}
+                  {userRole === "instructor" ? t("footer.roleInstructor") : t("footer.roleStudent")}
                 </p>
               </div>
               <ChevronDown className="h-4 w-4 text-sidebar-foreground/75 shrink-0" />
