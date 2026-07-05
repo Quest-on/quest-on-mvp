@@ -108,25 +108,16 @@ export async function resolveLocale(): Promise<Locale> {
   const store = await cookies();
   const cookieLocale = store.get(LOCALE_COOKIE)?.value;
   if (isLocale(cookieLocale)) return cookieLocale;
-  const user = await currentUser().catch(() => null);
-  if (user && isLocale((user as { language?: string }).language)) {
-    return (user as { language: Locale }).language;
-  }
-  return defaultLocale;
+  return defaultLocale; // v1: 쿠키 전용. DB 유저 선호 언어는 후속 PR.
 }
 
 export async function setLocale(locale: Locale): Promise<void> {
   if (!isLocale(locale)) return;
   const store = await cookies();
   store.set(LOCALE_COOKIE, locale, { path: "/", maxAge: 60 * 60 * 24 * 365 });
-  const user = await currentUser().catch(() => null);
-  if (user?.id) {
-    const supabase = await getSupabaseServer();
-    await supabase.from("app_users").update({ language: locale }).eq("id", user.id);
-  }
 }
 ```
-> 주의: `currentUser`/`getSupabaseServer` 실제 시그니처를 확인해 맞출 것(`lib/supabase-auth.ts`, `lib/supabase-server.ts`).
+> **정정**: 유저 레벨 `language` 컬럼은 존재하지 않음(라인 69 `language`는 `exams` 소속, 유저는 Supabase `profiles`). v1은 쿠키 전용. 기기 간 동기화는 후속.
 
 - [ ] **Step 2: `request.ts`**
 ```ts
@@ -152,13 +143,12 @@ export default getRequestConfig(async () => {
 - [ ] **Step 4: typecheck** — Run: `npx tsc --noEmit` → 통과.
 - [ ] **Step 5: Commit** — `git commit -m "feat(i18n): 로케일 해석 + request config + 메시지 골격"`
 
-### Task 0.4: AppUser.language 노출
+### Task 0.4: (후속 준비) profiles 언어 컬럼 마이그레이션 — 실행 안 함
 
-**Files:** Modify `lib/supabase-auth.ts`
+**Files:** Create `database/[NNN]_profiles_add_language.sql` (실행하지 않음, 후속 PR용)
 
-- [ ] **Step 1:** `AppUser` 타입/조회 select에 `language: "ko" | "en"` 추가(기본 ko fallback). 실제 select 쿼리에 `language` 컬럼 포함.
-- [ ] **Step 2: typecheck** → 통과.
-- [ ] **Step 3: Commit** — `git commit -m "feat(i18n): AppUser에 language 노출"`
+- [ ] **Step 1:** `ALTER TABLE profiles ADD COLUMN IF NOT EXISTS language text NOT NULL DEFAULT 'ko';` SQL 파일만 작성. 실 DB 실행·`currentUser` 수정은 후속 PR(기기 간 동기화 시)로 미룸.
+- [ ] **Step 2: Commit** — `git commit -m "chore(i18n): profiles 언어 컬럼 마이그레이션 준비(미실행)"`
 
 ### Task 0.5: Provider 배선
 
