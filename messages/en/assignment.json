@@ -1,1 +1,134 @@
-{}
+{
+  "page": {
+    "loading": "Loading assignment...",
+    "errorTitle": "Unable to open assignment",
+    "backButton": "Back",
+    "notFoundTitle": "Assignment not found",
+    "notFoundDescription": "Check your assignment code or contact your instructor.",
+    "deadlineExpiredToast": "The deadline has passed. Submitting automatically.",
+    "autoSubmitSuccess": "Assignment submitted automatically.",
+    "finalAnswerRequired": "Please write your final answer before submitting.",
+    "saveError": "Failed to save your final answer. Please try again.",
+    "submitError": "Submission failed.",
+    "quizRedirect": "Redirecting to the timed quiz.",
+    "submitNetworkError": "An error occurred during submission."
+  },
+  "review": {
+    "errorNotViewable": "This assignment is not available for review.",
+    "errorNotFound": "Assignment record not found.",
+    "errorLoading": "An error occurred while loading the assignment record.",
+    "errorFallback": "Unable to load assignment record",
+    "backToDashboard": "Back to student dashboard",
+    "breadcrumbDashboard": "Dashboard",
+    "breadcrumbReview": "Review",
+    "statusBadge": "Read-only · Closed",
+    "deadline": "Due: {deadline}",
+    "readonlyNotice": "The deadline has passed. Your submission is shown in read-only mode and can no longer be edited.",
+    "dashboardButton": "Dashboard",
+    "noSessionRecord": "No submission record found for this assignment.",
+    "sectionPrompt": "Assignment prompt",
+    "sectionQuestions": "Assignment questions",
+    "questionLabel": "Question {number}",
+    "sectionChat": "My research chat",
+    "noChatHistory": "No chat history.",
+    "sectionFinalAnswer": "My final answer"
+  },
+  "header": {
+    "overdue": "Overdue",
+    "timeLeftDaysHours": "{days}d {hours}h remaining",
+    "timeLeftHoursMinutes": "{hours}h {minutes}m remaining",
+    "timeLeftMinutesSeconds": "{minutes}m {seconds}s remaining",
+    "timeLeftSeconds": "{seconds}s remaining",
+    "submittedBadge": "Submitted",
+    "submittingButton": "Submitting...",
+    "submitButton": "Submit"
+  },
+  "chatPanel": {
+    "promptLabel": "Assignment prompt",
+    "questionLabel": "Question {number}",
+    "citationsLabel": "References",
+    "inputPlaceholder": "Ask a question or request help with the assignment...",
+    "hintWithMessages": "After submitting, a timed quiz based on your research will begin.",
+    "hintNoMessages": "Chat with the AI to organize your research and ideas."
+  },
+  "submitDialog": {
+    "title": "Submit assignment?",
+    "description": "Submitting will end the chat and immediately start a timed quiz. The quiz must be completed to finalize your submission.",
+    "finalAnswerPreview": "Final answer preview",
+    "editButton": "Edit",
+    "cancelButton": "Cancel",
+    "submittingButton": "Submitting...",
+    "submitButton": "Submit"
+  },
+  "finalAnswerButton": {
+    "ariaHasContent": "Edit final answer",
+    "ariaNoContent": "Write final answer",
+    "labelHasContent": "Final answer written",
+    "labelNoContent": "Write final answer"
+  },
+  "finalAnswerSheet": {
+    "title": "Final answer",
+    "description": "Summarize your research in your own words. This will be used along with your chat history for grading.",
+    "placeholder": "Write your final answer here...",
+    "ariaLabel": "Final answer",
+    "charCount": "{current} / {max} chars",
+    "statusSubmitted": "Submitted — read only",
+    "statusSaving": "Saving...",
+    "statusLastSaved": "Last saved: {time}",
+    "statusUnsaved": "Unsaved",
+    "statusNoChanges": "No changes",
+    "closeButton": "Close"
+  },
+  "canvas": {
+    "placeholder": "Chat with the AI or write your document directly...",
+    "pdfFilename": "{title}.pdf",
+    "pdfFallbackTitle": "Assignment",
+    "loading": "Loading editor...",
+    "headerLabel": "Assignment document",
+    "toolBold": "Bold (Ctrl+B)",
+    "toolItalic": "Italic (Ctrl+I)",
+    "toolHeading1": "Heading 1",
+    "toolHeading2": "Heading 2",
+    "toolBulletList": "Bullet list",
+    "toolOrderedList": "Numbered list",
+    "toolAlignLeft": "Align left",
+    "toolAlignCenter": "Align center",
+    "toolAlignRight": "Align right",
+    "toolCodeBlock": "Code block",
+    "toolCodeLabel": "Code",
+    "toolTableInsert": "Insert table",
+    "toolTableLabel": "Table",
+    "tableEditLabel": "Edit table",
+    "tableAddColumn": "Add column",
+    "tableAddColumnLabel": "Column",
+    "tableAddRow": "Add row",
+    "tableAddRowLabel": "Row",
+    "tableDeleteColumn": "Delete column",
+    "tableDeleteColumnLabel": "Column",
+    "tableDeleteRow": "Delete row",
+    "tableDeleteRowLabel": "Row",
+    "tableDelete": "Delete table",
+    "tableDeleteLabel": "Delete"
+  },
+  "chat": {
+    "aiAnswer": "AI response",
+    "latexBadge": "Contains LaTeX math",
+    "copySuccess": "Copied.",
+    "copyError": "Failed to copy.",
+    "copyAriaLabel": "Copy message"
+  },
+  "codeEditor": {
+    "loading": "Loading editor..."
+  },
+  "erdCanvas": {
+    "addTable": "Add table",
+    "deleteSelected": "Delete selected"
+  },
+  "hybridWorkspace": {
+    "codeLabel": "Code ({language})",
+    "erdLabel": "ERD Diagram"
+  },
+  "tableNode": {
+    "noColumns": "No columns defined"
+  }
+}

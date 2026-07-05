@@ -1,6 +1,117 @@
 {
+  "page": {
+    "loading": {
+      "title": "Loading student dashboard...",
+      "description": "Preparing your session list and stats."
+    }
+  },
+  "quiz": {
+    "loadError": "Failed to load the quiz.",
+    "submitError": "Failed to submit the quiz.",
+    "submitSuccess": "Quiz submitted successfully.",
+    "loading": "Preparing the timed quiz...",
+    "backToDashboard": "Back to dashboard",
+    "cannotLoad": "Unable to load the quiz",
+    "cannotLoadHint": "Please try again in a moment, or resume from the assignment list.",
+    "alreadyCompleted": "You have already completed this quiz",
+    "goToReport": "View report",
+    "title": "Timed comprehension quiz",
+    "timerSeconds": "{seconds}s",
+    "answeredCount": "{answered}/{total} answered",
+    "description": "This quiz checks whether you genuinely understood the conversation and research from the assignment. Unanswered questions will be auto-submitted when time runs out.",
+    "unansweredWarning": "Unanswered questions will be marked incorrect.",
+    "submitting": "Submitting...",
+    "submitButton": "Submit quiz and finalize"
+  },
   "dashboard": {
+    "greeting": {
+      "morning": "Good morning, {name} ☀️",
+      "afternoon": "Keep it up, {name} 💪",
+      "evening": "Great work today, {name} 🌙"
+    },
+    "nav": {
+      "dashboard": "Dashboard",
+      "newExam": "New exam"
+    },
     "welcomeDesc": "Enter an exam code to start an exam, or check the results of completed exams",
-    "joinButton": "Start Exam"
+    "joinButton": "Start exam",
+    "profileLoading": "Loading profile...",
+    "loginRequired": "Sign in required",
+    "loginHint": "Please sign in to access the student dashboard",
+    "loginButton": "Sign in as student",
+    "title": "Student dashboard",
+    "stats": {
+      "totalExams": "Total exams",
+      "completionRate": "{rate}% completion rate",
+      "thisMonth": "· {count} this month",
+      "completedAndInProgress": "{completed} completed, {inProgress} in progress",
+      "todo": "To-do",
+      "unsubmittedAssignments": "{count} unsubmitted {count, plural, one {assignment} other {assignments}}",
+      "averageScore": "Average score",
+      "pendingEvaluation": "Pending evaluation",
+      "examBasis": "Based on {count} {count, plural, one {exam} other {exams}}",
+      "completedExams": "Exams completed",
+      "inProgress": "{count} in progress",
+      "allCompleted": "All exams completed"
+    },
+    "history": {
+      "title": "History",
+      "description": "Your exam performance and progress",
+      "filteredCount": "Showing {filtered} of {total}",
+      "totalCount": "{total} {total, plural, one {exam} other {exams}} total"
+    },
+    "filter": {
+      "all": "All",
+      "allAria": "Filter: All",
+      "graded": "Graded",
+      "gradedAria": "Filter: Graded",
+      "pending": "Pending",
+      "pendingAria": "Filter: Pending evaluation",
+      "inProgress": "In progress",
+      "inProgressAria": "Filter: In progress",
+      "unsubmitted": "Not submitted",
+      "unsubmittedAria": "Filter: Not submitted"
+    },
+    "search": {
+      "placeholder": "Search by exam title or code...",
+      "ariaLabel": "Search exams",
+      "resetAria": "Clear filters and search"
+    },
+    "view": {
+      "gridAria": "Grid view",
+      "listAria": "List view"
+    },
+    "emptyState": {
+      "noExams": "No exams yet",
+      "noExamsHint": "Start your first exam to begin tracking your progress.",
+      "startFirst": "Start your first exam",
+      "noResults": "No results found",
+      "noResultsHint": "Try a different keyword or filter.",
+      "resetSearch": "Clear search"
+    },
+    "session": {
+      "statusAria": "Status: {status}",
+      "statusCompleted": "Completed",
+      "statusQuizPending": "Quiz pending",
+      "statusInProgress": "In progress",
+      "assignment": "Assignment",
+      "durationMinutes": "{duration} min",
+      "submissionCount": "{count} {count, plural, one {question} other {questions}} submitted",
+      "averageScoreAria": "Average score: {score}%",
+      "scorePoints": "{score}/{maxScore} pts",
+      "pendingEvaluation": "Pending evaluation"
+    },
+    "action": {
+      "viewRecord": "View record",
+      "continue": "Continue",
+      "takeQuiz": "Take quiz",
+      "checkAnswer": "Check answers",
+      "viewReport": "View report"
+    },
+    "infinite": {
+      "loading": "Loading more...",
+      "scrollHint": "Scroll to load more",
+      "allLoaded": "All exams loaded."
+    }
   }
 }

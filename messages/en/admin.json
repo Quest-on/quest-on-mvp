@@ -1,12 +1,235 @@
 {
+  "dashboard": {
+    "title": "Admin Dashboard",
+    "loading": "Loading...",
+    "stats": {
+      "totalUsers": "Total Users",
+      "instructors": "Instructors",
+      "students": "Students",
+      "noRole": "No Role Assigned"
+    },
+    "ai": {
+      "cost7d": "AI Cost (Last 7 Days)",
+      "requests7d": "AI Requests (Last 7 Days)",
+      "failRate7d": "Failure Rate (Last 7 Days)"
+    },
+    "pending": {
+      "title": "Pending Instructor Approvals ({count})",
+      "description": "Instructor approval requests are waiting. Please review and approve.",
+      "noName": "No name",
+      "appliedAt": "Applied: {date}",
+      "approve": "Approve"
+    },
+    "userManagement": {
+      "title": "User Management",
+      "description": "Search users and manage roles",
+      "searchPlaceholder": "Search by email or name...",
+      "roleFilter": "Role",
+      "allRoles": "All Roles",
+      "instructor": "Instructor",
+      "student": "Student",
+      "noRole": "Not Set",
+      "refresh": "Refresh",
+      "emptySearch": "No users match your search.",
+      "joinedAt": "Joined: {date}"
+    },
+    "error": {
+      "loadFail": "Failed to load user information.",
+      "aiLoadFail": "Failed to load AI usage information.",
+      "roleChangeFail": "Failed to change role.",
+      "serverError": "A server error occurred."
+    }
+  },
+  "login": {
+    "title": "Admin Login",
+    "description": "Sign in to access the Quest-On admin console",
+    "username": "Username",
+    "usernamePlaceholder": "Enter admin username",
+    "password": "Password",
+    "passwordPlaceholder": "Enter password",
+    "submit": "Sign In",
+    "submitting": "Signing in...",
+    "error": {
+      "loginFail": "Login failed.",
+      "serverError": "A server error occurred."
+    }
+  },
+  "aiUsage": {
+    "title": "AI Usage",
+    "filter": {
+      "title": "Filters",
+      "description": "View AI cost and events by time period, feature, model, or exam.",
+      "period": "Period",
+      "last7d": "Last 7 days",
+      "last30d": "Last 30 days",
+      "last90d": "Last 90 days",
+      "allFeatures": "All features",
+      "status": "Status",
+      "allStatus": "All statuses",
+      "success": "Success",
+      "error": "Error",
+      "timeout": "Timeout",
+      "modelPlaceholder": "Model name (exact match)",
+      "examIdPlaceholder": "Exam ID",
+      "sessionIdPlaceholder": "Session ID",
+      "refresh": "Refresh",
+      "reset": "Reset"
+    },
+    "summary": {
+      "totalCost": "Total Cost",
+      "totalRequests": "Total Requests",
+      "totalTokens": "Total Tokens",
+      "avgCostPerRequest": "Avg Cost / Request",
+      "failRate": "Failure Rate",
+      "p95LatencyNote": "p95 latency {ms}ms"
+    },
+    "chart": {
+      "dailyCostTitle": "Daily Cost Trend",
+      "dailyCostDesc": "Cost over the selected period, by day.",
+      "featureCostTitle": "Cost by Feature",
+      "featureCostDesc": "Top 8 features by cost.",
+      "cost": "Cost"
+    },
+    "table": {
+      "byModel": {
+        "title": "By Model",
+        "description": "Request count and cost broken down by model.",
+        "colModel": "Model",
+        "colRequests": "Requests",
+        "colTokens": "Tokens",
+        "colCost": "Cost"
+      },
+      "byExam": {
+        "title": "By Exam",
+        "description": "Cost hotspot by exam.",
+        "colExam": "Exam",
+        "colRequests": "Requests",
+        "colTokens": "Tokens",
+        "colCost": "Cost"
+      },
+      "bySession": {
+        "title": "By Session",
+        "description": "Cost breakdown by session within the selected exam.",
+        "colSession": "Session",
+        "colRequests": "Requests",
+        "colTokens": "Tokens",
+        "colCost": "Cost"
+      },
+      "events": {
+        "title": "Recent Events",
+        "description": "Raw AI event log. Click a row to view request/response id and metadata.",
+        "colTime": "Time",
+        "colFeature": "Feature",
+        "colModel": "Model",
+        "colStatus": "Status",
+        "colCost": "Cost",
+        "colTokens": "Tokens",
+        "colLatency": "Latency",
+        "empty": "No events found.",
+        "page": "Page {page} of {total}",
+        "prev": "Previous",
+        "next": "Next"
+      }
+    },
+    "detail": {
+      "title": "AI Event Detail",
+      "labelModel": "Model",
+      "labelStatus": "Status",
+      "labelLatency": "Latency",
+      "labelExam": "Exam",
+      "labelSession": "Session",
+      "labelInput": "Input",
+      "labelOutput": "Output",
+      "labelTotal": "Total",
+      "labelCost": "Cost",
+      "labelMetadata": "Metadata",
+      "labelFeature": "Feature",
+      "labelRequestId": "Request ID",
+      "labelResponseId": "Response ID"
+    },
+    "error": {
+      "summaryFail": "Failed to load AI usage summary.",
+      "breakdownFail": "Failed to load AI usage breakdown.",
+      "eventsFail": "Failed to load AI events."
+    }
+  },
+  "shell": {
+    "menuTitle": "Menu",
+    "mainNav": "Main Navigation"
+  },
+  "sidebar": {
+    "logout": "Sign Out",
+    "logoutAriaLabel": "Sign out"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "aiUsage": "AI Usage"
+  },
   "agent": {
     "errors": {
       "cancelledByInstructor": "The instructor stopped the task.",
       "navigateFailed": "Failed to navigate to the page.",
-      "editorNotReady": "The editor is not ready. Navigation to the exam creation page is required.",
+      "editorNotReady": "The editor is not ready. Navigate to the exam creation page to continue.",
       "actionFailed": "An error occurred while executing the action.",
       "runFailed": "An error occurred during agent execution.",
       "startFailed": "Failed to start agent execution."
+    },
+    "fab": {
+      "ariaLabel": "Open AI agent"
+    },
+    "panel": {
+      "title": "AI Agent",
+      "description": "AI agent panel",
+      "subtitle": "Here to help with exam editing",
+      "closeAriaLabel": "Close agent panel",
+      "ariaLabel": "AI agent panel"
+    },
+    "phase": {
+      "running": "Running",
+      "done": "Done",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "idle": {
+      "helpTitle": "How can I help?",
+      "helpDesc": "Describe what you'd like to do in plain language. The agent will edit the exam directly and show you each step here.",
+      "composerPlaceholder": "e.g. Create 5 short-answer questions on Calculus Unit 1"
+    },
+    "running": {
+      "stopping": "Stopping…",
+      "statusLabel": "Agent running · Press ESC to stop",
+      "stopAriaLabel": "Stop agent"
+    },
+    "done": {
+      "successTitle": "Task complete",
+      "newTask": "Start a new task"
+    },
+    "failed": {
+      "errorTitle": "Task failed",
+      "unknownError": "An unknown error occurred.",
+      "newTask": "Start a new task"
+    },
+    "cancelled": {
+      "title": "Task cancelled",
+      "desc": "Steps completed so far are shown above. You can start a new task.",
+      "newTask": "Start a new task"
+    },
+    "composer": {
+      "sendAriaLabel": "Send"
+    },
+    "timeline": {
+      "step": {
+        "userInput": "Request",
+        "plan": "Plan",
+        "dataFetch": "Data fetch",
+        "analysis": "Analysis",
+        "toolCall": "Tool call",
+        "draft": "Draft",
+        "approval": "Approval",
+        "final": "Complete"
+      },
+      "pending": "Agent is working…",
+      "noSteps": "No steps yet."
     }
   }
 }
