@@ -1,0 +1,102 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"/>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:-apple-system,'Pretendard','Apple SD Gothic Neo',sans-serif;background:#f8fafc;color:#0f172a;}
+  .mono{font-family:'SF Mono','Geist Mono','JetBrains Mono',ui-monospace,monospace;}
+
+  /* ===== hero card (1080×1080) ===== */
+  .card{width:1080px;height:1080px;background:#fff;padding:64px 72px;display:flex;flex-direction:column;overflow:hidden;border:1px solid #e2e8f0;}
+  .h{font-size:24px;color:#3559C4;font-weight:800;letter-spacing:.2px;}
+  h2{font-size:48px;font-weight:800;letter-spacing:-1.1px;line-height:1.18;margin-top:8px;}
+  .sub{font-size:22px;color:#64748b;margin-top:10px;line-height:1.45;}
+
+  .strip{display:flex;gap:16px;margin:32px 0 0;}
+  .stat{flex:1;border:1px solid #e5e7eb;border-radius:14px;padding:22px 20px;background:#fafbfc;}
+  .stat .n{font-size:34px;font-weight:800;letter-spacing:-.5px;color:#0f172a;line-height:1.15;}
+  .stat .n.p{color:#3559C4;}
+  .stat .l{font-size:18px;color:#64748b;margin-top:8px;line-height:1.35;}
+
+  /* blackbox vs glassbox */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px;}
+  .pane{border-radius:16px;padding:24px 22px;min-height:148px;}
+  .pane.bad{background:#0f172a;color:#e2e8f0;border:1px solid #1e293b;}
+  .pane.good{background:linear-gradient(145deg,#eef3ff,#f8fbff);border:1px solid #dbe4fb;}
+  .pane .tag{font-size:15px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.75;}
+  .pane.bad .tag{color:#94a3b8;}
+  .pane.good .tag{color:#3559C4;}
+  .pane .t{font-size:26px;font-weight:800;margin-top:10px;line-height:1.25;}
+  .pane .d{font-size:17px;margin-top:10px;line-height:1.45;opacity:.88;}
+  .pane.bad .d{color:#cbd5e1;}
+  .pane.good .d{color:#475569;}
+
+  /* product UI inset — matches BulkGradingPanel tokens */
+  .inset{margin-top:24px;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;box-shadow:0 18px 40px rgba(15,23,42,.08);}
+  .inset-h{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:#fff;border-bottom:1px solid #e2e8f0;}
+  .inset-h .title{font-size:17px;font-weight:700;color:#0f172a;}
+  .inset-h .badge{font-size:13px;font-weight:600;color:#3559C4;border:1px solid #c7d7fe;background:#eef2ff;padding:4px 10px;border-radius:999px;}
+  .inset-b{padding:20px 20px 22px;background:#fafafa;}
+  .prog-label{font-size:14px;color:#64748b;margin-bottom:10px;font-weight:600;}
+  .prog-track{height:14px;background:#e2e8f0;border-radius:999px;overflow:hidden;}
+  .prog-fill{height:100%;width:85%;background:linear-gradient(90deg,#3559C4,#57CDFF);border-radius:999px;}
+  .prog-meta{display:flex;justify-content:space-between;align-items:center;margin-top:12px;}
+  .prog-meta .n{font-size:28px;font-weight:800;color:#0f172a;letter-spacing:-.5px;}
+  .prog-meta .hint{font-size:15px;color:#64748b;}
+  .row{display:flex;gap:10px;margin-top:16px;}
+  .chip{flex:1;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;background:#fff;}
+  .chip .k{font-size:12px;color:#64748b;font-weight:600;}
+  .chip .v{font-size:18px;font-weight:700;color:#0f172a;margin-top:4px;}
+  .cta{margin-top:16px;display:inline-flex;align-items:center;justify-content:center;height:42px;padding:0 18px;border-radius:8px;background:#3559C4;color:#fff;font-size:15px;font-weight:700;}
+
+  .src{margin-top:auto;padding-top:20px;font-size:16px;color:#94a3b8;line-height:1.45;}
+</style></head>
+<body>
+
+  <!-- CARD A: professor grading ROI (single publish image) -->
+  <section id="cardA" class="card">
+    <div class="h">4주간 학생 데이터만 보여줬습니다</div>
+    <h2>이번엔 교수 채점 화면입니다</h2>
+    <div class="sub">AI를 막지 않는 시험 · AI가 초안을 잡고 · 교수가 한 화면에서 확정</div>
+
+    <div class="strip">
+      <div class="stat"><div class="n p">일괄</div><div class="l">CASE AI 가채점<br/>기준 한 번, 전원 처리</div></div>
+      <div class="stat"><div class="n">초안</div><div class="l">AI 제안 점수·코멘트<br/>표에서 바로 수정</div></div>
+      <div class="stat"><div class="n">확정</div><div class="l">교수 검토 후 저장<br/>AI 추천 ≠ 자동 반영</div></div>
+    </div>
+
+    <div class="split">
+      <div class="pane bad">
+        <div class="tag">Blackbox</div>
+        <div class="t">교수가 보는 것<br/>최종 답안뿐</div>
+        <div class="d">과정은 안 보이고, 채점은 손으로 처음부터</div>
+      </div>
+      <div class="pane good">
+        <div class="tag">Glassbox</div>
+        <div class="t">교수가 보는 것<br/>대화 + 초안 + 확정</div>
+        <div class="d">누가 깊이 팠는지, 어디를 고쳤는지 남음</div>
+      </div>
+    </div>
+
+    <div class="inset" aria-label="Quest-On instructor bulk grading UI example">
+      <div class="inset-h">
+        <span class="title">CASE AI 가채점</span>
+        <span class="badge">검토 후 확정</span>
+      </div>
+      <div class="inset-b">
+        <div class="prog-label mono">전체 CASE 가채점 중 · 처리 34/40</div>
+        <div class="prog-track"><div class="prog-fill"></div></div>
+        <div class="prog-meta">
+          <span class="n">85%</span>
+          <span class="hint">예시 화면 · 실제 제품 UI 구성</span>
+        </div>
+        <div class="row">
+          <div class="chip"><div class="k">AI 추천</div><div class="v">점수·피드백 초안</div></div>
+          <div class="chip"><div class="k">교수</div><div class="v">적용 / 무시 · 수정</div></div>
+        </div>
+        <div class="cta">채점 확정 (36개)</div>
+      </div>
+    </div>
+
+    <div class="src mono">Quest-On instructor UI · 예시 화면(34/40 등) · 학생·교수 식별정보 없음 · 채점 시간 % 미표기(실측 전)</div>
+  </section>
+
+</body></html>
