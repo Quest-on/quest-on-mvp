@@ -345,9 +345,11 @@ export async function initExamSession(data: {
 
     // 응시자에게 내려가는 문항에서 정답키/채점 컨텍스트(correctOptionIndex, ai_context)
     // 와 레거시 core_ability 를 제거한다. 채점은 서버에서 원본 exam 을 다시 읽어 수행하므로
-    // 클라이언트에는 이 필드들이 필요 없다.
+    // 클라이언트에는 이 필드들이 필요 없다. rubric(채점 기준)은 강사가 공개한 경우에만 유지.
     if (exam.questions && Array.isArray(exam.questions)) {
-      exam.questions = stripSensitiveQuestionFields(exam.questions);
+      exam.questions = stripSensitiveQuestionFields(exam.questions, {
+        keepRubric: exam.rubric_public === true,
+      });
     }
 
     // 2. Get all existing sessions (most recent first)

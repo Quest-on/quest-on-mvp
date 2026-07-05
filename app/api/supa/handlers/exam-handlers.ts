@@ -506,11 +506,13 @@ export async function getExam(data: { code: string }) {
     // Strip sensitive data from public endpoint:
     // - Remove answer key / grading context from each question (correctOptionIndex,
     //   ai_context, core_ability) so a bare exam code can't reveal answers.
-    // - Remove rubric when rubric_public is false (respects instructor privacy setting).
+    // - Remove per-question rubric unless the instructor made the rubric public.
+    // - Null the top-level rubric when rubric_public is false (existing privacy gate).
+    const rubricPublic = exam.rubric_public === true;
     const sanitizedExam = {
       ...exam,
-      questions: stripSensitiveQuestionFields(exam.questions),
-      ...(exam.rubric_public === false ? { rubric: null } : {}),
+      questions: stripSensitiveQuestionFields(exam.questions, { keepRubric: rubricPublic }),
+      ...(rubricPublic ? {} : { rubric: null }),
     };
 
     return successJson({ exam: sanitizedExam });

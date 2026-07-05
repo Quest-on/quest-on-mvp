@@ -42,7 +42,6 @@ describe("stripSensitiveQuestionFields", () => {
         idx: 0,
         prompt: "프롬프트",
         title: "제목",
-        rubric: [{ evaluationArea: "정확성", detailedCriteria: "..." }],
         correctOptionIndex: 0,
       },
     ];
@@ -59,9 +58,40 @@ describe("stripSensitiveQuestionFields", () => {
       prompt: "프롬프트",
       title: "제목",
     });
+  });
+
+  it("기본값(keepRubric 미지정)은 question-level rubric 을 제거한다", () => {
+    const input = [
+      {
+        id: "q1",
+        text: "문항",
+        type: "essay",
+        rubric: [{ evaluationArea: "정확성", detailedCriteria: "..." }],
+      },
+    ];
+    const out = stripSensitiveQuestionFields(input) as Array<Record<string, unknown>>;
+    expect(out[0]).not.toHaveProperty("rubric");
+    expect(out[0]).toMatchObject({ id: "q1", text: "문항", type: "essay" });
+  });
+
+  it("keepRubric: true 이면 rubric 을 보존한다 (강사가 공개한 경우)", () => {
+    const input = [
+      {
+        id: "q1",
+        text: "문항",
+        type: "essay",
+        rubric: [{ evaluationArea: "정확성", detailedCriteria: "..." }],
+        ai_context: "비공개",
+      },
+    ];
+    const out = stripSensitiveQuestionFields(input, { keepRubric: true }) as Array<
+      Record<string, unknown>
+    >;
     expect(out[0].rubric).toEqual([
       { evaluationArea: "정확성", detailedCriteria: "..." },
     ]);
+    // rubric 을 유지해도 정답키/ai_context 는 여전히 제거한다
+    expect(out[0]).not.toHaveProperty("ai_context");
   });
 
   it("true-false(OX) 정답키도 제거한다", () => {
