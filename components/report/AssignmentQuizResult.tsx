@@ -1,6 +1,11 @@
+"use client";
+
+import { useTranslations, useLocale } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ShieldQuestion } from "lucide-react";
+import { formatDateTime } from "@/lib/i18n/format";
+import type { Locale } from "@/lib/i18n/config";
 
 export interface AssignmentQuizQuestion {
   id: string;
@@ -27,25 +32,31 @@ export interface AssignmentQuiz {
  * 점수/정오답은 퀴즈 자체의 채점 결과이며, 과제 본채점(grades)과는 무관하다.
  */
 export function AssignmentQuizResult({ quiz }: { quiz: AssignmentQuiz }) {
+  const t = useTranslations("report.quizResult");
+  const locale = useLocale() as Locale;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ShieldQuestion className="w-5 h-5 text-amber-600" />
-          타임어택 퀴즈 결과
+          {t("title")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400">
-            점수 {quiz.score ?? 0}/100
+            {t("score", { score: quiz.score ?? 0 })}
           </Badge>
           <Badge variant="secondary">
-            {quiz.total_questions}문항 · {quiz.time_limit_seconds}초
+            {t("meta", {
+              totalQuestions: quiz.total_questions,
+              timeLimitSeconds: quiz.time_limit_seconds,
+            })}
           </Badge>
           {quiz.submitted_at && (
             <span className="text-sm text-muted-foreground">
-              완료: {new Date(quiz.submitted_at).toLocaleString("ko-KR")}
+              {t("completedAt", { date: formatDateTime(quiz.submitted_at, locale) })}
             </span>
           )}
         </div>
@@ -71,24 +82,24 @@ export function AssignmentQuizResult({ quiz }: { quiz: AssignmentQuiz }) {
                           : "bg-red-500/10 text-red-700 dark:text-red-400"
                       }
                     >
-                      {isCorrect ? "정답" : "오답"}
+                      {isCorrect ? t("correct") : t("incorrect")}
                     </Badge>
                   )}
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  선택:{" "}
+                  {t("selected")}{" "}
                   {typeof selectedIndex === "number"
-                    ? question.options[selectedIndex] || "무응답"
-                    : "무응답"}
+                    ? question.options[selectedIndex] || t("noAnswer")
+                    : t("noAnswer")}
                 </p>
                 {typeof correctIndex === "number" && (
                   <p className="text-sm text-muted-foreground">
-                    정답: {question.options[correctIndex]}
+                    {t("correctAnswer")} {question.options[correctIndex]}
                   </p>
                 )}
                 {question.rationale && (
                   <p className="mt-2 text-sm text-muted-foreground">
-                    근거: {question.rationale}
+                    {t("rationale")} {question.rationale}
                   </p>
                 )}
               </div>

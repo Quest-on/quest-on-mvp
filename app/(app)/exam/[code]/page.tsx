@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, type SetStateAction 
 import { useParams, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   ResizablePanelGroup,
@@ -101,6 +102,7 @@ export default function ExamPage() {
   const queryClient = useQueryClient();
   const { user, profile, isLoaded } = useAppUser();
   const examCode = params.code as string;
+  const t = useTranslations("exam");
 
   // --- Shared state owned by the page (used by multiple hooks) ---
   const [exam, setExam] = useState<Exam | null>(null);
@@ -318,9 +320,9 @@ export default function ExamPage() {
           <div className="animate-spin rounded-full h-16 w-16 sm:h-20 sm:w-20 border-4 border-primary border-t-transparent mx-auto"></div>
           <div className="space-y-2">
             <p className="text-lg sm:text-xl font-semibold text-foreground">
-              {!isLoaded ? "사용자 인증 중..." : "시험을 불러오는 중..."}
+              {!isLoaded ? t("page.loadingAuth") : t("page.loadingExam")}
             </p>
-            <p className="text-sm sm:text-base text-muted-foreground">잠시만 기다려주세요</p>
+            <p className="text-sm sm:text-base text-muted-foreground">{t("page.loadingWait")}</p>
           </div>
         </div>
       </div>
@@ -335,15 +337,15 @@ export default function ExamPage() {
             <div className="w-16 h-16 sm:w-20 sm:h-20 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
               <AlertCircle className="w-8 h-8 sm:w-10 sm:h-10 text-destructive" aria-hidden="true" />
             </div>
-            <CardTitle className="text-xl sm:text-2xl font-bold">로그인이 필요합니다</CardTitle>
-            <CardDescription className="text-sm sm:text-base">시험을 보려면 먼저 로그인해주세요.</CardDescription>
+            <CardTitle className="text-xl sm:text-2xl font-bold">{t("page.loginRequired")}</CardTitle>
+            <CardDescription className="text-sm sm:text-base">{t("page.loginDescription")}</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <Link
               href={`/sign-in?redirect_url=${encodeURIComponent(`/exam/${examCode}`)}`}
               onClick={() => { try { localStorage.setItem("onboarding_redirect", `/exam/${examCode}`); } catch {} }}
             >
-              <Button size="lg" className="min-h-[48px] px-8">로그인하기</Button>
+              <Button size="lg" className="min-h-[48px] px-8">{t("page.loginButton")}</Button>
             </Link>
           </CardContent>
         </Card>
@@ -359,11 +361,11 @@ export default function ExamPage() {
             <div className="w-16 h-16 sm:w-20 sm:h-20 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
               <AlertCircle className="w-8 h-8 sm:w-10 sm:h-10 text-destructive" aria-hidden="true" />
             </div>
-            <CardTitle className="text-xl sm:text-2xl font-bold">시험을 찾을 수 없습니다</CardTitle>
-            <CardDescription className="text-sm sm:text-base">시험 코드를 확인해주세요.</CardDescription>
+            <CardTitle className="text-xl sm:text-2xl font-bold">{t("page.notFound")}</CardTitle>
+            <CardDescription className="text-sm sm:text-base">{t("page.notFoundDescription")}</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <Link href="/join"><Button size="lg" className="min-h-[48px] px-8">다시 시도하기</Button></Link>
+            <Link href="/join"><Button size="lg" className="min-h-[48px] px-8">{t("page.retryButton")}</Button></Link>
           </CardContent>
         </Card>
       </div>
@@ -404,12 +406,12 @@ export default function ExamPage() {
           try { errorData = await response.json(); } catch {}
         } else {
           const text = await response.text().catch(() => "");
-          errorData = { message: text || "알 수 없는 오류" };
+          errorData = { message: text || t("page.unknownError") };
         }
-        toast.error(`시험 입장 확인에 실패했습니다: ${errorData.details || errorData.message || errorData.error || "알 수 없는 오류"}`);
+        toast.error(t("page.preflightError", { detail: errorData.details || errorData.message || errorData.error || t("page.unknownError") }));
       }
     } catch {
-      toast.error("시험 입장 확인 중 오류가 발생했습니다. 다시 시도해주세요.");
+      toast.error(t("page.preflightNetworkError"));
     }
   };
 
@@ -459,15 +461,15 @@ export default function ExamPage() {
         <AlertDialog open={submission.showPreflightCancelConfirm} onOpenChange={submission.setShowPreflightCancelConfirm}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>시험을 취소하시겠습니까?</AlertDialogTitle>
+              <AlertDialogTitle>{t("page.cancelTitle")}</AlertDialogTitle>
               <AlertDialogDescription>
-                시험 입장을 취소하면 학생 대시보드로 이동합니다. 나중에 다시 시험 코드를 입력하여 입장할 수 있습니다.
+                {t("page.cancelDescription")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>시험에 계속 참여하기</AlertDialogCancel>
+              <AlertDialogCancel>{t("page.cancelKeep")}</AlertDialogCancel>
               <AlertDialogAction onClick={() => router.push("/student")} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                시험 입장 취소
+                {t("page.cancelConfirm")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -549,7 +551,7 @@ export default function ExamPage() {
           {!autoSave.isOnline && (
             <div className="bg-destructive text-destructive-foreground px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-2 animate-in slide-in-from-top duration-300">
               <WifiOff className="h-4 w-4 shrink-0" />
-              <span>네트워크 연결이 끊어졌습니다. 연결이 복원되면 답안이 자동 저장됩니다.</span>
+              <span>{t("page.offlineBanner")}</span>
             </div>
           )}
 
@@ -712,6 +714,7 @@ function SubmittedScreen({
   profile: { avatarUrl?: string | null; fullName?: string | null; email?: string | null } | null;
   router: ReturnType<typeof useRouter>;
 }) {
+  const t = useTranslations("exam");
   const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
@@ -732,16 +735,16 @@ function SubmittedScreen({
             <div className="w-20 h-20 sm:w-24 sm:h-24 bg-green-500/10 rounded-full flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-10 h-10 sm:w-12 sm:h-12 text-green-600 dark:text-green-400" aria-hidden="true" />
             </div>
-            <CardTitle className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">답안이 성공적으로 제출되었습니다!</CardTitle>
-            <CardDescription className="text-sm sm:text-base">수고하셨습니다. 시험이 종료되었습니다.</CardDescription>
+            <CardTitle className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">{t("submitted.title")}</CardTitle>
+            <CardDescription className="text-sm sm:text-base">{t("submitted.description")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-center space-y-4">
               <p className="text-sm sm:text-base text-muted-foreground">
-                제출이 완료되었습니다. AI가 답안을 채점하고 있으며, 보통 1~2분 내에 완료됩니다.
+                {t("submitted.gradingInfo")}
               </p>
               <p className="text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">{countdown}초</span> 뒤 대시보드로 이동합니다.
+                <span className="font-semibold text-foreground">{t("submitted.redirectCountdown", { countdown })}</span>
               </p>
             </div>
           </CardContent>

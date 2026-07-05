@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import {
@@ -14,6 +15,7 @@ import { ChangePasswordForm } from "@/components/settings/ChangePasswordForm";
 import { KeyRound } from "lucide-react";
 
 export default function SettingsPage() {
+  const t = useTranslations("auth.settings");
   const { user, isLoaded } = useAppUser();
   const router = useRouter();
 
@@ -39,9 +41,9 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold">설정</h1>
+          <h1 className="text-3xl font-bold">{t("heading")}</h1>
           <p className="text-muted-foreground mt-2">
-            계정 보안 및 환경 설정을 관리하세요
+            {t("subtitle")}
           </p>
         </div>
 
@@ -51,10 +53,10 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <KeyRound className="w-5 h-5 text-primary" />
-                비밀번호 변경
+                {t("passwordSectionTitle")}
               </CardTitle>
               <CardDescription>
-                보안을 위해 현재 비밀번호 확인 후 변경됩니다. 비밀번호는 8자 이상으로 설정하세요.
+                {t("passwordSectionDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent>

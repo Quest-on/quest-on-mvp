@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { ArrowLeft, CheckCircle2, Clock, Loader2, ShieldQuestion } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +46,7 @@ export default function AssignmentQuizPage() {
   const queryClient = useQueryClient();
   const sessionId = params.sessionId as string;
   const { user, profile, isLoaded, isSignedIn } = useAppUser();
+  const t = useTranslations("student.quiz");
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const autoSubmittedRef = useRef(false);
@@ -56,7 +58,7 @@ export default function AssignmentQuizPage() {
     queryFn: async () => {
       const response = await fetch(`/api/student/session/${sessionId}/quiz`);
       if (!response.ok) {
-        throw new Error("퀴즈를 불러오지 못했습니다.");
+        throw new Error(t("loadError"));
       }
       return response.json() as Promise<QuizData>;
     },
@@ -86,19 +88,19 @@ export default function AssignmentQuizPage() {
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || "퀴즈 제출에 실패했습니다.");
+        throw new Error(data.message || t("submitError"));
       }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.student.sessions(user?.id) });
       queryClient.invalidateQueries({ queryKey: qk.student.stats(user?.id) });
-      toast.success("퀴즈가 제출되었습니다.");
+      toast.success(t("submitSuccess"));
       router.replace(`/student/report/${sessionId}`);
     },
     onError: (error) => {
       autoSubmittedRef.current = false;
-      toast.error(error instanceof Error ? error.message : "퀴즈 제출에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : t("submitError"));
     },
   });
 
@@ -133,7 +135,7 @@ export default function AssignmentQuizPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">타임어택 퀴즈를 준비하는 중...</p>
+          <p className="text-sm text-muted-foreground">{t("loading")}</p>
         </div>
       </div>
     );
@@ -148,15 +150,15 @@ export default function AssignmentQuizPage() {
       <div className="container mx-auto max-w-2xl p-6">
         <Button variant="outline" onClick={() => router.push("/student")} className="mb-6">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          대시보드로 돌아가기
+          {t("backToDashboard")}
         </Button>
         <Card>
           <CardHeader>
-            <CardTitle>퀴즈를 불러올 수 없습니다</CardTitle>
+            <CardTitle>{t("cannotLoad")}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              잠시 후 다시 시도하거나 과제 목록에서 이어서 진행해주세요.
+              {t("cannotLoadHint")}
             </p>
           </CardContent>
         </Card>
@@ -172,11 +174,11 @@ export default function AssignmentQuizPage() {
             <div className="mx-auto mb-3 w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center">
               <CheckCircle2 className="w-6 h-6 text-green-600" />
             </div>
-            <CardTitle>이미 완료된 퀴즈입니다</CardTitle>
+            <CardTitle>{t("alreadyCompleted")}</CardTitle>
           </CardHeader>
           <CardContent className="text-center">
             <Button onClick={() => router.replace(`/student/report/${sessionId}`)}>
-              리포트로 이동
+              {t("goToReport")}
             </Button>
           </CardContent>
         </Card>
@@ -196,7 +198,7 @@ export default function AssignmentQuizPage() {
             <div>
               <div className="flex items-center gap-2">
                 <ShieldQuestion className="w-5 h-5 text-primary" />
-                <h1 className="text-lg font-semibold">타임어택 이해도 퀴즈</h1>
+                <h1 className="text-lg font-semibold">{t("title")}</h1>
               </div>
               <p className="text-sm text-muted-foreground truncate">{quizQuery.data.exam.title}</p>
             </div>
@@ -206,10 +208,10 @@ export default function AssignmentQuizPage() {
                 className={remainingSeconds !== null && remainingSeconds <= 5 ? "border-red-500 text-red-600" : ""}
               >
                 <Clock className="w-4 h-4 mr-1" />
-                {remainingSeconds ?? 0}초
+                {t("timerSeconds", { seconds: remainingSeconds ?? 0 })}
               </Badge>
               <Badge variant="secondary">
-                {answeredCount}/{quiz.totalQuestions} 응답
+                {t("answeredCount", { answered: answeredCount, total: quiz.totalQuestions })}
               </Badge>
             </div>
           </div>
@@ -222,7 +224,7 @@ export default function AssignmentQuizPage() {
       <main className="container mx-auto max-w-4xl px-4 py-6">
         <Card className="mb-6 border-amber-500/20 bg-amber-500/5">
           <CardContent className="p-4 text-sm text-muted-foreground">
-            제출 전 AI와 나눈 대화와 리서치 내용을 실제로 이해했는지 확인합니다. 시간이 끝나면 현재 선택한 답으로 자동 제출됩니다.
+            {t("description")}
           </CardContent>
         </Card>
 
@@ -266,7 +268,7 @@ export default function AssignmentQuizPage() {
         <div className="sticky bottom-0 mt-6 border-t bg-background/95 py-4 backdrop-blur">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
-              미응답 문항은 오답 처리됩니다.
+              {t("unansweredWarning")}
             </p>
             <Button
               size="lg"
@@ -277,10 +279,10 @@ export default function AssignmentQuizPage() {
               {submitMutation.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  최종 제출 중...
+                  {t("submitting")}
                 </>
               ) : (
-                "퀴즈 제출하고 최종 제출"
+                t("submitButton")
               )}
             </Button>
           </div>

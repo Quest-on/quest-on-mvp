@@ -1,1 +1,117 @@
-{}
+{
+  "page": {
+    "loading": {
+      "title": "학생 대시보드를 불러오는 중...",
+      "description": "세션 목록과 통계를 순차적으로 준비하고 있습니다."
+    }
+  },
+  "quiz": {
+    "loadError": "퀴즈를 불러오지 못했습니다.",
+    "submitError": "퀴즈 제출에 실패했습니다.",
+    "submitSuccess": "퀴즈가 제출되었습니다.",
+    "loading": "타임어택 퀴즈를 준비하는 중...",
+    "backToDashboard": "대시보드로 돌아가기",
+    "cannotLoad": "퀴즈를 불러올 수 없습니다",
+    "cannotLoadHint": "잠시 후 다시 시도하거나 과제 목록에서 이어서 진행해주세요.",
+    "alreadyCompleted": "이미 완료된 퀴즈입니다",
+    "goToReport": "리포트로 이동",
+    "title": "타임어택 이해도 퀴즈",
+    "timerSeconds": "{seconds}초",
+    "answeredCount": "{answered}/{total} 응답",
+    "description": "제출 전 AI와 나눈 대화와 리서치 내용을 실제로 이해했는지 확인합니다. 시간이 끝나면 현재 선택한 답으로 자동 제출됩니다.",
+    "unansweredWarning": "미응답 문항은 오답 처리됩니다.",
+    "submitting": "최종 제출 중...",
+    "submitButton": "퀴즈 제출하고 최종 제출"
+  },
+  "dashboard": {
+    "greeting": {
+      "morning": "좋은 아침이에요, {name}님 ☀️",
+      "afternoon": "오후도 열심히, {name}님 💪",
+      "evening": "오늘 하루 수고했어요, {name}님 🌙"
+    },
+    "nav": {
+      "dashboard": "대시보드",
+      "newExam": "새 시험 시작"
+    },
+    "welcomeDesc": "시험 코드를 입력하여 시험을 시작하거나, 완료한 시험의 결과를 확인하세요",
+    "joinButton": "시험 시작",
+    "profileLoading": "프로필 확인 중...",
+    "loginRequired": "로그인이 필요합니다",
+    "loginHint": "학생 페이지에 접근하려면 로그인해주세요",
+    "loginButton": "학생으로 로그인",
+    "title": "학생 대시보드",
+    "stats": {
+      "totalExams": "전체 시험",
+      "completionRate": "완료율 {rate}%",
+      "thisMonth": "· 이번 달 {count}개",
+      "completedAndInProgress": "{completed}개 완료, {inProgress}개 진행 중",
+      "todo": "ToDo",
+      "unsubmittedAssignments": "미제출 과제 {count}개",
+      "averageScore": "평균 점수",
+      "pendingEvaluation": "평가 대기",
+      "examBasis": "{count}개 시험 기준",
+      "completedExams": "완료한 시험",
+      "inProgress": "{count}개 진행 중",
+      "allCompleted": "모든 시험 완료"
+    },
+    "history": {
+      "title": "기록",
+      "description": "시험에서의 성과 및 진행 상황",
+      "filteredCount": "{filtered}개 표시됨 / 총 {total}개",
+      "totalCount": "총 {total}개의 시험"
+    },
+    "filter": {
+      "all": "전체",
+      "allAria": "전체 필터",
+      "graded": "평가 완료",
+      "gradedAria": "평가 완료 필터",
+      "pending": "평가 대기중",
+      "pendingAria": "평가 대기중 필터",
+      "inProgress": "진행 중",
+      "inProgressAria": "진행 중 필터",
+      "unsubmitted": "미제출",
+      "unsubmittedAria": "미제출 필터"
+    },
+    "search": {
+      "placeholder": "시험 제목 또는 코드로 검색...",
+      "ariaLabel": "시험 검색",
+      "resetAria": "필터 및 검색 초기화"
+    },
+    "view": {
+      "gridAria": "그리드 뷰",
+      "listAria": "리스트 뷰"
+    },
+    "emptyState": {
+      "noExams": "아직 치른 시험이 없습니다",
+      "noExamsHint": "첫 번째 시험을 시작하여 학습 성과를 추적해보세요.",
+      "startFirst": "첫 번째 시험 시작하기",
+      "noResults": "검색 결과가 없습니다",
+      "noResultsHint": "다른 검색어나 필터를 시도해보세요.",
+      "resetSearch": "검색 초기화"
+    },
+    "session": {
+      "statusAria": "상태: {status}",
+      "statusCompleted": "완료",
+      "statusQuizPending": "퀴즈 대기",
+      "statusInProgress": "진행 중",
+      "assignment": "과제",
+      "durationMinutes": "{duration}분",
+      "submissionCount": "{count}개 문제 제출됨",
+      "averageScoreAria": "평균 점수: {score}%",
+      "scorePoints": "{score}/{maxScore}점",
+      "pendingEvaluation": "평가 대기중"
+    },
+    "action": {
+      "viewRecord": "기록 보기",
+      "continue": "계속하기",
+      "takeQuiz": "퀴즈 풀기",
+      "checkAnswer": "답안 확인",
+      "viewReport": "리포트 보기"
+    },
+    "infinite": {
+      "loading": "더 불러오는 중...",
+      "scrollHint": "스크롤해서 더 보기",
+      "allLoaded": "모든 시험을 불러왔습니다."
+    }
+  }
+}

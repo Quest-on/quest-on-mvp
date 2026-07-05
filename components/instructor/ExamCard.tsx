@@ -1,7 +1,10 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Copy, Clock, Calendar, Eye, Edit, Trash2, Users } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface ExamCardProps {
   exam: {
@@ -27,18 +30,19 @@ export function ExamCard({
   onDelete,
   showStudentCount = true,
 }: ExamCardProps) {
+  const t = useTranslations("authoring");
   const getStatusBadgeProps = (status: string) => {
     if (status === "published") {
       return {
         variant: "default" as const,
         className: "text-xs",
-        text: "게시됨",
+        text: t("examCard.statusPublished"),
       };
     }
     return {
       variant: "secondary" as const,
       className: "text-xs",
-      text: status === "draft" ? "임시저장" : status,
+      text: status === "draft" ? t("examCard.statusDraft") : status,
     };
   };
 
@@ -69,12 +73,12 @@ export function ExamCard({
           </div>
           <div className="flex items-center space-x-1">
             <Clock className={iconSize} />
-            <span>{exam.duration}분</span>
+            <span>{t("examCard.durationMin", { duration: exam.duration })}</span>
           </div>
           {showStudentCount && (
             <div className="flex items-center space-x-1">
               <Users className={iconSize} />
-              <span>{exam.student_count || 0}명 참여</span>
+              <span>{t("examCard.studentCount", { count: exam.student_count || 0 })}</span>
             </div>
           )}
           <div className="flex items-center space-x-1">
@@ -91,19 +95,19 @@ export function ExamCard({
             onClick={() => onCopyCode(exam.code)}
           >
             <Copy className={`${iconSize} sm:mr-1`} />
-            <span className="hidden sm:inline">복사</span>
+            <span className="hidden sm:inline">{t("examCard.buttonCopy")}</span>
           </Button>
         )}
         <Link href={`/instructor/${exam.id}`}>
           <Button variant="outline" size="sm">
             <Eye className={`${iconSize} sm:mr-1`} />
-            <span className="hidden sm:inline">보기</span>
+            <span className="hidden sm:inline">{t("examCard.buttonView")}</span>
           </Button>
         </Link>
         {onEdit && (
           <Button variant="outline" size="sm" onClick={() => onEdit(exam.id)}>
             <Edit className={`${iconSize} sm:mr-1`} />
-            <span className="hidden sm:inline">편집</span>
+            <span className="hidden sm:inline">{t("examCard.buttonEdit")}</span>
           </Button>
         )}
         {onDelete && (
@@ -114,7 +118,7 @@ export function ExamCard({
             onClick={() => onDelete(exam.id)}
           >
             <Trash2 className={`${iconSize} sm:mr-1`} />
-            <span className="hidden sm:inline">삭제</span>
+            <span className="hidden sm:inline">{t("examCard.buttonDelete")}</span>
           </Button>
         )}
       </div>

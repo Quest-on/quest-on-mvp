@@ -17,8 +17,10 @@ import { LogOut, User, Settings } from "lucide-react";
 import Link from "next/link";
 import { ThemeTogglerButton } from "@/components/animate-ui/components/buttons/theme-toggler";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { useTranslations } from "next-intl";
 
 export function UserMenu() {
+  const t = useTranslations("auth.userMenu");
   const { user, profile, isLoaded } = useAppUser();
   const router = useRouter();
 
@@ -75,19 +77,19 @@ export function UserMenu() {
         <DropdownMenuItem asChild>
           <Link href="/profile" className="flex items-center">
             <User className="mr-2 h-4 w-4" />
-            프로필
+            {t("profile")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/settings" className="flex items-center">
             <Settings className="mr-2 h-4 w-4" />
-            설정
+            {t("settings")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
           <div className="flex items-center justify-between w-full cursor-default">
-            <span className="text-sm">테마</span>
+            <span className="text-sm">{t("theme")}</span>
             <ThemeTogglerButton modes={["light", "dark"]} variant="outline" size="sm" />
           </div>
         </DropdownMenuItem>
@@ -103,7 +105,7 @@ export function UserMenu() {
           className="flex items-center text-red-600 focus:text-red-600"
         >
           <LogOut className="mr-2 h-4 w-4" />
-          로그아웃
+          {t("signOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -8,14 +8,12 @@ import {
 } from "@/components/ui/card";
 import { Sparkles, Quote, Plus, Minus, Loader2 } from "lucide-react";
 import type { QuestionSummaryData } from "@/lib/types/grading";
+import { useTranslations } from "next-intl";
 
-const SENTIMENT_STYLES: Record<
-  "positive" | "negative" | "neutral",
-  { label: string; className: string }
-> = {
-  positive: { label: "긍정적", className: "bg-green-100 text-green-700 border-green-200" },
-  negative: { label: "부정적", className: "bg-red-100 text-red-700 border-red-200" },
-  neutral: { label: "중립적", className: "bg-gray-100 text-gray-700 border-gray-200" },
+const SENTIMENT_CLASS: Record<"positive" | "negative" | "neutral", string> = {
+  positive: "bg-green-100 text-green-700 border-green-200",
+  negative: "bg-red-100 text-red-700 border-red-200",
+  neutral: "bg-gray-100 text-gray-700 border-gray-200",
 };
 
 interface QuestionAiSummaryCardProps {
@@ -27,18 +25,20 @@ export function QuestionAiSummaryCard({
   summary,
   loading = false,
 }: QuestionAiSummaryCardProps) {
+  const t = useTranslations("grading");
+
   if (loading) {
     return (
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
             <Sparkles className="h-4 w-4 text-indigo-600" />
-            CASE 문항 평가
+            {t("questionAiSummary.title")}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex items-center gap-2 text-sm text-muted-foreground py-6">
           <Loader2 className="h-4 w-4 animate-spin" />
-          CASE 문항 평가 생성 중…
+          {t("questionAiSummary.loadingDesc")}
         </CardContent>
       </Card>
     );
@@ -46,18 +46,21 @@ export function QuestionAiSummaryCard({
 
   if (!summary) return null;
 
+  const sentimentKey = summary.sentiment.charAt(0).toUpperCase() + summary.sentiment.slice(1);
+  const sentimentLabel = t(`questionAiSummary.sentiment${sentimentKey}` as Parameters<typeof t>[0]);
+
   return (
     <Card data-testid="grade-ai-summary">
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2">
           <CardTitle className="flex items-center gap-2 text-base">
             <Sparkles className="h-4 w-4 text-indigo-600" />
-            CASE 문항 평가
+            {t("questionAiSummary.title")}
           </CardTitle>
           <span
-            className={`ml-auto rounded-full border px-2 py-0.5 text-xs font-medium ${SENTIMENT_STYLES[summary.sentiment].className}`}
+            className={`ml-auto rounded-full border px-2 py-0.5 text-xs font-medium ${SENTIMENT_CLASS[summary.sentiment]}`}
           >
-            {SENTIMENT_STYLES[summary.sentiment].label}
+            {sentimentLabel}
           </span>
         </div>
       </CardHeader>
@@ -86,7 +89,7 @@ export function QuestionAiSummaryCard({
           <div>
             <div className="flex items-center gap-1.5 mb-1">
               <Plus className="h-3.5 w-3.5 text-blue-600" />
-              <span className="text-xs font-semibold text-blue-700">강점</span>
+              <span className="text-xs font-semibold text-blue-700">{t("questionAiSummary.strengths")}</span>
             </div>
             <ul className="space-y-0.5 pl-4 list-disc text-xs">
               {summary.strengths.map((s, idx) => (
@@ -100,7 +103,7 @@ export function QuestionAiSummaryCard({
           <div>
             <div className="flex items-center gap-1.5 mb-1">
               <Minus className="h-3.5 w-3.5 text-orange-600" />
-              <span className="text-xs font-semibold text-orange-700">개선점</span>
+              <span className="text-xs font-semibold text-orange-700">{t("questionAiSummary.weaknesses")}</span>
             </div>
             <ul className="space-y-0.5 pl-4 list-disc text-xs">
               {summary.weaknesses.map((w, idx) => (

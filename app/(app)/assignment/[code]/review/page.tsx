@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDateTime, formatTime } from "@/lib/i18n/format";
+import type { Locale } from "@/lib/i18n/config";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -63,6 +66,8 @@ function htmlHasContent(html: string | null | undefined): boolean {
 }
 
 export default function AssignmentReviewPage() {
+  const t = useTranslations("assignment");
+  const locale = useLocale() as Locale;
   const params = useParams();
   const router = useRouter();
   const { user, profile, isLoaded, isSignedIn } = useAppUser();
@@ -85,12 +90,12 @@ export default function AssignmentReviewPage() {
       const response = await fetch(`/api/student/assignment/${code}/review`);
       if (!response.ok) {
         if (response.status === 400) {
-          throw new Error("이 과제는 열람할 수 없습니다.");
+          throw new Error(t("review.errorNotViewable"));
         }
         if (response.status === 403 || response.status === 404) {
-          throw new Error("과제 기록을 찾을 수 없습니다.");
+          throw new Error(t("review.errorNotFound"));
         }
-        throw new Error("과제 기록을 불러오는 중 오류가 발생했습니다.");
+        throw new Error(t("review.errorLoading"));
       }
       return (await response.json()) as ReviewData;
     },
@@ -125,12 +130,12 @@ export default function AssignmentReviewPage() {
       <div className="container mx-auto p-6 max-w-4xl">
         <div className="text-center py-12">
           <h2 className="text-xl font-semibold text-red-600 mb-2">
-            {errorMessage || "과제 기록을 불러올 수 없습니다"}
+            {errorMessage || t("review.errorFallback")}
           </h2>
           <Link href="/student">
             <Button variant="outline" className="mt-4">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              학생 대시보드로 돌아가기
+              {t("review.backToDashboard")}
             </Button>
           </Link>
         </div>
@@ -147,12 +152,12 @@ export default function AssignmentReviewPage() {
       <div className="mb-8">
         <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
           <Link href="/student" className="hover:text-foreground transition-colors">
-            대시보드
+            {t("review.breadcrumbDashboard")}
           </Link>
           <span>/</span>
           <span className="truncate max-w-[200px]">{exam.title}</span>
           <span>/</span>
-          <span className="text-foreground font-medium">열람</span>
+          <span className="text-foreground font-medium">{t("review.breadcrumbReview")}</span>
         </nav>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-2">
@@ -163,23 +168,23 @@ export default function AssignmentReviewPage() {
                 className="bg-muted text-muted-foreground"
               >
                 <Lock className="w-3.5 h-3.5 mr-1" />
-                열람 전용 · 마감됨
+                {t("review.statusBadge")}
               </Badge>
               {deadline && (
                 <span className="text-sm text-muted-foreground">
-                  제출 기한: {new Date(deadline).toLocaleString("ko-KR")}
+                  {t("review.deadline", { deadline: formatDateTime(deadline, locale) })}
                 </span>
               )}
             </div>
             <p className="text-sm text-muted-foreground">
-              제출 기한이 지나 작성한 기록을 읽기 전용으로 보여드립니다. 더 이상 수정이나 제출은 할 수 없습니다.
+              {t("review.readonlyNotice")}
             </p>
           </div>
           <div className="shrink-0">
             <Link href="/student">
               <Button variant="outline">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                대시보드
+                {t("review.dashboardButton")}
               </Button>
             </Link>
           </div>
@@ -189,7 +194,7 @@ export default function AssignmentReviewPage() {
       {!session && (
         <Card className="mb-8">
           <CardContent className="py-10 text-center text-muted-foreground">
-            이 과제에 대한 응시 기록이 없습니다.
+            {t("review.noSessionRecord")}
           </CardContent>
         </Card>
       )}
@@ -201,7 +206,7 @@ export default function AssignmentReviewPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <ClipboardList className="w-5 h-5 text-primary" />
-                과제 안내
+                {t("review.sectionPrompt")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -222,14 +227,14 @@ export default function AssignmentReviewPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <FileText className="w-5 h-5 text-purple-600" />
-                과제 문제
+                {t("review.sectionQuestions")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {exam.questions.map((q, i) => (
                 <div key={q.id || `q-${i}`} className="space-y-1.5">
                   <p className="text-xs font-medium text-muted-foreground">
-                    문제 {i + 1}
+                    {t("review.questionLabel", { number: i + 1 })}
                   </p>
                   <RichTextViewer content={q.text} className="text-sm" />
                 </div>
@@ -243,13 +248,13 @@ export default function AssignmentReviewPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <MessageCircle className="w-5 h-5 text-blue-600" />내 리서치 채팅
+                <MessageCircle className="w-5 h-5 text-blue-600" />{t("review.sectionChat")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {messages.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-4 text-center">
-                  채팅 기록이 없습니다.
+                  {t("review.noChatHistory")}
                 </p>
               ) : (
                 <div className="space-y-4">
@@ -266,10 +271,7 @@ export default function AssignmentReviewPage() {
                             {msg.content}
                           </p>
                           <p className="text-xs mt-2 opacity-70">
-                            {new Date(msg.created_at).toLocaleTimeString("ko-KR", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
+                            {formatTime(msg.created_at, locale, { hour: "2-digit", minute: "2-digit" })}
                           </p>
                         </div>
                       ) : (
@@ -291,7 +293,7 @@ export default function AssignmentReviewPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <FileText className="w-5 h-5 text-emerald-600" />내 최종답안
+                <FileText className="w-5 h-5 text-emerald-600" />{t("review.sectionFinalAnswer")}
               </CardTitle>
             </CardHeader>
             <CardContent>

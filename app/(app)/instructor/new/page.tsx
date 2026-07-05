@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { extractErrorMessage } from "@/lib/error-messages";
+import { useTranslations } from "next-intl";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/query-keys";
@@ -58,6 +59,7 @@ import {
 export default function CreateExam() {
   const router = useRouter();
   const { user, isLoaded, isSignedIn } = useAppUser();
+  const t = useTranslations("instructor");
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -193,7 +195,7 @@ export default function CreateExam() {
 
     // 용량 초과 시 처리
     setCanAddMoreFiles(false);
-    toast.error("파일 용량이 50MB를 초과했습니다. 일부 파일이 비활성화됩니다.");
+    toast.error(t("newExam.toastFileSizeExceeded"));
 
     // 뒤에서부터 파일을 하나씩 비활성화하여 50MB 이하로 만들기
     const newDisabledFiles = new Set<number>();
@@ -263,14 +265,12 @@ export default function CreateExam() {
       !allowedTypes.includes(file.type) &&
       !allowedExtensions.includes(extension || "")
     ) {
-      toast.error(
-        "지원되지 않는 파일 형식입니다. PPT, PDF, 워드, 엑셀, 한글, 이미지 파일만 업로드 가능합니다."
-      );
+      toast.error(t("newExam.toastUnsupportedFormat"));
       return false;
     }
 
     if (file.size > maxSize) {
-      toast.error("파일 크기가 50MB를 초과합니다.");
+      toast.error(t("newExam.toastFileTooLarge"));
       return false;
     }
 
@@ -279,7 +279,7 @@ export default function CreateExam() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!canAddMoreFiles) {
-      toast.error("파일 용량이 초과되어 더 이상 파일을 추가할 수 없습니다.");
+      toast.error(t("newExam.toastCannotAddMore"));
       e.target.value = "";
       return;
     }
@@ -332,7 +332,7 @@ export default function CreateExam() {
     setIsDragOver(false);
 
     if (!canAddMoreFiles) {
-      toast.error("파일 용량이 초과되어 더 이상 파일을 추가할 수 없습니다.");
+      toast.error(t("newExam.toastCannotAddMore"));
       return;
     }
 
@@ -485,20 +485,20 @@ export default function CreateExam() {
     agentController.phase === "running";
 
   const submitReasons = [
-    !examData.title ? "시험 제목을 입력해주세요" : null,
-    !examData.code ? "시험 코드를 생성해주세요" : null,
-    questions.length === 0 ? "문제를 1개 이상 추가해주세요" : null,
+    !examData.title ? t("newExam.submitReasonTitle") : null,
+    !examData.code ? t("newExam.submitReasonCode") : null,
+    questions.length === 0 ? t("newExam.submitReasonQuestions") : null,
     questions.length > 0 &&
     questions.every((q) => isQuestionContentEmpty(q.text))
-      ? "문제 내용을 입력해주세요"
+      ? t("newExam.submitReasonContent")
       : null,
-    !canAddMoreFiles ? "파일 용량이 50MB를 초과했습니다" : null,
+    !canAddMoreFiles ? t("newExam.submitReasonFileSize") : null,
     isExamDurationTooShort(examData.duration) ? EXAM_DURATION_REASON : null,
     questions.some((q) => isObjectiveQuestionIncomplete(q))
-      ? "객관식 문제의 선택지와 정답을 입력해주세요"
+      ? t("newExam.submitReasonObjective")
       : null,
     questions.length > 0 && !scoreWeights
-      ? "최종 점수 비중을 설정해주세요"
+      ? t("newExam.submitReasonScoreWeights")
       : null,
     ...validateScoreWeightsForQuestions(
       scoreWeights,
@@ -556,7 +556,7 @@ export default function CreateExam() {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = extractErrorMessage(
           errorData,
-          "시험 생성에 실패했습니다",
+          t("new.createExamFailed"),
           response.status
         );
         throw new Error(errorMessage);
@@ -588,12 +588,12 @@ export default function CreateExam() {
     // 비활성화된 버튼 클릭 시 이유 안내
     if (!examData.title) {
       isSubmittingRef.current = false;
-      toast.error("시험 제목을 입력해주세요.");
+      toast.error(t("newExam.toastTitleRequired"));
       return;
     }
     if (!examData.code) {
       isSubmittingRef.current = false;
-      toast.error("시험 코드를 생성해주세요.");
+      toast.error(t("newExam.toastCodeRequired"));
       return;
     }
     // 모든 문제에 대해 빈 텍스트 검증
@@ -604,8 +604,8 @@ export default function CreateExam() {
       isSubmittingRef.current = false;
       toast.error(
         emptyQuestionIndices.length === questions.length
-          ? "문제를 입력해주세요."
-          : `${emptyQuestionIndices.join(", ")}번 문제가 비어있습니다.`
+          ? t("newExam.toastQuestionsRequired")
+          : t("newExam.toastEmptyQuestion", { indices: emptyQuestionIndices.join(", ") })
       );
       return;
     }
@@ -616,13 +616,13 @@ export default function CreateExam() {
     if (incompleteObjectiveIndices.length > 0) {
       isSubmittingRef.current = false;
       toast.error(
-        `${incompleteObjectiveIndices.join(", ")}번 객관식 문제의 선택지와 정답을 입력해주세요.`
+        t("newExam.toastObjectiveIncomplete", { indices: incompleteObjectiveIndices.join(", ") })
       );
       return;
     }
     if (!canAddMoreFiles) {
       isSubmittingRef.current = false;
-      toast.error("파일 용량이 50MB를 초과했습니다. 일부 파일을 삭제해주세요.");
+      toast.error(t("newExam.toastFileSizeDeleteSome"));
       return;
     }
     // duration 검증: 0(무제한)이 아니고 15 미만이면 에러
@@ -634,22 +634,22 @@ export default function CreateExam() {
 
     if (!examData.title) {
       isSubmittingRef.current = false;
-      toast.error("시험 제목을 입력해주세요.");
+      toast.error(t("newExam.toastTitleRequired"));
       return;
     }
     if (!examData.code) {
       isSubmittingRef.current = false;
-      toast.error("시험 코드를 입력해주세요.");
+      toast.error(t("newExam.toastCodeRequiredAlt"));
       return;
     }
     if (questions.length === 0) {
       isSubmittingRef.current = false;
-      toast.error("최소 1개 이상의 문제를 추가해주세요.");
+      toast.error(t("newExam.toastQuestionsMinRequired"));
       return;
     }
     if (!scoreWeights) {
       isSubmittingRef.current = false;
-      toast.error("최종 점수 비중을 설정해주세요.");
+      toast.error(t("newExam.toastScoreWeightsRequired"));
       return;
     }
     const scoreWeightErrors = validateScoreWeightsForQuestions(
@@ -696,7 +696,7 @@ export default function CreateExam() {
       setCreatedExamCode(examData.code);
       setIsDialogOpen(true);
     } catch {
-      toast.error("시험 생성 중 오류가 발생했습니다. 다시 시도해주세요.");
+      toast.error(t("newExam.toastCreateError"));
     } finally {
       setIsLoading(false);
       isSubmittingRef.current = false;
@@ -721,7 +721,7 @@ export default function CreateExam() {
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2 w-full justify-between">
-              <h1 className="text-3xl font-bold">새로운 시험 만들기</h1>
+              <h1 className="text-3xl font-bold">{t("newExam.pageTitle")}</h1>
               <Button
                 type="button"
                 variant="outline"
@@ -734,14 +734,14 @@ export default function CreateExam() {
                   }
                 }}
                 className="min-h-[44px] gap-2 border-border hover:bg-muted hover:text-foreground"
-                aria-label="대시보드로 돌아가기"
+                aria-label={t("newExam.backLabel")}
               >
                 <ArrowLeft className="w-4 h-4" />
-                {isDemoMode ? "데모로 돌아가기" : "대시보드"}
+                {isDemoMode ? t("newExam.backToDemo") : t("newExam.backToDashboard")}
               </Button>
             </div>
             <p className="text-muted-foreground">
-              문제와 설정으로 새로운 시험을 구성하세요
+              {t("newExam.pageDesc")}
             </p>
           </div>
 
@@ -754,11 +754,10 @@ export default function CreateExam() {
               <Bot className="w-5 h-5 text-primary shrink-0 mt-0.5 animate-pulse" />
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-foreground">
-                  AI 에이전트가 시험을 작성하고 있습니다
+                  {t("newExam.agentBannerTitle")}
                 </p>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  에이전트가 제목과 문제를 직접 입력합니다. 직접 이어서
-                  작성하려면 작업을 넘겨받으세요.
+                  {t("newExam.agentBannerDesc")}
                 </p>
               </div>
               <Button
@@ -767,10 +766,10 @@ export default function CreateExam() {
                 size="sm"
                 onClick={() => agentController.cancelRun()}
                 className="shrink-0 gap-1.5"
-                aria-label="에이전트 작업 넘겨받기"
+                aria-label={t("newExam.agentTakeOverLabel")}
               >
                 <Hand className="w-4 h-4" />
-                넘겨받기
+                {t("newExam.agentTakeOver")}
               </Button>
             </div>
           )}
@@ -781,18 +780,18 @@ export default function CreateExam() {
               <Info className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div className="text-sm">
                 <p className="font-medium text-amber-800 dark:text-amber-300">
-                  데모 모드로 체험 중입니다
+                  {t("newExam.demoBannerTitle")}
                 </p>
                 <p className="text-amber-700 dark:text-amber-400 mt-0.5">
-                  AI 문제 생성을 자유롭게 체험할 수 있지만, 실제 시험 출제를 위해서는{" "}
+                  {t("newExam.demoBannerDesc")}
                   <button
                     type="button"
                     onClick={() => router.push("/sign-up")}
                     className="underline font-medium hover:text-amber-900 dark:hover:text-amber-200"
                   >
-                    회원가입
+                    {t("newExam.demoBannerSignUp")}
                   </button>
-                  이 필요합니다.
+                  {t("newExam.demoBannerDescEnd")}
                 </p>
               </div>
             </div>
@@ -917,15 +916,15 @@ export default function CreateExam() {
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>출제 완료</DialogTitle>
+                    <DialogTitle>{t("newExam.dialogTitle")}</DialogTitle>
                     <DialogDescription>
-                      시험이 성공적으로 출제되었습니다.
+                      {t("newExam.dialogDesc")}
                     </DialogDescription>
                   </DialogHeader>
                   <div className="py-4">
                     <div className="space-y-3">
                       <div>
-                        <Label className="text-sm font-medium">시험 코드</Label>
+                        <Label className="text-sm font-medium">{t("newExam.dialogExamCode")}</Label>
                         <div className="flex items-center gap-2 mt-1">
                           <code className="px-4 py-2 bg-muted rounded-md exam-code text-lg font-semibold">
                             {createdExamCode}
@@ -936,22 +935,29 @@ export default function CreateExam() {
                             size="sm"
                             onClick={() => {
                               navigator.clipboard.writeText(createdExamCode);
-                              toast.success("시험 코드가 복사되었습니다.", {
+                              toast.success(t("newExam.dialogCopied"), {
                                 id: "copy-exam-code",
                               });
                             }}
                           >
-                            복사
+                            {t("newExam.dialogCopy")}
                           </Button>
                         </div>
                         <p className="text-sm text-muted-foreground mt-2">
-                          이 코드를 학생들에게 공유하세요.
+                          {t("newExam.dialogShare")}
                         </p>
                       </div>
                       {/* P2-5: Summary */}
                       <div className="text-sm text-muted-foreground space-y-1 border-t pt-3">
-                        <p>문제 {questions.length}개{examData.materials.length > 0 && ` · 자료 ${examData.materials.length}개`}</p>
-                        <p>시험 시간: {examData.duration === 0 ? "무제한 (과제형)" : `${examData.duration}분`}</p>
+                        <p>
+                          {t("newExam.dialogSummaryQuestions", { questions: questions.length })}
+                          {examData.materials.length > 0 && t("newExam.dialogSummaryMaterials", { materials: examData.materials.length })}
+                        </p>
+                        <p>
+                          {examData.duration === 0
+                            ? t("newExam.dialogDurationUnlimited")
+                            : t("newExam.dialogDuration", { duration: examData.duration })}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -963,7 +969,7 @@ export default function CreateExam() {
                         router.push("/instructor");
                       }}
                     >
-                      확인
+                      {t("newExam.dialogConfirm")}
                     </Button>
                   </DialogFooter>
             </DialogContent>
@@ -976,15 +982,14 @@ export default function CreateExam() {
           >
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>회원가입이 필요합니다</DialogTitle>
+                <DialogTitle>{t("newExam.signUpDialogTitle")}</DialogTitle>
                 <DialogDescription>
-                  시험을 출제하려면 회원가입이 필요합니다.
+                  {t("newExam.signUpDialogDesc")}
                 </DialogDescription>
               </DialogHeader>
               <div className="py-4">
                 <p className="text-sm text-muted-foreground">
-                  데모 모드에서는 실제로 시험을 출제할 수 없습니다. 회원가입을
-                  하시면 전체 기능을 이용하실 수 있습니다.
+                  {t("newExam.signUpDialogBody")}
                 </p>
               </div>
               <DialogFooter>
@@ -992,10 +997,10 @@ export default function CreateExam() {
                   variant="outline"
                   onClick={() => setIsSignUpDialogOpen(false)}
                 >
-                  닫기
+                  {t("newExam.signUpDialogClose")}
                 </Button>
                 <Button onClick={() => router.push("/sign-up")}>
-                  회원가입하기
+                  {t("newExam.signUpDialogButton")}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -1004,30 +1009,30 @@ export default function CreateExam() {
           <Dialog open={showRestoreModal}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>이전 작업 복원</DialogTitle>
+                <DialogTitle>{t("newExam.restoreDialogTitle")}</DialogTitle>
                 <DialogDescription>
-                  저장되지 않은 이전 작업이 있습니다. 복원하시겠습니까?
+                  {t("newExam.restoreDialogDesc")}
                 </DialogDescription>
               </DialogHeader>
               <div className="py-4">
                 {savedDraft && (
                   <div className="text-sm text-muted-foreground space-y-1">
-                    {savedDraft.title && <p>제목: {savedDraft.title}</p>}
+                    {savedDraft.title && <p>{t("newExam.restoreTitle", { title: savedDraft.title })}</p>}
                     {savedDraft.questions?.length > 0 && (
-                      <p>문제 {savedDraft.questions.length}개</p>
+                      <p>{t("newExam.restoreQuestions", { count: savedDraft.questions.length })}</p>
                     )}
                     <p className="text-xs">
-                      저장 시각: {new Date(savedDraft.savedAt).toLocaleString("ko-KR")}
+                      {t("newExam.restoreSavedAt", { time: new Date(savedDraft.savedAt).toLocaleString("ko-KR") })}
                     </p>
                   </div>
                 )}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={discardDraft}>
-                  새로 시작
+                  {t("newExam.restoreDiscard")}
                 </Button>
                 <Button onClick={handleRestoreDraft}>
-                  복원하기
+                  {t("newExam.restoreConfirm")}
                 </Button>
               </DialogFooter>
             </DialogContent>

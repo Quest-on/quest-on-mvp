@@ -1,1 +1,6 @@
-{}
+{
+  "dashboard": {
+    "welcomeDesc": "Enter an exam code to start an exam, or check the results of completed exams",
+    "joinButton": "Start Exam"
+  }
+}

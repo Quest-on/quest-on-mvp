@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { Quote } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 const MARQUEE_FAST_MS = 36000;
 const MARQUEE_SLOW_MS = 50000;
@@ -227,6 +228,7 @@ export default function TestimonialSection({
 }) {
   const isDark = mode === "dark";
   const [isHovered, setIsHovered] = useState(false);
+  const t = useTranslations("landing");
   const trackRef = useRef<HTMLDivElement>(null);
   const positionRef = useRef(0);
   const lastTimeRef = useRef<number>(0);
@@ -267,9 +269,9 @@ export default function TestimonialSection({
             }`}
             style={{ letterSpacing: "-0.01em" }}
           >
-            이미 수많은 교육 현장에서
+            {t("testimonial.sectionTitle.line1")}
             <br />
-            혁신이 시작되었습니다.
+            {t("testimonial.sectionTitle.line2")}
           </h2>
         </div>
 

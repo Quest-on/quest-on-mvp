@@ -18,6 +18,7 @@ import { SidebarFooter } from "@/components/dashboard/SidebarFooter";
 import { SidebarFolderTree } from "@/components/instructor/SidebarFolderTree";
 import { AlertTriangle, ChevronLeft, ChevronRight, CircleAlert, type LucideIcon } from "lucide-react";
 import { type ComponentType } from "react";
+import { useTranslations } from "next-intl";
 
 export interface NavItem {
   title: string;
@@ -50,6 +51,7 @@ export function DashboardSidebar({
   userId,
 }: DashboardSidebarProps) {
   const { state, toggleSidebar } = useSidebar();
+  const t = useTranslations("instructor");
   const isCollapsed = state === "collapsed";
   const hasTodoSection = Array.isArray(todoItems);
   const safeTodoItems = todoItems || [];
@@ -59,7 +61,7 @@ export function DashboardSidebar({
       return {
         rowClass: "text-sidebar-foreground/80",
         badgeClass: "text-blue-600 bg-blue-500/10 border-blue-500/30",
-        label: "기한 없음",
+        label: t("sidebar.noDueDate"),
         icon: CircleAlert,
       };
     }
@@ -113,7 +115,7 @@ export function DashboardSidebar({
         <button
           onClick={toggleSidebar}
           className="absolute -right-3.5 top-1/2 -translate-y-1/2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-sidebar-border bg-sidebar shadow-sm text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-          aria-label={isCollapsed ? "사이드바 확장" : "사이드바 축소"}
+          aria-label={isCollapsed ? t("sidebar.expand") : t("sidebar.collapse")}
         >
           {isCollapsed ? (
             <ChevronRight className="w-3.5 h-3.5" />
@@ -152,7 +154,7 @@ export function DashboardSidebar({
             <SidebarGroupContent>
               {safeTodoItems.length === 0 ? (
                 <div className="px-2 py-2 text-xs text-sidebar-foreground/80 group-data-[collapsible=icon]:hidden">
-                  미제출 과제 없음
+                  {t("sidebar.noTodo")}
                 </div>
               ) : (
                 <SidebarMenu className="group-data-[collapsible=icon]:items-center">

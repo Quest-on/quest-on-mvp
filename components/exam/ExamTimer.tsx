@@ -1,6 +1,7 @@
 "use client";
 
 import { Clock } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import {
   useExamTimer,
@@ -33,6 +34,7 @@ export function ExamTimer({
   className,
   showExpiredDialog: renderExpiredDialog = true,
 }: ExamTimerProps) {
+  const t = useTranslations("exam");
   const {
     timeRemaining,
     hasExpired,
@@ -70,7 +72,7 @@ export function ExamTimer({
         )}
         data-testid="exam-timer"
         aria-live="polite"
-        aria-label={`남은 시간 ${formatExamTime(displaySeconds)}`}
+        aria-label={t("timer.ariaLabel", { time: formatExamTime(displaySeconds) })}
       >
         <Clock
           className={cn("mr-2 shrink-0", urgent ? "size-5" : "size-4")}
@@ -84,14 +86,14 @@ export function ExamTimer({
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="text-destructive">
-                시험 시간이 종료되었습니다
+                {t("timer.expiredTitle")}
               </AlertDialogTitle>
               <AlertDialogDescription>
-                시험 시간이 종료되어 답안이 자동으로 제출되었습니다.
+                {t("timer.expiredDescription")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogAction className="min-h-[44px]">확인</AlertDialogAction>
+              <AlertDialogAction className="min-h-[44px]">{t("timer.confirm")}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

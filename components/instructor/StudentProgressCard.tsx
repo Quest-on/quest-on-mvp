@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { FileText, Activity } from "lucide-react";
 import { StudentLiveMonitoring } from "./StudentLiveMonitoring";
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 
 interface Student {
   id: string; // session ID
@@ -46,6 +47,7 @@ const getStudentStatusColor = (status: string) => {
 
 // 경과 시간을 계산하고 포맷하는 컴포넌트
 function ElapsedTime({ createdAt }: { createdAt: string | undefined }) {
+  const t = useTranslations("grading");
   const [elapsedTime, setElapsedTime] = useState<string>("");
 
   useEffect(() => {
@@ -60,7 +62,7 @@ function ElapsedTime({ createdAt }: { createdAt: string | undefined }) {
       const diffMs = now - startTime;
 
       if (diffMs < 0) {
-        setElapsedTime("방금 전");
+        setElapsedTime(t("studentProgress.elapsedJustNow"));
         return;
       }
 
@@ -70,13 +72,13 @@ function ElapsedTime({ createdAt }: { createdAt: string | undefined }) {
       const diffDays = Math.floor(diffHours / 24);
 
       if (diffDays > 0) {
-        setElapsedTime(`${diffDays}일 ${diffHours % 24}시간`);
+        setElapsedTime(t("studentProgress.elapsedDaysHours", { days: diffDays, hours: diffHours % 24 }));
       } else if (diffHours > 0) {
-        setElapsedTime(`${diffHours}시간 ${diffMinutes % 60}분`);
+        setElapsedTime(t("studentProgress.elapsedHoursMinutes", { hours: diffHours, minutes: diffMinutes % 60 }));
       } else if (diffMinutes > 0) {
-        setElapsedTime(`${diffMinutes}분`);
+        setElapsedTime(t("studentProgress.elapsedMinutes", { minutes: diffMinutes }));
       } else {
-        setElapsedTime("방금 전");
+        setElapsedTime(t("studentProgress.elapsedJustNow"));
       }
     };
 
@@ -107,13 +109,14 @@ function ElapsedTime({ createdAt }: { createdAt: string | undefined }) {
 
   if (!elapsedTime) return null;
 
-  return <span>시작한 지: {elapsedTime}</span>;
+  return <span>{t("studentProgress.elapsedSince", { elapsed: elapsedTime })}</span>;
 }
 
 export function StudentProgressCard({
   students,
   examId,
 }: StudentProgressCardProps) {
+  const t = useTranslations("grading");
   const [monitoringSessionId, setMonitoringSessionId] = useState<string | null>(
     null
   );
@@ -135,8 +138,8 @@ export function StudentProgressCard({
     <>
       <Card>
         <CardHeader>
-          <CardTitle>학생 진행 상황 ({students.length})</CardTitle>
-          <CardDescription>학생 참여도와 점수 모니터링</CardDescription>
+          <CardTitle>{t("studentProgress.cardTitle", { count: students.length })}</CardTitle>
+          <CardDescription>{t("studentProgress.cardDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="border rounded-md divide-y">
@@ -169,10 +172,10 @@ export function StudentProgressCard({
                           </span>
                         )}
                         {student.status === "completed"
-                          ? "완료"
+                          ? t("studentProgress.statusCompleted")
                           : student.status === "in-progress"
-                          ? "진행 중"
-                          : "시작 안함"}
+                          ? t("studentProgress.statusInProgress")
+                          : t("studentProgress.statusNotStarted")}
                       </Badge>
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">
@@ -197,7 +200,7 @@ export function StudentProgressCard({
                     {student.score !== undefined && student.score !== null && (
                       <div className="flex flex-col items-end">
                         <span className="font-semibold text-lg">
-                          {student.score}점
+                          {t("studentProgress.scoreLabel", { score: student.score })}
                         </span>
                         {student.status === "completed" &&
                           student.submittedAt && (
@@ -233,7 +236,7 @@ export function StudentProgressCard({
                         onClick={() => handleLiveMonitoring(student)}
                       >
                         <Activity className="w-3.5 h-3.5 mr-1" />
-                        모니터링
+                        {t("studentProgress.monitoringButton")}
                       </Button>
                     )}
                     {student.status === "completed" && (
@@ -246,7 +249,7 @@ export function StudentProgressCard({
                         }
                       >
                         <FileText className="w-3.5 h-3.5 mr-1" />
-                        채점
+                        {t("studentProgress.gradeButton")}
                       </Button>
                     )}
                   </div>

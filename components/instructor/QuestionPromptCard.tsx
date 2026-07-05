@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Card,
   CardContent,
@@ -6,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { RichTextViewer } from "@/components/ui/rich-text-viewer";
 import { FileText } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface Question {
   id: string;
@@ -24,12 +27,13 @@ export function QuestionPromptCard({
   question,
   questionNumber,
 }: QuestionPromptCardProps) {
+  const t = useTranslations("authoring");
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileText className="w-5 h-5 text-blue-600" />
-          문제 {questionNumber}
+          {t("questionPromptCard.cardTitle", { number: questionNumber })}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -38,7 +42,7 @@ export function QuestionPromptCard({
             <RichTextViewer content={question.prompt} className="text-sm" />
             {question.ai_context && (
               <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-xs text-gray-600 mb-2">AI 컨텍스트:</p>
+                <p className="text-xs text-gray-600 mb-2">{t("questionPromptCard.labelAiContext")}</p>
                 <p className="text-sm text-gray-700 whitespace-pre-wrap">
                   {question.ai_context}
                 </p>
@@ -47,9 +51,9 @@ export function QuestionPromptCard({
           </div>
         ) : (
           <div className="text-center py-8 text-red-600">
-            <p>❌ 문제를 불러올 수 없습니다.</p>
+            <p>{t("questionPromptCard.errorLoad")}</p>
             <p className="text-sm mt-2 text-gray-600">
-              선택된 문제 인덱스: {questionNumber - 1}
+              {t("questionPromptCard.errorIndex", { index: questionNumber - 1 })}
             </p>
           </div>
         )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import React from "react";
 import ReactMarkdown, { Components } from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -26,6 +27,7 @@ const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({
   timestamp,
   variant = "bubble",
 }) => {
+  const t = useTranslations("assignment");
   const isPlain = variant === "plain";
   const normalizedContent = normalizeMathDelimiters(content);
   const hasMathSyntax = containsMathSyntax(content);
@@ -252,7 +254,7 @@ const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
               <span className="text-xs font-medium text-muted-foreground">
-                AI 답변
+                {t("chat.aiAnswer")}
               </span>
               <CopyMessageButton text={content} />
             </div>
@@ -265,7 +267,7 @@ const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({
           </div>
           {hasMathSyntax && (
             <div className="mt-1 text-[10px] text-muted-foreground/70 text-right">
-              LaTeX 수식 포함됨
+              {t("chat.latexBadge")}
             </div>
           )}
         </>

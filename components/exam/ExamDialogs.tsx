@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -55,6 +56,7 @@ export function ExamDialogs({
   onManualSubmitRetry,
   submitErrorMessage,
 }: ExamDialogsProps) {
+  const t = useTranslations("exam");
   const [now, setNow] = useState(() => Date.now());
   const [unansweredSubmitDeadline, setUnansweredSubmitDeadline] = useState<number | null>(null);
 
@@ -97,18 +99,18 @@ export function ExamDialogs({
       <AlertDialog open={showExitConfirm} onOpenChange={setShowExitConfirm}>
         <AlertDialogContent data-testid="exit-confirm-dialog">
           <AlertDialogHeader>
-            <AlertDialogTitle>시험을 그만두시겠습니까?</AlertDialogTitle>
+            <AlertDialogTitle>{t("dialogs.exitTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              진행한 내용은 저장됩니다. 시험을 종료하고 학생 대시보드로 이동합니다.
+              {t("dialogs.exitDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>계속 응시</AlertDialogCancel>
+            <AlertDialogCancel>{t("dialogs.exitKeep")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={onExitConfirm}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              그만두기
+              {t("dialogs.exitConfirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -118,9 +120,9 @@ export function ExamDialogs({
       <AlertDialog open={unansweredDialog.open} onOpenChange={(open) => setUnansweredDialog({ ...unansweredDialog, open })}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>미작성 문제가 있습니다</AlertDialogTitle>
+            <AlertDialogTitle>{t("dialogs.unansweredTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {unansweredDialog.indices.length}개의 문제에 답안이 작성되지 않았습니다. 해당 문제로 이동하거나, 현재 상태로 제출할 수 있습니다.
+              {t("dialogs.unansweredDescription", { count: unansweredDialog.indices.length })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex flex-wrap gap-2 py-2">
@@ -137,12 +139,12 @@ export function ExamDialogs({
                     setUnansweredDialog({ open: false, indices: [] });
                   }}
                 >
-                  문제 {displayNumber(idx)}
+                  {t("dialogs.questionButton", { number: displayNumber(idx) })}
                 </Button>
               ))}
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>돌아가기</AlertDialogCancel>
+            <AlertDialogCancel>{t("dialogs.unansweredBack")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (isUnansweredSubmitCoolingDown) return;
@@ -155,10 +157,10 @@ export function ExamDialogs({
               {isUnansweredSubmitCoolingDown ? (
                 <>
                   <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-destructive-foreground border-t-transparent" aria-hidden="true" />
-                  미작성 상태로 제출하기 ({unansweredSubmitRemainingSeconds}초)
+                  {t("dialogs.unansweredSubmitCooldown", { seconds: unansweredSubmitRemainingSeconds })}
                 </>
               ) : (
-                "미작성 상태로 제출하기"
+                t("dialogs.unansweredSubmit")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -171,18 +173,18 @@ export function ExamDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
               <AlertCircle className="h-5 w-5" />
-              자동 제출 실패
+              {t("dialogs.autoFailTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              시간 만료로 인한 자동 제출에 실패했습니다. 아래 버튼을 눌러 수동으로 제출해주세요. 답안은 이미 저장되어 있습니다.
+              {t("dialogs.autoFailDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={onAutoSubmitExit}>
-              저장 후 나가기
+              {t("dialogs.autoFailExit")}
             </AlertDialogCancel>
             <AlertDialogAction onClick={onAutoSubmitRetry}>
-              수동 제출
+              {t("dialogs.autoFailRetry")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -194,16 +196,16 @@ export function ExamDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
               <AlertCircle className="h-5 w-5" />
-              답안 제출 실패
+              {t("dialogs.manualFailTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {submitErrorMessage || "답안 제출에 실패했습니다. 네트워크 연결을 확인하고 다시 시도해주세요."}
+              {submitErrorMessage || t("dialogs.manualFailDefault")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>닫기</AlertDialogCancel>
+            <AlertDialogCancel>{t("dialogs.manualFailClose")}</AlertDialogCancel>
             <AlertDialogAction onClick={onManualSubmitRetry}>
-              다시 제출
+              {t("dialogs.manualFailRetry")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

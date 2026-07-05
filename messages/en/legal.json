@@ -1,1 +1,8 @@
-{}
+{
+  "cookies": {
+    "section5": {
+      "noteLabel": "Note:",
+      "noteBody": "Consent for analytics cookies can be individually withdrawn on the settings page within the service. (Coming soon)"
+    }
+  }
+}

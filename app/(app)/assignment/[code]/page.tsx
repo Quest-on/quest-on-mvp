@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState, useCallback, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { AssignmentHeader } from "@/components/assignment/AssignmentHeader";
 import { AssignmentChatPanel } from "@/components/assignment/AssignmentChatPanel";
 import { AssignmentSubmitDialog } from "@/components/assignment/AssignmentSubmitDialog";
@@ -20,6 +21,7 @@ export default function AssignmentPage({
 }: {
   params: Promise<{ code: string }>;
 }) {
+  const t = useTranslations("assignment");
   const resolvedParams = use(params);
   const code = resolvedParams.code;
   const router = useRouter();
@@ -117,7 +119,7 @@ export default function AssignmentPage({
   const handleDeadlineExpired = useCallback(async () => {
     if (isSubmitted || isSubmitting) return;
     if (!session?.id || !exam?.id || !userId) return;
-    toast("마감 시간이 지났습니다. 자동 제출합니다.", { icon: "\u23F0" });
+    toast(t("page.deadlineExpiredToast"), { icon: "\u23F0" });
     setIsSubmitting(true);
     try {
       try {
@@ -130,7 +132,7 @@ export default function AssignmentPage({
       });
       if (res.ok || res.status === 409) {
         setIsSubmitted(true);
-        toast.success("과제가 자동 제출되었습니다.");
+        toast.success(t("page.autoSubmitSuccess"));
         router.push(`/student/report/${session.id}`);
       }
     } catch {
@@ -145,7 +147,7 @@ export default function AssignmentPage({
     if (!finalAnswer.value.trim()) {
       setFinalAnswerSheetOpen(true);
       setFinalAnswerAttention(true);
-      toast.error("최종답안을 먼저 작성해주세요.");
+      toast.error(t("page.finalAnswerRequired"));
       return;
     }
     setShowSubmitDialog(true);
@@ -160,7 +162,7 @@ export default function AssignmentPage({
       // 1) Flush any pending auto-save first
       const flushRes = await finalAnswer.flush();
       if (!flushRes.ok && flushRes.error && flushRes.error !== "aborted") {
-        throw new Error("최종답안 저장에 실패했습니다. 다시 시도해주세요.");
+        throw new Error(t("page.saveError"));
       }
 
       // 2) Submit
@@ -184,18 +186,18 @@ export default function AssignmentPage({
           setShowSubmitDialog(false);
           setFinalAnswerSheetOpen(true);
           setFinalAnswerAttention(true);
-          throw new Error("최종답안을 먼저 작성해주세요.");
+          throw new Error(t("page.finalAnswerRequired"));
         }
-        throw new Error(errData.message || "제출에 실패했습니다.");
+        throw new Error(errData.message || t("page.submitError"));
       }
 
       setIsSubmitted(true);
       setShowSubmitDialog(false);
-      toast.success("타임어택 퀴즈로 이동합니다.");
+      toast.success(t("page.quizRedirect"));
       router.push(`/student/session/${session.id}/quiz`);
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "제출 중 오류가 발생했습니다."
+        err instanceof Error ? err.message : t("page.submitNetworkError")
       );
     } finally {
       setIsSubmitting(false);
@@ -207,7 +209,7 @@ export default function AssignmentPage({
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">과제를 불러오는 중...</p>
+        <p className="text-sm text-muted-foreground">{t("page.loading")}</p>
       </div>
     );
   }
@@ -221,12 +223,12 @@ export default function AssignmentPage({
             <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
               <AlertCircle className="w-8 h-8 text-destructive" />
             </div>
-            <CardTitle className="text-xl font-bold">과제에 입장할 수 없습니다</CardTitle>
+            <CardTitle className="text-xl font-bold">{t("page.errorTitle")}</CardTitle>
             <CardDescription className="text-sm">{error}</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <Button size="lg" className="min-h-[48px] px-8" onClick={() => router.push("/")}>
-              돌아가기
+              {t("page.backButton")}
             </Button>
           </CardContent>
         </Card>
@@ -242,12 +244,12 @@ export default function AssignmentPage({
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
               <FileX className="w-8 h-8 text-muted-foreground" />
             </div>
-            <CardTitle className="text-xl font-bold">과제를 찾을 수 없습니다</CardTitle>
-            <CardDescription className="text-sm">과제 코드를 확인하거나 강사에게 문의해주세요.</CardDescription>
+            <CardTitle className="text-xl font-bold">{t("page.notFoundTitle")}</CardTitle>
+            <CardDescription className="text-sm">{t("page.notFoundDescription")}</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <Button size="lg" className="min-h-[48px] px-8" onClick={() => router.push("/")}>
-              돌아가기
+              {t("page.backButton")}
             </Button>
           </CardContent>
         </Card>

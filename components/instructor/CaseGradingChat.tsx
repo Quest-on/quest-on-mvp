@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { qk } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +62,7 @@ export function CaseGradingChat({
   initialComment = "",
   onCommitPendingChange,
 }: CaseGradingChatProps) {
+  const t = useTranslations("grading");
   const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -82,7 +84,7 @@ export function CaseGradingChat({
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "채점 대화를 불러오지 못했습니다");
+        throw new Error(err.message || t("caseGradingChat.loadFail"));
       }
       const json = (await res.json()) as { messages: CaseGradingChatMessage[] };
       return json.messages ?? [];
@@ -108,7 +110,7 @@ export function CaseGradingChat({
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(
-          extractErrorMessage(err, "AI 응답을 받지 못했습니다", res.status),
+          extractErrorMessage(err, t("caseGradingChat.aiResponseFail"), res.status),
         );
       }
       return res.json() as Promise<{
@@ -145,7 +147,7 @@ export function CaseGradingChat({
     mutationFn: async () => {
       const scoreNum = parseInt(score, 10);
       if (Number.isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) {
-        throw new Error("0~100 사이의 점수를 입력해주세요");
+        throw new Error(t("caseGradingChat.invalidScore"));
       }
       const res = await fetch(`/api/session/${sessionId}/case-grade/commit`, {
         method: "POST",
@@ -159,13 +161,13 @@ export function CaseGradingChat({
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(
-          extractErrorMessage(err, "채점 저장에 실패했습니다", res.status),
+          extractErrorMessage(err, t("caseGradingChat.saveFail"), res.status),
         );
       }
       return res.json();
     },
     onSuccess: () => {
-      toast.success("채점이 저장되었습니다.");
+      toast.success(t("caseGradingChat.saveSuccess"));
       queryClient.invalidateQueries({
         queryKey: qk.session.grade(sessionId),
       });
@@ -216,9 +218,9 @@ export function CaseGradingChat({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>AI 채점 대화</CardTitle>
+        <CardTitle>{t("caseGradingChat.cardTitle")}</CardTitle>
         <CardDescription>
-          {questionNumber}번 문항 — 답안·대화 맥락을 바탕으로 AI와 채점을 논의합니다
+          {t("caseGradingChat.cardDescription", { questionNumber })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -232,7 +234,7 @@ export function CaseGradingChat({
           {historyLoading ? (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              대화 불러오는 중…
+              {t("caseGradingChat.historyLoading")}
             </div>
           ) : displayMessages.length === 0 && !chatMutation.isPending ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
@@ -240,10 +242,10 @@ export function CaseGradingChat({
                 <Bot className="h-5 w-5 text-muted-foreground" />
               </div>
               <p className="text-sm font-medium text-foreground">
-                AI와 채점을 논의해 보세요
+                {t("caseGradingChat.emptyTitle")}
               </p>
               <p className="text-xs text-muted-foreground">
-                예: &quot;이 답안의 핵심 강점과 약점은?&quot;
+                {t("caseGradingChat.emptyExample")}
               </p>
             </div>
           ) : (
@@ -292,7 +294,7 @@ export function CaseGradingChat({
                   </div>
                   <div className="inline-flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    AI가 답변을 작성 중…
+                    {t("caseGradingChat.aiThinking")}
                   </div>
                 </div>
               )}
@@ -303,7 +305,7 @@ export function CaseGradingChat({
 
         <div className="rounded-md border bg-muted/40 p-2">
           <Label htmlFor={`case-grade-chat-${qIdx}`} className="sr-only">
-            AI에게 보낼 채점 질문
+            {t("caseGradingChat.inputAriaLabel")}
           </Label>
           <div className="flex items-end gap-2">
             <Textarea
@@ -312,7 +314,7 @@ export function CaseGradingChat({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="AI에게 채점 질문하기…"
+              placeholder={t("caseGradingChat.inputPlaceholder")}
               rows={2}
               disabled={chatMutation.isPending}
               className="min-h-0 resize-none bg-background"
@@ -323,7 +325,7 @@ export function CaseGradingChat({
               onClick={handleSend}
               disabled={!input.trim() || chatMutation.isPending}
               aria-busy={chatMutation.isPending}
-              aria-label="메시지 보내기"
+              aria-label={t("caseGradingChat.sendAriaLabel")}
             >
               {chatMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -333,14 +335,14 @@ export function CaseGradingChat({
             </Button>
           </div>
           <p className="mt-1.5 px-0.5 text-xs text-muted-foreground">
-            Enter 전송 · Shift+Enter 줄바꿈
+            {t("caseGradingChat.keyboardHint")}
           </p>
         </div>
 
         <div className="space-y-3 rounded-md border bg-card p-3">
-          <p className="text-xs font-semibold text-muted-foreground">채점 입력</p>
+          <p className="text-xs font-semibold text-muted-foreground">{t("caseGradingChat.gradeInputLabel")}</p>
           <div className="space-y-2">
-            <Label htmlFor={`case-grade-score-${qIdx}`}>점수 (0–100)</Label>
+            <Label htmlFor={`case-grade-score-${qIdx}`}>{t("caseGradingChat.scoreLabel")}</Label>
             <Input
               id={`case-grade-score-${qIdx}`}
               data-testid="grade-score-input"
@@ -357,7 +359,7 @@ export function CaseGradingChat({
               >
                 <span className="flex items-center gap-1.5 text-xs text-foreground">
                   <Bot className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-                  AI 추천 점수 <strong className="font-semibold">{suggestedScore}점</strong>
+                  {t("caseGradingChat.suggestedScorePrefix")}<strong className="font-semibold">{t("caseGradingChat.suggestedScoreValue", { score: suggestedScore })}</strong>
                 </span>
                 <div className="flex shrink-0 gap-1">
                   <Button
@@ -370,7 +372,7 @@ export function CaseGradingChat({
                       setSuggestedScore(null);
                     }}
                   >
-                    적용
+                    {t("caseGradingChat.applyButton")}
                   </Button>
                   <Button
                     type="button"
@@ -379,20 +381,20 @@ export function CaseGradingChat({
                     className="h-6 px-2 text-xs"
                     onClick={() => setSuggestedScore(null)}
                   >
-                    무시
+                    {t("caseGradingChat.ignoreButton")}
                   </Button>
                 </div>
               </div>
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor={`case-grade-comment-${qIdx}`}>코멘트</Label>
+            <Label htmlFor={`case-grade-comment-${qIdx}`}>{t("caseGradingChat.commentLabel")}</Label>
             <Textarea
               id={`case-grade-comment-${qIdx}`}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               rows={3}
-              placeholder="학생에게 전달할 피드백"
+              placeholder={t("caseGradingChat.commentPlaceholder")}
             />
           </div>
           <Button
@@ -405,10 +407,10 @@ export function CaseGradingChat({
             {commitMutation.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                저장 중…
+                {t("caseGradingChat.savingLabel")}
               </>
             ) : (
-              "채점 저장"
+              t("caseGradingChat.saveButton")
             )}
           </Button>
         </div>

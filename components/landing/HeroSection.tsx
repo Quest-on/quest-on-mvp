@@ -22,6 +22,7 @@ import {
   TypingText,
   TypingTextCursor,
 } from "@/components/animate-ui/primitives/texts/typing";
+import { useTranslations } from "next-intl";
 
 // ============================================================================
 // TYPES
@@ -107,6 +108,7 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
   const colors = COLORS[mode];
   const sectionRef = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(false);
+  const t = useTranslations("landing");
   const [typingState, setTypingState] = useState<{
     isTyping: boolean;
     text: string;
@@ -242,10 +244,10 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
               </div>
               <div>
                 <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                  최종 답안
+                  {t("demo.finalAnswer.heading")}
                 </div>
                 <div className="text-[9px] text-zinc-500">
-                  학생이 제출한 최종 답안입니다
+                  {t("demo.finalAnswer.subtitle")}
                 </div>
               </div>
             </div>
@@ -258,13 +260,13 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
               <div className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded border bg-red-50 border-red-200 text-red-600 dark:bg-red-900/20 dark:border-red-900/50 dark:text-red-400">
                 <TriangleAlert className="w-3 h-3" />
                 <span className="font-semibold text-[10px]">
-                  외부 붙여넣기 4건
+                  {t("demo.cheating.externalPaste")}
                 </span>
               </div>
               <div className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded border bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-900/50 dark:text-blue-400">
                 <Copy className="w-3 h-3" />
                 <span className="font-semibold text-[10px]">
-                  내부 복사 10건
+                  {t("demo.cheating.internalCopy")}
                 </span>
               </div>
             </div>
@@ -274,7 +276,7 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
               <div className="flex items-center gap-1.5 mb-2 text-red-700 dark:text-red-400">
                 <TriangleAlert className="w-3.5 h-3.5" />
                 <span className="font-bold text-[11px]">
-                  부정행위 의심 활동 감지
+                  {t("demo.cheating.suspiciousHeading")}
                 </span>
               </div>
               <ul className="space-y-1 text-[10px] text-red-600/80 dark:text-red-400/80 font-mono">
@@ -288,7 +290,7 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:bg-blue-900/10 dark:border-blue-900/30">
               <div className="flex items-center gap-1.5 mb-2 text-blue-700 dark:text-blue-400">
                 <Copy className="w-3.5 h-3.5" />
-                <span className="font-bold text-[11px]">내부 복사 활동</span>
+                <span className="font-bold text-[11px]">{t("demo.cheating.internalCopyHeading")}</span>
               </div>
               <ul className="space-y-1 text-[10px] text-blue-600/80 dark:text-blue-400/80 font-mono">
                 <li>• 149자 내부 복사 (오전 12:22:23)</li>
@@ -345,10 +347,10 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
               <MessageSquare className="w-5 h-5 text-blue-600" />
               <div>
                 <div className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                  AI와의 대화 기록
+                  {t("demo.chat.heading")}
                 </div>
                 <div className="text-[10px] text-zinc-500">
-                  학생이 AI와 나눈 대화 내용입니다
+                  {t("demo.chat.subtitle")}
                 </div>
               </div>
             </div>
@@ -481,7 +483,7 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
                 </span>
               ) : (
                 <span className="text-xs text-zinc-400">
-                  메시지를 입력하세요...
+                  {t("demo.chat.placeholder")}
                 </span>
               )}
               <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center">
@@ -510,7 +512,7 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
           >
             <Sparkles className="w-4 h-4 text-purple-500" />
             <span className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
-              AI 종합 평가
+              {t("demo.grading.heading")}
             </span>
           </div>
 
@@ -535,7 +537,7 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
               </div>
               <div className="flex-1 opacity-80 leading-relaxed line-clamp-3">
                 <span className="font-bold text-zinc-900 dark:text-zinc-100">
-                  종합 의견:{" "}
+                  {t("demo.grading.opinionLabel")}{" "}
                 </span>
                 이 학생의 답안은 전반적으로 논리적이며 마케팅 이론의 구조를
                 충실히 따르고 있습니다. 3C와 SWOT 분석이 구체적으로 연결되어
@@ -548,7 +550,7 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
               <div className="flex items-center gap-1.5 mb-1.5 opacity-80">
                 <MessageSquare className="w-3 h-3 fill-current" />
                 <span className="text-[10px] font-bold uppercase">
-                  핵심 인용구 (Highlight)
+                  {t("demo.grading.highlightLabel")}
                 </span>
               </div>
               <div className="italic leading-relaxed opacity-90">
@@ -562,7 +564,7 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
               {/* Strengths (Blue) */}
               <div className="bg-blue-500/5 border border-blue-500/10 rounded-lg p-3 flex flex-col gap-2">
                 <div className="text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1">
-                  <Plus className="w-3 h-3" /> 강점
+                  <Plus className="w-3 h-3" /> {t("demo.grading.strengthsLabel")}
                 </div>
                 <ul className="list-disc pl-3 space-y-1.5 opacity-80 leading-snug">
                   <li>3C 및 SWOT 분석 간 논리적 일관성 우수</li>
@@ -574,7 +576,7 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
               {/* Improvements (Orange) */}
               <div className="bg-orange-500/5 border border-orange-500/10 rounded-lg p-3 flex flex-col gap-2">
                 <div className="text-orange-600 dark:text-orange-400 font-bold flex items-center gap-1">
-                  <div className="w-2.5 h-0.5 bg-current rounded-full" /> 개선점
+                  <div className="w-2.5 h-0.5 bg-current rounded-full" /> {t("demo.grading.improvementsLabel")}
                 </div>
                 <ul className="list-disc pl-3 space-y-1.5 opacity-80 leading-snug">
                   <li>유통전략(Place)의 구체성 부족</li>
@@ -597,12 +599,14 @@ export default function HeroSection({
   headline,
   subheadline,
 
-  ctaText = "지금 시작하기",
+  ctaText,
   //   onCtaClick,
   mode = "light",
 }: HeroSectionProps) {
   const colors = COLORS[mode];
   const [isVideoOpen, setIsVideoOpen] = useState(false);
+  const t = useTranslations("landing");
+  const resolvedCtaText = ctaText ?? t("hero.cta.start");
 
   return (
     <div
@@ -655,7 +659,7 @@ export default function HeroSection({
                   "hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
                 )}
               >
-                {ctaText}
+                {resolvedCtaText}
                 <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
               </Link>
 
@@ -669,7 +673,7 @@ export default function HeroSection({
                 }}
               >
                 <Play className="w-4 h-4 fill-current" />
-                데모 영상 보기
+                {t("hero.cta.watchDemo")}
               </button>
             </div>
 
@@ -679,7 +683,7 @@ export default function HeroSection({
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden shadow-2xl">
                   <iframe
                     src="https://www.youtube.com/embed/yjKH4Nzy_Xk"
-                    title="데모 영상"
+                    title={t("hero.cta.demoVideoTitle")}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                     className="absolute inset-0 w-full h-full"

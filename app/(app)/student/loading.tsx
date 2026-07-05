@@ -1,10 +1,12 @@
+import { getTranslations } from "next-intl/server";
 import { DashboardPageFallback } from "@/components/dashboard/DashboardPageFallback";
 
-export default function StudentLoading() {
+export default async function StudentLoading() {
+  const t = await getTranslations("auth.loading");
   return (
     <DashboardPageFallback
-      title="학생 대시보드를 불러오는 중..."
-      description="세션 목록과 통계를 순차적으로 준비하고 있습니다."
+      title={t("student")}
+      description={t("studentDesc")}
     />
   );
 }

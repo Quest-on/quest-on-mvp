@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ShieldQuestion } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export interface SessionQuizQuestion {
   id: string;
@@ -37,12 +38,13 @@ export function SessionQuizResultsCard({
   quiz,
   compact = false,
 }: SessionQuizResultsCardProps) {
+  const t = useTranslations("grading");
   return (
     <Card>
       <CardHeader className={compact ? "pb-2" : undefined}>
         <CardTitle className="flex items-center gap-2 text-base">
           <ShieldQuestion className="w-5 h-5 text-amber-600" />
-          타임어택 퀴즈 결과
+          {t("sessionQuiz.title")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -51,14 +53,14 @@ export function SessionQuizResultsCard({
             variant="outline"
             className="bg-amber-500/10 text-amber-700 dark:text-amber-400"
           >
-            점수 {quiz.score ?? 0}/100
+            {t("sessionQuiz.scoreBadge", { score: quiz.score ?? 0 })}
           </Badge>
           <Badge variant="secondary">
-            {quiz.total_questions}문항 · {quiz.time_limit_seconds}초
+            {t("sessionQuiz.metaBadge", { questions: quiz.total_questions, seconds: quiz.time_limit_seconds })}
           </Badge>
           {quiz.submitted_at && (
             <span className="text-xs text-muted-foreground">
-              완료:{" "}
+              {t("sessionQuiz.completedLabel")}{" "}
               {new Date(quiz.submitted_at).toLocaleString("ko-KR", {
                 month: "short",
                 day: "numeric",
@@ -90,24 +92,24 @@ export function SessionQuizResultsCard({
                           : "bg-red-500/10 text-red-700 dark:text-red-400 shrink-0"
                       }
                     >
-                      {isCorrect ? "정답" : "오답"}
+                      {isCorrect ? t("sessionQuiz.badgeCorrect") : t("sessionQuiz.badgeWrong")}
                     </Badge>
                   )}
                 </div>
                 <p className="mt-1.5 text-xs text-muted-foreground">
-                  선택:{" "}
+                  {t("sessionQuiz.choiceLabel")}{" "}
                   {typeof selectedIndex === "number"
-                    ? question.options[selectedIndex] || "무응답"
-                    : "무응답"}
+                    ? question.options[selectedIndex] || t("sessionQuiz.noAnswer")
+                    : t("sessionQuiz.noAnswer")}
                 </p>
                 {typeof correctIndex === "number" && (
                   <p className="text-xs text-muted-foreground">
-                    정답: {question.options[correctIndex]}
+                    {t("sessionQuiz.answerLabel")} {question.options[correctIndex]}
                   </p>
                 )}
                 {!compact && question.rationale && (
                   <p className="mt-1.5 text-xs text-muted-foreground">
-                    근거: {question.rationale}
+                    {t("sessionQuiz.rationaleLabel")} {question.rationale}
                   </p>
                 )}
               </div>

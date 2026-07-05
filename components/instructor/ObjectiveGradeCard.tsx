@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Card,
   CardContent,
@@ -8,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 interface ObjectiveGradeCardProps {
   type: string;
@@ -31,6 +34,7 @@ export function ObjectiveGradeCard({
   studentAnswer,
   embedded = false,
 }: ObjectiveGradeCardProps) {
+  const t = useTranslations("grading");
   const resolvedOptions =
     options && options.length > 0
       ? options
@@ -59,19 +63,19 @@ export function ObjectiveGradeCard({
       <div className="flex flex-wrap items-center gap-2">
         <ListChecks className="h-5 w-5 text-primary" />
         <h3 className="text-lg font-semibold">
-          {type === "true-false" ? "O·X 정답 확인" : "객관식 정답 확인"}
+          {type === "true-false" ? t("objectiveGrade.titleTrueFalse") : t("objectiveGrade.titleMultipleChoice")}
         </h3>
         {hasCorrect && selectedIndex !== null && (
           <Badge variant={isCorrect ? "default" : "destructive"}>
-            {isCorrect ? "정답" : "오답"}
+            {isCorrect ? t("objectiveGrade.badgeCorrect") : t("objectiveGrade.badgeWrong")}
           </Badge>
         )}
         {selectedIndex === null && (
-          <Badge variant="outline">무응답</Badge>
+          <Badge variant="outline">{t("objectiveGrade.badgeNoAnswer")}</Badge>
         )}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        학생이 선택한 답안과 정답을 비교합니다.
+        {t("objectiveGrade.description")}
       </p>
     </div>
   );
@@ -80,7 +84,7 @@ export function ObjectiveGradeCard({
     <>
       {resolvedOptions.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          선택지 정보가 없습니다.
+          {t("objectiveGrade.noOptions")}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -111,12 +115,12 @@ export function ObjectiveGradeCard({
                       ) : (
                         <XCircle className="h-3 w-3 text-destructive" />
                       )}
-                      학생 선택
+                      {t("objectiveGrade.badgeStudentPick")}
                     </Badge>
                   )}
                   {isAnswer && (
                     <Badge className="bg-emerald-600 hover:bg-emerald-600">
-                      정답
+                      {t("objectiveGrade.badgeAnswer")}
                     </Badge>
                   )}
                 </div>
@@ -127,7 +131,7 @@ export function ObjectiveGradeCard({
       )}
       {!hasCorrect && (
         <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">
-          이 문제에 정답 정보가 없어 자동 채점되지 않았습니다.
+          {t("objectiveGrade.noCorrectInfo")}
         </p>
       )}
     </>
@@ -147,18 +151,18 @@ export function ObjectiveGradeCard({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ListChecks className="h-5 w-5 text-primary" />
-          {type === "true-false" ? "O·X 정답 확인" : "객관식 정답 확인"}
+          {type === "true-false" ? t("objectiveGrade.titleTrueFalse") : t("objectiveGrade.titleMultipleChoice")}
           {hasCorrect && selectedIndex !== null && (
             <Badge variant={isCorrect ? "default" : "destructive"}>
-              {isCorrect ? "정답" : "오답"}
+              {isCorrect ? t("objectiveGrade.badgeCorrect") : t("objectiveGrade.badgeWrong")}
             </Badge>
           )}
           {selectedIndex === null && (
-            <Badge variant="outline">무응답</Badge>
+            <Badge variant="outline">{t("objectiveGrade.badgeNoAnswer")}</Badge>
           )}
         </CardTitle>
         <CardDescription>
-          학생이 선택한 답안과 정답을 비교합니다.
+          {t("objectiveGrade.description")}
         </CardDescription>
       </CardHeader>
       <CardContent>{content}</CardContent>

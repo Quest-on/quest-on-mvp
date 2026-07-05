@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import toast from "react-hot-toast";
 import { extractErrorMessage, getErrorMessage } from "@/lib/error-messages";
+import { useTranslations } from "next-intl";
 
 interface ExamNode {
   id: string;
@@ -86,6 +87,7 @@ function FolderTreeItem({
   queryClient: ReturnType<typeof useQueryClient>;
   level?: number;
 }) {
+  const t = useTranslations("instructor");
   const { data: children = [], isLoading } = useQuery({
     queryKey: qk.drive.folderContents(folder.id, userId),
     queryFn: async ({ signal }) => {
@@ -202,7 +204,7 @@ function FolderTreeItem({
 
       if (draggedNode.kind === "folder") {
         if (targetNode.parent_id === draggedNode.id) {
-          toast.error("자기 자신의 하위 폴더로는 이동할 수 없습니다.");
+          toast.error(t("drive.toastMoveSelfError"));
           return;
         }
       }
@@ -225,7 +227,7 @@ function FolderTreeItem({
 
         if (response.ok) {
           toast.success(
-            `"${draggedNode.name}"이(가) "${targetNode.name}" 폴더로 이동되었습니다.`
+            t("drive.toastMovedTo", { name: draggedNode.name, target: targetNode.name })
           );
           // 모든 관련 쿼리 무효화
           queryClient.invalidateQueries({
@@ -241,7 +243,7 @@ function FolderTreeItem({
           const errorData = await response.json().catch(() => ({}));
           const errorMessage = extractErrorMessage(
             errorData,
-            "이동에 실패했습니다",
+            t("drive.toastMoveFail"),
             response.status
           );
           toast.error(errorMessage, {
@@ -249,7 +251,7 @@ function FolderTreeItem({
           });
         }
       } catch (error) {
-        const errorMessage = getErrorMessage(error, "이동에 실패했습니다");
+        const errorMessage = getErrorMessage(error, t("drive.toastMoveFail"));
         toast.error(errorMessage, {
           duration: 5000,
         });
@@ -321,7 +323,7 @@ function FolderTreeItem({
         <FolderContent className="pl-2">
           {isLoading ? (
             <div className="py-1 text-xs text-muted-foreground pl-2">
-              로딩 중...
+              {t("fileTree.loading")}
             </div>
           ) : (
             <>
@@ -410,6 +412,7 @@ export function FileTree({
   const { user, profile } = useAppUser();
   const queryClient = useQueryClient();
   const effectiveUserId = userId || user?.id;
+  const t = useTranslations("instructor");
 
   // URL 쿼리 파라미터에서 currentFolderId를 읽거나 prop에서 가져옴
   const currentFolderId = propCurrentFolderId ?? searchParams.get("folder");
@@ -526,7 +529,7 @@ export function FileTree({
 
       if (draggedNode.kind === "folder") {
         if (targetNode.parent_id === draggedNode.id) {
-          toast.error("자기 자신의 하위 폴더로는 이동할 수 없습니다.");
+          toast.error(t("drive.toastMoveSelfError"));
           return;
         }
       }
@@ -549,7 +552,7 @@ export function FileTree({
 
         if (response.ok) {
           toast.success(
-            `"${draggedNode.name}"이(가) "${targetNode.name}" 폴더로 이동되었습니다.`
+            t("drive.toastMovedTo", { name: draggedNode.name, target: targetNode.name })
           );
           // 모든 관련 쿼리 무효화
           queryClient.invalidateQueries({
@@ -562,7 +565,7 @@ export function FileTree({
           const errorData = await response.json().catch(() => ({}));
           const errorMessage = extractErrorMessage(
             errorData,
-            "이동에 실패했습니다",
+            t("drive.toastMoveFail"),
             response.status
           );
           toast.error(errorMessage, {
@@ -570,7 +573,7 @@ export function FileTree({
           });
         }
       } catch (error) {
-        const errorMessage = getErrorMessage(error, "이동에 실패했습니다");
+        const errorMessage = getErrorMessage(error, t("drive.toastMoveFail"));
         toast.error(errorMessage, {
           duration: 5000,
         });
@@ -604,7 +607,7 @@ export function FileTree({
   if (isLoading) {
     return (
       <div className={cn("p-4 text-sm text-muted-foreground", className)}>
-        로딩 중...
+        {t("fileTree.loading")}
       </div>
     );
   }
@@ -612,7 +615,7 @@ export function FileTree({
   if (rootFolders.length === 0 && rootFiles.length === 0) {
     return (
       <div className={cn("p-4 text-sm text-muted-foreground", className)}>
-        폴더가 없습니다
+        {t("fileTree.noFolders")}
       </div>
     );
   }

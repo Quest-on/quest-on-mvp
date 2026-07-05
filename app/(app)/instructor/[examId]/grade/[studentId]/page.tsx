@@ -5,6 +5,7 @@ import { useAppUser } from "@/components/providers/AppAuthProvider";
 import { useState, useEffect, use, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { qk } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -181,6 +182,7 @@ export default function GradeStudentPage({
   const searchParams = useSearchParams();
   const { isSignedIn, isLoaded, profile } = useAppUser();
   const queryClient = useQueryClient();
+  const t = useTranslations("grading");
 
   const questionType = searchParams.get("questionType") ?? undefined;
   const qIdxParam = searchParams.get("qIdx");
@@ -208,7 +210,7 @@ export default function GradeStudentPage({
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `채점 데이터 로드 실패 (${response.status})`);
+        throw new Error(errorData.message || t("gradePage.loadFail", { status: response.status }));
       }
 
       const data: SessionData = await response.json();
@@ -270,14 +272,14 @@ export default function GradeStudentPage({
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "AI 재채점에 실패했습니다");
+        throw new Error(errorData.message || t("gradePage.regradeFailed"));
       }
 
       const data = await response.json();
       toast.success(
         data.skipped
-          ? "이미 채점이 완료되어 있습니다."
-          : "AI 재채점 요청을 큐에 등록했습니다. 완료되면 자동으로 결과가 표시됩니다."
+          ? t("gradePage.alreadyGraded")
+          : t("gradePage.regradeQueued")
       );
 
       // 데이터 리프레시 — 큐잉 직후부터 폴링으로 진행률 반영
@@ -286,7 +288,7 @@ export default function GradeStudentPage({
       });
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "AI 재채점 중 오류가 발생했습니다"
+        error instanceof Error ? error.message : t("gradePage.regradeError")
       );
     } finally {
       setIsRegrading(false);
@@ -330,7 +332,7 @@ export default function GradeStudentPage({
         <div className="text-center py-12 space-y-4">
           <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
           <h2 className="text-xl font-semibold text-red-600 mb-2">
-            {sessionError ? "채점 데이터를 불러오는 중 오류가 발생했습니다" : "제출물을 찾을 수 없습니다"}
+            {sessionError ? t("gradePage.errorTitle") : t("gradePage.notFoundTitle")}
           </h2>
           {sessionError && (
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
@@ -340,10 +342,10 @@ export default function GradeStudentPage({
           <div className="flex items-center justify-center gap-3">
             <Button variant="outline" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4 mr-2" />
-              다시 시도
+              {t("gradePage.retry")}
             </Button>
             <Link href={`/instructor/${resolvedParams.examId}`}>
-              <Button variant="outline">돌아가기</Button>
+              <Button variant="outline">{t("gradePage.goBack")}</Button>
             </Link>
           </div>
         </div>
@@ -418,7 +420,7 @@ export default function GradeStudentPage({
     ? buildTypedQuestionEntries(sessionData.exam.questions, objectiveQuestionType)
     : [];
   const objectiveTitle =
-    objectiveQuestionType === "multiple-choice" ? "사지선다 정답 확인" : "O/X 정답 확인";
+    objectiveQuestionType === "multiple-choice" ? t("gradePage.objectiveTitleMultiple") : t("gradePage.objectiveTitleTrueFalse");
   const caseQuestionEntries = (sessionData.exam?.questions || [])
     .map((q, arrIdx) => ({ q, arrIdx }))
     .filter(({ q }) => isCaseNavigationQuestionType(q.type));
@@ -492,7 +494,7 @@ export default function GradeStudentPage({
                 <CardHeader>
                   <CardTitle>{objectiveTitle}</CardTitle>
                   <CardDescription>
-                    이 화면은 {objectiveQuestionType === "multiple-choice" ? "사지선다" : "O/X"} 문제의 학생 선택과 정답만 표시합니다.
+                    {t("gradePage.objectiveDescription", { questionType: objectiveQuestionType === "multiple-choice" ? t("gradePage.objectiveDescMultiple") : t("gradePage.objectiveDescTrueFalse") })}
                   </CardDescription>
                 </CardHeader>
               </Card>
@@ -500,7 +502,7 @@ export default function GradeStudentPage({
               {objectiveQuestionEntries.length === 0 ? (
                 <Card>
                   <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                    표시할 문제가 없습니다.
+                    {t("gradePage.noQuestions")}
                   </CardContent>
                 </Card>
               ) : (
@@ -516,7 +518,7 @@ export default function GradeStudentPage({
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <FileText className="h-5 w-5 text-blue-600" />
-                          문제 {displayIndex + 1}
+                          {t("gradePage.questionTitle", { number: displayIndex + 1 })}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4">
@@ -525,7 +527,7 @@ export default function GradeStudentPage({
                           {question.ai_context && (
                             <div className="mt-4 border-t pt-4">
                               <p className="mb-2 text-xs text-muted-foreground">
-                                AI 컨텍스트:
+                                {t("gradePage.aiContext")}
                               </p>
                               <p className="whitespace-pre-wrap text-sm text-muted-foreground">
                                 {question.ai_context}
@@ -557,10 +559,10 @@ export default function GradeStudentPage({
               <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
               <div>
                 <p className="font-medium text-amber-800 dark:text-amber-200">
-                  강제 종료로 자동 제출된 세션
+                  {t("gradePage.autoSubmittedBannerTitle")}
                 </p>
                 <p className="text-sm text-amber-600 dark:text-amber-400">
-                  이 세션은 시험 강제 종료로 자동 제출되었습니다. 자동 저장된 답변만 표시됩니다.
+                  {t("gradePage.autoSubmittedBannerDesc")}
                 </p>
               </div>
             </div>
@@ -593,13 +595,13 @@ export default function GradeStudentPage({
                     <Loader2 className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 animate-spin" />
                     <div>
                       <p className="font-medium text-blue-800 dark:text-blue-200">
-                        AI 채점이 진행 중입니다
+                        {t("gradePage.gradingInProgressTitle")}
                       </p>
                       <p className="text-sm text-blue-600 dark:text-blue-400">
-                        {total > 0 ? `${done}/${total} 문제 완료` : "채점 대기 중"}
+                        {total > 0 ? t("gradePage.gradingProgress", { done, total }) : t("gradePage.gradingWaiting")}
                         {gp && gp.failed > 0 && (
                           <span className="ml-2 text-red-600 dark:text-red-400">
-                            (실패 {gp.failed})
+                            ({t("gradePage.gradingFailed", { count: gp.failed })})
                           </span>
                         )}
                       </p>
@@ -619,13 +621,12 @@ export default function GradeStudentPage({
 
             // Failed or no-grades — show retry button
             const title = isFailed
-              ? "AI 채점 실패"
-              : "자동 채점 결과가 없습니다";
+              ? t("gradePage.gradingFailedTitle")
+              : t("gradePage.noGradesTitle");
+            const progressPart = total > 0 ? ` (${done}/${total})` : "";
             const desc = isFailed
-              ? `일부(또는 전체) 문제의 AI 채점이 실패했습니다.${
-                  total > 0 ? ` (${done}/${total})` : ""
-                } AI 재채점을 실행하거나 수동으로 채점해주세요.`
-              : "배경 자동 채점이 실행되지 않았거나 실패했습니다. AI 재채점을 실행해주세요.";
+              ? t("gradePage.gradingFailedDesc", { progressPart })
+              : t("gradePage.gradingAbsentDesc");
 
             return (
               <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg flex items-center justify-between gap-4">
@@ -649,12 +650,12 @@ export default function GradeStudentPage({
                   {isRegrading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      큐 등록 중...
+                      {t("gradePage.queuingLabel")}
                     </>
                   ) : (
                     <>
                       <RefreshCw className="h-4 w-4 mr-2" />
-                      AI 재채점
+                      {t("gradePage.regradeButton")}
                     </>
                   )}
                 </Button>

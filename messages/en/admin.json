@@ -1,1 +1,12 @@
-{}
+{
+  "agent": {
+    "errors": {
+      "cancelledByInstructor": "The instructor stopped the task.",
+      "navigateFailed": "Failed to navigate to the page.",
+      "editorNotReady": "The editor is not ready. Navigation to the exam creation page is required.",
+      "actionFailed": "An error occurred while executing the action.",
+      "runFailed": "An error occurred during agent execution.",
+      "startFailed": "Failed to start agent execution."
+    }
+  }
+}

@@ -2,6 +2,7 @@
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import StarterKit from "@tiptap/starter-kit";
 import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
@@ -44,11 +45,13 @@ interface RichTextEditorProps {
 export function RichTextEditor({
   value,
   onChange,
-  placeholder = "여기에 입력하세요...",
+  placeholder,
   className = "",
   contentClassName,
   testId,
 }: RichTextEditorProps) {
+  const t = useTranslations("common.richTextEditor");
+  const resolvedPlaceholder = placeholder ?? t("placeholder");
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -57,7 +60,7 @@ export function RichTextEditor({
       TextStyle,
       Color,
       Placeholder.configure({
-        placeholder,
+        placeholder: resolvedPlaceholder,
       }),
       TextAlign.configure({
         types: ["heading", "paragraph"],
@@ -254,7 +257,7 @@ export function RichTextEditor({
               .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
               .run()
           }
-          title="테이블 삽입"
+          title={t("insertTable")}
         >
           <TableIcon className="h-4 w-4" />
         </Button>
@@ -266,65 +269,63 @@ export function RichTextEditor({
               variant="ghost"
               size="sm"
               onClick={() => editor.chain().focus().addColumnBefore().run()}
-              title="왼쪽에 열 추가"
+              title={t("addColumnBefore")}
             >
-              <span className="text-xs">← 열</span>
+              <span className="text-xs">{t("addColumnBeforeShort")}</span>
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => editor.chain().focus().addColumnAfter().run()}
-              title="오른쪽에 열 추가"
+              title={t("addColumnAfter")}
             >
-              <span className="text-xs">열 →</span>
+              <span className="text-xs">{t("addColumnAfterShort")}</span>
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => editor.chain().focus().addRowBefore().run()}
-              title="위에 행 추가"
+              title={t("addRowBefore")}
             >
-              <span className="text-xs">↑ 행</span>
+              <span className="text-xs">{t("addRowBeforeShort")}</span>
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => editor.chain().focus().addRowAfter().run()}
-              title="아래에 행 추가"
+              title={t("addRowAfter")}
             >
-              <span className="text-xs">행 ↓</span>
+              <span className="text-xs">{t("addRowAfterShort")}</span>
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => editor.chain().focus().deleteColumn().run()}
-              title="열 삭제"
+              title={t("deleteColumn")}
               className="text-red-600 hover:text-red-700"
             >
               <Trash2 className="h-3 w-3" />
-              <span className="text-xs ml-1">열</span>
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => editor.chain().focus().deleteRow().run()}
-              title="행 삭제"
+              title={t("deleteRow")}
               className="text-red-600 hover:text-red-700"
             >
               <Trash2 className="h-3 w-3" />
-              <span className="text-xs ml-1">행</span>
             </Button>
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => editor.chain().focus().deleteTable().run()}
-              title="테이블 삭제"
+              title={t("deleteTable")}
               className="text-red-600 hover:text-red-700"
             >
               <Trash2 className="h-4 w-4" />
@@ -355,7 +356,7 @@ export function RichTextEditor({
 
       {/* Editor Content */}
       <div className="bg-white dark:bg-gray-900">
-        <EditorContent editor={editor} placeholder={placeholder} />
+        <EditorContent editor={editor} placeholder={resolvedPlaceholder} />
       </div>
     </div>
   );

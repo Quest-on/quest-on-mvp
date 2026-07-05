@@ -17,20 +17,22 @@ import {
 } from "@/components/ui/collapsible";
 import { Send, Loader2, Check, ChevronDown, ChevronUp, Eye } from "lucide-react";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import type { ChatMessage } from "@/hooks/useQuestionGeneration";
 
-const PRESETS = [
-  { label: "더 어렵게", instruction: "난이도를 높여주세요. 더 복잡한 조건과 깊은 분석을 요구하도록 수정해주세요." },
-  { label: "더 쉽게", instruction: "난이도를 낮춰주세요. 조건을 단순화하고 질문을 더 명확하게 만들어주세요." },
-  { label: "더 구체적으로", instruction: "질문을 더 구체적이고 명확하게 만들어주세요." },
-  { label: "더 길게", instruction: "시나리오를 더 상세하게 만들고 하위 질문을 추가해주세요." },
+// AI instructions kept in Korean (prompt text, not UI labels)
+const PRESET_INSTRUCTIONS = [
+  "난이도를 높여주세요. 더 복잡한 조건과 깊은 분석을 요구하도록 수정해주세요.",
+  "난이도를 낮춰주세요. 조건을 단순화하고 질문을 더 명확하게 만들어주세요.",
+  "질문을 더 구체적이고 명확하게 만들어주세요.",
+  "시나리오를 더 상세하게 만들고 하위 질문을 추가해주세요.",
 ];
 
-const ASSIGNMENT_PRESETS = [
-  { label: "더 어렵게", instruction: "리서치 범위와 비교 기준을 더 정교하게 만들어주세요." },
-  { label: "더 쉽게", instruction: "조사 대상과 요구 기준을 더 단순하고 명확하게 만들어주세요." },
-  { label: "더 구체적으로", instruction: "학생이 조사해야 할 대상, 기간, 비교 기준을 더 구체적으로 제시해주세요." },
-  { label: "더 길게", instruction: "리서치 지시문을 더 자세하게 풀어 쓰되 정답이나 조사 결과는 포함하지 마세요." },
+const ASSIGNMENT_PRESET_INSTRUCTIONS = [
+  "리서치 범위와 비교 기준을 더 정교하게 만들어주세요.",
+  "조사 대상과 요구 기준을 더 단순하고 명확하게 만들어주세요.",
+  "학생이 조사해야 할 대상, 기간, 비교 기준을 더 구체적으로 제시해주세요.",
+  "리서치 지시문을 더 자세하게 풀어 쓰되 정답이나 조사 결과는 포함하지 마세요.",
 ];
 
 /** {@link QuestionAdjustSheet} 의 적용 콜백 페이로드. */
@@ -61,9 +63,11 @@ interface QuestionAdjustSheetProps {
 function OptionPreview({
   options,
   correctOptionIndex,
+  answerLabel,
 }: {
   options: string[];
   correctOptionIndex?: number;
+  answerLabel: string;
 }) {
   return (
     <ul className="mt-2 space-y-1">
@@ -90,7 +94,7 @@ function OptionPreview({
             <span className="min-w-0 flex-1 break-words">{option}</span>
             {isCorrect && (
               <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                정답
+                {answerLabel}
               </span>
             )}
           </li>
@@ -113,34 +117,50 @@ export function QuestionAdjustSheet({
   questionOptions,
   questionCorrectOptionIndex,
 }: QuestionAdjustSheetProps) {
+  const t = useTranslations("authoring");
   const [input, setInput] = useState("");
   const [appliedIdx, setAppliedIdx] = useState<number | null>(null);
   const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
   const [loadingPreset, setLoadingPreset] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const PRESETS = [
+    { label: t("questionAdjustSheet.presetHarder"), instruction: PRESET_INSTRUCTIONS[0] },
+    { label: t("questionAdjustSheet.presetEasier"), instruction: PRESET_INSTRUCTIONS[1] },
+    { label: t("questionAdjustSheet.presetMoreSpecific"), instruction: PRESET_INSTRUCTIONS[2] },
+    { label: t("questionAdjustSheet.presetLonger"), instruction: PRESET_INSTRUCTIONS[3] },
+  ];
+
+  const ASSIGNMENT_PRESETS = [
+    { label: t("questionAdjustSheet.presetHarder"), instruction: ASSIGNMENT_PRESET_INSTRUCTIONS[0] },
+    { label: t("questionAdjustSheet.presetEasier"), instruction: ASSIGNMENT_PRESET_INSTRUCTIONS[1] },
+    { label: t("questionAdjustSheet.presetMoreSpecific"), instruction: ASSIGNMENT_PRESET_INSTRUCTIONS[2] },
+    { label: t("questionAdjustSheet.presetLonger"), instruction: ASSIGNMENT_PRESET_INSTRUCTIONS[3] },
+  ];
+
   const presets = generationMode === "research-assignment" ? ASSIGNMENT_PRESETS : PRESETS;
 
   const isObjective =
     questionType === "multiple-choice" || questionType === "true-false";
   const sheetTitle =
     generationMode === "research-assignment"
-      ? "AI로 과제 생성"
-      : "AI 수정";
+      ? t("questionAdjustSheet.titleAssignment")
+      : t("questionAdjustSheet.titleExam");
   const emptyHint = isObjective
     ? questionType === "true-false"
-      ? "원하는 O·X 문제를 한 문장으로 적어주세요. 문장과 정답을 AI가 만들어 줍니다."
-      : "원하는 객관식 문제를 한 문장으로 적어주세요. 문제·선택지·정답을 AI가 만들어 줍니다."
-    : "원하는 문제를 한 문장으로 적어주세요.";
+      ? t("questionAdjustSheet.emptyHintTrueFalse")
+      : t("questionAdjustSheet.emptyHintMcq")
+    : t("questionAdjustSheet.emptyHintEssay");
   const emptyExample = isObjective
     ? questionType === "true-false"
-      ? '예: "재귀 함수에 대한 O·X 문제를 만들어줘"'
-      : '예: "다형성 개념을 묻는 사지선다 문제를 만들어줘"'
-    : '예: "난이도는 유지하고, 사례를 한국 기업으로 바꿔줘"';
+      ? t("questionAdjustSheet.emptyExampleTrueFalse")
+      : t("questionAdjustSheet.emptyExampleMcq")
+    : t("questionAdjustSheet.emptyExampleEssay");
   const inputPlaceholder = isObjective
     ? questionType === "true-false"
-      ? "예: 상속 개념을 묻는 O·X 문제"
-      : "예: 다형성 개념을 묻는 사지선다 문제"
-    : "예: 난이도는 유지하고, 사례를 한국 기업으로 바꿔줘";
+      ? t("questionAdjustSheet.placeholderTrueFalse")
+      : t("questionAdjustSheet.placeholderMcq")
+    : t("questionAdjustSheet.placeholderEssay");
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -188,7 +208,7 @@ export function QuestionAdjustSheet({
             onClick={() => setIsPreviewExpanded(!isPreviewExpanded)}
             className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
           >
-            현재 문제
+            {t("questionAdjustSheet.labelCurrentQuestion")}
             {isPreviewExpanded ? (
               <ChevronUp className="w-3 h-3" />
             ) : (
@@ -205,6 +225,7 @@ export function QuestionAdjustSheet({
               <OptionPreview
                 options={questionOptions}
                 correctOptionIndex={questionCorrectOptionIndex}
+                answerLabel={t("questionAdjustSheet.labelAnswer")}
               />
             )}
           </div>
@@ -246,7 +267,7 @@ export function QuestionAdjustSheet({
                           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                         >
                           <Eye className="w-3 h-3" />
-                          수정된 문제 미리보기
+                          {t("questionAdjustSheet.labelPreviewModified")}
                           <ChevronDown className="w-3 h-3" />
                         </button>
                       </CollapsibleTrigger>
@@ -260,6 +281,7 @@ export function QuestionAdjustSheet({
                             <OptionPreview
                               options={msg.options}
                               correctOptionIndex={msg.correctOptionIndex}
+                              answerLabel={t("questionAdjustSheet.labelAnswer")}
                             />
                           )}
                         </div>
@@ -279,11 +301,11 @@ export function QuestionAdjustSheet({
                           correctOptionIndex: msg.correctOptionIndex,
                         });
                         setAppliedIdx(idx);
-                        toast.success("이 버전이 적용되었습니다.");
+                        toast.success(t("questionAdjustSheet.toastVersionApplied"));
                       }}
                     >
                       <Check className="w-3.5 h-3.5" />
-                      {appliedIdx === idx ? "적용됨" : "이 버전 적용"}
+                      {appliedIdx === idx ? t("questionAdjustSheet.buttonApplied") : t("questionAdjustSheet.buttonApplyThis")}
                     </Button>
                   </div>
                 )}
@@ -316,10 +338,10 @@ export function QuestionAdjustSheet({
                 try {
                   const result = await onSendInstruction(preset.instruction) as { questionText?: string; explanation?: string } | null;
                   if (result && typeof result === "object" && "questionText" in result) {
-                    toast.success(`"${preset.label}" 적용됨`);
+                    toast.success(t("questionAdjustSheet.toastPresetApplied", { label: preset.label }));
                   }
                 } catch {
-                  toast.error("수정에 실패했습니다.");
+                  toast.error(t("questionAdjustSheet.toastAdjustFailed"));
                 } finally {
                   setLoadingPreset(null);
                 }

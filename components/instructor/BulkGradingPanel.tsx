@@ -8,6 +8,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { computeMissingBulkGradeStudents } from "@/lib/bulk-grade-roster";
 import {
   isNearBottom,
@@ -53,18 +54,6 @@ import {
 } from "@/lib/types/student-summary";
 
 type PermissionKey = "review_before_commit" | "no_precheck" | "ai_default";
-
-const PERMISSION_LABELS: Record<PermissionKey, string> = {
-  review_before_commit: "검토 후 확정",
-  no_precheck: "바로 가채점",
-  ai_default: "AI한테 다 맡기기",
-};
-
-const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
-  review_before_commit: "검토 후 최종 확정",
-  no_precheck: "추가 질문 없이 시작",
-  ai_default: "AI 기본 기준으로 시작",
-};
 
 const EXAMPLE_CRITERIA = [
   "논리 40 · 완성도 30 · 개념 30",
@@ -170,8 +159,22 @@ export function BulkGradingPanel({
   mode = "exam",
 }: BulkGradingPanelProps) {
   const queryClient = useQueryClient();
+  const t = useTranslations("grading");
+
+  const PERMISSION_LABELS: Record<PermissionKey, string> = {
+    review_before_commit: t("bulkGrading.permissionReviewLabel"),
+    no_precheck: t("bulkGrading.permissionNoPrecheckLabel"),
+    ai_default: t("bulkGrading.permissionAiDefaultLabel"),
+  };
+
+  const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
+    review_before_commit: t("bulkGrading.permissionReviewDesc"),
+    no_precheck: t("bulkGrading.permissionNoPrecheckDesc"),
+    ai_default: t("bulkGrading.permissionAiDefaultDesc"),
+  };
+
   /** Visible noun for the grading target: "과제" for assignments, "CASE" for exams. */
-  const gradeNoun = mode === "assignment" ? "과제" : "CASE";
+  const gradeNoun = mode === "assignment" ? t("bulkGrading.gradeNounAssignment") : t("bulkGrading.gradeNounExam");
   const [criteriaMode, setCriteriaMode] = useState<"custom" | "ai_default">("custom");
   const [approvalMode, setApprovalMode] = useState<"review_before_commit" | "no_precheck">(
     "review_before_commit",
@@ -210,7 +213,7 @@ export function BulkGradingPanel({
       const res = await fetch(`/api/exam/${examId}/bulk-grade`, { signal });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "채점 세션을 불러오지 못했습니다");
+        throw new Error(err.message || t("bulkGrading.sessionLoadFail"));
       }
       return res.json() as Promise<SessionData>;
     },
@@ -227,7 +230,7 @@ export function BulkGradingPanel({
       const res = await fetch(`/api/exam/${examId}/bulk-grade/chat`, { signal });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "가채점 대화를 불러오지 못했습니다");
+        throw new Error(err.message || t("bulkGrading.chatLoadFail"));
       }
       return res.json() as Promise<BulkGradeChatData>;
     },
@@ -269,7 +272,7 @@ export function BulkGradingPanel({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(extractErrorMessage(err, "채점 인터뷰를 시작하지 못했습니다", res.status));
+        throw new Error(extractErrorMessage(err, t("bulkGrading.interviewStartFail"), res.status));
       }
       return res.json() as Promise<BulkGradeChatData>;
     },
@@ -307,7 +310,7 @@ export function BulkGradingPanel({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(extractErrorMessage(err, "대화 전송에 실패했습니다", res.status));
+        throw new Error(extractErrorMessage(err, t("bulkGrading.sendFail"), res.status));
       }
       return res.json() as Promise<BulkGradeChatData>;
     },
@@ -352,7 +355,7 @@ export function BulkGradingPanel({
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(
-          extractErrorMessage(err, "인터뷰를 마무리하지 못했습니다", res.status),
+          extractErrorMessage(err, t("bulkGrading.interviewEndFail"), res.status),
         );
       }
       return res.json() as Promise<BulkGradeChatData>;
@@ -360,7 +363,7 @@ export function BulkGradingPanel({
     onSuccess: (result) => {
       setChatOptions([]);
       queryClient.setQueryData(qk.instructor.bulkGradeChat(examId), result);
-      toast.success("지금까지의 기준으로 가채점을 시작할 수 있습니다.");
+      toast.success(t("bulkGrading.proceedReady"));
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -381,7 +384,7 @@ export function BulkGradingPanel({
       const res = await fetch(`/api/exam/${examId}/student-summaries`, { signal });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(payload.message || "확정 결과를 불러오지 못했습니다");
+        throw new Error(payload.message || t("bulkGrading.finalLoadFail"));
       }
       return (payload.students ?? []) as ExamStudentSummary[];
     },
@@ -429,7 +432,7 @@ export function BulkGradingPanel({
         scoreLabel: overallScoreLabel({ overallScore: summary?.overallScore }),
         statusLabel: summary
           ? dashboardStatusLabel(dashboardStatus(summary))
-          : "확정됨",
+          : t("bulkGrading.statusCommitted"),
       };
     });
 
@@ -466,12 +469,12 @@ export function BulkGradingPanel({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(extractErrorMessage(err, "채점 시작에 실패했습니다.", res.status));
+        throw new Error(extractErrorMessage(err, t("bulkGrading.startFail"), res.status));
       }
       return res.json() as Promise<{ ok: boolean; total: number }>;
     },
     onSuccess: (result) => {
-      toast.success(`${result.total}명 전체 ${gradeNoun} 가채점을 시작했습니다.`);
+      toast.success(t("bulkGrading.startSuccess", { total: result.total, gradeNoun }));
       setEditedGrades(null);
       setRegradeArmed(false);
       setDraft("");
@@ -489,7 +492,7 @@ export function BulkGradingPanel({
   const commitMutation = useMutation({
     mutationFn: async () => {
       if (!currentGrades || Object.keys(currentGrades).length === 0) {
-        throw new Error("확정할 채점 결과가 없습니다.");
+        throw new Error(t("bulkGrading.noGradesToCommit"));
       }
       const grades = Object.entries(currentGrades).flatMap(([sessionId, qMap]) =>
         Object.entries(qMap).map(([qIdxStr, { score, comment }]) => ({
@@ -506,12 +509,12 @@ export function BulkGradingPanel({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(extractErrorMessage(err, "채점 저장에 실패했습니다", res.status));
+        throw new Error(extractErrorMessage(err, t("bulkGrading.saveFail"), res.status));
       }
       return res.json() as Promise<{ ok: boolean; gradedCount: number }>;
     },
     onSuccess: (result) => {
-      toast.success(`${result.gradedCount}개 채점이 확정되었습니다. 성적 공개는 별도로 진행하세요.`);
+      toast.success(t("bulkGrading.commitSuccess", { gradedCount: result.gradedCount }));
       setEditedGrades(null);
       queryClient.invalidateQueries({ queryKey: qk.instructor.bulkGradeSession(examId) });
       queryClient.invalidateQueries({ queryKey: qk.instructor.studentSummaries(examId) });
@@ -586,7 +589,7 @@ export function BulkGradingPanel({
     if (
       progress?.failed &&
       progress.failed > 0 &&
-      !window.confirm(`${progress.failed}명 채점에 실패했습니다. 성공한 제안 점수만 확정하시겠습니까?`)
+      !window.confirm(t("bulkGrading.confirmPartialFail", { failed: progress.failed }))
     ) {
       return;
     }
@@ -755,7 +758,7 @@ export function BulkGradingPanel({
   const criteriaEchoText =
     data?.session?.criteriaSummary ||
     lastSubmittedCriteria?.text ||
-    "가채점을 시작했습니다";
+    t("bulkGrading.criteriaEchoDefault");
 
   const threadItems = useMemo<ThreadItem[]>(() => {
     const items: ThreadItem[] = [];
@@ -816,8 +819,8 @@ export function BulkGradingPanel({
             className="text-xs text-muted-foreground"
             aria-live="polite"
           >
-            전체 {gradeNoun} 가채점 중 · 처리 {processedCount}/{progress?.total ?? 0}
-            {progress && progress.failed > 0 ? ` · 실패 ${progress.failed}명` : ""}
+            {t("bulkGrading.gradingStatusLabel", { gradeNoun, processed: processedCount, total: progress?.total ?? 0 })}
+            {progress && progress.failed > 0 ? ` ${t("bulkGrading.gradingStatusFailed", { failed: progress.failed })}` : ""}
           </p>
         ),
       });
@@ -836,8 +839,8 @@ export function BulkGradingPanel({
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>
               {gradingFailed
-                ? "일부 실패. 다시 채점하면 제안 점수가 초기화됩니다."
-                : `${progress?.failed ?? 0}명 실패. 성공분만 확정할 수 있습니다.`}
+                ? t("bulkGrading.partialFailMsg")
+                : t("bulkGrading.failedCountMsg", { failed: progress?.failed ?? 0 })}
             </span>
           </p>
         ),
@@ -948,24 +951,24 @@ export function BulkGradingPanel({
   // ─── Result card ─────────────────────────────────────────────────────────────
   function renderResultCard(): React.ReactNode {
     const statusBadge = committed ? (
-      <Badge variant="secondary">반영됨</Badge>
+      <Badge variant="secondary">{t("bulkGrading.badgeCommitted")}</Badge>
     ) : isGrading ? (
       <Badge variant="outline" className="gap-1">
         <Loader2 className="h-3 w-3 animate-spin" />
-        채점 중
+        {t("bulkGrading.badgeGrading")}
       </Badge>
     ) : (
-      <Badge variant="outline">가채점 완료</Badge>
+      <Badge variant="outline">{t("bulkGrading.badgeDone")}</Badge>
     );
 
-    const title = committed ? `확정된 ${gradeNoun} 채점` : "AI 제안 점수";
+    const title = committed ? t("bulkGrading.resultTitleCommitted", { gradeNoun }) : t("bulkGrading.resultTitleProposed");
     const count = committed ? finalRows.length : totalGrades;
 
     return (
       <Collapsible defaultOpen className="rounded-xl border bg-card text-card-foreground shadow-sm">
         <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-3 text-left">
           <span className="text-sm font-medium">{title}</span>
-          <span className="text-xs text-muted-foreground">({count}개)</span>
+          <span className="text-xs text-muted-foreground">{t("bulkGrading.resultCount", { count })}</span>
           {statusBadge}
           <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground transition-transform [[data-state=open]_&]:rotate-180" />
         </CollapsibleTrigger>
@@ -974,9 +977,9 @@ export function BulkGradingPanel({
           <div className="px-4 pb-3">
             <div className="mb-1 flex justify-between text-xs text-muted-foreground">
               <span>
-                처리 {processedCount}/{progress.total}명
+                {t("bulkGrading.progressProcessed", { processed: processedCount, total: progress.total })}
                 {progress.failed > 0
-                  ? ` · 성공 ${progress.completed}명 · 실패 ${progress.failed}명`
+                  ? ` · ${t("bulkGrading.progressDetail", { completed: progress.completed, failed: progress.failed })}`
                   : ""}
               </span>
               <span>{progressPercent}%</span>
@@ -1003,10 +1006,10 @@ export function BulkGradingPanel({
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     <span>
                       {isGrading
-                        ? `처리 대기 중 ${missingStudents.length}명`
-                        : `채점되지 않은 학생 ${missingStudents.length}명${
-                            failedCount > 0 ? ` (실패 ${failedCount}명)` : ""
-                          }`}
+                        ? t("bulkGrading.pendingStudents", { count: missingStudents.length })
+                        : failedCount > 0
+                          ? t("bulkGrading.ungradedWithFailed", { count: missingStudents.length, failed: failedCount })
+                          : t("bulkGrading.ungradedStudents", { count: missingStudents.length })}
                     </span>
                   </div>
                   {!isGrading && !committed && (
@@ -1025,7 +1028,7 @@ export function BulkGradingPanel({
                       {startGradingMutation.isPending && (
                         <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
                       )}
-                      다시 가채점
+                      {t("bulkGrading.regradeButton")}
                     </Button>
                   )}
                 </div>
@@ -1049,14 +1052,14 @@ export function BulkGradingPanel({
                             : "bg-muted text-muted-foreground",
                         )}
                       >
-                        {s.failed ? "채점 실패" : "대기 중"}
+                        {s.failed ? t("bulkGrading.badgeFailed") : t("bulkGrading.badgePending")}
                       </span>
                     </li>
                   ))}
                 </ul>
                 {!isGrading && !committed && (
                   <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                    다시 가채점하면 제안 점수가 초기화됩니다.
+                    {t("bulkGrading.regradeWarning")}
                   </p>
                 )}
               </div>
@@ -1065,23 +1068,23 @@ export function BulkGradingPanel({
             {/* (b) editable grade table OR (c) committed final summary. */}
             {committed ? (
               <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">학생 목록 기준 최종 점수입니다.</p>
+                <p className="text-xs text-muted-foreground">{t("bulkGrading.committedNote")}</p>
                 {finalSummariesLoading ? (
                   <div className="flex items-center justify-center rounded-md border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    확정 결과 불러오는 중...
+                    {t("bulkGrading.finalLoadingMsg")}
                   </div>
                 ) : finalRows.length === 0 ? (
                   <div className="rounded-md border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
-                    확정 결과가 없습니다. 학생 목록에서 최종 점수를 확인하세요.
+                    {t("bulkGrading.finalEmpty")}
                   </div>
                 ) : (
                   <table className="w-full text-xs" data-testid="bulk-grade-final-results">
                     <thead className="bg-background">
                       <tr className="border-b text-left text-muted-foreground">
-                        <th className="pb-1 pr-2 font-normal">학생</th>
-                        <th className="pb-1 pr-2 font-normal">총점</th>
-                        <th className="pb-1 font-normal">상태</th>
+                        <th className="pb-1 pr-2 font-normal">{t("bulkGrading.tableHeaderStudent")}</th>
+                        <th className="pb-1 pr-2 font-normal">{t("bulkGrading.tableHeaderTotal")}</th>
+                        <th className="pb-1 font-normal">{t("bulkGrading.tableHeaderStatus")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1112,10 +1115,10 @@ export function BulkGradingPanel({
               <table className="w-full text-xs">
                 <thead className="bg-background">
                   <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-1 pr-2 font-normal">학생</th>
-                    <th className="pb-1 pr-2 font-normal">문제</th>
-                    <th className="pb-1 pr-2 font-normal">점수</th>
-                    <th className="pb-1 pr-2 font-normal">코멘트</th>
+                    <th className="pb-1 pr-2 font-normal">{t("bulkGrading.tableHeaderStudent")}</th>
+                    <th className="pb-1 pr-2 font-normal">{t("bulkGrading.tableHeaderQuestion")}</th>
+                    <th className="pb-1 pr-2 font-normal">{t("bulkGrading.tableHeaderScore")}</th>
+                    <th className="pb-1 pr-2 font-normal">{t("bulkGrading.tableHeaderComment")}</th>
                     <th className="pb-1 font-normal"></th>
                   </tr>
                 </thead>
@@ -1133,7 +1136,7 @@ export function BulkGradingPanel({
                           </div>
                         )}
                       </td>
-                      <td className="py-1.5 pr-2 text-muted-foreground">Q{row.qIdx + 1}</td>
+                      <td className="py-1.5 pr-2 text-muted-foreground">{t("bulkGrading.questionLabel", { number: row.qIdx + 1 })}</td>
                       <td className="py-1.5 pr-2">
                         <input
                           type="number"
@@ -1175,11 +1178,11 @@ export function BulkGradingPanel({
                           }
                           target="_blank"
                           rel="noopener noreferrer"
-                          aria-label={`${row.studentName} Q${row.qIdx + 1} 개별 채점 새 탭에서 열기`}
+                          aria-label={t("bulkGrading.individualGradeAriaLabel", { studentName: row.studentName, number: row.qIdx + 1 })}
                           data-testid={`bulk-grade-row-link-${row.sessionId}-${row.qIdx}`}
                           className="inline-flex items-center gap-0.5 whitespace-nowrap text-blue-600 hover:underline"
                         >
-                          개별 채점
+                          {t("bulkGrading.individualGradeLink")}
                           <ExternalLink className="h-3 w-3" aria-hidden="true" />
                         </a>
                       </td>
@@ -1190,7 +1193,7 @@ export function BulkGradingPanel({
             ) : (
               !isGrading && (
                 <p className="text-sm text-muted-foreground">
-                  제안 점수가 아직 없습니다.
+                  {t("bulkGrading.noProposedGrades")}
                 </p>
               )
             )}
@@ -1206,17 +1209,17 @@ export function BulkGradingPanel({
                   {commitMutation.isPending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      저장 중...
+                      {t("bulkGrading.savingLabel")}
                     </>
                   ) : (
-                    `채점 확정 (${totalGrades}개)`
+                    t("bulkGrading.commitButton", { count: totalGrades })
                   )}
                 </Button>
               </div>
             )}
             {committed && (
               <div className="border-t pt-3 text-xs text-muted-foreground">
-                확정된 채점입니다. 아래에서 결과만 논의할 수 있습니다.
+                {t("bulkGrading.committedMsg")}
               </div>
             )}
           </div>
@@ -1228,7 +1231,7 @@ export function BulkGradingPanel({
   return (
     <aside
       role="complementary"
-      aria-label={`${gradeNoun} AI 가채점`}
+      aria-label={t("bulkGrading.panelAriaLabel", { gradeNoun })}
       aria-hidden={!open}
       inert={!open}
       className={cn(
@@ -1239,16 +1242,16 @@ export function BulkGradingPanel({
     >
       {/* Header */}
       <div className="flex shrink-0 items-center gap-2 border-b px-5 py-3">
-        <h2 className="text-sm font-semibold text-foreground">{gradeNoun} AI 가채점</h2>
+        <h2 className="text-sm font-semibold text-foreground">{t("bulkGrading.panelTitle", { gradeNoun })}</h2>
         {data?.studentCount != null && (
           <span className="text-xs font-normal text-muted-foreground">
-            (대상 {data.studentCount}명)
+            {t("bulkGrading.panelSubtitle", { count: data.studentCount })}
           </span>
         )}
         <button
           type="button"
           onClick={() => onOpenChange(false)}
-          aria-label="닫기"
+          aria-label={t("bulkGrading.closeAriaLabel")}
           className="ml-auto rounded-sm p-1 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <X className="h-4 w-4" />
@@ -1265,13 +1268,13 @@ export function BulkGradingPanel({
           {isLoading ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              불러오는 중...
+              {t("bulkGrading.loadingMsg")}
             </div>
           ) : !hasThreadContent ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                제출 데이터를 분석하고 채점 인터뷰를 준비하는 중…
+                {t("bulkGrading.preparingMsg")}
               </p>
             </div>
           ) : (
@@ -1279,7 +1282,7 @@ export function BulkGradingPanel({
               {chatLoading && chatMessageCount === 0 && (
                 <div className="flex items-center justify-center py-2 text-xs text-muted-foreground">
                   <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                  대화 불러오는 중...
+                  {t("bulkGrading.chatLoadingMsg")}
                 </div>
               )}
               {threadItems.map((item) => (
@@ -1295,12 +1298,12 @@ export function BulkGradingPanel({
         {showJumpToBottom && (
           <button
             type="button"
-            aria-label="맨 아래로 이동"
+            aria-label={t("bulkGrading.jumpToBottomAriaLabel")}
             onClick={scrollToBottom}
             className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border bg-background px-3 py-1.5 text-xs shadow-md hover:bg-muted"
           >
             <ArrowDown className="h-3.5 w-3.5" />
-            맨 아래로
+            {t("bulkGrading.jumpToBottomLabel")}
           </button>
         )}
       </div>
@@ -1318,7 +1321,7 @@ export function BulkGradingPanel({
               data-testid="bulk-grade-regrade-arm"
               className="w-full justify-center"
             >
-              이 기준으로 다시 가채점
+              {t("bulkGrading.regradeArmButton")}
             </Button>
           </div>
         )}
@@ -1326,14 +1329,14 @@ export function BulkGradingPanel({
         {regradeArmed && (
           <div className="mb-2 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
             <span className="flex-1">
-              전송하면 제안 점수를 새로 만듭니다
+              {t("bulkGrading.regradeArmedNotice")}
             </span>
             <button
               type="button"
               onClick={cancelRegrade}
               className="font-medium underline-offset-2 hover:underline"
             >
-              취소
+              {t("bulkGrading.cancelRegrade")}
             </button>
           </div>
         )}
@@ -1356,10 +1359,10 @@ export function BulkGradingPanel({
               {completeInterviewMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  준비 중...
+                  {t("bulkGrading.proceedButton")}
                 </>
               ) : (
-                "여기까지만 질문받고 일단 채점 진행"
+                t("bulkGrading.proceedGradingButton")
               )}
             </Button>
           </div>
@@ -1367,7 +1370,7 @@ export function BulkGradingPanel({
 
         {interviewReady && !gradingAttempted && !committed && (
           <p className="mb-2 text-xs text-muted-foreground">
-            점수 범위가 확정되었습니다. 전송하면 전체 {gradeNoun} 가채점을 시작합니다.
+            {t("bulkGrading.interviewReadyNotice", { gradeNoun })}
           </p>
         )}
 
@@ -1378,13 +1381,13 @@ export function BulkGradingPanel({
               {chatOptionsMutation.isPending ? (
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  보기 생성 중...
+                  {t("bulkGrading.optionsGenerating")}
                 </div>
               ) : (
                 <div
                   className="flex flex-col gap-2"
                   role="group"
-                  aria-label="답변 선택지"
+                  aria-label={t("bulkGrading.optionsAriaLabel")}
                 >
                   {displayedOptions.map((label, optIdx) => (
                     <button
@@ -1423,10 +1426,10 @@ export function BulkGradingPanel({
             onKeyDown={handleComposerKeyDown}
             placeholder={
               sendMode === "start"
-                ? "추가 메모(선택). 전송하면 가채점을 시작합니다"
+                ? t("bulkGrading.placeholderStart")
                 : interviewInProgress
-                  ? "인터뷰 질문에 답변하세요"
-                  : "질문 입력"
+                  ? t("bulkGrading.placeholderInterview")
+                  : t("bulkGrading.placeholderDefault")
             }
             data-testid="bulk-grade-composer-input"
             className="max-h-48 min-h-[44px] resize-none border-0 p-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
@@ -1471,8 +1474,8 @@ export function BulkGradingPanel({
               size="icon"
               aria-label={
                 sendMode === "start"
-                  ? `전체 ${gradeNoun} 가채점 시작`
-                  : "인터뷰 답변 전송"
+                  ? t("bulkGrading.sendAriaLabelStart", { gradeNoun })
+                  : t("bulkGrading.sendAriaLabelDiscuss")
               }
               onClick={send}
               disabled={sendDisabled}

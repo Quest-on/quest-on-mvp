@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { ReportCardTemplate } from "@/components/report/ReportCardTemplate";
 import type { QuestionSummaryData, StageGrading, SummaryData } from "@/lib/types/grading";
 
@@ -156,6 +157,7 @@ export function QuickActionsCard({
   isGraded = false,
   reportData: providedReportData,
 }: QuickActionsCardProps) {
+  const t = useTranslations("authoring");
   const [downloading, setDownloading] = useState(false);
   const [reportData, setReportData] = useState<ReportData | null>(
     providedReportData || null
@@ -165,7 +167,7 @@ export function QuickActionsCard({
 
   const handleDownloadReportCard = async () => {
     if (!isGraded) {
-      alert("평가가 완료되지 않았습니다.");
+      alert(t("quickActionsCard.alertNotGraded"));
       return;
     }
 
@@ -179,7 +181,7 @@ export function QuickActionsCard({
           `/api/student/session/${sessionId}/report`
         );
         if (!response.ok) {
-          throw new Error("리포트 데이터를 불러올 수 없습니다.");
+          throw new Error(t("quickActionsCard.errorReportData"));
         }
         const data = await response.json();
         setReportData(data);
@@ -190,7 +192,7 @@ export function QuickActionsCard({
 
       // Ensure template is rendered
       if (!reportTemplateRef.current || !dataToUse) {
-        throw new Error("PDF 템플릿을 찾을 수 없습니다.");
+        throw new Error(t("quickActionsCard.errorTemplate"));
       }
 
       // Dynamically import libraries
@@ -235,7 +237,7 @@ export function QuickActionsCard({
       alert(
         error instanceof Error
           ? error.message
-          : "PDF 생성 중 오류가 발생했습니다."
+          : t("quickActionsCard.errorPdfGenerate")
       );
     } finally {
       setDownloading(false);
@@ -246,7 +248,7 @@ export function QuickActionsCard({
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">빠른 작업</CardTitle>
+          <CardTitle className="text-sm">{t("quickActionsCard.cardTitle")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <Button
@@ -259,12 +261,12 @@ export function QuickActionsCard({
             {downloading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                생성 중...
+                {t("quickActionsCard.buttonGenerating")}
               </>
             ) : (
               <>
                 <Download className="w-4 h-4 mr-2" />
-                PDF 다운로드
+                {t("quickActionsCard.buttonDownloadPdf")}
               </>
             )}
           </Button>
