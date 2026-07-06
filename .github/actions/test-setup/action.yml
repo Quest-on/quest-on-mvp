@@ -59,6 +59,20 @@ runs:
             updated_at TIMESTAMPTZ DEFAULT now()
           );
 
+          -- profiles: Supabase Auth 사용자 프로필(role/status/display_name/avatar_url).
+          -- Prisma 스키마 밖(Supabase 관리 테이블)이라 prisma db push 로 생성되지 않는다.
+          -- 앱의 인증(lib/supabase-auth.ts)·유저 조회(lib/app-users.ts)가 이 테이블을 읽어,
+          -- 없으면 PGRST205("Could not find the table 'public.profiles'")로 조회가 실패한다.
+          CREATE TABLE IF NOT EXISTS profiles (
+            id TEXT PRIMARY KEY,
+            role TEXT NOT NULL DEFAULT 'student',
+            status TEXT NOT NULL DEFAULT 'approved',
+            display_name TEXT,
+            avatar_url TEXT,
+            created_at TIMESTAMPTZ DEFAULT now(),
+            updated_at TIMESTAMPTZ DEFAULT now()
+          );
+
           CREATE TABLE IF NOT EXISTS error_logs (
             id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
             level TEXT NOT NULL DEFAULT 'error',
