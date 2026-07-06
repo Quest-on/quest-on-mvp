@@ -59,6 +59,20 @@ runs:
             updated_at TIMESTAMPTZ DEFAULT now()
           );
 
+          -- profiles: Supabase Auth 사용자 프로필(role/status/display_name/avatar_url).
+          -- Prisma 스키마 밖(Supabase 관리 테이블)이라 prisma db push 로 생성되지 않는다.
+          -- 앱의 인증(lib/supabase-auth.ts)·유저 조회(lib/app-users.ts)가 이 테이블을 읽어,
+          -- 없으면 PGRST205("Could not find the table 'public.profiles'")로 조회가 실패한다.
+          CREATE TABLE IF NOT EXISTS profiles (
+            id TEXT PRIMARY KEY,
+            role TEXT NOT NULL DEFAULT 'student',
+            status TEXT NOT NULL DEFAULT 'approved',
+            display_name TEXT,
+            avatar_url TEXT,
+            created_at TIMESTAMPTZ DEFAULT now(),
+            updated_at TIMESTAMPTZ DEFAULT now()
+          );
+
           CREATE TABLE IF NOT EXISTS error_logs (
             id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
             level TEXT NOT NULL DEFAULT 'error',
@@ -113,4 +127,21 @@ runs:
         # Reload PostgREST schema cache so new functions are immediately callable
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -c "NOTIFY pgrst, 'reload schema';"
+      shell: bash
+
+    # Tables created via `prisma db push` and the raw CREATE TABLE block are owned by
+    # `postgres` and carry no grants for the Supabase API roles. Without these grants the
+    # running app (which queries through PostgREST as service_role/authenticated) hits
+    # "permission denied for table ..." on audit_logs, ai_events, exam_grading_sessions,
+    # bulk_grading_messages, etc. Grant the standard Supabase roles on everything now that
+    # all tables/sequences/routines exist. Run last so nothing is missed.
+    - name: Grant privileges to Supabase API roles
+      run: |
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -c "
+          GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+          GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+          GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+          GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+          NOTIFY pgrst, 'reload schema';
+        "
       shell: bash
