@@ -2,7 +2,7 @@ export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifySignatureAppRouter } from "@upstash/qstash/nextjs";
+import { withQStashSignature } from "@/lib/qstash-signature";
 import { z } from "zod";
 import {
   gradeOneQuestion,
@@ -255,6 +255,4 @@ async function handler(request: NextRequest): Promise<Response> {
   }
 }
 
-export const POST = process.env.QSTASH_CURRENT_SIGNING_KEY
-  ? verifySignatureAppRouter(handler)
-  : handler;
+export const POST = withQStashSignature(handler);

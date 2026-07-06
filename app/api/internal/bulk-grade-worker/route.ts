@@ -2,7 +2,7 @@ export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifySignatureAppRouter } from "@upstash/qstash/nextjs";
+import { withQStashSignature } from "@/lib/qstash-signature";
 import { getOpenAI, AI_MODEL_BULK_GRADING_WORKER } from "@/lib/openai";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { logError } from "@/lib/logger";
@@ -21,17 +21,10 @@ import {
 import {
   buildPerStudentGradingSystemPrompt,
   type ExtractedCriteria,
-  type GradingScoreRange,
 } from "@/lib/prompts";
 import { isAssignmentType } from "@/lib/grading-helpers";
-import { buildScoreAntiClusterBlock } from "@/lib/bulk-grade-score-cluster";
+import { buildScoreAntiClusterBlock, clampScore } from "@/lib/bulk-grade-score-cluster";
 import { stripEmoji } from "@/lib/sanitize";
-
-function clampScore(score: number, range?: GradingScoreRange): number {
-  const min = range?.min ?? 0;
-  const max = range?.max ?? 100;
-  return Math.min(max, Math.max(min, Math.round(score)));
-}
 
 async function handler(request: NextRequest): Promise<NextResponse> {
   try {
@@ -237,6 +230,4 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   }
 }
 
-export const POST = process.env.QSTASH_CURRENT_SIGNING_KEY
-  ? verifySignatureAppRouter(handler)
-  : handler;
+export const POST = withQStashSignature(handler);
