@@ -143,7 +143,12 @@ test.describe("Instructor — Exam & Grading Flow", () => {
       name: "CASE AI 가채점",
     });
     await expect(draftPanel).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
-    await expect(draftPanel.getByText("채점 기준을 알려주세요")).toBeVisible();
+    // draft 상태에서 패널 헤더가 보이고(=패널이 열림), 채팅 composer 가 노출되는지 확인한다.
+    // (과거 "채점 기준을 알려주세요" 안내 문구는 bulk-grade UI 재설계 때 제거됨 — composer
+    //  입력창 노출로 "draft 에서 채팅이 보인다"는 원래 의도를 검증한다.)
+    await expect(
+      draftPanel.getByRole("heading", { name: "CASE AI 가채점" }),
+    ).toBeVisible();
     await expect(draftPanel.getByTestId("bulk-grade-composer-input")).toBeVisible();
     await expect(draftPanel).not.toContainText("전체 CASE 제안 점수");
     await draftPanel.getByRole("button", { name: "닫기" }).click();
