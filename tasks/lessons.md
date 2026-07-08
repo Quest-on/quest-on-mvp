@@ -1,3 +1,7 @@
+## 2026-07-08
+
+- Before any update or merge work, explicitly confirm the current branch is not `main`, and create or rename a task branch before touching files when the user is worried about branch safety.
+
 ## 2026-03-06
 
 - QA 증상을 제품 정책으로 즉시 해석하지 않는다.

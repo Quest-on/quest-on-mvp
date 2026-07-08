@@ -34,7 +34,10 @@ import {
   CaseQuestionGenerator,
   type CaseQuestionGeneratorHandle,
 } from "@/components/instructor/CaseQuestionGenerator";
-import { SimpleExamAuthoringForm } from "@/components/instructor/SimpleExamAuthoringForm";
+import {
+  MAX_QUESTION_ADD_COUNT,
+  SimpleExamAuthoringForm,
+} from "@/components/instructor/SimpleExamAuthoringForm";
 import { useAgentRunController } from "@/components/agent/AgentRunController";
 import { useAgentEditorExecutor } from "@/components/agent/useAgentEditorExecutor";
 import { Bot, Hand } from "lucide-react";
@@ -440,7 +443,10 @@ export default function CreateExam() {
   });
 
   const addQuestion = (type: Question["type"] = "essay", count: number = 1) => {
-    const safeCount = Math.max(1, Math.min(5, Math.floor(count)));
+    const safeCount = Math.max(
+      1,
+      Math.min(MAX_QUESTION_ADD_COUNT, Math.floor(count)),
+    );
     setQuestions((prev) => [
       ...prev,
       ...Array.from({ length: safeCount }, () => createEmptyQuestion(type)),

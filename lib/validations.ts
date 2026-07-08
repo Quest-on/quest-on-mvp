@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { sanitizeUserInput } from "@/lib/sanitize";
 
+const MAX_GENERATED_QUESTION_COUNT = 1000;
+
 // Reusable field schemas
 const sessionId = z.string().uuid("Invalid session ID format");
 
@@ -531,7 +533,7 @@ export const generateCaseQuestionsSchema = z.object({
   examTitle: z.string().min(1).max(500),
   topics: z.string().max(500).optional(),
   difficulty: z.enum(["basic", "intermediate", "advanced"]).default("intermediate"),
-  questionCount: z.number().int().min(1).max(5).default(2),
+  questionCount: z.number().int().min(1).max(MAX_GENERATED_QUESTION_COUNT).default(2),
   customInstructions: z.string().max(2000).optional(),
   materialsText: z.array(z.object({
     url: z.string(),

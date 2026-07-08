@@ -206,6 +206,17 @@ const SCORE_BUCKET_COLORS: Record<ScoreWeightBucket, string> = {
   case: "bg-primary/35",
 };
 
+const QUICK_QUESTION_COUNTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
+const QUICK_QUESTION_COUNT_MAX =
+  QUICK_QUESTION_COUNTS[QUICK_QUESTION_COUNTS.length - 1];
+const CUSTOM_QUESTION_COUNT_VALUE = "custom";
+export const MAX_QUESTION_ADD_COUNT = 1000;
+
+function normalizeQuestionCount(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.max(1, Math.min(MAX_QUESTION_ADD_COUNT, Math.floor(value)));
+}
+
 function getPresentScoreBuckets(questions: Question[]): ScoreWeightBucket[] {
   const buckets = new Set<ScoreWeightBucket>();
   questions.forEach((question) => {
@@ -399,9 +410,10 @@ export function SimpleExamAuthoringForm({
 
   // "추가" 버튼 핸들러
   const handleAdd = useCallback(async () => {
+    const safePickedCount = normalizeQuestionCount(pickedCount);
     if (!pickedPrompt.trim()) {
       // 프롬프트 없음 → 빈 문제 추가
-      onQuestionAdd(pickedType, pickedCount);
+      onQuestionAdd(pickedType, safePickedCount);
       setIsAddPickerOpen(false);
       setPickedCount(1);
       return;
@@ -420,7 +432,7 @@ export function SimpleExamAuthoringForm({
             ? "true-false"
             : "case") as "mcq" | "true-false" | "case",
         prompt: pickedPrompt,
-        count: pickedCount,
+        count: safePickedCount,
       },
     ];
     await generateAll(slots, {
@@ -1312,31 +1324,65 @@ export function SimpleExamAuthoringForm({
           </DialogHeader>
           <QuestionTypePicker value={pickedType} onChange={setPickedType} t={t} />
           <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Label htmlFor="add-question-count" className="text-sm">
                 {t("simpleExamAuthoringForm.dialogCountLabel")}
               </Label>
               <Select
-                value={pickedCount.toString()}
-                onValueChange={(value) =>
-                  setPickedCount(Number.parseInt(value, 10))
+                value={
+                  pickedCount > QUICK_QUESTION_COUNT_MAX
+                    ? CUSTOM_QUESTION_COUNT_VALUE
+                    : pickedCount.toString()
                 }
+                onValueChange={(value) => {
+                  if (value === CUSTOM_QUESTION_COUNT_VALUE) {
+                    setPickedCount((count) =>
+                      count > QUICK_QUESTION_COUNT_MAX
+                        ? normalizeQuestionCount(count)
+                        : QUICK_QUESTION_COUNT_MAX + 1
+                    );
+                    return;
+                  }
+                  setPickedCount(
+                    normalizeQuestionCount(Number.parseInt(value, 10)),
+                  );
+                }}
               >
                 <SelectTrigger
                   id="add-question-count"
-                  className="h-9 w-20"
+                  className="h-9 w-28"
                   data-testid="add-question-count"
                 >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[1, 2, 3, 4, 5].map((n) => (
+                  {QUICK_QUESTION_COUNTS.map((n) => (
                     <SelectItem key={n} value={n.toString()}>
                       {t("caseQuestionGenerator.countItem", { n })}
                     </SelectItem>
                   ))}
+                  <SelectItem value={CUSTOM_QUESTION_COUNT_VALUE}>
+                    10+
+                  </SelectItem>
                 </SelectContent>
               </Select>
+              {pickedCount > QUICK_QUESTION_COUNT_MAX && (
+                <Input
+                  type="number"
+                  min={1}
+                  max={MAX_QUESTION_ADD_COUNT}
+                  value={pickedCount}
+                  onChange={(e) =>
+                    setPickedCount(
+                      normalizeQuestionCount(
+                        Number.parseInt(e.target.value, 10),
+                      ),
+                    )
+                  }
+                  className="h-9 w-24"
+                  aria-label={t("simpleExamAuthoringForm.dialogCountLabel")}
+                />
+              )}
             </div>
           </div>
 
