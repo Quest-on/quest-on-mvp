@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { sanitizeUserInput } from "@/lib/sanitize";
 
-const MAX_GENERATED_QUESTION_COUNT = 1000;
+// AI 문항 생성 상한. 스트림 라우트가 문항당 병렬 OpenAI 호출을 발사하므로
+// (비용·rate-limit 폭주 방지) 보수적으로 유지한다.
+const MAX_GENERATED_QUESTION_COUNT = 10;
 
 // Reusable field schemas
 const sessionId = z.string().uuid("Invalid session ID format");

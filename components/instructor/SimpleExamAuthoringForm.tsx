@@ -207,10 +207,9 @@ const SCORE_BUCKET_COLORS: Record<ScoreWeightBucket, string> = {
 };
 
 const QUICK_QUESTION_COUNTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
-const QUICK_QUESTION_COUNT_MAX =
-  QUICK_QUESTION_COUNTS[QUICK_QUESTION_COUNTS.length - 1];
-const CUSTOM_QUESTION_COUNT_VALUE = "custom";
-export const MAX_QUESTION_ADD_COUNT = 1000;
+// 한 번에 추가/생성할 수 있는 최대 문항 수. AI 생성 라우트가 문항당 병렬
+// OpenAI 호출을 발사하므로(비용·rate-limit 폭주 방지) 상한을 보수적으로 유지한다.
+export const MAX_QUESTION_ADD_COUNT = 10;
 
 function normalizeQuestionCount(value: number): number {
   if (!Number.isFinite(value)) return 1;
@@ -1329,24 +1328,12 @@ export function SimpleExamAuthoringForm({
                 {t("simpleExamAuthoringForm.dialogCountLabel")}
               </Label>
               <Select
-                value={
-                  pickedCount > QUICK_QUESTION_COUNT_MAX
-                    ? CUSTOM_QUESTION_COUNT_VALUE
-                    : pickedCount.toString()
-                }
-                onValueChange={(value) => {
-                  if (value === CUSTOM_QUESTION_COUNT_VALUE) {
-                    setPickedCount((count) =>
-                      count > QUICK_QUESTION_COUNT_MAX
-                        ? normalizeQuestionCount(count)
-                        : QUICK_QUESTION_COUNT_MAX + 1
-                    );
-                    return;
-                  }
+                value={pickedCount.toString()}
+                onValueChange={(value) =>
                   setPickedCount(
                     normalizeQuestionCount(Number.parseInt(value, 10)),
-                  );
-                }}
+                  )
+                }
               >
                 <SelectTrigger
                   id="add-question-count"
@@ -1361,28 +1348,8 @@ export function SimpleExamAuthoringForm({
                       {t("caseQuestionGenerator.countItem", { n })}
                     </SelectItem>
                   ))}
-                  <SelectItem value={CUSTOM_QUESTION_COUNT_VALUE}>
-                    10+
-                  </SelectItem>
                 </SelectContent>
               </Select>
-              {pickedCount > QUICK_QUESTION_COUNT_MAX && (
-                <Input
-                  type="number"
-                  min={1}
-                  max={MAX_QUESTION_ADD_COUNT}
-                  value={pickedCount}
-                  onChange={(e) =>
-                    setPickedCount(
-                      normalizeQuestionCount(
-                        Number.parseInt(e.target.value, 10),
-                      ),
-                    )
-                  }
-                  className="h-9 w-24"
-                  aria-label={t("simpleExamAuthoringForm.dialogCountLabel")}
-                />
-              )}
             </div>
           </div>
 
