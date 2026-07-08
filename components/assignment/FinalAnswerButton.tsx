@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Pencil, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ export function FinalAnswerButton({
   onClick,
   disabled,
 }: FinalAnswerButtonProps) {
+  const t = useTranslations("assignment");
   return (
     <div className="fixed bottom-6 right-6 z-40 pointer-events-none">
       <div className="relative pointer-events-auto">
@@ -36,7 +38,7 @@ export function FinalAnswerButton({
         <Button
           onClick={onClick}
           disabled={disabled}
-          aria-label={hasContent ? "최종답안 수정" : "최종답안 작성하기"}
+          aria-label={hasContent ? t("finalAnswerButton.ariaHasContent") : t("finalAnswerButton.ariaNoContent")}
           className={cn(
             "h-auto px-4 py-3 rounded-2xl rounded-br-sm shadow-lg hover:shadow-xl transition-all duration-200 gap-2 border-2 font-medium",
             hasContent
@@ -52,7 +54,7 @@ export function FinalAnswerButton({
           ) : (
             <Pencil className="w-5 h-5" />
           )}
-          <span>{hasContent ? "최종답안 작성됨" : "최종답안 작성하기"}</span>
+          <span>{hasContent ? t("finalAnswerButton.labelHasContent") : t("finalAnswerButton.labelNoContent")}</span>
         </Button>
       </div>
     </div>

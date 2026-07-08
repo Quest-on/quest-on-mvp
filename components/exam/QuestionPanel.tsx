@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { RichTextViewer } from "@/components/ui/rich-text-viewer";
 import { CopyProtector } from "@/components/exam/CopyProtector";
@@ -17,7 +18,23 @@ interface Question {
   ai_context?: string;
 }
 
-/** 문제 유형 → 한국어 라벨. 비-exhaustive 분기 방지용 단일 소스. */
+/** 문제 유형 → i18n 키. 비-exhaustive 분기 방지용 단일 소스. */
+export function questionTypeKey(type: string): string {
+  switch (type) {
+    case "essay":
+      return "questionPanel.typeEssay";
+    case "short-answer":
+      return "questionPanel.typeShortAnswer";
+    case "multiple-choice":
+      return "questionPanel.typeMultipleChoice";
+    case "true-false":
+      return "questionPanel.typeTrueFalse";
+    default:
+      return "questionPanel.typeDefault";
+  }
+}
+
+/** 하위 호환용 래퍼 — 훅 외부에서 정적 라벨이 필요한 경우만 사용. */
 export function questionTypeLabel(type: string): string {
   switch (type) {
     case "essay":
@@ -42,6 +59,7 @@ export function QuestionPanel({
   question,
   questionNumber,
 }: QuestionPanelProps) {
+  const t = useTranslations("exam");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
 
@@ -57,14 +75,14 @@ export function QuestionPanel({
         <div className="p-4 sm:p-6 space-y-4 sm:space-y-5">
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold bg-primary/10 text-primary border border-primary/20">
-              문제 {questionNumber}
+              {t("questionPanel.questionLabel", { number: questionNumber })}
             </span>
             <span className="text-xs sm:text-sm font-medium text-muted-foreground">
-              {questionTypeLabel(question.type)}
+              {t(questionTypeKey(question.type) as Parameters<typeof t>[0])}
             </span>
             {typeof question.points === "number" && (
               <span className="text-xs sm:text-sm text-muted-foreground">
-                배점: {question.points}점
+                {t("questionPanel.points", { points: question.points })}
               </span>
             )}
           </div>
@@ -100,7 +118,7 @@ export function QuestionPanel({
               });
             }}
             className="rounded-full bg-transparent hover:bg-transparent border-transparent hover:border-transparent min-h-[44px] px-4 gap-2 pointer-events-auto animate-in fade-in slide-in-from-bottom-2 duration-300"
-            aria-label="더 읽기"
+            aria-label={t("questionPanel.scrollMoreAriaLabel")}
           >
             <ChevronsDown
               className="w-4 h-4 animate-bounce"

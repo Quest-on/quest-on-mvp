@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { AlertCircle } from "lucide-react";
 
 interface ChatLoadingIndicatorProps {
@@ -8,15 +9,16 @@ interface ChatLoadingIndicatorProps {
 }
 
 export function ChatLoadingIndicator({ isTyping }: ChatLoadingIndicatorProps) {
+  const t = useTranslations("exam");
   const [messageIndex, setMessageIndex] = useState(0);
   const [isLongLoading, setIsLongLoading] = useState(false);
   const [progress, setProgress] = useState(0);
 
   const messages = [
-    "AI가 질문을 분석하고 있습니다...",
-    "답변을 작성하고 있습니다...",
-    "내용을 검토하고 있습니다...",
-    "답변을 마무리하고 있습니다...",
+    t("chatLoading.analyzing"),
+    t("chatLoading.writing"),
+    t("chatLoading.reviewing"),
+    t("chatLoading.finishing"),
   ];
 
   useEffect(() => {
@@ -65,7 +67,7 @@ export function ChatLoadingIndicator({ isTyping }: ChatLoadingIndicatorProps) {
           </div>
           <span className="text-sm text-muted-foreground animate-pulse">
             {isLongLoading
-              ? "답변 생성이 지연되고 있습니다. 잠시만 더 기다려주세요..."
+              ? t("chatLoading.longLoading")
               : messages[messageIndex]}
           </span>
         </div>
@@ -79,7 +81,7 @@ export function ChatLoadingIndicator({ isTyping }: ChatLoadingIndicatorProps) {
       {isLongLoading && (
         <div className="text-xs text-muted-foreground flex items-center gap-1 px-1">
           <AlertCircle className="w-3 h-3" />
-          <span>네트워크 상태에 따라 시간이 소요될 수 있습니다.</span>
+          <span>{t("chatLoading.networkWarning")}</span>
         </div>
       )}
     </div>
@@ -91,15 +93,16 @@ interface SubmissionOverlayProps {
 }
 
 export function SubmissionOverlay({ isSubmitting }: SubmissionOverlayProps) {
+  const t = useTranslations("exam");
   const [messageIndex, setMessageIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isTimeout, setIsTimeout] = useState(false);
 
   const messages = [
-    "답안을 안전하게 저장하고 있습니다...",
-    "AI가 채점을 준비하고 있습니다...",
-    "최종 데이터를 전송하고 있습니다...",
-    "제출을 마무리하고 있습니다...",
+    t("submissionOverlay.saving"),
+    t("submissionOverlay.preparing"),
+    t("submissionOverlay.transmitting"),
+    t("submissionOverlay.finishing"),
   ];
 
   useEffect(() => {
@@ -144,10 +147,10 @@ export function SubmissionOverlay({ isSubmitting }: SubmissionOverlayProps) {
         </div>
 
         <div className="space-y-3 w-full">
-          <h3 className="text-xl font-bold">답안 제출 중</h3>
+          <h3 className="text-xl font-bold">{t("submissionOverlay.title")}</h3>
           <p className="text-muted-foreground animate-pulse min-h-[24px]">
             {isTimeout
-              ? "제출이 지연되고 있습니다. 잠시만 더 기다려주세요..."
+              ? t("submissionOverlay.timeout")
               : messages[messageIndex]}
           </p>
           {/* Progress bar */}
@@ -162,7 +165,7 @@ export function SubmissionOverlay({ isSubmitting }: SubmissionOverlayProps) {
         <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 px-4 py-3 rounded-md text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span className="text-left">
-            제출이 완료될 때까지 창을 닫거나 이동하지 마세요.
+            {t("submissionOverlay.doNotClose")}
           </span>
         </div>
       </div>

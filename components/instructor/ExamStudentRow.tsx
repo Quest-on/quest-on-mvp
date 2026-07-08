@@ -14,6 +14,8 @@ import {
   overallScoreLabel,
   type ExamStudentSummary,
 } from "@/lib/types/student-summary";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDateTime } from "@/lib/i18n/format";
 
 function formatProgress(correct: number, total: number): string {
   if (total === 0) return "—";
@@ -64,6 +66,8 @@ export function ExamStudentRow({
   canOpenGrading = false,
   onLiveMonitoring,
 }: ExamStudentRowProps) {
+  const t = useTranslations("authoring");
+  const locale = useLocale() as "ko" | "en";
   const subInfo = [student.studentNumber, student.school]
     .filter(Boolean)
     .join(" · ");
@@ -145,7 +149,7 @@ export function ExamStudentRow({
 
       <div className="text-xs text-muted-foreground">
         {student.submittedAt
-          ? new Date(student.submittedAt).toLocaleString("ko-KR", {
+          ? formatDateTime(student.submittedAt, locale, {
               month: "short",
               day: "numeric",
               hour: "2-digit",
@@ -168,7 +172,7 @@ export function ExamStudentRow({
               onClick={() => onLiveMonitoring(student)}
             >
               <Radio size={14} className="mr-1" />
-              실시간
+              {t("examStudentRow.buttonLive")}
             </Button>
           </AnimateIcon>
         )}
@@ -181,7 +185,7 @@ export function ExamStudentRow({
                 className="text-blue-600 border-blue-600 hover:bg-blue-50 h-7 px-2 text-xs"
               >
                 <ClipboardCheck size={14} className="mr-1" />
-                {student.overallStatus === "manually_graded" ? "재채점" : "채점"}
+                {student.overallStatus === "manually_graded" ? t("examStudentRow.buttonRegrade") : t("examStudentRow.buttonGrade")}
               </Button>
             </Link>
           </AnimateIcon>

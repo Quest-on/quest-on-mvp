@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { ExamTimer } from "@/components/exam/ExamTimer";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,7 @@ export function ExamCenterToolbar({
   onToggleQuestion,
   className,
 }: ExamCenterToolbarProps) {
+  const t = useTranslations("exam");
   return (
     <div
       className={cn(
@@ -47,12 +49,12 @@ export function ExamCenterToolbar({
             size="sm"
             onClick={onToggleQuestion}
             className="shrink-0 gap-1.5 min-h-[40px] text-blue-600 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-800"
-            aria-label={isQuestionVisible ? "문제 접기" : "문제 보기"}
+            aria-label={isQuestionVisible ? t("toolbar.hideQuestion") : t("toolbar.showQuestion")}
             aria-expanded={isQuestionVisible}
           >
             <FileText className="size-4 shrink-0" aria-hidden="true" />
             <span className="hidden sm:inline">
-              {isQuestionVisible ? "문제 접기" : "문제 보기"}
+              {isQuestionVisible ? t("toolbar.hideQuestion") : t("toolbar.showQuestion")}
             </span>
             {isQuestionVisible ? (
               <ChevronUp className="size-4 opacity-50 shrink-0" aria-hidden="true" />
@@ -78,16 +80,16 @@ export function ExamCenterToolbar({
           disabled={isSubmitting}
           className="min-h-[44px] text-sm font-semibold shadow-md hover:shadow-lg px-4 sm:px-6"
           size="lg"
-          aria-label="시험 제출하기"
+          aria-label={t("toolbar.submitAriaLabel")}
           data-testid="exam-submit-btn"
         >
           {isSubmitting ? (
             <>
               <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary-foreground border-t-transparent mr-2" />
-              제출 중...
+              {t("toolbar.submitting")}
             </>
           ) : (
-            "시험 제출하기"
+            t("toolbar.submitButton")
           )}
         </Button>
       </div>

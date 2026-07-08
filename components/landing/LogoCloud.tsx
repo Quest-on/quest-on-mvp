@@ -2,6 +2,7 @@
 
 // framer-motion 제거됨 - 성능 최적화를 위해 애니메이션 제거 (실제로 사용되지 않았음)
 // 이전: import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 
 const PARTNERS = [
   { name: "고려대학교", logo: "Korea University" },
@@ -15,6 +16,7 @@ export default function LogoCloud({
   mode?: "light" | "dark";
 }) {
   const isDark = mode === "dark";
+  const t = useTranslations("landing");
 
   return (
     <section
@@ -30,7 +32,7 @@ export default function LogoCloud({
               isDark ? "text-zinc-500" : "text-zinc-600"
             }`}
           >
-            함께하는 교수진
+            {t("logoCloud.caption")}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 w-full max-w-4xl mx-auto gap-8 sm:gap-12 opacity-70 grayscale hover:grayscale-0 transition-all duration-500">
             {PARTNERS.map((partner) => (

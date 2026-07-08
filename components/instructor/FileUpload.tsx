@@ -1,3 +1,5 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +17,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { HelpCircle, Upload, FolderOpen, X, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 type ExtractionStatus = "uploading" | "extracting" | "done" | "failed";
 
@@ -26,11 +29,11 @@ interface StatusConfig {
   pulse: boolean;
 }
 
-function getStatusConfig(status: ExtractionStatus): StatusConfig {
+function getStatusConfig(status: ExtractionStatus, labels: Record<ExtractionStatus, string>): StatusConfig {
   switch (status) {
     case "uploading":
       return {
-        label: "업로드 중...",
+        label: labels.uploading,
         barWidth: "w-2/5",
         barColor: "bg-amber-400",
         textColor: "text-amber-600 dark:text-amber-400",
@@ -38,7 +41,7 @@ function getStatusConfig(status: ExtractionStatus): StatusConfig {
       };
     case "extracting":
       return {
-        label: "AI 분석 중...",
+        label: labels.extracting,
         barWidth: "w-3/4",
         barColor: "bg-blue-500",
         textColor: "text-blue-600 dark:text-blue-400",
@@ -46,7 +49,7 @@ function getStatusConfig(status: ExtractionStatus): StatusConfig {
       };
     case "done":
       return {
-        label: "완료",
+        label: labels.done,
         barWidth: "w-full",
         barColor: "bg-emerald-500",
         textColor: "text-emerald-600 dark:text-emerald-400",
@@ -54,7 +57,7 @@ function getStatusConfig(status: ExtractionStatus): StatusConfig {
       };
     case "failed":
       return {
-        label: "실패",
+        label: labels.failed,
         barWidth: "w-full",
         barColor: "bg-red-500",
         textColor: "text-red-600 dark:text-red-400",
@@ -98,27 +101,32 @@ export function FileUpload({
   onRemoveExistingFile,
   extractionStatus,
 }: FileUploadProps) {
+  const t = useTranslations("authoring");
+  const statusLabels: Record<ExtractionStatus, string> = {
+    uploading: t("fileUpload.statusUploading"),
+    extracting: t("fileUpload.statusExtracting"),
+    done: t("fileUpload.statusDone"),
+    failed: t("fileUpload.statusFailed"),
+  };
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          수업 자료
+          {t("fileUpload.cardTitle")}
           <Tooltip>
             <TooltipTrigger asChild>
               <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
             </TooltipTrigger>
             <TooltipContent>
               <p className="max-w-xs">
-                시험 문제 작성을 위한 수업 자료를 업로드하세요. PPT, PDF, 워드,
-                엑셀, 한글, 이미지 파일을 지원하며, 최대 50MB까지 업로드
-                가능합니다. AI가 이 자료를 참고하여 문제를 생성합니다.
+                {t("fileUpload.tooltipContent")}
               </p>
             </TooltipContent>
           </Tooltip>
         </CardTitle>
         <CardDescription>
-          PPT, PDF, 워드, 엑셀, CSV, 한글, 이미지 파일 (최대 50MB, 자동 압축)
-          {!canAddMoreFiles && " - 용량 초과로 추가 불가"}
+          {t("fileUpload.cardDescription")}
+          {!canAddMoreFiles && t("fileUpload.capacityExceeded")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -153,8 +161,8 @@ export function FileUpload({
               )}
               <div className="text-sm font-medium">
                 {isDragOver
-                  ? "파일을 여기에 놓으세요"
-                  : "파일을 드래그하거나 클릭하여 선택"}
+                  ? t("fileUpload.dropHint")
+                  : t("fileUpload.uploadHint")}
               </div>
             </div>
           </div>
@@ -163,9 +171,9 @@ export function FileUpload({
         {(existingFiles.length > 0 || files.length > 0) && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">업로드된 파일:</Label>
+              <Label className="text-sm font-medium">{t("fileUpload.uploadedFilesLabel")}</Label>
               <span className="text-xs text-muted-foreground">
-                총 용량: {(totalSize / 1024 / 1024).toFixed(1)}MB / 50MB
+                {t("fileUpload.totalSize", { size: (totalSize / 1024 / 1024).toFixed(1) })}
               </span>
             </div>
             <div className="space-y-1">
@@ -179,7 +187,7 @@ export function FileUpload({
                     {getFileIcon(file.name)}
                     <span className="text-sm font-medium">{file.name}</span>
                     <span className="text-xs text-muted-foreground">
-                      (기존 파일)
+                      {t("fileUpload.existingFile")}
                     </span>
                   </div>
                   {onRemoveExistingFile && (
@@ -199,7 +207,7 @@ export function FileUpload({
               {files.map((file, index) => {
                 const isDisabled = disabledFiles.has(index);
                 const status = extractionStatus?.get(file.name);
-                const cfg = status ? getStatusConfig(status) : null;
+                const cfg = status ? getStatusConfig(status, statusLabels) : null;
                 const isInProgress = status === "uploading" || status === "extracting";
 
                 return (
@@ -246,7 +254,7 @@ export function FileUpload({
                           </span>
                           {isDisabled && (
                             <span className="text-xs text-red-500 font-medium shrink-0">
-                              (용량 초과로 비활성화)
+                              {t("fileUpload.disabledFile")}
                             </span>
                           )}
                         </div>

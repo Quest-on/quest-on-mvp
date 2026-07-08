@@ -1,0 +1,70 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "newExam": "New exam",
+    "myExams": "My exams",
+    "joinExam": "Join exam"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signUp": "Sign up"
+  },
+  "brand": {
+    "logoAlt": "Quest-On Logo",
+    "name": "Quest-On"
+  },
+  "exam": {
+    "quit": "Quit"
+  },
+  "footer": {
+    "contactUs": "Contact us",
+    "description": "Next-generation AI-powered assessment.\nProving the thinking process through data."
+  },
+  "errorAlert": {
+    "retry": "Try again"
+  },
+  "loadingMessage": {
+    "timeout": "This is taking longer than expected. Please wait a moment...",
+    "networkHint": "Network conditions may be causing the delay."
+  },
+  "answerTextarea": {
+    "placeholder": "Write your detailed answer here..."
+  },
+  "richTextEditor": {
+    "placeholder": "Start typing here...",
+    "insertTable": "Insert table",
+    "addColumnBefore": "Add column before",
+    "addColumnAfter": "Add column after",
+    "addRowBefore": "Add row above",
+    "addColumnBeforeShort": "← Col",
+    "addColumnAfterShort": "Col →",
+    "addRowBeforeShort": "↑ Row",
+    "addRowAfterShort": "Row ↓",
+    "addRowAfter": "Add row below",
+    "deleteColumn": "Delete column",
+    "deleteRow": "Delete row",
+    "deleteTable": "Delete table"
+  },
+  "simpleRichTextEditor": {
+    "placeholder": "Start typing here...",
+    "bold": "Bold (Ctrl+B)",
+    "italic": "Italic (Ctrl+I)",
+    "heading1": "Heading 1",
+    "heading2": "Heading 2",
+    "bulletList": "Bulleted list",
+    "orderedList": "Numbered list",
+    "alignLeft": "Align left",
+    "alignCenter": "Align center",
+    "alignRight": "Align right"
+  },
+  "progressBar": {
+    "chat": {
+      "label": "Chat",
+      "description": "Work through the question with AI"
+    },
+    "answer": {
+      "label": "Final answer",
+      "description": "Write and submit your answer"
+    }
+  }
+}

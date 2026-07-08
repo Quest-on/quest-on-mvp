@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Card,
   CardContent,
@@ -11,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Star, Check, Sparkles, Quote, Plus, Minus, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { StageKey, QuestionSummaryData } from "@/lib/types/grading";
+import { useTranslations } from "next-intl";
 
 interface GradingPanelProps {
   questionNumber: number;
@@ -32,13 +35,10 @@ interface GradingPanelProps {
   onSave: () => void;
 }
 
-const SENTIMENT_STYLES: Record<
-  "positive" | "negative" | "neutral",
-  { label: string; className: string }
-> = {
-  positive: { label: "긍정적", className: "bg-green-100 text-green-700 border-green-200" },
-  negative: { label: "부정적", className: "bg-red-100 text-red-700 border-red-200" },
-  neutral: { label: "중립적", className: "bg-gray-100 text-gray-700 border-gray-200" },
+const SENTIMENT_CLASS: Record<"positive" | "negative" | "neutral", string> = {
+  positive: "bg-green-100 text-green-700 border-green-200",
+  negative: "bg-red-100 text-red-700 border-red-200",
+  neutral: "bg-gray-100 text-gray-700 border-gray-200",
 };
 
 export function GradingPanel({
@@ -60,6 +60,7 @@ export function GradingPanel({
   onAcceptAiScore,
   onSave,
 }: GradingPanelProps) {
+  const t = useTranslations("grading");
   // 입력 중에는 문자열로 관리하여 "020" 같은 문제 방지
   const [scoreInput, setScoreInput] = useState<string>(overallScore.toString());
   const isAssignmentMode = mode === "assignment";
@@ -75,15 +76,15 @@ export function GradingPanel({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Star className="w-5 h-5 text-yellow-600" />
-            문제 {questionNumber} 채점
+            {t("gradingPanel.inProgressTitle", { number: questionNumber })}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-            <p className="text-sm font-medium">AI 채점이 진행 중입니다</p>
+            <p className="text-sm font-medium">{t("gradingPanel.inProgressDesc")}</p>
             <p className="text-xs text-muted-foreground">
-              채점이 완료되면 점수와 피드백이 표시됩니다
+              {t("gradingPanel.inProgressNote")}
             </p>
           </div>
         </CardContent>
@@ -96,16 +97,16 @@ export function GradingPanel({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Star className="w-5 h-5 text-yellow-600" />
-          문제 {questionNumber} 채점
+          {t("gradingPanel.title", { number: questionNumber })}
         </CardTitle>
         <CardDescription>
           {isAssignmentMode
-            ? "AI 요약 평가를 참고해 점수를 확정하세요."
+            ? t("gradingPanel.descAssignment")
             : isAiGradedOnly
-            ? "가채점만 있습니다. 반드시 점수를 직접 입력해야 합니다."
+            ? t("gradingPanel.descAiOnly")
             : isGraded && overallScore > 0
-            ? "AI 가채점 완료. 점수와 피드백을 수정할 수 있습니다."
-            : "이 문제에 대한 점수와 피드백을 입력하세요"}
+            ? t("gradingPanel.descAiDone")
+            : t("gradingPanel.descDefault")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -169,7 +170,7 @@ export function GradingPanel({
                       onChange={(e) =>
                         onStageCommentChange(stageKey, e.target.value)
                       }
-                      placeholder="이 단계에 대한 평가 의견을 입력하세요..."
+                      placeholder={t("gradingPanel.stageCommentPlaceholder")}
                       className="mt-1 min-h-[100px] resize-none"
                     />
                   </div>
@@ -184,7 +185,7 @@ export function GradingPanel({
         <div className="space-y-4">
           <div>
             <Label htmlFor="score" className="text-sm font-medium">
-              종합 점수 (0-100)
+              {t("gradingPanel.scoreLabel")}
             </Label>
             <div className="mt-1 flex gap-2">
               <input
@@ -263,7 +264,7 @@ export function GradingPanel({
                   size="icon"
                   onClick={onAcceptAiScore}
                   className="shrink-0"
-                  title="가채점 점수로 채점하기"
+                  title={t("gradingPanel.acceptAiScoreTitle")}
                 >
                   <Check className="h-4 w-4" />
                 </Button>
@@ -271,7 +272,7 @@ export function GradingPanel({
             </div>
             {isAiGradedOnly && aiGradedScore !== undefined && (
               <p className="text-xs text-gray-500 mt-1">
-                가채점 점수: {aiGradedScore}점. 체크 버튼을 눌러 가채점 점수로 채점하거나 직접 입력해주세요.
+                {t("gradingPanel.aiScoreHint", { score: aiGradedScore })}
               </p>
             )}
           </div>
@@ -285,11 +286,11 @@ export function GradingPanel({
           >
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-indigo-600" />
-              <h4 className="text-sm font-semibold">AI 문제별 요약</h4>
+              <h4 className="text-sm font-semibold">{t("gradingPanel.aiSummaryTitle")}</h4>
               <span
-                className={`ml-auto rounded-full border px-2 py-0.5 text-xs font-medium ${SENTIMENT_STYLES[aiSummary.sentiment].className}`}
+                className={`ml-auto rounded-full border px-2 py-0.5 text-xs font-medium ${SENTIMENT_CLASS[aiSummary.sentiment]}`}
               >
-                {SENTIMENT_STYLES[aiSummary.sentiment].label}
+                {t(`gradingPanel.sentiment${aiSummary.sentiment.charAt(0).toUpperCase() + aiSummary.sentiment.slice(1)}` as `gradingPanel.sentiment${"Positive"|"Negative"|"Neutral"}`)}
               </span>
             </div>
 
@@ -317,7 +318,7 @@ export function GradingPanel({
               <div>
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <Plus className="h-3.5 w-3.5 text-blue-600" />
-                  <span className="text-xs font-semibold text-blue-700">강점</span>
+                  <span className="text-xs font-semibold text-blue-700">{t("questionAiSummary.strengths")}</span>
                 </div>
                 <ul className="space-y-1 pl-5 list-disc">
                   {aiSummary.strengths.map((s, idx) => (
@@ -333,7 +334,7 @@ export function GradingPanel({
               <div>
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <Minus className="h-3.5 w-3.5 text-orange-600" />
-                  <span className="text-xs font-semibold text-orange-700">개선점</span>
+                  <span className="text-xs font-semibold text-orange-700">{t("questionAiSummary.weaknesses")}</span>
                 </div>
                 <ul className="space-y-1 pl-5 list-disc">
                   {aiSummary.weaknesses.map((w, idx) => (
@@ -354,10 +355,10 @@ export function GradingPanel({
           data-testid="grade-save-btn"
         >
           {saving
-            ? "저장 중..."
+            ? t("gradingPanel.savingLabel")
             : isAiGradedOnly
-            ? "점수를 입력해주세요"
-            : "문제 채점 저장"}
+            ? t("gradingPanel.enterScoreButton")
+            : t("gradingPanel.saveButton")}
         </Button>
 
         {isGraded && (
@@ -371,12 +372,12 @@ export function GradingPanel({
             }`}
           >
             {isAssignmentMode
-              ? `현재 점수: ${overallScore}점`
+              ? t("gradingPanel.currentScore", { score: overallScore })
               : isAiGradedOnly
-              ? "⚠ 가채점만 있습니다"
+              ? t("gradingPanel.badgeAiOnly")
               : overallScore > 0
-              ? "✓ AI 가채점 완료"
-              : "✓ 채점 완료됨"}
+              ? t("gradingPanel.badgeAiDone")
+              : t("gradingPanel.badgeDone")}
           </div>
         )}
       </CardContent>

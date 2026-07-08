@@ -47,6 +47,7 @@ import { cn } from "@/lib/utils";
 import type { InstructorExam } from "@/lib/types/exam";
 import type { ExamStudentSummary } from "@/lib/types/student-summary";
 import { BulkGradingPanel } from "@/components/instructor/BulkGradingPanel";
+import { useTranslations } from "next-intl";
 
 function isCaseGradingQuestionType(type?: string): boolean {
   return type === "case" || type === "essay" || type === "short-answer";
@@ -74,6 +75,7 @@ export default function ExamDetail({
 }) {
   const resolvedParams = use(params);
   const { isSignedIn, isLoaded, user, profile } = useAppUser();
+  const t = useTranslations("instructor");
 
   const [monitoringStudent, setMonitoringStudent] = useState<ExamStudentSummary | null>(null);
   const [examInfoOpen, setExamInfoOpen] = useState(false);
@@ -131,7 +133,7 @@ export default function ExamDetail({
       const response = await fetch(`/api/exam/${resolvedParams.examId}/bulk-grade`, { signal });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || "일괄 채점 상태를 불러오지 못했습니다.");
+        throw new Error(data.message || t("examDetail.bulkGradeLoadFail"));
       }
       return response.json() as Promise<BulkGradeStatusData>;
     },
@@ -151,7 +153,7 @@ export default function ExamDetail({
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || "성적 공개 상태 변경에 실패했습니다.");
+        throw new Error(data.message || "성적 공개 상태 변경에 실패했습니다."); // 별도 ns 처리
       }
       return response.json();
     },
@@ -166,8 +168,8 @@ export default function ExamDetail({
   const handleToggleGradesRelease = () => {
     const currentlyReleased = exam?.grades_released === true;
     const msg = currentlyReleased
-      ? "학생들에게 성적이 비공개됩니다. 계속하시겠습니까?"
-      : "학생들에게 성적이 공개됩니다. 계속하시겠습니까?";
+      ? t("examDetail.gradeConfirmHidden")
+      : t("examDetail.gradeConfirmPublic");
     if (window.confirm(msg)) {
       releaseGradesMutation.mutate(!currentlyReleased);
     }
@@ -252,32 +254,32 @@ export default function ExamDetail({
   const bulkGradingDone = bulkGradeSessionStatus === "grading_done";
   const bulkGradingCommitted = bulkGradeSessionStatus === "committed";
   const bulkCtaTitle = isBulkGrading
-    ? "CASE AI 가채점 진행 중"
+    ? t("examDetail.bulkGradeStatus.inProgress")
     : bulkGradingFailed
-      ? "CASE AI 가채점 실패"
+      ? t("examDetail.bulkGradeStatus.failed")
       : bulkGradingCommitted
-        ? "CASE 채점 결과"
+        ? t("examDetail.bulkGradeStatus.committed")
         : bulkGradingDone
-          ? "CASE 제안 점수 생성 완료"
-          : "CASE AI 가채점하기";
+          ? t("examDetail.bulkGradeStatus.done")
+          : t("examDetail.bulkGradeStatus.idle");
   const bulkCtaDescription = isBulkGrading && bulkGradeProgress && bulkGradeProgress.total > 0
-    ? `백그라운드 가채점 중 · ${bulkGradeProcessed}/${bulkGradeProgress.total}명 처리`
+    ? t("examDetail.bulkGradeStatus.descInProgress", { processed: bulkGradeProcessed, total: bulkGradeProgress.total })
     : bulkGradingFailed
-      ? "실패 원인을 확인하고 다시 채점을 시작할 수 있습니다"
+      ? t("examDetail.bulkGradeStatus.descFailed")
       : bulkGradingCommitted
-        ? "확정된 결과와 가채점 대화 기록을 확인합니다"
+        ? t("examDetail.bulkGradeStatus.descCommitted")
         : bulkGradingDone
-          ? "제안 점수를 검토한 뒤 확정해주세요"
-          : "강사의 자연어 기준으로 CASE 답안을 일괄 가채점합니다";
+          ? t("examDetail.bulkGradeStatus.descDone")
+          : t("examDetail.bulkGradeStatus.descIdle");
   const bulkCtaButtonLabel = isBulkGrading
-    ? "진행 상황 보기"
+    ? t("examDetail.bulkGradeStatus.btnInProgress")
     : bulkGradingCommitted
-      ? "결과/채팅 보기"
+      ? t("examDetail.bulkGradeStatus.btnCommitted")
       : bulkGradingDone
-        ? "검토/확정"
+        ? t("examDetail.bulkGradeStatus.btnDone")
         : bulkGradingFailed
-          ? "다시 보기"
-          : "가채점 시작";
+          ? t("examDetail.bulkGradeStatus.btnFailed")
+          : t("examDetail.bulkGradeStatus.btnIdle");
 
   const [isExporting, setIsExporting] = useState<"excel" | "csv" | null>(null);
 
@@ -288,7 +290,7 @@ export default function ExamDetail({
       try {
         const res = await fetch(`/api/exam/${exam.id}/export/${format}`);
         if (!res.ok) {
-          let message = "내보내기에 실패했습니다.";
+          let message = t("examDetail.exportFail");
           try {
             const body = await res.json();
             message = body.message || body.error || message;
@@ -312,7 +314,7 @@ export default function ExamDetail({
         link.remove();
         URL.revokeObjectURL(url);
       } catch {
-        toast.error("내보내기 중 오류가 발생했습니다.");
+        toast.error(t("examDetail.exportError"));
       } finally {
         setIsExporting(null);
       }
@@ -339,12 +341,12 @@ export default function ExamDetail({
     return (
       <div className="container mx-auto p-6">
         <div className="text-center py-12">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">오류 발생</h2>
+          <h2 className="text-xl font-semibold text-red-600 mb-2">{t("examDetail.error")}</h2>
           <p className="text-muted-foreground">
-            {error || "시험 데이터를 불러올 수 없습니다."}
+            {error || t("examDetail.loadFail")}
           </p>
           <Link href="/instructor" className="inline-block mt-4">
-            <Button variant="outline">시험 목록으로 돌아가기</Button>
+            <Button variant="outline">{t("examDetail.backToList")}</Button>
           </Link>
         </div>
       </div>
@@ -392,7 +394,7 @@ export default function ExamDetail({
                   </TooltipTrigger>
                   {!allStudentsManuallyGraded && (
                     <TooltipContent side="bottom">
-                      모든 학생 채점을 완료해주세요
+                      {t("examDetail.allGradedRequired")}
                     </TooltipContent>
                   )}
                 </Tooltip>
@@ -416,7 +418,7 @@ export default function ExamDetail({
                   </TooltipTrigger>
                   {!allStudentsManuallyGraded && (
                     <TooltipContent side="bottom">
-                      모든 학생 채점을 완료해주세요
+                      {t("examDetail.allGradedRequired")}
                     </TooltipContent>
                   )}
                 </Tooltip>
@@ -452,7 +454,7 @@ export default function ExamDetail({
                   <CollapsibleTrigger className="w-full">
                     <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-3">
-                        <h3 className="font-semibold">시험 정보</h3>
+                        <h3 className="font-semibold">{t("examDetail.examInfo")}</h3>
                         <span className="text-sm text-muted-foreground">
                           {exam.duration}분 &bull; {exam.code}
                         </span>
@@ -484,11 +486,11 @@ export default function ExamDetail({
                   <CollapsibleTrigger className="w-full">
                     <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-3">
-                        <h3 className="font-semibold">문제 보기</h3>
+                        <h3 className="font-semibold">{t("examDetail.viewQuestions")}</h3>
                         <span className="text-sm text-muted-foreground">
                           {questionsCount !== null
-                            ? `${questionsCount}개 문제`
-                            : "문제 로딩 중..."}
+                            ? t("examDetail.questionsCountLabel", { count: questionsCount })
+                            : t("examDetail.questionsLoading")}
                         </span>
                       </div>
                       {questionsOpen ? (
@@ -515,7 +517,7 @@ export default function ExamDetail({
           </div>
 
           <div className="space-y-4">
-            <h3 className="font-semibold">학생 목록</h3>
+            <h3 className="font-semibold">{t("examDetail.studentList")}</h3>
 
             {exam.status === "running" && (
               <LateEntryPanel examId={exam.id} examStatus={exam.status} />
@@ -529,12 +531,12 @@ export default function ExamDetail({
                   <EyeOff className="h-4 w-4 text-muted-foreground" />
                 )}
                 <span className="text-sm font-medium">
-                  {exam.grades_released ? "성적 공개중" : "성적 비공개"}
+                  {exam.grades_released ? t("examDetail.gradesPublic") : t("examDetail.gradesHidden")}
                 </span>
                 <span className="text-xs text-muted-foreground hidden sm:inline">
                   {exam.grades_released
-                    ? "학생들이 점수와 응시 내용을 볼 수 있습니다"
-                    : "학생들은 답안만 확인할 수 있습니다"}
+                    ? t("examDetail.gradesPublicDesc")
+                    : t("examDetail.gradesHiddenDesc")}
                 </span>
               </div>
               <Button
@@ -550,7 +552,7 @@ export default function ExamDetail({
                 ) : (
                   <Eye className="h-4 w-4 mr-1.5" />
                 )}
-                {exam.grades_released ? "성적 비공개" : "성적 공개"}
+                {exam.grades_released ? t("examDetail.makeHidden") : t("examDetail.makePublic")}
               </Button>
             </div>
 
@@ -585,7 +587,7 @@ export default function ExamDetail({
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
-                  placeholder="학생 이름, 이메일, 학번, 학교로 검색..."
+                  placeholder={t("examDetail.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -596,13 +598,13 @@ export default function ExamDetail({
                 onValueChange={(v) => setSortOption(v as StudentFilterSortOption)}
               >
                 <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue placeholder="정렬 기준" />
+                  <SelectValue placeholder={t("examDetail.sortBy")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="name">이름순</SelectItem>
-                  <SelectItem value="studentNumber">학번순</SelectItem>
-                  <SelectItem value="submittedAt">제출 빠른 순</SelectItem>
-                  <SelectItem value="overallStatus">채점 상태순</SelectItem>
+                  <SelectItem value="name">{t("examDetail.sortByName")}</SelectItem>
+                  <SelectItem value="studentNumber">{t("examDetail.sortByStudentNumber")}</SelectItem>
+                  <SelectItem value="submittedAt">{t("examDetail.sortBySubmittedAt")}</SelectItem>
+                  <SelectItem value="overallStatus">{t("examDetail.sortByStatus")}</SelectItem>
                 </SelectContent>
               </Select>
               <Button
@@ -618,14 +620,14 @@ export default function ExamDetail({
                   });
                   void refetchSummaries();
                 }}
-                title="새로고침"
+                title={t("examDetail.refresh")}
               >
                 <RefreshCw className={cn("h-4 w-4", summariesFetching && "animate-spin")} />
               </Button>
             </div>
 
             <p className="text-sm text-muted-foreground">
-              총 {filteredAndSortedStudents.length}명
+              {t("examDetail.totalStudents", { count: filteredAndSortedStudents.length })}
             </p>
 
             {studentsLoading ? (
@@ -645,34 +647,34 @@ export default function ExamDetail({
             ) : summariesError ? (
               <div className="border border-destructive/30 rounded-lg p-12 text-center">
                 <p className="text-destructive font-medium mb-2">
-                  학생 목록을 불러오지 못했습니다
+                  {t("examDetail.loadStudentsFail")}
                 </p>
                 <p className="text-sm text-muted-foreground mb-4">
                   {summariesErrorDetail instanceof Error
                     ? summariesErrorDetail.message
-                    : "잠시 후 다시 시도해 주세요."}
+                    : t("examDetail.retryLater")}
                 </p>
                 <Button variant="outline" onClick={() => void refetchSummaries()}>
-                  다시 시도
+                  {t("examDetail.retry")}
                 </Button>
               </div>
             ) : filteredAndSortedStudents.length === 0 ? (
               <div className="border rounded-lg p-12 text-center text-muted-foreground">
-                <p>표시할 학생이 없습니다.</p>
+                <p>{t("examDetail.noStudents")}</p>
               </div>
             ) : (
               <div className="border rounded-lg overflow-hidden">
                 <div className="bg-muted/50 border-b px-4 py-3 hidden md:block">
                   <div className="grid grid-cols-[40px_minmax(160px,1fr)_72px_72px_96px_108px_140px_104px_80px] gap-3 items-center text-sm font-medium text-muted-foreground">
                     <span className="text-center">#</span>
-                    <span>학생</span>
-                    <span className="text-center">객관식</span>
-                    <span className="text-center">O/X</span>
-                    <span className="text-center">서술</span>
-                    <span className="text-center">총점</span>
-                    <span>제출일시</span>
-                    <span>상태</span>
-                    <span className="text-center">액션</span>
+                    <span>{t("examDetail.tableColStudent")}</span>
+                    <span className="text-center">{t("examDetail.tableColMCQ")}</span>
+                    <span className="text-center">{t("examDetail.tableColOX")}</span>
+                    <span className="text-center">{t("examDetail.tableColEssay")}</span>
+                    <span className="text-center">{t("examDetail.tableColTotal")}</span>
+                    <span>{t("examDetail.tableColSubmittedAt")}</span>
+                    <span>{t("examDetail.tableColStatus")}</span>
+                    <span className="text-center">{t("examDetail.tableColAction")}</span>
                   </div>
                 </div>
                 <div className="divide-y">

@@ -1,0 +1,91 @@
+{
+  "hero": {
+    "headline": {
+      "cheating": "AI cheating",
+      "cannotStop": " — if you can't stop it,",
+      "partOf": "make it part of",
+      "makePart": "the assessment."
+    },
+    "subheadline": {
+      "line1": "Quest-On turns generative AI from a cheating tool into a thinking partner.",
+      "line2": "We don't just grade answers — we assess the entire reasoning process."
+    },
+    "cta": {
+      "start": "Get started",
+      "watchDemo": "Watch demo",
+      "demoVideoTitle": "Demo video"
+    }
+  },
+  "cta": {
+    "badge": "A new paradigm in education",
+    "title": {
+      "line1": "Start with Quest-On today",
+      "line2": "and prove learning outcomes."
+    },
+    "body": {
+      "line1": "Go beyond rote memorization — capture the thinking process as data.",
+      "line2": "Start for free and experience a smarter way to assess."
+    },
+    "button": "Start for free"
+  },
+  "demo": {
+    "finalAnswer": {
+      "heading": "Final Answer",
+      "subtitle": "The student's submitted final answer"
+    },
+    "cheating": {
+      "externalPaste": "4 external pastes",
+      "internalCopy": "10 internal copies",
+      "suspiciousHeading": "Suspicious activity detected",
+      "internalCopyHeading": "Internal copy activity"
+    },
+    "chat": {
+      "heading": "AI conversation log",
+      "subtitle": "The student's conversation with the AI",
+      "placeholder": "Type a message..."
+    },
+    "grading": {
+      "heading": "AI overall evaluation",
+      "opinionLabel": "Summary:",
+      "highlightLabel": "Key quotes (Highlight)",
+      "strengthsLabel": "Strengths",
+      "improvementsLabel": "Areas for improvement"
+    }
+  },
+  "testimonial": {
+    "sectionTitle": {
+      "line1": "Educators around the world",
+      "line2": "are already transforming their classrooms."
+    }
+  },
+  "logoCloud": {
+    "caption": "Trusted by faculty"
+  },
+  "footer": {
+    "categories": {
+      "product": "Product",
+      "resources": "Resources",
+      "company": "Company",
+      "legal": "Legal"
+    },
+    "links": {
+      "main": "Home",
+      "testimonials": "Testimonials",
+      "partnership": "Partnership",
+      "startFree": "Start for free",
+      "gettingStarted": "Getting started",
+      "changelog": "Changelog",
+      "apiDocs": "API docs",
+      "helpCenter": "Help center",
+      "systemStatus": "System status",
+      "team": "Team",
+      "blog": "Blog",
+      "careers": "Careers",
+      "contact": "Contact us",
+      "terms": "Terms of service",
+      "privacy": "Privacy policy",
+      "security": "Data security",
+      "cookies": "Cookie policy"
+    }
+  }
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import { useTranslations } from "next-intl";
 import { Handle, Position } from "@xyflow/react";
 import type { ErdColumn } from "@/lib/types/workspace";
 
@@ -10,6 +11,7 @@ interface TableNodeData {
 }
 
 function TableNodeComponent({ data }: { data: TableNodeData }) {
+  const t = useTranslations("assignment");
   return (
     <div className="rounded-lg border-2 border-border bg-card shadow-md min-w-[200px]">
       {/* Table header */}
@@ -36,7 +38,7 @@ function TableNodeComponent({ data }: { data: TableNodeData }) {
         ))}
         {data.columns.length === 0 && (
           <div className="px-3 py-2 text-xs text-muted-foreground italic">
-            No columns defined
+            {t("tableNode.noColumns")}
           </div>
         )}
       </div>

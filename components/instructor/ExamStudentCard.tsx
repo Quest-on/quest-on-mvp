@@ -15,6 +15,8 @@ import {
   overallScoreLabel,
   type ExamStudentSummary,
 } from "@/lib/types/student-summary";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDateTime } from "@/lib/i18n/format";
 
 interface ExamStudentCardProps {
   student: ExamStudentSummary;
@@ -51,6 +53,8 @@ export function ExamStudentCard({
   examId,
   onLiveMonitoring,
 }: ExamStudentCardProps) {
+  const t = useTranslations("authoring");
+  const locale = useLocale() as "ko" | "en";
   const subInfo = [student.studentNumber, student.school].filter(Boolean).join(" · ");
   const status = dashboardStatus(student);
 
@@ -89,8 +93,8 @@ export function ExamStudentCard({
             ) : null}
             {student.submittedAt && (
               <p className="text-xs text-muted-foreground mt-1">
-                제출:{" "}
-                {new Date(student.submittedAt).toLocaleString("ko-KR", {
+                {t("examStudentCard.labelSubmitted")}{" "}
+                {formatDateTime(student.submittedAt, locale, {
                   month: "short",
                   day: "numeric",
                   hour: "2-digit",
@@ -104,25 +108,25 @@ export function ExamStudentCard({
       <CardContent className="space-y-2 pt-0">
         <dl className="grid grid-cols-2 gap-2 text-xs">
           <div>
-            <dt className="text-muted-foreground">객관식</dt>
+            <dt className="text-muted-foreground">{t("examStudentCard.labelMcq")}</dt>
             <dd className="font-medium tabular-nums">
               {formatProgress(student.mcq.correct, student.mcq.total)}
             </dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">O/X</dt>
+            <dt className="text-muted-foreground">{t("examStudentCard.labelOx")}</dt>
             <dd className="font-medium tabular-nums">
               {formatProgress(student.ox.correct, student.ox.total)}
             </dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">서술</dt>
+            <dt className="text-muted-foreground">{t("examStudentCard.labelEssay")}</dt>
             <dd className="font-medium tabular-nums">
               {caseStatusLabel(student.status, student.caseProgress)}
             </dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">총점</dt>
+            <dt className="text-muted-foreground">{t("examStudentCard.labelTotal")}</dt>
             <dd className="font-medium tabular-nums">
               {overallScoreLabel(student)}
             </dd>
@@ -139,7 +143,7 @@ export function ExamStudentCard({
                 onClick={() => onLiveMonitoring(student)}
               >
                 <Radio size={14} className="mr-1" />
-                실시간 보기
+                {t("examStudentCard.buttonLiveView")}
               </Button>
             </AnimateIcon>
           )}
@@ -152,7 +156,7 @@ export function ExamStudentCard({
                   className="text-blue-600 border-blue-600 hover:bg-blue-50 h-8 px-2.5 text-xs"
                 >
                   <ClipboardCheck size={14} className="mr-1" />
-                  {student.overallStatus === "manually_graded" ? "재채점" : "채점"}
+                  {student.overallStatus === "manually_graded" ? t("examStudentCard.buttonRegrade") : t("examStudentCard.buttonGrade")}
                 </Button>
               </Link>
             </AnimateIcon>

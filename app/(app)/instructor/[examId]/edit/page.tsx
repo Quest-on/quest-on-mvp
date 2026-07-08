@@ -16,6 +16,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { SimpleExamAuthoringForm } from "@/components/instructor/SimpleExamAuthoringForm";
+import { useTranslations } from "next-intl";
 import type { Question } from "@/components/instructor/QuestionEditor";
 import { useFileUpload } from "@/hooks/useFileUpload";
 import {
@@ -40,6 +41,7 @@ export default function EditExam({
   const resolvedParams = use(params);
   const router = useRouter();
   const { user, isLoaded } = useAppUser();
+  const t = useTranslations("instructor");
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingExam, setIsLoadingExam] = useState(true);
   const [examData, setExamData] = useState({
@@ -76,7 +78,7 @@ export default function EditExam({
             data: { id: resolvedParams.examId },
           }),
         });
-        if (!response.ok) throw new Error("시험 데이터를 불러올 수 없습니다.");
+        if (!response.ok) throw new Error(t("editExam.toastSaveFail"));
         const result = await response.json();
         const exam = result.exam;
         setExamData({
@@ -95,7 +97,7 @@ export default function EditExam({
         setHasSessions(Boolean(exam.has_sessions));
         fileUpload.initExistingData(exam.materials || [], exam.materials_text);
       } catch {
-        toast.error("시험 데이터를 불러오는 중 오류가 발생했습니다.");
+        toast.error(t("editExam.toastLoadFail"));
         router.push(`/instructor/${resolvedParams.examId}`);
       } finally {
         setIsLoadingExam(false);
@@ -129,7 +131,7 @@ export default function EditExam({
       return true;
     }
     setCanAddMoreFiles(false);
-    toast.error("파일 용량이 50MB를 초과했습니다. 일부 파일이 비활성화됩니다.");
+    toast.error(t("editExam.toastFileSizeExceeded"));
     const disabled = new Set<number>();
     let cur = 0;
     for (let i = files.length - 1; i >= 0; i--) {
@@ -156,11 +158,11 @@ export default function EditExam({
     const ext = file.name.split(".").pop()?.toLowerCase();
     const allowedExt = ["pdf","ppt","pptx","doc","docx","xls","xlsx","csv","hwp","hwpx","jpg","jpeg","png","gif","webp"];
     if (!allowedTypes.includes(file.type) && !allowedExt.includes(ext || "")) {
-      toast.error("지원되지 않는 파일 형식입니다.");
+      toast.error(t("editExam.toastUnsupportedFormat"));
       return false;
     }
     if (file.size > 50 * 1024 * 1024) {
-      toast.error("파일 크기가 50MB를 초과합니다.");
+      toast.error(t("editExam.toastFileTooLarge"));
       return false;
     }
     return true;
@@ -168,7 +170,7 @@ export default function EditExam({
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!canAddMoreFiles) {
-      toast.error("파일 용량이 초과되어 더 이상 파일을 추가할 수 없습니다.");
+      toast.error(t("editExam.toastCannotAddMore"));
       e.target.value = "";
       return;
     }
@@ -192,7 +194,7 @@ export default function EditExam({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation(); setIsDragOver(false);
     if (!canAddMoreFiles) {
-      toast.error("파일 용량이 초과되어 더 이상 파일을 추가할 수 없습니다.");
+      toast.error(t("editExam.toastCannotAddMore"));
       return;
     }
     const files = Array.from(e.dataTransfer.files).filter(validateFile);
@@ -230,8 +232,8 @@ export default function EditExam({
   };
 
   const getFileNameFromUrl = (url: string) => {
-    try { return decodeURIComponent(new URL(url).pathname.split("/").pop() || "파일"); }
-    catch { return "파일"; }
+    try { return decodeURIComponent(new URL(url).pathname.split("/").pop() || t("editExam.filenameFallback")); }
+    catch { return t("editExam.filenameFallback"); }
   };
 
   // ── 문제 CRUD ──────────────────────────────────────────────────────────────
@@ -325,9 +327,9 @@ export default function EditExam({
         const err = await response.json().catch(() => ({}));
         throw new Error(extractErrorMessage(err, "시험 수정에 실패했습니다", response.status));
       }
-      toast.success("변경사항이 저장되었습니다.");
+      toast.success(t("editExam.toastSaved"));
     } catch (error) {
-      toast.error(getErrorMessage(error, "시험 수정 중 오류가 발생했습니다."), { duration: 5000 });
+      toast.error(getErrorMessage(error, t("editExam.toastSaveError")), { duration: 5000 });
     } finally {
       setIsLoading(false);
       isSubmittingRef.current = false;
@@ -337,18 +339,18 @@ export default function EditExam({
   // ── 제출 사유 ─────────────────────────────────────────────────────────────
   const submitReasons = useMemo(() => {
     return [
-      !examData.title ? "시험 제목을 입력해주세요" : null,
-      questions.length === 0 ? "문제를 1개 이상 추가해주세요" : null,
+      !examData.title ? t("editExam.submitReasonTitle") : null,
+      questions.length === 0 ? t("editExam.submitReasonQuestions") : null,
       questions.length > 0 && questions.every((q) => isQuestionContentEmpty(q.text))
-        ? "문제 내용을 입력해주세요"
+        ? t("editExam.submitReasonContent")
         : null,
-      !canAddMoreFiles ? "파일 용량이 50MB를 초과했습니다" : null,
+      !canAddMoreFiles ? t("editExam.submitReasonFileSize") : null,
       isExamDurationTooShort(examData.duration) ? EXAM_DURATION_REASON : null,
       questions.some((q) => isObjectiveQuestionIncomplete(q))
-        ? "객관식 문제의 선택지와 정답을 입력해주세요"
+        ? t("editExam.submitReasonObjective")
         : null,
       questions.length > 0 && !scoreWeights
-        ? "최종 점수 비중을 설정해주세요"
+        ? t("editExam.submitReasonScoreWeights")
         : null,
       ...validateScoreWeightsForQuestions(
         scoreWeights,
@@ -362,7 +364,7 @@ export default function EditExam({
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
-        <span className="ml-2 text-muted-foreground">시험 데이터를 불러오는 중...</span>
+        <span className="ml-2 text-muted-foreground">{t("editExam.loadingText")}</span>
       </div>
     );
   }
@@ -381,11 +383,11 @@ export default function EditExam({
             onClick={() => router.push(`/instructor/${resolvedParams.examId}`)}
           >
             <ArrowLeft className="h-4 w-4" />
-            대시보드
+            {t("editExam.backToDashboard")}
           </Button>
           <div className="h-4 w-px bg-border" />
           <h1 className="font-semibold text-sm sm:text-base truncate">
-            {examData.title ? `${examData.title} 편집` : "시험 편집"}
+            {examData.title ? `${examData.title}${t("editExam.titleSuffix")}` : t("editExam.titleDefault")}
           </h1>
         </div>
       </header>
@@ -443,7 +445,7 @@ export default function EditExam({
             materialsText={fileUpload.getMaterialsText()}
             onQuestionsAppend={handleQuestionsAppend}
             // ── 편집 전용 ───────────────────────────────────────────────────
-            submitButtonText="변경사항 저장"
+            submitButtonText={t("editExam.submitButtonText")}
             existingFiles={fileUpload.existingUrls.map((url, i) => ({
               url,
               name: getFileNameFromUrl(url),

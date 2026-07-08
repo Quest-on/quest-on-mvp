@@ -10,24 +10,26 @@ import {
   MessageSquare,
   ThumbsUp,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { AgentStep, AgentStepType } from "@/lib/agent/types";
 
-/** stepType 별 아이콘 + 라벨 */
+/** stepType 별 아이콘 + 번역 키 */
 const STEP_META: Record<
   AgentStepType,
-  { icon: typeof Brain; label: string }
+  { icon: typeof Brain; labelKey: string }
 > = {
-  user_input: { icon: MessageSquare, label: "요청" },
-  plan: { icon: ClipboardList, label: "계획" },
-  data_fetch: { icon: Database, label: "자료 조회" },
-  analysis: { icon: Brain, label: "분석" },
-  tool_call: { icon: Hammer, label: "툴 실행" },
-  draft: { icon: FileText, label: "초안 작성" },
-  approval: { icon: ThumbsUp, label: "승인" },
-  final: { icon: CheckCircle2, label: "완료" },
+  user_input: { icon: MessageSquare, labelKey: "agent.timeline.step.userInput" },
+  plan: { icon: ClipboardList, labelKey: "agent.timeline.step.plan" },
+  data_fetch: { icon: Database, labelKey: "agent.timeline.step.dataFetch" },
+  analysis: { icon: Brain, labelKey: "agent.timeline.step.analysis" },
+  tool_call: { icon: Hammer, labelKey: "agent.timeline.step.toolCall" },
+  draft: { icon: FileText, labelKey: "agent.timeline.step.draft" },
+  approval: { icon: ThumbsUp, labelKey: "agent.timeline.step.approval" },
+  final: { icon: CheckCircle2, labelKey: "agent.timeline.step.final" },
 };
 
 function StepRow({ step, isLast }: { step: AgentStep; isLast: boolean }) {
+  const t = useTranslations("admin");
   const meta = STEP_META[step.stepType] ?? STEP_META.analysis;
   const Icon = meta.icon;
 
@@ -45,7 +47,7 @@ function StepRow({ step, isLast }: { step: AgentStep; isLast: boolean }) {
       <div className={isLast ? "pb-1" : "pb-4"}>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            {meta.label}
+            {t(meta.labelKey)}
           </span>
         </div>
         <p className="mt-0.5 text-sm font-medium text-foreground">
@@ -71,6 +73,7 @@ function StepRow({ step, isLast }: { step: AgentStep; isLast: boolean }) {
  * 스텝 사이 공백(OpenAI 호출 대기) 동안에도 "살아있는" 느낌을 준다.
  */
 function PendingRow({ hasSteps }: { hasSteps: boolean }) {
+  const t = useTranslations("admin");
   return (
     <li className="flex gap-3" aria-live="polite">
       {/* 위 스텝과 이어지는 연결선 + 맥동 점 */}
@@ -85,7 +88,7 @@ function PendingRow({ hasSteps }: { hasSteps: boolean }) {
       {/* 본문 */}
       <div className="flex items-center pb-1">
         <span className="animate-pulse text-sm font-medium text-muted-foreground">
-          에이전트가 작업 중…
+          {t("agent.timeline.pending")}
         </span>
       </div>
     </li>
@@ -100,6 +103,7 @@ export function AgentStepTimeline({
   /** queued/running 동안 true — 마지막 스텝 아래에 맥동 인디케이터 표시 */
   pending?: boolean;
 }) {
+  const t = useTranslations("admin");
   if (steps.length === 0) {
     if (pending) {
       return (
@@ -110,7 +114,7 @@ export function AgentStepTimeline({
     }
     return (
       <p className="px-1 py-2 text-xs text-muted-foreground">
-        아직 단계가 없습니다.
+        {t("agent.timeline.noSteps")}
       </p>
     );
   }

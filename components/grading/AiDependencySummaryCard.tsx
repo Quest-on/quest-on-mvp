@@ -8,6 +8,7 @@ import type {
   AiDependencyRiskLevel,
 } from "@/lib/types/grading";
 import { Bot, RotateCcw, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface AiDependencySummaryCardProps {
   mode: "instructor" | "student";
@@ -16,24 +17,28 @@ interface AiDependencySummaryCardProps {
   loading?: boolean;
 }
 
-function getRiskLabel(risk: AiDependencyRiskLevel, isAssignment: boolean) {
+function getRiskLabel(
+  risk: AiDependencyRiskLevel,
+  isAssignment: boolean,
+  t: ReturnType<typeof useTranslations<"grading">>
+) {
   if (isAssignment) {
     switch (risk) {
       case "high":
-        return "의존 우려 높음";
+        return t("aiDependency.riskHighAssignment");
       case "medium":
-        return "의존 우려 있음";
+        return t("aiDependency.riskMediumAssignment");
       default:
-        return "양호";
+        return t("aiDependency.riskLowAssignment");
     }
   }
   switch (risk) {
     case "high":
-      return "높음";
+      return t("aiDependency.riskHigh");
     case "medium":
-      return "중간";
+      return t("aiDependency.riskMedium");
     default:
-      return "낮음";
+      return t("aiDependency.riskLow");
   }
 }
 
@@ -54,6 +59,7 @@ export function AiDependencySummaryCard({
   overallSummary,
   loading,
 }: AiDependencySummaryCardProps) {
+  const t = useTranslations("grading");
   const isAssignment =
     questionAssessment?.evaluationMode === "assignment" ||
     overallSummary?.evaluationMode === "assignment";
@@ -64,13 +70,13 @@ export function AiDependencySummaryCard({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Bot className="h-4 w-4 text-primary" />
-            {isAssignment ? "리서치 참여 신호" : "AI 의존 신호"}
+            {isAssignment ? t("aiDependency.titleResearchLoading") : t("aiDependency.titleAiLoading")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-3 py-6 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin shrink-0" />
-            <p className="text-sm">채점 완료 후 분석 결과가 표시됩니다</p>
+            <p className="text-sm">{t("aiDependency.loadingDesc")}</p>
           </div>
         </CardContent>
       </Card>
@@ -84,11 +90,11 @@ export function AiDependencySummaryCard({
   const title =
     mode === "instructor"
       ? isAssignment
-        ? "리서치 참여 신호"
-        : "AI 의존 신호"
+        ? t("aiDependency.titleResearchInstructor")
+        : t("aiDependency.titleAiInstructor")
       : isAssignment
-        ? "리서치 참여 평가"
-        : "AI 활용 평가";
+        ? t("aiDependency.titleResearchStudent")
+        : t("aiDependency.titleAiStudent");
 
   const metrics = questionAssessment?.assignmentMetrics;
 
@@ -104,24 +110,28 @@ export function AiDependencySummaryCard({
         {overallSummary && (
           <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
             <div className="flex items-center justify-between gap-3">
-              <span className="font-medium">전체 세션 해석</span>
+              <span className="font-medium">{t("aiDependency.overallSessionLabel")}</span>
               <Badge variant={getRiskVariant(overallSummary.overallRisk)}>
-                {isAssignment ? "AI 의존 " : "위험도 "}
-                {getRiskLabel(overallSummary.overallRisk, isAssignment)}
+                {isAssignment ? t("aiDependency.badgePrefixAssignment") : t("aiDependency.badgePrefixExam")}
+                {getRiskLabel(overallSummary.overallRisk, isAssignment, t)}
               </Badge>
             </div>
             <p className="text-muted-foreground">{overallSummary.summary}</p>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <span>
-                {isAssignment ? "리서치 질문" : "트리거"} {overallSummary.triggerCount}회
+                {isAssignment
+                  ? t("aiDependency.triggerCountAssignment", { count: overallSummary.triggerCount })
+                  : t("aiDependency.triggerCountExam", { count: overallSummary.triggerCount })}
               </span>
               <span>
                 {isAssignment
                   ? questionAssessment?.recoveryObserved ||
                     overallSummary.recoveryObserved
-                    ? "질문 흐름 연결됨"
-                    : "질문 연결 제한적"
-                  : `회복 ${overallSummary.recoveryObserved ? "관찰됨" : "근거 약함"}`}
+                    ? t("aiDependency.recoveryConnected")
+                    : t("aiDependency.recoveryLimited")
+                  : overallSummary.recoveryObserved
+                    ? t("aiDependency.recoveryObserved")
+                    : t("aiDependency.recoveryWeak")}
               </span>
             </div>
           </div>
@@ -130,10 +140,10 @@ export function AiDependencySummaryCard({
         {questionAssessment && (
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <span className="font-medium">현재 문항 해석</span>
+              <span className="font-medium">{t("aiDependency.currentQuestionLabel")}</span>
               <Badge variant={getRiskVariant(questionAssessment.overallRisk)}>
-                {isAssignment ? "AI 의존 " : "위험도 "}
-                {getRiskLabel(questionAssessment.overallRisk, isAssignment)}
+                {isAssignment ? t("aiDependency.badgePrefixAssignment") : t("aiDependency.badgePrefixExam")}
+                {getRiskLabel(questionAssessment.overallRisk, isAssignment, t)}
               </Badge>
             </div>
 
@@ -141,18 +151,18 @@ export function AiDependencySummaryCard({
 
             {isAssignment && metrics ? (
               <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                <div>후속·확장 질문 {metrics.followUpQuestionCount}회</div>
-                <div>검증·확인 질문 {metrics.verificationQuestionCount}회</div>
-                <div>개념·범위 탐색 {metrics.conceptExplorationCount}회</div>
-                <div>답안 위임 요청 {metrics.answerDelegationCount}회</div>
+                <div>{t("aiDependency.followUpCount", { count: metrics.followUpQuestionCount })}</div>
+                <div>{t("aiDependency.verificationCount", { count: metrics.verificationQuestionCount })}</div>
+                <div>{t("aiDependency.conceptExplorationCount", { count: metrics.conceptExplorationCount })}</div>
+                <div>{t("aiDependency.answerDelegationCount", { count: metrics.answerDelegationCount })}</div>
               </div>
             ) : (
               <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                <div>풀이 위임형 요청 {questionAssessment.delegationRequestCount}회</div>
-                <div>출발점 의존 {questionAssessment.startingPointDependencyCount}회</div>
-                <div>직접 답 요구 {questionAssessment.directAnswerRequestCount}회</div>
+                <div>{t("aiDependency.delegationRequestCount", { count: questionAssessment.delegationRequestCount })}</div>
+                <div>{t("aiDependency.startingPointCount", { count: questionAssessment.startingPointDependencyCount })}</div>
+                <div>{t("aiDependency.directAnswerCount", { count: questionAssessment.directAnswerRequestCount })}</div>
                 <div>
-                  답안 유사도 {(questionAssessment.finalAnswerOverlapScore * 100).toFixed(0)}%
+                  {t("aiDependency.overlapScore", { percent: (questionAssessment.finalAnswerOverlapScore * 100).toFixed(0) })}
                 </div>
               </div>
             )}
@@ -162,11 +172,11 @@ export function AiDependencySummaryCard({
                 <RotateCcw className="h-4 w-4 text-primary" />
                 {isAssignment
                   ? questionAssessment.recoveryObserved
-                    ? "질문 흐름이 이어지며 탐색·검증이 관찰됨"
-                    : "질문 연결·검증 흔적이 제한적임"
+                    ? t("aiDependency.recoveryFlowGood")
+                    : t("aiDependency.recoveryFlowLimited")
                   : questionAssessment.recoveryObserved
-                    ? "독립 추론 회복이 확인됨"
-                    : "독립 추론 회복 근거가 제한적임"}
+                    ? t("aiDependency.independentRecovery")
+                    : t("aiDependency.independentRecoveryWeak")}
               </div>
               {questionAssessment.recoveryEvidence.length > 0 && (
                 <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
@@ -182,11 +192,11 @@ export function AiDependencySummaryCard({
                 <p className="mb-2 text-xs font-medium text-muted-foreground">
                   {mode === "instructor"
                     ? isAssignment
-                      ? "리서치 질문 예시"
-                      : "근거 문장"
+                      ? t("aiDependency.triggerEvidenceInstructor")
+                      : t("aiDependency.triggerEvidenceExamInstructor")
                     : isAssignment
-                      ? "평가에 반영된 리서치 질문"
-                      : "평가에 반영된 대화 근거"}
+                      ? t("aiDependency.triggerEvidenceStudent")
+                      : t("aiDependency.triggerEvidenceExamStudent")}
                 </p>
                 <ul className="space-y-1 text-xs text-muted-foreground">
                   {questionAssessment.triggerEvidence.slice(0, 3).map((evidence, index) => (

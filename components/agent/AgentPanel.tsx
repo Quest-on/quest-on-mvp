@@ -17,6 +17,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -49,6 +50,7 @@ const PANEL_WIDTH_OPEN = "w-[320px] lg:w-[360px]";
 /* ─────────────────────────────────────────────────────────────── */
 
 export default function AgentPanel() {
+  const t = useTranslations("admin");
   const { open, setOpen } = useAgentPanel();
   const isMobile = useIsMobile();
 
@@ -63,8 +65,8 @@ export default function AgentPanel() {
           className="w-[min(360px,100vw)] p-0 bg-sidebar border-l flex flex-col [&>button]:hidden"
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>AI 에이전트</SheetTitle>
-            <SheetDescription>AI 에이전트 패널</SheetDescription>
+            <SheetTitle>{t("agent.panel.title")}</SheetTitle>
+            <SheetDescription>{t("agent.panel.description")}</SheetDescription>
           </SheetHeader>
           <PanelShell onClose={close} />
         </SheetContent>
@@ -77,7 +79,7 @@ export default function AgentPanel() {
   return (
     <div
       role="dialog"
-      aria-label="AI 에이전트 패널"
+      aria-label={t("agent.panel.ariaLabel")}
       aria-modal="false"
       inert={!open}
       data-state={open ? "open" : "closed"}
@@ -156,24 +158,24 @@ function PanelShell({ onClose }: { onClose: () => void }) {
 
 const PHASE_BADGE: Record<
   string,
-  { label: string; className: string; pulse?: boolean } | null
+  { labelKey: string; className: string; pulse?: boolean } | null
 > = {
   idle: null,
   running: {
-    label: "실행 중",
+    labelKey: "agent.phase.running",
     className: "bg-primary/10 text-primary",
     pulse: true,
   },
   done: {
-    label: "완료",
+    labelKey: "agent.phase.done",
     className: "bg-emerald-500/10 text-emerald-600",
   },
   failed: {
-    label: "실패",
+    labelKey: "agent.phase.failed",
     className: "bg-destructive/10 text-destructive",
   },
   cancelled: {
-    label: "중단됨",
+    labelKey: "agent.phase.cancelled",
     className: "bg-muted text-muted-foreground",
   },
 };
@@ -185,6 +187,7 @@ function PanelHeader({
   onClose: () => void;
   phase: string;
 }) {
+  const t = useTranslations("admin");
   const badge = PHASE_BADGE[phase] ?? null;
 
   return (
@@ -195,10 +198,10 @@ function PanelHeader({
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold leading-none text-sidebar-foreground">
-            AI 에이전트
+            {t("agent.panel.title")}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            시험 편집을 도와드립니다
+            {t("agent.panel.subtitle")}
           </p>
         </div>
         <Button
@@ -207,7 +210,7 @@ function PanelHeader({
           size="icon"
           className="h-8 w-8 shrink-0"
           onClick={onClose}
-          aria-label="에이전트 패널 닫기"
+          aria-label={t("agent.panel.closeAriaLabel")}
         >
           <X className="h-4 w-4" />
         </Button>
@@ -227,7 +230,7 @@ function PanelHeader({
               <span className="relative inline-flex h-2 w-2 rounded-full bg-current" />
             </span>
           )}
-          {badge.label}
+          {t(badge.labelKey)}
         </div>
       )}
     </div>
@@ -257,6 +260,7 @@ function PanelBody() {
 /* ── idle: 입력창 + 안내 ────────────────────────────────────── */
 
 function IdleView() {
+  const t = useTranslations("admin");
   const { startRun } = useAgentRunController();
   const [prompt, setPrompt] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -277,11 +281,10 @@ function IdleView() {
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="rounded-xl border bg-muted/40 p-3">
           <p className="text-sm font-medium text-foreground">
-            무엇을 도와드릴까요?
+            {t("agent.idle.helpTitle")}
           </p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            하고 싶은 작업을 자연어로 설명해 주세요. 에이전트가 직접
-            편집기를 조작하고, 그 과정을 여기에 단계별로 보여드립니다.
+            {t("agent.idle.helpDesc")}
           </p>
         </div>
       </div>
@@ -292,7 +295,7 @@ function IdleView() {
           onChange={setPrompt}
           onSubmit={() => void submit()}
           disabled={submitting}
-          placeholder="예: 미적분 1단원 서술형 시험 5문항 만들어줘"
+          placeholder={t("agent.idle.composerPlaceholder")}
         />
       </div>
     </div>
@@ -344,13 +347,14 @@ function StopBar({
   onStop: () => void;
   stopping: boolean;
 }) {
+  const t = useTranslations("admin");
   return (
     <div className="flex items-center justify-between gap-3 rounded-[26px] border bg-background p-2 pl-4 shadow-sm">
       <span className="flex items-center gap-2 text-xs text-muted-foreground">
         {stopping ? (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            중단 중…
+            {t("agent.running.stopping")}
           </>
         ) : (
           <>
@@ -358,7 +362,7 @@ function StopBar({
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
-            에이전트 실행 중 · ESC로 중단
+            {t("agent.running.statusLabel")}
           </>
         )}
       </span>
@@ -369,7 +373,7 @@ function StopBar({
         className="h-10 w-10 shrink-0 rounded-full"
         onClick={onStop}
         disabled={stopping}
-        aria-label="에이전트 실행 중단"
+        aria-label={t("agent.running.stopAriaLabel")}
       >
         {stopping ? (
           <Loader2 className="h-5 w-5 animate-spin" />
@@ -384,6 +388,7 @@ function StopBar({
 /* ── done: 완료 요약 ────────────────────────────────────────── */
 
 function DoneView() {
+  const t = useTranslations("admin");
   const { activeRun, summary, reset } = useAgentRunController();
 
   return (
@@ -395,7 +400,7 @@ function DoneView() {
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             <p className="text-sm font-medium text-foreground">
-              작업을 완료했습니다
+              {t("agent.done.successTitle")}
             </p>
           </div>
           {summary && (
@@ -408,7 +413,7 @@ function DoneView() {
 
       <div className="border-t p-3">
         <Button type="button" className="w-full" onClick={reset}>
-          새 작업 시작하기
+          {t("agent.done.newTask")}
         </Button>
       </div>
     </div>
@@ -418,6 +423,7 @@ function DoneView() {
 /* ── failed: 에러 ───────────────────────────────────────────── */
 
 function FailedView() {
+  const t = useTranslations("admin");
   const { activeRun, summary, reset } = useAgentRunController();
 
   return (
@@ -429,10 +435,10 @@ function FailedView() {
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
           <div>
             <p className="text-sm font-medium text-destructive">
-              작업이 실패했습니다
+              {t("agent.failed.errorTitle")}
             </p>
             <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              {activeRun?.error ?? summary ?? "알 수 없는 오류가 발생했습니다."}
+              {activeRun?.error ?? summary ?? t("agent.failed.unknownError")}
             </p>
           </div>
         </div>
@@ -440,7 +446,7 @@ function FailedView() {
 
       <div className="border-t p-3">
         <Button type="button" className="w-full" onClick={reset}>
-          새 작업 시작하기
+          {t("agent.failed.newTask")}
         </Button>
       </div>
     </div>
@@ -450,6 +456,7 @@ function FailedView() {
 /* ── cancelled: 중단 안내 ───────────────────────────────────── */
 
 function CancelledView() {
+  const t = useTranslations("admin");
   const { activeRun, reset } = useAgentRunController();
 
   return (
@@ -461,11 +468,10 @@ function CancelledView() {
           <Square className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           <div>
             <p className="text-sm font-medium text-foreground">
-              작업이 중단되었습니다
+              {t("agent.cancelled.title")}
             </p>
             <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              그때까지 진행된 단계는 위에 남아 있습니다. 새 작업을 시작할
-              수 있습니다.
+              {t("agent.cancelled.desc")}
             </p>
           </div>
         </div>
@@ -473,7 +479,7 @@ function CancelledView() {
 
       <div className="border-t p-3">
         <Button type="button" className="w-full" onClick={reset}>
-          새 작업 시작하기
+          {t("agent.cancelled.newTask")}
         </Button>
       </div>
     </div>
@@ -495,6 +501,7 @@ function Composer({
   disabled: boolean;
   placeholder: string;
 }) {
+  const t = useTranslations("admin");
   return (
     <div className="flex items-end justify-between gap-2 rounded-[26px] border bg-background p-2 shadow-sm">
       <Textarea
@@ -516,7 +523,7 @@ function Composer({
         className="h-10 w-10 shrink-0 rounded-full"
         onClick={onSubmit}
         disabled={disabled || !value.trim()}
-        aria-label="전송"
+        aria-label={t("agent.composer.sendAriaLabel")}
       >
         {disabled ? (
           <Loader2 className="h-5 w-5 animate-spin" />

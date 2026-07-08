@@ -15,6 +15,7 @@ import { validateRequest, chatRequestSchema } from "@/lib/validations";
 import { successJson, errorJson } from "@/lib/api-response";
 import { logError } from "@/lib/logger";
 import { currentUser } from "@/lib/get-current-user";
+import { resolveChatQIdx, extractQuestionAiContext } from "@/lib/chat-qidx";
 import { classifyMessageType, type MessageType } from "@/lib/message-classification";
 import { extractResponseText } from "@/lib/parse-openai-response";
 import {
@@ -575,7 +576,8 @@ export async function POST(request: NextRequest) {
       examId,
       studentId,
       currentQuestionText,
-      currentQuestionAiContext,
+      // NOTE: currentQuestionAiContext 는 클라이언트에서 받지 않는다. 정답/채점 컨텍스트는
+      // 학생에게 내려주지 않으므로(민감 필드 스트립), 서버가 원본 exam 에서 직접 파생한다.
     } = validation.data;
 
     // Require authentication unconditionally
@@ -596,17 +598,9 @@ export async function POST(request: NextRequest) {
       return errorJson("RATE_LIMITED", "Too many requests. Please try again later.", 429);
     }
 
-    // 안전한 문제 인덱스 계산 (공통 로직)
-    let safeQIdx: number;
-    if (questionIdx !== undefined && questionIdx !== null) {
-      const parsed = parseInt(String(questionIdx), 10);
-      safeQIdx = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-    } else if (questionId) {
-      const parsed = parseInt(String(questionId), 10);
-      safeQIdx = Number.isFinite(parsed) && parsed >= 0 ? Math.abs(parsed % 2147483647) : 0;
-    } else {
-      safeQIdx = 0;
-    }
+    // 안전한 문제 인덱스 계산 — 검증된 questionIdx 만 사용한다.
+    // (questionId 는 UUID 라 parseInt 로 숫자화하면 문항 오염을 유발 → 폴백 제거)
+    const safeQIdx = resolveChatQIdx(questionIdx);
 
     const isTemp = sessionId.startsWith("temp_");
 
@@ -618,17 +612,23 @@ export async function POST(request: NextRequest) {
         skipIncrementUsedClarifications,
       } = await resolveTempSession({ sessionId, examId, studentId });
 
-      // exam 언어 조회 (영문 프롬프트 분기용). 실패/미조회 시 기본값 ko 유지.
+      // exam 언어/문항 조회. 언어는 영문 프롬프트 분기용, 문항은 강사 채점 컨텍스트
+      // (ai_context)를 서버에서 직접 파생하기 위함(클라이언트는 ai_context 를 받지 않음).
       let tempExamLanguage: PromptLanguage = "ko";
+      let currentQuestionAiContext: string | undefined;
       if (examId) {
         const { data: examLangRow } = await getSupabase()
           .from("exams")
-          .select("language")
+          .select("language, questions")
           .eq("id", examId)
           .maybeSingle();
         if (examLangRow?.language === "en") {
           tempExamLanguage = "en";
         }
+        currentQuestionAiContext = extractQuestionAiContext(
+          examLangRow?.questions,
+          safeQIdx
+        );
       }
 
       // temp_로 남아있는 경우(DB 적재 불가): AI 응답은 하되 DB 저장은 생략
@@ -764,6 +764,10 @@ export async function POST(request: NextRequest) {
       : undefined;
 
     const examLanguage: PromptLanguage = exam.language === "en" ? "en" : "ko";
+
+    // 강사 채점 컨텍스트(ai_context)는 학생 응답에서 스트립되므로 클라이언트가 아닌
+    // 서버가 로드한 원본 exam.questions 에서 직접 파생한다.
+    const currentQuestionAiContext = extractQuestionAiContext(exam.questions, safeQIdx);
 
     const { aiResponse, warnings } = await handleChatLogic({
       sessionId,

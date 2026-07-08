@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useTranslations } from "next-intl";
 
 interface Question {
   id: string;
@@ -30,10 +31,12 @@ interface QuestionNavigationProps {
   initialFilter?: string;
 }
 
-function getTypePrefix(type: string): string {
-  if (type === "multiple-choice") return "사지선다";
-  if (type === "true-false") return "OX";
-  return "CASE";
+type TypePrefixKey = "questionNavigation.typePrefixMcq" | "questionNavigation.typePrefixOx" | "questionNavigation.typePrefixCase";
+
+function getTypePrefixKey(type: string): TypePrefixKey {
+  if (type === "multiple-choice") return "questionNavigation.typePrefixMcq";
+  if (type === "true-false") return "questionNavigation.typePrefixOx";
+  return "questionNavigation.typePrefixCase";
 }
 
 function isCaseType(type: string): boolean {
@@ -57,17 +60,17 @@ function questionFilterBucket(type: string): Exclude<FilterType, "all"> {
 function buildQuestionLabels(questions: Question[]): string[] {
   const counters: Record<string, number> = {};
   return questions.map((q) => {
-    const prefix = getTypePrefix(q.type);
+    const prefix = getTypePrefixKey(q.type);
     counters[prefix] = (counters[prefix] ?? 0) + 1;
     return `${prefix} ${counters[prefix]}`;
   });
 }
 
-const FILTER_TABS: { key: FilterType; label: string }[] = [
-  { key: "all", label: "모두" },
-  { key: "multiple-choice", label: "사지선다" },
-  { key: "true-false", label: "OX" },
-  { key: "case", label: "Case" },
+const FILTER_TAB_KEYS: { key: FilterType; labelKey: "questionNavigation.filterAll" | "questionNavigation.filterMcq" | "questionNavigation.filterOx" | "questionNavigation.filterCase" }[] = [
+  { key: "all", labelKey: "questionNavigation.filterAll" },
+  { key: "multiple-choice", labelKey: "questionNavigation.filterMcq" },
+  { key: "true-false", labelKey: "questionNavigation.filterOx" },
+  { key: "case", labelKey: "questionNavigation.filterCase" },
 ];
 
 export function QuestionNavigation({
@@ -78,6 +81,7 @@ export function QuestionNavigation({
   hideScores = false,
   initialFilter,
 }: QuestionNavigationProps) {
+  const t = useTranslations("authoring");
   const [activeFilter, setActiveFilter] = useState<FilterType>(() =>
     normalizeFilter(initialFilter)
   );
@@ -85,7 +89,7 @@ export function QuestionNavigation({
   if (!questions || !Array.isArray(questions)) {
     return (
       <div className="mb-6">
-        <div className="text-red-600">문제를 불러올 수 없습니다.</div>
+        <div className="text-red-600">{t("questionNavigation.errorLoad")}</div>
       </div>
     );
   }
@@ -93,7 +97,7 @@ export function QuestionNavigation({
   const labels = buildQuestionLabels(questions);
 
   // 실제 탭에 표시할 유형만 (해당 유형 문제가 1개 이상 있을 때)
-  const availableTabs = FILTER_TABS.filter((tab) => {
+  const availableTabs = FILTER_TAB_KEYS.filter((tab) => {
     if (tab.key === "all") return true;
     return questions.some((q) =>
       tab.key === "case" ? isCaseType(q.type) : q.type === tab.key
@@ -140,7 +144,7 @@ export function QuestionNavigation({
               }}
               aria-pressed={activeFilter === tab.key}
             >
-              {tab.label}
+              {t(tab.labelKey)}
             </Button>
           ))}
         </div>
@@ -165,7 +169,7 @@ export function QuestionNavigation({
                   variant="secondary"
                   className="ml-2 bg-green-100 text-green-800"
                 >
-                  {grade.score || 0}점
+                  {t("questionNavigation.scorePoints", { score: grade.score || 0 })}
                 </Badge>
               )}
             </Button>
@@ -176,4 +180,4 @@ export function QuestionNavigation({
   );
 }
 
-export { buildQuestionLabels, getTypePrefix };
+export { buildQuestionLabels, getTypePrefixKey as getTypePrefix };

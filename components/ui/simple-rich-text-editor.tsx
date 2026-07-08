@@ -2,6 +2,7 @@
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import StarterKit from "@tiptap/starter-kit";
 import { TextAlign } from "@tiptap/extension-text-align";
 import { Placeholder } from "@tiptap/extension-placeholder";
@@ -29,16 +30,18 @@ interface SimpleRichTextEditorProps {
 export function SimpleRichTextEditor({
   value,
   onChange,
-  placeholder = "여기에 입력하세요...",
+  placeholder,
   className = "",
   onPaste,
 }: SimpleRichTextEditorProps) {
+  const t = useTranslations("common.simpleRichTextEditor");
+  const resolvedPlaceholder = placeholder ?? t("placeholder");
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
       StarterKit,
       Placeholder.configure({
-        placeholder,
+        placeholder: resolvedPlaceholder,
       }),
       TextAlign.configure({
         types: ["heading", "paragraph"],
@@ -83,7 +86,7 @@ export function SimpleRichTextEditor({
           size="sm"
           onClick={() => editor.chain().focus().toggleBold().run()}
           className={editor.isActive("bold") ? "bg-muted" : ""}
-          title="굵게 (Ctrl+B)"
+          title={t("bold")}
         >
           <Bold className="h-4 w-4" />
         </Button>
@@ -93,7 +96,7 @@ export function SimpleRichTextEditor({
           size="sm"
           onClick={() => editor.chain().focus().toggleItalic().run()}
           className={editor.isActive("italic") ? "bg-muted" : ""}
-          title="기울임 (Ctrl+I)"
+          title={t("italic")}
         >
           <Italic className="h-4 w-4" />
         </Button>
@@ -109,7 +112,7 @@ export function SimpleRichTextEditor({
             editor.chain().focus().toggleHeading({ level: 1 }).run()
           }
           className={editor.isActive("heading", { level: 1 }) ? "bg-muted" : ""}
-          title="제목 1"
+          title={t("heading1")}
         >
           <Heading1 className="h-4 w-4" />
         </Button>
@@ -121,7 +124,7 @@ export function SimpleRichTextEditor({
             editor.chain().focus().toggleHeading({ level: 2 }).run()
           }
           className={editor.isActive("heading", { level: 2 }) ? "bg-muted" : ""}
-          title="제목 2"
+          title={t("heading2")}
         >
           <Heading2 className="h-4 w-4" />
         </Button>
@@ -135,7 +138,7 @@ export function SimpleRichTextEditor({
           size="sm"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           className={editor.isActive("bulletList") ? "bg-muted" : ""}
-          title="글머리 기호 목록"
+          title={t("bulletList")}
         >
           <List className="h-4 w-4" />
         </Button>
@@ -145,7 +148,7 @@ export function SimpleRichTextEditor({
           size="sm"
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           className={editor.isActive("orderedList") ? "bg-muted" : ""}
-          title="번호 매기기 목록"
+          title={t("orderedList")}
         >
           <ListOrdered className="h-4 w-4" />
         </Button>
@@ -159,7 +162,7 @@ export function SimpleRichTextEditor({
           size="sm"
           onClick={() => editor.chain().focus().setTextAlign("left").run()}
           className={editor.isActive({ textAlign: "left" }) ? "bg-muted" : ""}
-          title="왼쪽 정렬"
+          title={t("alignLeft")}
         >
           <AlignLeft className="h-4 w-4" />
         </Button>
@@ -169,7 +172,7 @@ export function SimpleRichTextEditor({
           size="sm"
           onClick={() => editor.chain().focus().setTextAlign("center").run()}
           className={editor.isActive({ textAlign: "center" }) ? "bg-muted" : ""}
-          title="가운데 정렬"
+          title={t("alignCenter")}
         >
           <AlignCenter className="h-4 w-4" />
         </Button>
@@ -179,7 +182,7 @@ export function SimpleRichTextEditor({
           size="sm"
           onClick={() => editor.chain().focus().setTextAlign("right").run()}
           className={editor.isActive({ textAlign: "right" }) ? "bg-muted" : ""}
-          title="오른쪽 정렬"
+          title={t("alignRight")}
         >
           <AlignRight className="h-4 w-4" />
         </Button>

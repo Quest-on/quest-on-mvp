@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Clock, Users, Loader2 } from "lucide-react";
@@ -37,6 +38,7 @@ export function WaitingRoom({
   questionCount,
   examHasEssay,
 }: WaitingRoomProps) {
+  const t = useTranslations("exam");
   const [isWaiting, setIsWaiting] = useState(true);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const onGateStartRef = useRef(onGateStart);
@@ -182,9 +184,9 @@ export function WaitingRoom({
               <Clock className="h-6 w-6 text-primary absolute top-3 left-3" />
             </div>
           </div>
-          <CardTitle className="text-2xl">대기실</CardTitle>
+          <CardTitle className="text-2xl">{t("waitingRoom.title")}</CardTitle>
           <CardDescription className="text-base mt-2">
-            강사가 시험을 시작하기를 기다리고 있습니다.
+            {t("waitingRoom.description")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -194,30 +196,30 @@ export function WaitingRoom({
               <div className="space-y-2">
                 <h3 className="font-semibold flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  시험 정보
+                  {t("waitingRoom.examInfoTitle")}
                 </h3>
                 <div className="text-sm space-y-1">
                   <p>
-                    <span className="font-medium">시험명:</span> {examTitle}
+                    <span className="font-medium">{t("waitingRoom.examName")}</span> {examTitle}
                   </p>
                   {examCode && (
                     <p>
-                      <span className="font-medium">시험 코드:</span> {examCode}
+                      <span className="font-medium">{t("waitingRoom.examCode")}</span> {examCode}
                     </p>
                   )}
                   {examDuration != null && examDuration > 0 && (
                     <p>
-                      <span className="font-medium">시험 시간:</span> {examDuration}분
+                      <span className="font-medium">{t("waitingRoom.examDuration")}</span> {t("waitingRoom.examDurationValue", { duration: examDuration })}
                     </p>
                   )}
                   {examDuration === 0 && (
                     <p>
-                      <span className="font-medium">시험 시간:</span> 무제한 (과제형)
+                      <span className="font-medium">{t("waitingRoom.examDuration")}</span> {t("waitingRoom.examDurationUnlimited")}
                     </p>
                   )}
                   {questionCount != null && questionCount > 0 && (
                     <p>
-                      <span className="font-medium">문제 수:</span> {questionCount}문제
+                      <span className="font-medium">{t("waitingRoom.questionCount")}</span> {t("waitingRoom.questionCountValue", { count: questionCount })}
                     </p>
                   )}
                 </div>
@@ -230,16 +232,15 @@ export function WaitingRoom({
             <Clock className="h-4 w-4" />
             <AlertDescription>
               <div className="space-y-2">
-                <p className="font-semibold">시험 시작 대기 중</p>
+                <p className="font-semibold">{t("waitingRoom.waitingTitle")}</p>
                 <p className="text-sm">
-                  강사가 &quot;시험 시작&quot; 버튼을 클릭하면 시험이 시작됩니다. 이 페이지를
-                  닫지 마세요.
+                  {t("waitingRoom.waitingDescription")}
                 </p>
                 {!allowDraftInWaiting && !allowChatInWaiting && (
                   <p className="text-sm text-muted-foreground mt-2">
                     {examHasEssay
-                      ? "시험이 시작되기 전까지 답안 작성이나 AI 채팅이 불가능합니다."
-                      : "시험이 시작되기 전까지 답안 작성이 불가능합니다."}
+                      ? t("waitingRoom.noAccessEssay")
+                      : t("waitingRoom.noAccessObjective")}
                   </p>
                 )}
               </div>
@@ -251,8 +252,7 @@ export function WaitingRoom({
             <Alert variant="default">
               <AlertDescription>
                 <p className="text-sm">
-                  <span className="font-semibold">참고:</span> 대기 중에도 답안 초안을
-                  작성할 수 있습니다. 시험이 시작되면 자동으로 저장됩니다.
+                  <span className="font-semibold">{t("waitingRoom.draftAllowedNote")}</span> {t("waitingRoom.draftAllowedDescription")}
                 </p>
               </AlertDescription>
             </Alert>
@@ -262,10 +262,10 @@ export function WaitingRoom({
           <div className="flex flex-col items-center gap-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>시험 시작 신호 대기 중...</span>
+              <span>{t("waitingRoom.waitingSignal")}</span>
             </div>
             <div className="text-xs text-muted-foreground">
-              대기 시간: {Math.floor(elapsedSeconds / 60)}분 {(elapsedSeconds % 60).toString().padStart(2, "0")}초
+              {t("waitingRoom.elapsedTime", { minutes: Math.floor(elapsedSeconds / 60), seconds: (elapsedSeconds % 60).toString().padStart(2, "0") })}
             </div>
           </div>
         </CardContent>

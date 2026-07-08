@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useTranslations, useLocale } from "next-intl";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,8 @@ import {
   AssignmentQuizResult,
   type AssignmentQuiz,
 } from "@/components/report/AssignmentQuizResult";
+import { formatDateTime, formatTime } from "@/lib/i18n/format";
+import type { Locale } from "@/lib/i18n/config";
 
 interface Question {
   id: string;
@@ -80,6 +83,8 @@ export default function StudentReportPage() {
   const params = useParams();
   const router = useRouter();
   const { user, profile, isLoaded, isSignedIn } = useAppUser();
+  const t = useTranslations("report.page");
+  const locale = useLocale() as Locale;
   const sessionId = params.sessionId as string;
   const userRole = (profile?.role as string) || "student";
 
@@ -100,9 +105,9 @@ export default function StudentReportPage() {
 
       if (!response.ok) {
         if (response.status === 403 || response.status === 404) {
-          throw new Error("리포트를 찾을 수 없습니다.");
+          throw new Error(t("notFound"));
         }
-        throw new Error("리포트를 불러오는 중 오류가 발생했습니다.");
+        throw new Error(t("loadError"));
       }
 
       const data: ReportData = await response.json();
@@ -152,12 +157,12 @@ export default function StudentReportPage() {
       <div className="container mx-auto p-6 max-w-4xl">
         <div className="text-center py-12">
           <h2 className="text-xl font-semibold text-red-600 mb-2">
-            {errorMessage || "리포트를 불러올 수 없습니다"}
+            {errorMessage || t("cannotLoad")}
           </h2>
           <Link href="/student">
             <Button variant="outline" className="mt-4">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              학생 대시보드로 돌아가기
+              {t("backToDashboard")}
             </Button>
           </Link>
         </div>
@@ -185,7 +190,7 @@ export default function StudentReportPage() {
             onClick={() => router.push("/student")}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            대시보드로 돌아가기
+            {t("backToDashboardShort")}
           </Button>
         </div>
         <div className="text-center py-16">
@@ -193,16 +198,16 @@ export default function StudentReportPage() {
             <Loader2 className="w-10 h-10 text-primary animate-spin" />
           </div>
           <h2 className="text-xl font-semibold mb-2">
-            {isFailed ? "AI 채점 중 일부 문제가 실패했어요" : "AI 채점이 진행 중입니다"}
+            {isFailed ? t("grading.failedTitle") : t("grading.inProgressTitle")}
           </h2>
           <p className="text-muted-foreground mb-1">
             {isFailed
-              ? "강사가 확인하고 재채점을 진행할 예정입니다."
-              : "채점이 완료되면 자동으로 리포트가 표시됩니다."}
+              ? t("grading.failedDesc")
+              : t("grading.inProgressDesc")}
           </p>
           {!isFailed && (
             <p className="text-sm text-muted-foreground">
-              보통 1~2분 내에 완료됩니다.
+              {t("grading.estimatedTime")}
             </p>
           )}
 
@@ -210,10 +215,10 @@ export default function StudentReportPage() {
             <div className="max-w-md mx-auto mt-8">
               <div className="flex items-center justify-between text-sm mb-2">
                 <span className="text-muted-foreground">
-                  {done}/{progress!.total} 문제 채점 완료
+                  {t("grading.progressCount", { done, total: progress!.total })}
                   {progress!.failed > 0 && (
                     <span className="text-red-600 dark:text-red-400 ml-2">
-                      (실패 {progress!.failed})
+                      {t("grading.failedCount", { failed: progress!.failed })}
                     </span>
                   )}
                 </span>
@@ -259,21 +264,19 @@ export default function StudentReportPage() {
       <div className="mb-8">
         <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
           <Link href="/student" className="hover:text-foreground transition-colors">
-            대시보드
+            {t("breadcrumb.dashboard")}
           </Link>
           <span>/</span>
           <span className="truncate max-w-[200px]">{reportData.exam.title}</span>
           <span>/</span>
-          <span className="text-foreground font-medium">리포트</span>
+          <span className="text-foreground font-medium">{t("breadcrumb.report")}</span>
         </nav>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">{reportData.exam.title}</h1>
             <p className="text-muted-foreground mt-2">
-              제출일:{" "}
-              {new Date(reportData.session.submitted_at).toLocaleString(
-                "ko-KR"
-              )}
+              {t("submittedAt")}{" "}
+              {formatDateTime(reportData.session.submitted_at, locale)}
             </p>
             {!gradesNotReleased && reportData.overallScore !== null && (
               <div className="flex items-center gap-2 mt-3">
@@ -282,13 +285,13 @@ export default function StudentReportPage() {
                   data-testid="report-overall-score"
                   className="text-2xl font-bold text-foreground"
                 >
-                  전체 점수: {reportData.overallScore}/100점
+                  {t("overallScore", { score: reportData.overallScore })}
                 </p>
               </div>
             )}
             {gradesNotReleased && (
               <p className="text-sm text-amber-600 dark:text-amber-400 mt-3">
-                채점이 아직 확정되지 않았습니다. 교수의 최종 확정 후 성적을 확인할 수 있습니다.
+                {t("gradesNotReleased")}
               </p>
             )}
           </div>
@@ -299,7 +302,7 @@ export default function StudentReportPage() {
                 className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
               >
                 <Clock className="w-4 h-4 mr-1" />
-                채점 확정 대기중
+                {t("badge.pendingRelease")}
               </Badge>
             ) : (
               <Badge
@@ -307,7 +310,7 @@ export default function StudentReportPage() {
                 className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20"
               >
                 <CheckCircle className="w-4 h-4 mr-1" />
-                평가 완료
+                {t("badge.evaluated")}
               </Badge>
             )}
           </div>
@@ -315,7 +318,7 @@ export default function StudentReportPage() {
       </div>
 
       {allQuestions.length === 0 && (
-        <div className="text-red-600">문제를 불러올 수 없습니다.</div>
+        <div className="text-red-600">{t("noQuestions")}</div>
       )}
 
       <div className="space-y-10">
@@ -324,10 +327,15 @@ export default function StudentReportPage() {
           <section className="space-y-4">
             <div className="flex items-center gap-2">
               <ListChecks className="w-5 h-5 text-blue-600" />
-              <h2 className="text-lg font-semibold">객관식 {mcqQuestions.length}문항</h2>
+              <h2 className="text-lg font-semibold">
+                {t("group.mcq", { count: mcqQuestions.length })}
+              </h2>
               {released && (
                 <Badge variant="secondary" className="text-foreground">
-                  {correctCount(mcqQuestions)}/{mcqQuestions.length} 정답
+                  {t("group.mcqCorrect", {
+                    correct: correctCount(mcqQuestions),
+                    total: mcqQuestions.length,
+                  })}
                 </Badge>
               )}
             </div>
@@ -366,10 +374,15 @@ export default function StudentReportPage() {
           <section className="space-y-4">
             <div className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-emerald-600" />
-              <h2 className="text-lg font-semibold">OX {oxQuestions.length}문항</h2>
+              <h2 className="text-lg font-semibold">
+                {t("group.ox", { count: oxQuestions.length })}
+              </h2>
               {released && (
                 <Badge variant="secondary" className="text-foreground">
-                  {correctCount(oxQuestions)}/{oxQuestions.length} 정답
+                  {t("group.oxCorrect", {
+                    correct: correctCount(oxQuestions),
+                    total: oxQuestions.length,
+                  })}
                 </Badge>
               )}
             </div>
@@ -408,7 +421,9 @@ export default function StudentReportPage() {
           <section className="space-y-4">
             <div className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-purple-600" />
-              <h2 className="text-lg font-semibold">서술형 {caseQuestions.length}문항</h2>
+              <h2 className="text-lg font-semibold">
+                {t("group.essay", { count: caseQuestions.length })}
+              </h2>
             </div>
             <div className="space-y-6">
               {caseQuestions.map((question, i) => {
@@ -429,7 +444,7 @@ export default function StudentReportPage() {
                         </CardTitle>
                         {typeof score === "number" && (
                           <Badge variant="secondary" className="shrink-0 text-foreground">
-                            {score}점
+                            {t("group.scorePoints", { score })}
                           </Badge>
                         )}
                       </div>
@@ -439,7 +454,7 @@ export default function StudentReportPage() {
                         <div>
                           <div className="flex items-center gap-2 mb-3 text-sm font-medium text-muted-foreground">
                             <MessageCircle className="w-4 h-4" />
-                            내 AI 채팅 기록
+                            {t("chat.title")}
                           </div>
                           <div className="space-y-4">
                             {msgs.map((msg, index) => (
@@ -455,10 +470,7 @@ export default function StudentReportPage() {
                                       {msg.content}
                                     </p>
                                     <p className="text-xs mt-2 opacity-70">
-                                      {new Date(msg.created_at).toLocaleTimeString(
-                                        "ko-KR",
-                                        { hour: "2-digit", minute: "2-digit" }
-                                      )}
+                                      {formatTime(msg.created_at, locale)}
                                     </p>
                                   </div>
                                 ) : (
@@ -476,7 +488,7 @@ export default function StudentReportPage() {
                       {!assignmentQuiz && (
                         <div>
                           <p className="text-sm font-medium text-muted-foreground mb-2">
-                            내 최종답변
+                            {t("finalAnswer.title")}
                           </p>
                           {submission ? (
                             <RichTextViewer
@@ -484,7 +496,7 @@ export default function StudentReportPage() {
                               className="text-base leading-relaxed whitespace-pre-wrap"
                             />
                           ) : (
-                            <p className="text-muted-foreground">제출된 답안이 없습니다.</p>
+                            <p className="text-muted-foreground">{t("finalAnswer.empty")}</p>
                           )}
                         </div>
                       )}
@@ -502,19 +514,17 @@ export default function StudentReportPage() {
         {/* Exam Info */}
         <Card>
           <CardHeader>
-            <CardTitle>시험 정보</CardTitle>
+            <CardTitle>{t("examInfo.title")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div>
-              <span className="text-muted-foreground">시험 코드:</span>
+              <span className="text-muted-foreground">{t("examInfo.examCode")}</span>
               <span className="ml-2 exam-code">{reportData.exam.code}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">제출 일시:</span>
+              <span className="text-muted-foreground">{t("examInfo.submittedAt")}</span>
               <span className="ml-2">
-                {new Date(reportData.session.submitted_at).toLocaleString(
-                  "ko-KR"
-                )}
+                {formatDateTime(reportData.session.submitted_at, locale)}
               </span>
             </div>
           </CardContent>

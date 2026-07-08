@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
+import { useTranslations } from "next-intl";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -57,6 +58,7 @@ export function HybridWorkspace({
     [emitChange]
   );
 
+  const t = useTranslations("assignment");
   const showCode = canvasConfig.codeEnabled !== false;
   const showErd = canvasConfig.erdEnabled !== false;
   const isHybrid = showCode && showErd && canvasConfig.secondaryCanvas;
@@ -79,7 +81,7 @@ export function HybridWorkspace({
               <div className="h-full flex flex-col">
                 <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-card/50">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    Code ({workspaceState.language})
+                    {t("hybridWorkspace.codeLabel", { language: workspaceState.language })}
                   </span>
                   {!readOnly && (
                     <select
@@ -119,7 +121,7 @@ export function HybridWorkspace({
               <div className="h-full flex flex-col">
                 <div className="px-3 py-1.5 border-b border-border bg-card/50">
                   <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    ERD Diagram
+                    {t("hybridWorkspace.erdLabel")}
                   </span>
                 </div>
                 <div className="flex-1">
@@ -137,7 +139,7 @@ export function HybridWorkspace({
           <div className="h-full flex flex-col">
             <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-card/50">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Code ({workspaceState.language})
+                {t("hybridWorkspace.codeLabel", { language: workspaceState.language })}
               </span>
               {!readOnly && (
                 <select
@@ -174,7 +176,7 @@ export function HybridWorkspace({
           <div className="h-full flex flex-col">
             <div className="px-3 py-1.5 border-b border-border bg-card/50">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                ERD Diagram
+                {t("hybridWorkspace.erdLabel")}
               </span>
             </div>
             <div className="flex-1">

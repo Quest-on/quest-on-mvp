@@ -3,6 +3,7 @@
 // framer-motion 제거됨 - 성능 최적화를 위해 애니메이션 제거
 // 이전: import { motion } from "framer-motion";
 import { ArrowRight, Zap } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface CTASectionProps {
   mode?: "light" | "dark";
@@ -14,6 +15,7 @@ export default function CTASection({
   onCtaClick,
 }: CTASectionProps) {
   const isDark = mode === "dark";
+  const t = useTranslations("landing");
 
   return (
     <section
@@ -34,7 +36,7 @@ export default function CTASection({
             }`}
           >
             <Zap className="w-3 h-3 fill-current" />
-            교육의 새로운 패러다임
+            {t("cta.badge")}
           </div>
 
           <h2
@@ -42,9 +44,9 @@ export default function CTASection({
               isDark ? "text-white" : "text-[#1F1F1F]"
             }`}
           >
-            지금 바로 Quest-On으로
+            {t("cta.title.line1")}
             <br />
-            교육 성과를 증명하세요.
+            {t("cta.title.line2")}
           </h2>
 
           <p
@@ -52,9 +54,9 @@ export default function CTASection({
               isDark ? "text-zinc-500" : "text-zinc-500"
             }`}
           >
-            암기 평가를 넘어 사고의 과정을 데이터로 기록합니다.
+            {t("cta.body.line1")}
             <br />
-            무료로 시작하고 혁신적인 평가 시스템을 경험해 보세요.
+            {t("cta.body.line2")}
           </p>
 
           <div className="pt-6">
@@ -66,7 +68,7 @@ export default function CTASection({
                   : "bg-zinc-900 text-white hover:bg-zinc-800 shadow-[0_15px_30px_rgba(0,0,0,0.15)]"
               }`}
             >
-              무료로 시작하기
+              {t("cta.button")}
               <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>

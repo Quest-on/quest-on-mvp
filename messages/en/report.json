@@ -1,0 +1,119 @@
+{
+  "page": {
+    "notFound": "Report not found.",
+    "loadError": "An error occurred while loading the report.",
+    "cannotLoad": "Unable to load report",
+    "backToDashboard": "Back to student dashboard",
+    "backToDashboardShort": "Back to dashboard",
+    "grading": {
+      "failedTitle": "Some questions failed to grade",
+      "inProgressTitle": "AI grading in progress",
+      "failedDesc": "Your instructor will review and re-grade the affected questions.",
+      "inProgressDesc": "Your report will appear automatically once grading is complete.",
+      "estimatedTime": "This usually takes 1–2 minutes.",
+      "progressCount": "{done}/{total} questions graded",
+      "failedCount": "({failed} failed)"
+    },
+    "breadcrumb": {
+      "dashboard": "Dashboard",
+      "report": "Report"
+    },
+    "submittedAt": "Submitted:",
+    "overallScore": "Overall score: {score}/100",
+    "gradesNotReleased": "Grades have not been finalized yet. Your score will be available after your instructor confirms the final grades.",
+    "badge": {
+      "pendingRelease": "Awaiting grade release",
+      "evaluated": "Graded"
+    },
+    "noQuestions": "Unable to load questions.",
+    "group": {
+      "mcq": "{count} multiple-choice {count, plural, one {question} other {questions}}",
+      "mcqCorrect": "{correct}/{total} correct",
+      "ox": "{count} true/false {count, plural, one {question} other {questions}}",
+      "oxCorrect": "{correct}/{total} correct",
+      "essay": "{count} short-answer {count, plural, one {question} other {questions}}",
+      "scorePoints": "{score} pts"
+    },
+    "chat": {
+      "title": "My AI chat history"
+    },
+    "finalAnswer": {
+      "title": "My final answer",
+      "empty": "No answer submitted."
+    },
+    "examInfo": {
+      "title": "Exam information",
+      "examCode": "Exam code:",
+      "submittedAt": "Submitted:"
+    }
+  },
+  "quizResult": {
+    "title": "Timed quiz results",
+    "score": "Score {score}/100",
+    "meta": "{totalQuestions} questions · {timeLimitSeconds}s",
+    "completedAt": "Completed: {date}",
+    "correct": "Correct",
+    "incorrect": "Incorrect",
+    "selected": "Your answer:",
+    "noAnswer": "No answer",
+    "correctAnswer": "Correct answer:",
+    "rationale": "Rationale:"
+  },
+  "reportCard": {
+    "gradeA": "A (Excellent)",
+    "gradeB": "B (Good)",
+    "gradeC": "C (Satisfactory)",
+    "gradeD": "D (Needs improvement)",
+    "gradeF": "F (Reassessment required)",
+    "logoAlt": "Logo",
+    "heading": "Assessment Report",
+    "studentInfo": {
+      "title": "Student information",
+      "name": "Name",
+      "studentNumber": "Student ID",
+      "school": "School",
+      "submittedAt": "Submitted"
+    },
+    "examInfo": {
+      "title": "Exam information",
+      "examCode": "Exam code",
+      "description": "Description",
+      "noDescription": "No description"
+    },
+    "overallScore": {
+      "title": "Overall score",
+      "scorePoints": "{score} pts"
+    },
+    "aiSummary": {
+      "title": "CASE overall evaluation",
+      "strengths": "Key strengths",
+      "weaknesses": "Areas for improvement",
+      "aiDependency": "AI dependency summary"
+    },
+    "questionsDetail": {
+      "title": "Per-question breakdown",
+      "questionLabel": "Question {index}",
+      "scorePoints": "{score} pts",
+      "evaluationComment": "Evaluation comment",
+      "aiEvaluation": {
+        "title": "AI evaluation",
+        "chatLabel": "Chat evaluation:",
+        "answerLabel": "Final answer evaluation:",
+        "aiDependency": "AI dependency:",
+        "aiSummary": "Question summary:"
+      }
+    },
+    "footer": "Quest-On Assessment Report | Generated: {date}"
+  },
+  "objectiveAnswer": {
+    "noAnswer": "No answer",
+    "ungraded": "Not graded",
+    "correct": "Correct",
+    "incorrect": "Incorrect",
+    "scorePoints": "{score} pts",
+    "mySelectText": "Your answer: {answer}",
+    "noOptionInfo": "Option information unavailable.",
+    "mySelect": "Your answer",
+    "noSelectionMade": "No answer selected."
+  }
+}

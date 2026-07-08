@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { Label } from "@/components/ui/label";
 import { AnswerTextarea } from "@/components/ui/answer-textarea";
 import { Save, AlertTriangle } from "lucide-react";
@@ -31,13 +32,14 @@ export function AnswerPanel({
   saveError = false,
   saveShortcut,
 }: AnswerPanelProps) {
+  const t = useTranslations("exam");
   return (
     <div className="h-full overflow-y-auto hide-scrollbar bg-muted/20">
       <div className="max-w-4xl mx-auto bg-background min-h-full">
         <div className="p-4 sm:p-6 lg:p-8">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
             <Label className="text-base sm:text-lg font-semibold text-foreground flex items-center gap-2">
-              <span className="text-muted-foreground">답안 작성</span>
+              <span className="text-muted-foreground">{t("answerPanel.label")}</span>
             </Label>
 
             <SaveStatusIndicator
@@ -51,9 +53,7 @@ export function AnswerPanel({
           <div className="w-full space-y-4 mb-6 sm:mb-8">
             <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-sm shadow-sm min-h-[60vh] sm:min-h-[70vh] lg:min-h-[1123px] w-full">
               <AnswerTextarea
-                placeholder={
-                  "여기에 상세한 답안을 작성하세요...\n\n• 문제의 핵심을 파악하여 답변하세요\n• 풀이 과정을 단계별로 명확히 작성하세요\n• AI와의 대화를 통해 필요한 정보를 얻을 수 있습니다"
-                }
+                placeholder={t("answerPanel.placeholder")}
                 value={value}
                 onChange={onChange}
                 onPaste={onPaste}
@@ -78,15 +78,17 @@ function SaveStatusIndicator({
   saveError?: boolean;
   saveShortcut: ReactNode;
 }) {
+  const t = useTranslations("exam");
+
   if (saveError) {
     return (
       <div data-testid="save-status" className="flex items-center gap-2 text-xs sm:text-sm text-red-600 dark:text-red-400">
         <AlertTriangle className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
-        <span className="font-medium">저장 실패 — 네트워크를 확인하세요</span>
+        <span className="font-medium">{t("answerPanel.saveError")}</span>
         <span className="hidden sm:flex items-center gap-1 text-xs">
           <span>•</span>
           {saveShortcut}
-          <span>으로 재시도</span>
+          <span>{t("answerPanel.saveRetryHint")}</span>
         </span>
       </div>
     );
@@ -96,7 +98,7 @@ function SaveStatusIndicator({
     return (
       <div data-testid="save-status" className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
         <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-2 border-primary border-t-transparent" />
-        <span className="font-medium">저장 중...</span>
+        <span className="font-medium">{t("answerPanel.saving")}</span>
       </div>
     );
   }
@@ -114,7 +116,7 @@ function SaveStatusIndicator({
             aria-hidden="true"
           />
           <span className="font-medium text-green-600 dark:text-green-400">
-            저장됨
+            {t("answerPanel.saved")}
           </span>
         </div>
         <span className="hidden sm:inline">•</span>
@@ -130,7 +132,7 @@ function SaveStatusIndicator({
   return (
     <div data-testid="save-status" className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
       <Save className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
-      <span>자동 저장</span>
+      <span>{t("answerPanel.autoSave")}</span>
       <span className="hidden sm:flex items-center gap-1 text-xs">
         <span>•</span>
         {saveShortcut}

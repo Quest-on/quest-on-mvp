@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 interface AnswerTextareaProps {
@@ -27,11 +28,13 @@ const INTERNAL_COPY_MIME_TYPE = "application/x-queston-internal";
 export function AnswerTextarea({
   value,
   onChange,
-  placeholder = "여기에 상세한 답안을 작성하세요...",
+  placeholder,
   className = "",
   onFocus,
   onPaste,
 }: AnswerTextareaProps) {
+  const t = useTranslations("common.answerTextarea");
+  const resolvedPlaceholder = placeholder ?? t("placeholder");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Copy 이벤트 핸들러 - 내부 복사 마커 추가
@@ -161,7 +164,7 @@ export function AnswerTextarea({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onFocus={onFocus}
-      placeholder={placeholder}
+      placeholder={resolvedPlaceholder}
       className={cn(
         "w-full min-h-[300px] sm:min-h-[400px] p-4",
         "border rounded-md bg-background",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import { createSupabaseClient } from "@/lib/supabase-client";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ function PasswordField({
   onChange,
   show,
   onToggleShow,
+  toggleAriaLabel,
   autoComplete,
   placeholder,
   error,
@@ -30,6 +32,7 @@ function PasswordField({
   onChange: (value: string) => void;
   show: boolean;
   onToggleShow: () => void;
+  toggleAriaLabel: string;
   autoComplete: string;
   placeholder: string;
   error?: string | null;
@@ -51,7 +54,7 @@ function PasswordField({
           type="button"
           onClick={onToggleShow}
           tabIndex={-1}
-          aria-label={show ? "비밀번호 숨기기" : "비밀번호 표시"}
+          aria-label={toggleAriaLabel}
           className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
         >
           {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -63,6 +66,7 @@ function PasswordField({
 }
 
 export function ChangePasswordForm() {
+  const t = useTranslations("auth.changePassword");
   const { user } = useAppUser();
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -86,13 +90,13 @@ export function ChangePasswordForm() {
     confirmPassword.length > 0 && newPassword !== confirmPassword;
 
   const validate = (): string | null => {
-    if (hasPassword && !currentPassword) return "현재 비밀번호를 입력해주세요.";
+    if (hasPassword && !currentPassword) return t("currentPasswordRequired");
     if (newPassword.length < MIN_PASSWORD_LENGTH)
-      return `새 비밀번호는 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다.`;
+      return t("newPasswordTooShort", { minLength: MIN_PASSWORD_LENGTH });
     if (newPassword !== confirmPassword)
-      return "새 비밀번호와 확인이 일치하지 않습니다.";
+      return t("passwordMismatch");
     if (hasPassword && currentPassword === newPassword)
-      return "새 비밀번호가 현재 비밀번호와 동일합니다.";
+      return t("sameAsCurrentPassword");
     return null;
   };
 
@@ -112,7 +116,7 @@ export function ChangePasswordForm() {
       return;
     }
     if (!email) {
-      toast.error("계정 이메일을 확인할 수 없습니다. 다시 로그인해주세요.");
+      toast.error(t("noEmail"));
       return;
     }
 
@@ -127,7 +131,7 @@ export function ChangePasswordForm() {
           password: currentPassword,
         });
         if (reauthError) {
-          toast.error("현재 비밀번호가 올바르지 않습니다.");
+          toast.error(t("wrongCurrentPassword"));
           setIsSubmitting(false);
           return;
         }
@@ -138,7 +142,7 @@ export function ChangePasswordForm() {
         password: newPassword,
       });
       if (updateError) {
-        toast.error(updateError.message || "비밀번호 변경에 실패했습니다.");
+        toast.error(updateError.message || t("updateFailed"));
         setIsSubmitting(false);
         return;
       }
@@ -149,9 +153,7 @@ export function ChangePasswordForm() {
           scope: "others",
         });
         if (signOutError) {
-          toast.success(
-            "비밀번호가 변경되었습니다. (다른 기기 로그아웃은 일부 실패했습니다)",
-          );
+          toast.success(t("changedWithSignOutFail"));
           resetForm();
           setIsSubmitting(false);
           return;
@@ -159,11 +161,11 @@ export function ChangePasswordForm() {
       }
 
       toast.success(
-        hasPassword ? "비밀번호가 변경되었습니다." : "비밀번호가 설정되었습니다.",
+        hasPassword ? t("changed") : t("set"),
       );
       resetForm();
     } catch {
-      toast.error("처리 중 오류가 발생했습니다. 다시 시도해주세요.");
+      toast.error(t("genericError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -173,8 +175,7 @@ export function ChangePasswordForm() {
     <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
       {!hasPassword && (
         <p className="text-sm text-muted-foreground rounded-md bg-muted p-3">
-          소셜 로그인(예: Google)으로 가입한 계정입니다. 비밀번호를 설정하면 이메일과
-          비밀번호로도 로그인할 수 있습니다.
+          {t("socialAccountInfo")}
         </p>
       )}
 
@@ -182,37 +183,40 @@ export function ChangePasswordForm() {
       {hasPassword && (
         <PasswordField
           id="current-password"
-          label="현재 비밀번호"
+          label={t("currentPasswordLabel")}
           value={currentPassword}
           onChange={setCurrentPassword}
           show={showCurrent}
           onToggleShow={() => setShowCurrent((v) => !v)}
+          toggleAriaLabel={showCurrent ? t("hidePassword") : t("showPassword")}
           autoComplete="current-password"
-          placeholder="현재 비밀번호"
+          placeholder={t("currentPasswordPlaceholder")}
         />
       )}
 
       <PasswordField
         id="new-password"
-        label={hasPassword ? "새 비밀번호" : "비밀번호"}
+        label={hasPassword ? t("newPasswordLabel") : t("passwordLabel")}
         value={newPassword}
         onChange={setNewPassword}
         show={showNew}
         onToggleShow={() => setShowNew((v) => !v)}
+        toggleAriaLabel={showNew ? t("hidePassword") : t("showPassword")}
         autoComplete="new-password"
-        placeholder={`${MIN_PASSWORD_LENGTH}자 이상`}
+        placeholder={t("newPasswordPlaceholder", { minLength: MIN_PASSWORD_LENGTH })}
       />
 
       <PasswordField
         id="confirm-password"
-        label="비밀번호 확인"
+        label={t("confirmPasswordLabel")}
         value={confirmPassword}
         onChange={setConfirmPassword}
         show={showNew}
         onToggleShow={() => setShowNew((v) => !v)}
+        toggleAriaLabel={showNew ? t("hidePassword") : t("showPassword")}
         autoComplete="new-password"
-        placeholder="비밀번호를 다시 입력"
-        error={confirmMismatch ? "비밀번호가 일치하지 않습니다." : null}
+        placeholder={t("confirmPasswordPlaceholder")}
+        error={confirmMismatch ? t("confirmMismatch") : null}
       />
 
       <div className="flex items-center gap-2 pt-1">
@@ -222,7 +226,7 @@ export function ChangePasswordForm() {
           onCheckedChange={(checked) => setRevokeOthers(checked === true)}
         />
         <Label htmlFor="revoke-others" className="text-sm font-normal cursor-pointer">
-          변경 후 다른 기기에서 모두 로그아웃
+          {t("revokeOthersLabel")}
         </Label>
       </div>
 
@@ -230,12 +234,12 @@ export function ChangePasswordForm() {
         {isSubmitting ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            처리 중...
+            {t("submitting")}
           </>
         ) : hasPassword ? (
-          "비밀번호 변경"
+          t("changeBtn")
         ) : (
-          "비밀번호 설정"
+          t("setBtn")
         )}
       </Button>
     </form>

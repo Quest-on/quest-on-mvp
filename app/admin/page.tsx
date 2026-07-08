@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDateTime } from "@/lib/i18n/format";
 import {
   Bot,
   Clock,
@@ -78,6 +80,8 @@ function formatPercent(numerator: number, denominator: number): string {
 }
 
 export default function AdminDashboard() {
+  const t = useTranslations("admin");
+  const locale = useLocale() as "ko" | "en";
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [mutationError, setMutationError] = useState("");
@@ -98,7 +102,7 @@ export default function AdminDashboard() {
       }
 
       if (!response.ok) {
-        throw new Error("사용자 정보를 불러오는데 실패했습니다.");
+        throw new Error(t("dashboard.error.loadFail"));
       }
 
       const data = await response.json();
@@ -121,7 +125,7 @@ export default function AdminDashboard() {
       }
 
       if (!response.ok) {
-        throw new Error("AI 사용량 정보를 불러오는데 실패했습니다.");
+        throw new Error(t("dashboard.error.aiLoadFail"));
       }
 
       return response.json();
@@ -158,10 +162,10 @@ export default function AdminDashboard() {
       if (response.ok) {
         await refetch();
       } else {
-        setMutationError("역할 변경에 실패했습니다.");
+        setMutationError(t("dashboard.error.roleChangeFail"));
       }
     } catch {
-      setMutationError("서버 오류가 발생했습니다.");
+      setMutationError(t("dashboard.error.serverError"));
     }
   };
 
@@ -192,7 +196,7 @@ export default function AdminDashboard() {
     (queryError instanceof Error
       ? queryError.message
       : queryError
-        ? "사용자 정보를 불러오는데 실패했습니다."
+        ? t("dashboard.error.loadFail")
         : "");
 
   const filteredUsers = users.filter((user) => {
@@ -217,7 +221,7 @@ export default function AdminDashboard() {
   };
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString("ko-KR", {
+    formatDateTime(dateString, locale, {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -230,7 +234,7 @@ export default function AdminDashboard() {
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
           <RefreshCw className="mx-auto mb-4 h-8 w-8 animate-spin" />
-          <p className="text-muted-foreground">로딩 중...</p>
+          <p className="text-muted-foreground">{t("dashboard.loading")}</p>
         </div>
       </div>
     );
@@ -239,11 +243,11 @@ export default function AdminDashboard() {
   const aiTotals = aiSummary?.totals;
 
   return (
-    <AdminShell title="관리자 대시보드" icon={Shield}>
+    <AdminShell title={t("dashboard.title")} icon={Shield}>
       <div className="grid gap-6 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">전체 사용자</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("dashboard.stats.totalUsers")}</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -252,7 +256,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">강사</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("dashboard.stats.instructors")}</CardTitle>
             <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -261,7 +265,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">학생</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("dashboard.stats.students")}</CardTitle>
             <UserX className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -272,7 +276,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">역할 미설정</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("dashboard.stats.noRole")}</CardTitle>
             <Settings className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -284,7 +288,7 @@ export default function AdminDashboard() {
       <div className="grid gap-6 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">최근 7일 AI 비용</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("dashboard.ai.cost7d")}</CardTitle>
             <Bot className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -295,7 +299,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">최근 7일 AI 요청 수</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("dashboard.ai.requests7d")}</CardTitle>
             <Bot className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -306,7 +310,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">최근 7일 실패율</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("dashboard.ai.failRate7d")}</CardTitle>
             <Bot className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -324,10 +328,10 @@ export default function AdminDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
               <Clock className="w-5 h-5" />
-              승인 대기 강사 ({pendingInstructors.length}명)
+              {t("dashboard.pending.title", { count: pendingInstructors.length })}
             </CardTitle>
             <CardDescription>
-              강사 승인 요청이 있습니다. 검토 후 승인해주세요.
+              {t("dashboard.pending.description")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -343,10 +347,10 @@ export default function AdminDashboard() {
                   className="flex items-center justify-between rounded-lg border border-amber-200 bg-white dark:bg-amber-950/30 p-4"
                 >
                   <div>
-                    <p className="font-medium">{instructor.name || "이름 없음"}</p>
+                    <p className="font-medium">{instructor.name || t("dashboard.pending.noName")}</p>
                     <p className="text-sm text-muted-foreground">{instructor.email}</p>
                     <p className="text-xs text-muted-foreground">
-                      신청일: {new Date(instructor.created_at).toLocaleDateString("ko-KR")}
+                      {t("dashboard.pending.appliedAt", { date: formatDateTime(instructor.created_at, locale, { year: "numeric", month: "short", day: "numeric" }) })}
                     </p>
                   </div>
                   <Button
@@ -355,7 +359,7 @@ export default function AdminDashboard() {
                     className="bg-amber-600 hover:bg-amber-700 text-white"
                   >
                     <UserCheck className="w-4 h-4 mr-1" />
-                    승인
+                    {t("dashboard.pending.approve")}
                   </Button>
                 </div>
               ))}
@@ -366,8 +370,8 @@ export default function AdminDashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>사용자 관리</CardTitle>
-          <CardDescription>사용자 목록을 검색하고 역할을 관리하세요</CardDescription>
+          <CardTitle>{t("dashboard.userManagement.title")}</CardTitle>
+          <CardDescription>{t("dashboard.userManagement.description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-4 sm:flex-row">
@@ -375,7 +379,7 @@ export default function AdminDashboard() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="이메일 또는 이름으로 검색..."
+                  placeholder={t("dashboard.userManagement.searchPlaceholder")}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -384,12 +388,12 @@ export default function AdminDashboard() {
             </div>
             <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="역할 필터" />
+                <SelectValue placeholder={t("dashboard.userManagement.roleFilter")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">모든 역할</SelectItem>
-                <SelectItem value="instructor">강사</SelectItem>
-                <SelectItem value="student">학생</SelectItem>
+                <SelectItem value="all">{t("dashboard.userManagement.allRoles")}</SelectItem>
+                <SelectItem value="instructor">{t("dashboard.userManagement.instructor")}</SelectItem>
+                <SelectItem value="student">{t("dashboard.userManagement.student")}</SelectItem>
               </SelectContent>
             </Select>
             <Button
@@ -400,7 +404,7 @@ export default function AdminDashboard() {
               variant="outline"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
-              새로고침
+              {t("dashboard.userManagement.refresh")}
             </Button>
           </div>
 
@@ -410,7 +414,7 @@ export default function AdminDashboard() {
             {filteredUsers.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
                 <Users className="mx-auto mb-4 h-12 w-12 opacity-50" />
-                <p>검색 조건에 맞는 사용자가 없습니다.</p>
+                <p>{t("dashboard.userManagement.emptySearch")}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -440,15 +444,15 @@ export default function AdminDashboard() {
                           </h3>
                           <Badge variant={getRoleBadgeVariant(user.role)}>
                             {user.role === "instructor"
-                              ? "강사"
+                              ? t("dashboard.userManagement.instructor")
                               : user.role === "student"
-                                ? "학생"
-                                : "미설정"}
+                                ? t("dashboard.userManagement.student")
+                                : t("dashboard.userManagement.noRole")}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">{user.email}</p>
                         <p className="text-xs text-muted-foreground">
-                          가입일: {formatDate(user.createdAt)}
+                          {t("dashboard.userManagement.joinedAt", { date: formatDate(user.createdAt) })}
                         </p>
                       </div>
                     </div>
@@ -460,8 +464,8 @@ export default function AdminDashboard() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="instructor">강사</SelectItem>
-                        <SelectItem value="student">학생</SelectItem>
+                        <SelectItem value="instructor">{t("dashboard.userManagement.instructor")}</SelectItem>
+                        <SelectItem value="student">{t("dashboard.userManagement.student")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

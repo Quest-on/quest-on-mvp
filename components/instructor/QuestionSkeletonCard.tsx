@@ -1,16 +1,20 @@
+"use client";
+
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTranslations } from "next-intl";
 
 interface QuestionSkeletonCardProps {
   index: number;
 }
 
 export function QuestionSkeletonCard({ index }: QuestionSkeletonCardProps) {
+  const t = useTranslations("authoring");
   return (
     <div className="border rounded-lg p-4 space-y-3 bg-card">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h4 className="font-medium text-sm text-muted-foreground">
-          문제 {index + 1}
+          {t("questionSkeletonCard.title", { index: index + 1 })}
         </h4>
         <Skeleton className="size-8 rounded-md" />
       </div>

@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,6 +29,8 @@ export function StudentObjectiveAnswer({
   released,
   score,
 }: StudentObjectiveAnswerProps) {
+  const t = useTranslations("report.objectiveAnswer");
+
   const resolvedOptions =
     options && options.length > 0
       ? options
@@ -51,23 +56,23 @@ export function StudentObjectiveAnswer({
       {released && (
         <div className="flex items-center gap-2">
           {!answered ? (
-            <Badge variant="outline">무응답</Badge>
+            <Badge variant="outline">{t("noAnswer")}</Badge>
           ) : !hasScore ? (
-            <Badge variant="outline">미채점</Badge>
+            <Badge variant="outline">{t("ungraded")}</Badge>
           ) : isCorrect ? (
             <Badge className="gap-1 bg-emerald-600 hover:bg-emerald-600">
               <CheckCircle2 className="h-3 w-3" />
-              정답
+              {t("correct")}
             </Badge>
           ) : (
             <Badge variant="destructive" className="gap-1">
               <XCircle className="h-3 w-3" />
-              오답
+              {t("incorrect")}
             </Badge>
           )}
           {hasScore && (
             <span className="text-sm font-medium text-muted-foreground">
-              {score}점
+              {t("scorePoints", { score })}
             </span>
           )}
         </div>
@@ -75,7 +80,7 @@ export function StudentObjectiveAnswer({
 
       {resolvedOptions.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {answered ? `내 선택: ${selectedAnswer}` : "선택지 정보가 없습니다."}
+          {answered ? t("mySelectText", { answer: selectedAnswer ?? "" }) : t("noOptionInfo")}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -107,7 +112,7 @@ export function StudentObjectiveAnswer({
                       ) : (
                         <XCircle className="h-3 w-3 text-destructive" />
                       ))}
-                    내 선택
+                    {t("mySelect")}
                   </Badge>
                 )}
               </li>
@@ -117,7 +122,7 @@ export function StudentObjectiveAnswer({
       )}
 
       {!answered && resolvedOptions.length > 0 && (
-        <p className="text-sm text-muted-foreground">선택한 답안이 없습니다.</p>
+        <p className="text-sm text-muted-foreground">{t("noSelectionMade")}</p>
       )}
     </div>
   );

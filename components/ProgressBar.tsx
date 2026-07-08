@@ -2,24 +2,26 @@
 
 import React from "react";
 import { Check, FileText, Brain } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface ProgressBarProps {
   currentStep: "exam" | "answer";
 }
 
 const ProgressBar: React.FC<ProgressBarProps> = ({ currentStep }) => {
+  const t = useTranslations("common.progressBar");
   const steps = [
     {
       id: "exam" as const,
-      label: "대화",
+      label: t("chat.label"),
       icon: Brain,
-      description: "문제 풀이 및 AI 도움",
+      description: t("chat.description"),
     },
     {
       id: "answer" as const,
-      label: "최종답안",
+      label: t("answer.label"),
       icon: FileText,
-      description: "답안 작성 및 제출",
+      description: t("answer.description"),
     },
   ];
 

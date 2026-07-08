@@ -15,6 +15,7 @@ import type { Question } from "@/components/instructor/QuestionEditor";
 import { CaseQuestionGenerator } from "@/components/instructor/CaseQuestionGenerator";
 import { isoToKSTDateString } from "@/lib/date-utils";
 import { isQuestionContentEmpty } from "@/lib/authoring-validation";
+import { useTranslations } from "next-intl";
 
 export default function EditAssignment({
   params,
@@ -27,6 +28,7 @@ export default function EditAssignment({
   const router = useRouter();
   const { user, isLoaded, isSignedIn, profile } = useAppUser();
   const queryClient = useQueryClient();
+  const t = useTranslations("instructor");
 
   const [isLoadingExam, setIsLoadingExam] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -71,7 +73,7 @@ export default function EditAssignment({
             data: { id: assignmentId },
           }),
         });
-        if (!response.ok) throw new Error("과제 데이터를 불러올 수 없습니다.");
+        if (!response.ok) throw new Error(t("editAssignment.toastLoadFail"));
         const result = await response.json();
         const exam = result.exam;
 
@@ -88,7 +90,7 @@ export default function EditAssignment({
         });
         setQuestions(exam.questions ?? []);
       } catch {
-        toast.error("과제 데이터를 불러오는 중 오류가 발생했습니다.");
+        toast.error(t("editAssignment.toastLoadError"));
         router.push(`/instructor/assignment/${assignmentId}`);
       } finally {
         setIsLoadingExam(false);
@@ -146,10 +148,10 @@ export default function EditAssignment({
     isSubmittingRef.current = true;
 
     const errors: { title?: string; deadline?: string; questions?: string } = {};
-    if (!examData.title.trim()) errors.title = "과제 제목을 입력해주세요";
-    if (!examData.deadline) errors.deadline = "제출 기한을 선택해주세요";
+    if (!examData.title.trim()) errors.title = t("editAssignment.fieldErrorTitle");
+    if (!examData.deadline) errors.deadline = t("editAssignment.fieldErrorDeadline");
     if (questions.length === 0) {
-      errors.questions = "최소 1개 이상의 문제를 추가해주세요";
+      errors.questions = t("editAssignment.fieldErrorQuestionsMin");
     } else {
       const emptyIndices = questions
         .map((q, i) => (isQuestionContentEmpty(q.text) ? i + 1 : -1))
@@ -157,8 +159,8 @@ export default function EditAssignment({
       if (emptyIndices.length > 0) {
         errors.questions =
           emptyIndices.length === questions.length
-            ? "문제 내용을 입력해주세요"
-            : `${emptyIndices.join(", ")}번 문제가 비어있습니다`;
+            ? t("editAssignment.fieldErrorQuestionsContent")
+            : t("editAssignment.fieldErrorQuestionsEmpty", { indices: emptyIndices.join(", ") });
       }
     }
 
@@ -199,15 +201,15 @@ export default function EditAssignment({
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(extractErrorMessage(errData, "과제 수정에 실패했습니다", response.status));
+        throw new Error(extractErrorMessage(errData, t("editAssignment.toastSaveFail"), response.status));
       }
 
-      toast.success("변경사항이 저장되었습니다.");
+      toast.success(t("editAssignment.toastSaved"));
       queryClient.invalidateQueries({ queryKey: qk.instructor.examDetail(assignmentId) });
       queryClient.invalidateQueries({ queryKey: qk.instructor.exams() });
       router.push(`/instructor/assignment/${assignmentId}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "과제 수정 중 오류가 발생했습니다.");
+      toast.error(err instanceof Error ? err.message : t("editAssignment.toastSaveError"));
     } finally {
       setIsSaving(false);
       isSubmittingRef.current = false;
@@ -224,7 +226,7 @@ export default function EditAssignment({
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
-        <span className="ml-2 text-muted-foreground">과제 데이터를 불러오는 중...</span>
+        <span className="ml-2 text-muted-foreground">{t("editAssignment.loadingText")}</span>
       </div>
     );
   }
@@ -234,16 +236,16 @@ export default function EditAssignment({
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-sm w-full border rounded-lg p-8 text-center space-y-4 bg-background shadow-sm">
-          <h2 className="text-xl font-semibold">편집 불가</h2>
+          <h2 className="text-xl font-semibold">{t("editAssignment.blockedTitle")}</h2>
           <p className="text-muted-foreground">
-            참여한 학생이 있어 과제를 편집할 수 없습니다.
+            {t("editAssignment.blockedDesc")}
           </p>
           <Button
             variant="outline"
             onClick={() => router.push(`/instructor/assignment/${assignmentId}`)}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            과제 페이지로 돌아가기
+            {t("editAssignment.blockedBack")}
           </Button>
         </div>
       </div>
@@ -264,11 +266,11 @@ export default function EditAssignment({
             onClick={() => router.push(`/instructor/assignment/${assignmentId}`)}
           >
             <ArrowLeft className="h-4 w-4" />
-            과제 페이지
+            {t("editAssignment.backToAssignment")}
           </Button>
           <div className="h-4 w-px bg-border" />
           <h1 className="font-semibold text-sm sm:text-base truncate">
-            {examData.title ? `${examData.title} 편집` : "과제 편집"}
+            {examData.title ? `${examData.title}${t("editAssignment.titleSuffix")}` : t("editAssignment.titleDefault")}
           </h1>
         </div>
       </header>
@@ -375,10 +377,10 @@ export default function EditAssignment({
               variant="outline"
               onClick={() => router.push(`/instructor/assignment/${assignmentId}`)}
             >
-              취소
+              {t("editAssignment.cancel")}
             </Button>
             <Button type="submit" disabled={isSaving}>
-              {isSaving ? "저장 중..." : "변경사항 저장"}
+              {isSaving ? t("editAssignment.saving") : t("editAssignment.save")}
             </Button>
           </div>
         </form>

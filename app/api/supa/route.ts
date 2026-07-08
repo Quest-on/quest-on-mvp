@@ -99,6 +99,14 @@ export async function POST(request: NextRequest) {
       if (!authedUser) {
         return errorJson("UNAUTHORIZED", "Unauthorized", 401);
       }
+    } else {
+      // Public actions have no user to key on — rate limit by IP so a bare exam
+      // code can't be brute-forced / scraped through these endpoints.
+      const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+      const rl = await checkRateLimitAsync(`supa:${action}:${ip}`, RATE_LIMITS.publicSearch);
+      if (!rl.allowed) {
+        return errorJson("RATE_LIMITED", "Too many requests", 429);
+      }
     }
 
     // Rate limit sensitive actions at handler level

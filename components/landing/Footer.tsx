@@ -2,6 +2,7 @@
 
 import { Mail, Phone } from "lucide-react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 
 interface FooterProps {
   mode?: "light" | "dark";
@@ -22,45 +23,56 @@ const COLORS = {
   },
 } as const;
 
-const FOOTER_LINKS = {
-  제품: [
-    { label: "메인", href: "#hero" },
-    { label: "고객 후기", href: "#features" },
-    { label: "파트너십", href: "#partners" },
-    { label: "무료로 시작하기", href: "/sign-up" },
-  ],
-  //   리소스: [
-  //     { label: "시작 가이드", href: "/docs/getting-started" },
-  //     { label: "업데이트 소식", href: "/changelog" },
-  //     { label: "API 문서", href: "/docs/api" },
-  //     { label: "도움말 센터", href: "/help" },
-  //     { label: "시스템 현황", href: "/status" },
-  //   ],
-  //   회사: [
-  //     { label: "팀 소개", href: "/about" },
-  //     { label: "블로그", href: "/blog" },
-  //     { label: "채용 안내", href: "/careers" },
-  //     { label: "파트너십", href: "/partners" },
-  //     { label: "문의하기", href: "mailto:questonkr@gmail.com" },
-  //   ],
-  법적고지: [
-    { label: "이용약관", href: "/legal/terms" },
-    { label: "개인정보처리방침", href: "/legal/privacy" },
-    { label: "데이터 보안", href: "/legal/security" },
-    { label: "쿠키 정책", href: "/legal/cookies" },
-  ],
-} as const;
+const FOOTER_LINKS_CONFIG = [
+  {
+    categoryKey: "product",
+    links: [
+      { labelKey: "main", href: "#hero" },
+      { labelKey: "testimonials", href: "#features" },
+      { labelKey: "partnership", href: "#partners" },
+      { labelKey: "startFree", href: "/sign-up" },
+    ],
+  },
+  //   {
+  //     categoryKey: "resources",
+  //     links: [
+  //       { labelKey: "gettingStarted", href: "/docs/getting-started" },
+  //       { labelKey: "changelog", href: "/changelog" },
+  //       { labelKey: "apiDocs", href: "/docs/api" },
+  //       { labelKey: "helpCenter", href: "/help" },
+  //       { labelKey: "systemStatus", href: "/status" },
+  //     ],
+  //   },
+  //   {
+  //     categoryKey: "company",
+  //     links: [
+  //       { labelKey: "team", href: "/about" },
+  //       { labelKey: "blog", href: "/blog" },
+  //       { labelKey: "careers", href: "/careers" },
+  //       { labelKey: "partnership", href: "/partners" },
+  //       { labelKey: "contact", href: "mailto:questonkr@gmail.com" },
+  //     ],
+  //   },
+  {
+    categoryKey: "legal",
+    links: [
+      { labelKey: "terms", href: "/legal/terms" },
+      { labelKey: "privacy", href: "/legal/privacy" },
+      { labelKey: "security", href: "/legal/security" },
+      { labelKey: "cookies", href: "/legal/cookies" },
+    ],
+  },
+];
 
 export default function Footer({ mode = "light" }: FooterProps) {
   const colors = COLORS[mode];
   const isDark = mode === "dark";
+  const t = useTranslations("landing");
+  const tc = useTranslations("common");
 
   const handleContactClick = () => {
     window.location.href = "mailto:questonkr@gmail.com?subject=문의사항";
   };
-
-  const footerLinksEntries = Object.entries(FOOTER_LINKS);
-  //   const linksPerColumn = Math.ceil(footerLinksEntries.length / 2);
 
   return (
     <footer
@@ -78,7 +90,7 @@ export default function Footer({ mode = "light" }: FooterProps) {
             <div className="flex items-center gap-3 mb-8">
               <Image
                 src="/qlogo_icon.png"
-                alt="Quest-On Logo"
+                alt={tc("brand.logoAlt")}
                 width={40}
                 height={40}
                 sizes="40px"
@@ -89,21 +101,21 @@ export default function Footer({ mode = "light" }: FooterProps) {
                 className="font-bold text-2xl tracking-tight"
                 style={{ color: colors.text }}
               >
-                Quest-On
+                {tc("brand.name")}
               </span>
             </div>
 
             {/* Description */}
             <p
               className="text-base lg:text-lg mb-8 leading-[1.6] max-w-lg"
-              style={{ 
+              style={{
                 color: colors.textSec,
                 letterSpacing: "-0.3px"
               }}
             >
-              AI와 함께하는 차세대 교육 평가 시스템.
-              <br />
-              사고의 과정을 데이터로 증명합니다.
+              {tc("footer.description").split("\n").map((line, i, arr) => (
+                <span key={i}>{line}{i < arr.length - 1 && <br />}</span>
+              ))}
             </p>
 
             {/* Contact Button */}
@@ -126,7 +138,7 @@ export default function Footer({ mode = "light" }: FooterProps) {
               }}
             >
               <Mail className="w-5 h-5" />
-              문의하기
+              {tc("footer.contactUs")}
             </button>
 
             {/* Contact Info */}
@@ -163,13 +175,13 @@ export default function Footer({ mode = "light" }: FooterProps) {
           {/* Right Section - Links */}
           <div className="w-full lg:w-1/2">
             <div className="grid grid-cols-2 gap-8 lg:gap-12">
-              {footerLinksEntries.map(([category, links]) => (
-                <div key={category}>
+              {FOOTER_LINKS_CONFIG.map(({ categoryKey, links }) => (
+                <div key={categoryKey}>
                   <h5
                     className="text-xs font-bold uppercase tracking-widest mb-6 opacity-60"
                     style={{ color: colors.text }}
                   >
-                    {category}
+                    {t(`footer.categories.${categoryKey}`)}
                   </h5>
                   <ul className="space-y-3">
                     {links.map((link) => {
@@ -191,14 +203,14 @@ export default function Footer({ mode = "light" }: FooterProps) {
                       };
 
                       return (
-                        <li key={link.label}>
+                        <li key={link.labelKey}>
                           <a
                             href={link.href}
                             onClick={handleClick}
                             className="text-sm font-medium transition-all cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
                             style={{ color: colors.textSec }}
                           >
-                            {link.label}
+                            {t(`footer.links.${link.labelKey}`)}
                           </a>
                         </li>
                       );

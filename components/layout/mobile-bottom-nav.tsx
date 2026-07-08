@@ -6,6 +6,7 @@ import { type NavItem } from "@/components/layout/dashboard-sidebar";
 import { BotMessageSquare } from "@/components/animate-ui/icons/bot-message-square";
 import { useAgentPanelOptional } from "@/components/agent/AgentPanelProvider";
 import { useAgentRunController } from "@/components/agent/AgentRunController";
+import { useTranslations } from "next-intl";
 
 interface MobileBottomNavProps {
   navItems: NavItem[];
@@ -20,6 +21,7 @@ interface MobileBottomNavProps {
 function AgentNavButton() {
   const panelCtx = useAgentPanelOptional();
   const controller = useAgentRunController();
+  const t = useTranslations("instructor");
 
   if (!panelCtx) return null;
 
@@ -30,7 +32,7 @@ function AgentNavButton() {
     <button
       type="button"
       onClick={toggle}
-      aria-label="AI 에이전트"
+      aria-label={t("nav.aiAgent")}
       className={cn(
         "relative flex-1 flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors",
         open
@@ -52,17 +54,18 @@ function AgentNavButton() {
         )}
         aria-hidden="true"
       />
-      <span>AI 에이전트</span>
+      <span>{t("nav.aiAgent")}</span>
     </button>
   );
 }
 
 export function MobileBottomNav({ navItems, showAgentButton = false }: MobileBottomNavProps) {
+  const t = useTranslations("instructor");
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-background/95 backdrop-blur border-t border-border"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      aria-label="하단 네비게이션"
+      aria-label={t("nav.mobileNavLabel")}
     >
       <div className="flex items-stretch h-16">
         {navItems.map((item) => {

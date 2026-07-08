@@ -1,5 +1,8 @@
+"use client";
+
 import type { KeyboardEvent } from "react";
 import { Label } from "@/components/ui/label";
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,12 +31,12 @@ export interface Question {
   rubric?: Array<{ evaluationArea: string; detailedCriteria: string }>;
 }
 
-/** 문제 유형별 한글 표기 — 추가 다이얼로그의 유형 선택기와 같은 어휘를 쓴다. */
-const QUESTION_TYPE_LABELS: Record<Question["type"], string> = {
-  "multiple-choice": "사지선다",
-  "true-false": "O·X",
-  essay: "사례형",
-  "short-answer": "단답형",
+/** 문제 유형별 i18n 키 맵 */
+const QUESTION_TYPE_LABEL_KEYS: Record<Question["type"], "questionEditor.typeMcq" | "questionEditor.typeOx" | "questionEditor.typeEssay" | "questionEditor.typeShortAnswer"> = {
+  "multiple-choice": "questionEditor.typeMcq",
+  "true-false": "questionEditor.typeOx",
+  essay: "questionEditor.typeEssay",
+  "short-answer": "questionEditor.typeShortAnswer",
 };
 
 type QuestionFieldValue = string | boolean | number | string[];
@@ -60,6 +63,7 @@ interface QuestionEditorProps {
 function OptionEditor({
   question,
   onUpdate,
+  t,
 }: {
   question: Question;
   onUpdate: (
@@ -67,6 +71,7 @@ function OptionEditor({
     field: keyof Question,
     value: QuestionFieldValue
   ) => void;
+  t: ReturnType<typeof useTranslations<"authoring">>;
 }) {
   const isTrueFalse = question.type === "true-false";
   const fallback = isTrueFalse ? ["O", "X"] : ["", "", "", ""];
@@ -103,11 +108,11 @@ function OptionEditor({
   return (
     <div className="border-t p-3">
       <p className="mb-2 text-xs text-muted-foreground">
-        선택지를 입력하고 정답을 표시하세요.
+        {t("questionEditor.optionEditorHint")}
       </p>
       <div
         role="radiogroup"
-        aria-label="정답 선택지"
+        aria-label={t("questionEditor.ariaAnswerGroup")}
         className="grid grid-cols-2 gap-2"
       >
         {options.map((option, idx) => {
@@ -126,7 +131,7 @@ function OptionEditor({
                 role="radio"
                 id={`${question.id}-option-${idx}`}
                 aria-checked={isCorrect}
-                aria-label={`${idx + 1}번 선택지를 정답으로 표시`}
+                aria-label={t("questionEditor.ariaOptionRadio", { index: idx + 1 })}
                 tabIndex={(hasSelection ? isCorrect : idx === 0) ? 0 : -1}
                 onClick={() => setCorrect(idx)}
                 onKeyDown={(e) => handleRadioKeyDown(e, idx)}
@@ -144,9 +149,9 @@ function OptionEditor({
                 <Input
                   value={option}
                   onChange={(e) => setOptionText(idx, e.target.value)}
-                  placeholder={`선택지 ${idx + 1}`}
+                  placeholder={t("questionEditor.placeholderOption", { index: idx + 1 })}
                   className="h-8 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
-                  aria-label={`${idx + 1}번 선택지 내용`}
+                  aria-label={t("questionEditor.ariaOptionInput", { index: idx + 1 })}
                 />
               )}
             </div>
@@ -166,6 +171,7 @@ export function QuestionEditor({
   mode = "exam",
   variant = "card",
 }: QuestionEditorProps) {
+  const t = useTranslations("authoring");
   const isObjective =
     question.type === "multiple-choice" || question.type === "true-false";
   const isEmpty =
@@ -188,7 +194,7 @@ export function QuestionEditor({
               {index + 1}
             </Badge>
             <Label className="text-sm">
-              {QUESTION_TYPE_LABELS[question.type]}
+              {t(QUESTION_TYPE_LABEL_KEYS[question.type])}
             </Label>
           </div>
           <div className="flex items-center gap-1">
@@ -201,7 +207,7 @@ export function QuestionEditor({
                 className="h-8 gap-1.5"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                {isEmpty ? "AI 생성" : "AI 수정"}
+                {isEmpty ? t("questionEditor.buttonAIGenerate") : t("questionEditor.buttonAIEdit")}
               </Button>
             )}
             {onRemove && (
@@ -217,7 +223,7 @@ export function QuestionEditor({
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>문제 삭제</TooltipContent>
+                <TooltipContent>{t("questionEditor.tooltipDelete")}</TooltipContent>
               </Tooltip>
             )}
           </div>
@@ -225,13 +231,13 @@ export function QuestionEditor({
         <RichTextEditor
           value={question.text}
           onChange={(value) => onUpdate(question.id, "text", value)}
-          placeholder="문제를 입력하세요"
+          placeholder={t("questionEditor.placeholderQuestion")}
           className="rounded-t-none border-0"
           contentClassName="prose max-w-none focus:outline-none min-h-[140px] p-3"
           testId={`question-editor-input-${index}`}
         />
         {isObjective && (
-          <OptionEditor question={question} onUpdate={onUpdate} />
+          <OptionEditor question={question} onUpdate={onUpdate} t={t} />
         )}
       </div>
     );
@@ -255,7 +261,7 @@ export function QuestionEditor({
             {index + 1}
           </Badge>
           <div className="h-6 w-px bg-border"></div>
-          <span className="text-sm text-muted-foreground">문제 출제 중</span>
+          <span className="text-sm text-muted-foreground">{t("questionEditor.statusDrafting")}</span>
         </div>
         <div className="flex items-center gap-1">
           {onAIEdit && (
@@ -274,7 +280,7 @@ export function QuestionEditor({
                 className="relative overflow-hidden gap-1.5 rounded-full"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
-                {isEmpty ? "AI 생성" : "AI 수정"}
+                {isEmpty ? t("questionEditor.buttonAIGenerate") : t("questionEditor.buttonAIEdit")}
               </Button>
             </Shine>
           )}
@@ -291,33 +297,33 @@ export function QuestionEditor({
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>문제 삭제</TooltipContent>
+              <TooltipContent>{t("questionEditor.tooltipDelete")}</TooltipContent>
             </Tooltip>
           )}
         </div>
       </div>
       {onAIEdit && (
         <p className="text-xs text-muted-foreground mb-4">
-          {isEmpty ? "AI로 문제를 생성하세요" : "AI로 문제, 선택지, 정답을 수정"}
+          {isEmpty ? t("questionEditor.hintEmpty") : t("questionEditor.hintEdit")}
         </p>
       )}
       <div className="space-y-4">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label>{QUESTION_TYPE_LABELS[question.type]}</Label>
+            <Label>{t(QUESTION_TYPE_LABEL_KEYS[question.type])}</Label>
             <Tooltip>
               <TooltipTrigger asChild>
                 <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
               </TooltipTrigger>
               <TooltipContent>
-                <p className="max-w-xs">{mode === "assignment" ? "과제 문제를 입력하세요." : "시험 문제를 입력하세요."}</p>
+                <p className="max-w-xs">{mode === "assignment" ? t("questionEditor.tooltipAssignment") : t("questionEditor.tooltipExam")}</p>
               </TooltipContent>
             </Tooltip>
           </div>
           <RichTextEditor
             value={question.text}
             onChange={(value) => onUpdate(question.id, "text", value)}
-            placeholder="여기에 문제를 입력하세요..."
+            placeholder={t("questionEditor.placeholderCardQuestion")}
             className="min-h-[300px]"
             testId={`question-editor-input-${index}`}
           />

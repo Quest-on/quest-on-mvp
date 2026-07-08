@@ -10,10 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { createSupabaseClient } from "@/lib/supabase-client";
+import { useTranslations } from "next-intl";
 
 type Step = "start" | "verify";
 
 export function CustomSignUp() {
+  const t = useTranslations("auth.signUp");
   const router = useRouter();
   const [role, setRole] = useState<"instructor" | "student">("student");
   const [email, setEmail] = useState("");
@@ -81,7 +83,7 @@ export function CustomSignUp() {
     });
 
     if (verifyError) {
-      setError("인증 코드가 올바르지 않습니다. 다시 확인해주세요.");
+      setError(t("invalidOtp"));
       setLoading(false);
       return;
     }
@@ -101,7 +103,7 @@ export function CustomSignUp() {
         >
           <Image
             src="/qstn_logo_svg.svg"
-            alt="Quest-On Logo"
+            alt={t("logoAlt")}
             width={30}
             height={30}
             className="w-8 h-8"
@@ -117,19 +119,19 @@ export function CustomSignUp() {
             <>
               <div className="space-y-2 mb-6">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  새로운 계정 만들기
+                  {t("heading")}
                 </h1>
                 <p className="text-gray-600 dark:text-gray-400">
-                  Quest-On 계정을 만들어보세요
+                  {t("subtitle")}
                 </p>
               </div>
 
               {/* 역할 선택 */}
               <div className="mb-6">
                 <div className="mb-2">
-                  <Label className="text-sm font-medium">사용자 유형 선택</Label>
+                  <Label className="text-sm font-medium">{t("roleLabel")}</Label>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    계정 유형을 선택해주세요
+                    {t("roleSubtitle")}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -145,11 +147,11 @@ export function CustomSignUp() {
                     <div className="flex items-center gap-2 mb-1">
                       <Users className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                       <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        강사
+                        {t("instructorRole")}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 text-left">
-                      시험을 만들고 관리합니다
+                      {t("instructorRoleDesc")}
                     </p>
                   </button>
                   <button
@@ -164,11 +166,11 @@ export function CustomSignUp() {
                     <div className="flex items-center gap-2 mb-1">
                       <GraduationCap className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                       <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        학생
+                        {t("studentRole")}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 text-left">
-                      시험에 참여하고 피드백을 받습니다
+                      {t("studentRoleDesc")}
                     </p>
                   </button>
                 </div>
@@ -194,7 +196,7 @@ export function CustomSignUp() {
                         <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                       </svg>
                     )}
-                    <span className="font-medium">Google로 계속하기</span>
+                    <span className="font-medium">{t("googleBtn")}</span>
                   </Button>
 
                   <Button
@@ -211,9 +213,9 @@ export function CustomSignUp() {
                       <path d="M11.5 11.5H23V23H11.5V11.5z" fill="#FFB900" />
                     </svg>
                     <span className="flex items-center gap-2 font-medium">
-                      Microsoft로 계속하기
+                      {t("microsoftBtn")}
                       <Badge variant="secondary" className="text-[10px]">
-                        준비중
+                        {t("comingSoon")}
                       </Badge>
                     </span>
                   </Button>
@@ -226,7 +228,7 @@ export function CustomSignUp() {
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
                     <span className="bg-background px-2 text-muted-foreground">
-                      또는
+                      {t("divider")}
                     </span>
                   </div>
                 </div>
@@ -234,11 +236,11 @@ export function CustomSignUp() {
                 {/* 이메일/비밀번호 폼 */}
                 <form onSubmit={handleSignUp} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">이메일 주소</Label>
+                    <Label htmlFor="email">{t("emailLabel")}</Label>
                     <Input
                       id="email"
                       type="email"
-                      placeholder="이메일 주소를 입력하세요"
+                      placeholder={t("emailPlaceholder")}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -246,11 +248,11 @@ export function CustomSignUp() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="password">비밀번호</Label>
+                    <Label htmlFor="password">{t("passwordLabel")}</Label>
                     <Input
                       id="password"
                       type="password"
-                      placeholder="비밀번호를 입력하세요 (6자 이상)"
+                      placeholder={t("passwordPlaceholder")}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       minLength={6}
@@ -271,18 +273,18 @@ export function CustomSignUp() {
                     {loading ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
-                      <span className="font-bold">회원가입</span>
+                      <span className="font-bold">{t("submitBtn")}</span>
                     )}
                   </Button>
                 </form>
 
                 <div className="text-center text-sm text-gray-600 dark:text-gray-400 mt-6">
-                  이미 계정이 있으신가요?{" "}
+                  {t("hasAccount")}{" "}
                   <Link
                     href="/sign-in"
                     className="font-medium text-black dark:text-white hover:underline"
                   >
-                    로그인
+                    {t("signInLink")}
                   </Link>
                 </div>
               </div>
@@ -292,24 +294,24 @@ export function CustomSignUp() {
             <>
               <div className="space-y-2 mb-6">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  이메일 인증
+                  {t("verifyHeading")}
                 </h1>
                 <p className="text-gray-600 dark:text-gray-400">
                   <span className="font-medium text-gray-900 dark:text-white">
                     {email}
                   </span>
-                  로 발송된 6자리 인증 코드를 입력해주세요.
+                  {t("verifyDesc")}
                 </p>
               </div>
 
               <form onSubmit={handleVerify} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="otp">인증 코드</Label>
+                  <Label htmlFor="otp">{t("otpLabel")}</Label>
                   <Input
                     id="otp"
                     type="text"
                     inputMode="numeric"
-                    placeholder="6자리 코드 입력"
+                    placeholder={t("otpPlaceholder")}
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
                     maxLength={6}
@@ -330,7 +332,7 @@ export function CustomSignUp() {
                   {loading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
-                    <span className="font-bold">인증 완료</span>
+                    <span className="font-bold">{t("verifyBtn")}</span>
                   )}
                 </Button>
 
@@ -339,7 +341,7 @@ export function CustomSignUp() {
                   className="w-full text-sm text-muted-foreground hover:underline"
                   onClick={() => { setStep("start"); setError(null); }}
                 >
-                  이메일 다시 입력하기
+                  {t("backToEmail")}
                 </button>
               </form>
             </>
@@ -355,7 +357,7 @@ export function CustomSignUp() {
         <div className="relative w-full h-full flex items-center justify-center">
           <Image
             src="/wqstn.png"
-            alt="Quest-On"
+            alt={t("logoAltRight")}
             width={400}
             height={400}
             className="w-auto h-auto max-w-[51%] max-h-[51%] object-contain"

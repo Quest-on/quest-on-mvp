@@ -13,7 +13,8 @@ import { MessageSquare, RefreshCw, Play, Pause } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 // ScrollArea will be replaced with div for now
 import { formatDistanceToNow } from "date-fns";
-import { ko } from "date-fns/locale";
+import { ko, enUS } from "date-fns/locale";
+import { useTranslations, useLocale } from "next-intl";
 
 interface LiveMessage {
   id: string;
@@ -36,6 +37,9 @@ interface LiveMonitoringCardProps {
 }
 
 export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
+  const t = useTranslations("grading");
+  const locale = useLocale() as "ko" | "en";
+  const dateFnsLocale = locale === "ko" ? ko : enUS;
   const [messages, setMessages] = useState<LiveMessage[]>([]);
   const [isMonitoring, setIsMonitoring] = useState(true);
   const [lastFetchTime, setLastFetchTime] = useState<string | null>(() => {
@@ -148,10 +152,10 @@ export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
           <div>
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5" />
-              실시간 모니터링
+              {t("liveMonitoring.cardTitle")}
             </CardTitle>
             <CardDescription>
-              학생들의 실시간 질문 및 활동 모니터링
+              {t("liveMonitoring.cardDescription")}
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -167,9 +171,9 @@ export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
             >
               {isMonitoring
                 ? isPageVisible
-                  ? "활성"
-                  : "백그라운드"
-                : "중지됨"}
+                  ? t("liveMonitoring.badgeActive")
+                  : t("liveMonitoring.badgeBackground")
+                : t("liveMonitoring.badgeStopped")}
             </Badge>
             <Button
               variant="outline"
@@ -180,12 +184,12 @@ export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
               {isMonitoring ? (
                 <>
                   <Pause className="w-4 h-4 mr-1" />
-                  중지
+                  {t("liveMonitoring.stopButton")}
                 </>
               ) : (
                 <>
                   <Play className="w-4 h-4 mr-1" />
-                  시작
+                  {t("liveMonitoring.startButton")}
                 </>
               )}
             </Button>
@@ -207,9 +211,9 @@ export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
           {messages.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>아직 질문이 없습니다.</p>
+              <p>{t("liveMonitoring.emptyTitle")}</p>
               <p className="text-sm mt-2">
-                학생들이 질문하면 여기에 실시간으로 표시됩니다.
+                {t("liveMonitoring.emptyDesc")}
               </p>
             </div>
           ) : (
@@ -240,10 +244,10 @@ export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
                               : ""
                           }`}
                         >
-                          {message.role === "ai" ? "AI 답변" : "학생 질문"}
+                          {message.role === "ai" ? t("liveMonitoring.badgeAiReply") : t("liveMonitoring.badgeStudentQuestion")}
                         </Badge>
                         <Badge variant="outline" className="text-xs">
-                          문제 {message.q_idx + 1}
+                          {t("liveMonitoring.questionBadge", { number: message.q_idx + 1 })}
                         </Badge>
                       </div>
                       {message.role === "user" && message.student.school && (
@@ -255,7 +259,7 @@ export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
                     <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
                       {formatDistanceToNow(new Date(message.created_at), {
                         addSuffix: true,
-                        locale: ko,
+                        locale: dateFnsLocale,
                       })}
                     </span>
                   </div>

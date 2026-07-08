@@ -22,6 +22,17 @@ import {
 } from "@/lib/prompts";
 import { stripEmoji } from "@/lib/sanitize";
 
+/**
+ * 강사가 인터뷰에서 확정한 점수 범위(min/max)로 점수를 강제한다.
+ * 범위 미지정 시 기본 0~100. 원본 채점 경로와 재보정 경로가 동일 clamp 를 공유해,
+ * AI 가 지시를 무시하고 범위 밖 점수를 내도 학생 성적에 그대로 저장되지 않게 한다.
+ */
+export function clampScore(score: number, range?: GradingScoreRange): number {
+  const min = range?.min ?? 0;
+  const max = range?.max ?? 100;
+  return Math.min(max, Math.max(min, Math.round(score)));
+}
+
 export function buildScoreAntiClusterBlock(
   language: PromptLanguage,
   scoreRange?: GradingScoreRange,
@@ -275,7 +286,7 @@ export async function recalibrateBulkGradesIfClustered(
       for (const g of parsed) {
         if (!proposed[g.session_id]) proposed[g.session_id] = {};
         proposed[g.session_id][g.q_idx] = {
-          score: g.score,
+          score: clampScore(g.score, criteria.score_range),
           comment: stripEmoji(g.comment).trim(),
         };
       }
