@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   InputGroup,
@@ -71,6 +72,7 @@ export function ExamChatSidebar({
   chatEndRef,
   currentQuestion,
 }: ExamChatSidebarProps) {
+  const t = useTranslations("exam");
   const { setOpen, isMobile, setOpenMobile } = useSidebar();
 
   return (
@@ -81,10 +83,10 @@ export function ExamChatSidebar({
             <div className="flex items-center gap-2">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold bg-primary/10 text-primary border border-primary/20">
                 <MessageCircle className="w-4 h-4" aria-hidden="true" />
-                <span>AI 도우미</span>
+                <span>{t("chat.aiHelper")}</span>
               </div>
               <div className="text-xs text-muted-foreground">
-                문제 {currentQuestion + 1} 관련 대화
+                {t("chat.questionContext", { number: currentQuestion + 1 })}
               </div>
             </div>
             <Button
@@ -93,7 +95,7 @@ export function ExamChatSidebar({
               size="icon"
               className="h-8 w-8"
               onClick={() => (isMobile ? setOpenMobile(false) : setOpen(false))}
-              aria-label="채팅 사이드바 닫기"
+              aria-label={t("chat.closeSidebar")}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -105,7 +107,7 @@ export function ExamChatSidebar({
           <div
             className="flex-1 overflow-y-auto hide-scrollbar p-4 sm:p-6 pb-28 sm:pb-32 space-y-4 sm:space-y-6 min-h-0"
             aria-live="polite"
-            aria-label="채팅 메시지"
+            aria-label={t("chat.messagesAriaLabel")}
           >
             <CopyProtector className="min-h-full flex flex-col gap-4 sm:gap-6">
               {chatHistory.length === 0 ? (
@@ -117,10 +119,10 @@ export function ExamChatSidebar({
                     />
                   </div>
                   <h3 className="text-base sm:text-lg font-semibold text-foreground mb-2">
-                    AI와 대화를 시작하세요
+                    {t("chat.emptyTitle")}
                   </h3>
                   <p className="text-sm sm:text-base text-muted-foreground max-w-md leading-relaxed mb-4">
-                    AI를 활용하여 문제를 분석하고 풀이 방향을 탐색해보세요.
+                    {t("chat.emptyDescription")}
                   </p>
                 </div>
               ) : (
@@ -170,7 +172,7 @@ export function ExamChatSidebar({
           {sessionError && (
             <div className="px-4 sm:px-6 py-3">
               <ErrorAlert
-                message="세션 연결에 문제가 있습니다."
+                message={t("chat.sessionError")}
                 onRetry={() => {
                   setSessionError(false);
                   window.location.reload();
@@ -183,7 +185,7 @@ export function ExamChatSidebar({
           <div className="border-t border-border p-2 sm:p-3 bg-background">
             <InputGroup className="bg-background shadow-md">
               <InputGroupTextarea
-                placeholder="AI에게 질문하기..."
+                placeholder={t("chat.placeholder")}
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
                 onKeyDown={(e) => {
@@ -194,14 +196,14 @@ export function ExamChatSidebar({
                 }}
                 disabled={isLoading || sessionError}
                 className="min-h-[40px] sm:min-h-[44px] text-sm resize-none"
-                aria-label="AI에게 질문 입력"
+                aria-label={t("chat.inputAriaLabel")}
                 rows={1}
               />
               <InputGroupAddon align="block-end">
                 <InputGroupText className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5 px-2">
                   <span className="hidden sm:flex items-center gap-1">
                     <Kbd>Enter</Kbd>
-                    <span>전송</span>
+                    <span>{t("chat.sendShortcut")}</span>
                   </span>
                   <span className="hidden sm:inline">&bull;</span>
                   <span className="hidden sm:flex items-center gap-1">
@@ -210,17 +212,17 @@ export function ExamChatSidebar({
                       <span>+</span>
                       <Kbd>Enter</Kbd>
                     </KbdGroup>
-                    <span>줄바꿈</span>
+                    <span>{t("chat.newlineShortcut")}</span>
                   </span>
                   {sessionError && (
                     <>
                       <span className="hidden sm:inline">&bull;</span>
-                      <span className="text-destructive">연결 오류</span>
+                      <span className="text-destructive">{t("chat.connectionError")}</span>
                     </>
                   )}
                 </InputGroupText>
                 <InputGroupText className="ml-auto text-xs text-muted-foreground px-2">
-                  {chatMessage.length}자
+                  {t("chat.charCount", { count: chatMessage.length })}
                 </InputGroupText>
                 <Separator orientation="vertical" className="!h-5 sm:!h-6" />
                 <InputGroupButton
@@ -229,10 +231,10 @@ export function ExamChatSidebar({
                   size="icon-xs"
                   onClick={sendChatMessage}
                   disabled={isLoading || !chatMessage.trim() || sessionError}
-                  aria-label="메시지 전송"
+                  aria-label={t("chat.sendAriaLabel")}
                 >
                   <ArrowUp className="w-4 h-4" aria-hidden="true" />
-                  <span className="sr-only">전송</span>
+                  <span className="sr-only">{t("chat.sendSrOnly")}</span>
                 </InputGroupButton>
               </InputGroupAddon>
             </InputGroup>

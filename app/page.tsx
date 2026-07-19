@@ -3,6 +3,7 @@ import { currentUser } from "@/lib/get-current-user";
 import dynamic from "next/dynamic";
 import { PublicHeader } from "@/components/PublicHeader";
 import HeroSection from "@/components/landing/HeroSection";
+import { getTranslations } from "next-intl/server";
 
 // Lazy load below-the-fold components for better performance
 const DemoExperienceSection = dynamic(
@@ -24,6 +25,7 @@ const Footer = dynamic(
 
 export default async function LandingPage() {
   const user = await currentUser();
+  const t = await getTranslations("landing");
 
   if (user) {
     if (!user.role) {
@@ -49,24 +51,23 @@ export default async function LandingPage() {
           headline={
             <>
               <span className="text-strikethrough-bottom text-gray-800">
-                AI 부정행위
+                {t("hero.headline.cheating")}
               </span>
               <span className="text-gray-700 text-2xl sm:text-3xl md:text-4xl lg:text-5xl">
-                , 막을 수 없다면
+                {t("hero.headline.cannotStop")}
               </span>{" "}
               <br />
-              <span className="gradient-animated-blue">평가의 일부</span>
+              <span className="gradient-animated-blue">{t("hero.headline.partOf")}</span>
               <span className="text-gray-700 text-2xl sm:text-3xl md:text-4xl lg:text-5xl">
-                로 만드세요.
+                {t("hero.headline.makePart")}
               </span>
             </>
           }
           subheadline={
             <>
-              Quest-On은 생성형 AI를 '컨닝 도구'가 아닌 '사고력 파트너'로
-              전환시킵니다.
+              {t("hero.subheadline.line1")}
               <br />
-              결과만 보는 시험이 아니라, 사고하는 과정 전체를 평가합니다.
+              {t("hero.subheadline.line2")}
             </>
           }
         />

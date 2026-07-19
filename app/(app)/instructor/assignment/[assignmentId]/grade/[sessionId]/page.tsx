@@ -5,6 +5,7 @@ import { useAppUser } from "@/components/providers/AppAuthProvider";
 import { useState, useEffect, use, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { qk } from "@/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -156,6 +157,7 @@ export default function AssignmentGradePage({
     };
   }, [searchParams]);
 
+  const t = useTranslations("grading");
   const [selectedQuestionIdx, setSelectedQuestionIdx] = useState<number>(0);
   const [overallSummary, setOverallSummary] = useState<SummaryData | null>(null);
 
@@ -183,7 +185,7 @@ export default function AssignmentGradePage({
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData.message || `채점 데이터 로드 실패 (${response.status})`
+          errorData.message || t("assignmentGradePage.loadFail", { status: response.status })
         );
       }
       return (await response.json()) as SessionData;
@@ -214,13 +216,13 @@ export default function AssignmentGradePage({
       );
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "AI 재채점에 실패했습니다");
+        throw new Error(errorData.message || t("assignmentGradePage.regradeFailed"));
       }
       const data = await response.json();
       toast.success(
         data.skipped
-          ? "이미 채점이 완료되어 있습니다."
-          : "AI 재채점 요청을 큐에 등록했습니다. 완료되면 자동으로 결과가 표시됩니다."
+          ? t("assignmentGradePage.alreadyGraded")
+          : t("assignmentGradePage.regradeQueued")
       );
       queryClient.invalidateQueries({
         queryKey: qk.session.grade(resolvedParams.sessionId),
@@ -229,7 +231,7 @@ export default function AssignmentGradePage({
       toast.error(
         error instanceof Error
           ? error.message
-          : "AI 재채점 중 오류가 발생했습니다"
+          : t("assignmentGradePage.regradeError")
       );
     } finally {
       setIsRegrading(false);
@@ -297,8 +299,8 @@ export default function AssignmentGradePage({
           <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
           <h2 className="text-xl font-semibold text-red-600 mb-2">
             {sessionError
-              ? "채점 데이터를 불러오는 중 오류가 발생했습니다"
-              : "제출물을 찾을 수 없습니다"}
+              ? t("assignmentGradePage.errorTitle")
+              : t("assignmentGradePage.notFoundTitle")}
           </h2>
           {sessionError && (
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
@@ -308,10 +310,10 @@ export default function AssignmentGradePage({
           <div className="flex items-center justify-center gap-3">
             <Button variant="outline" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4 mr-2" />
-              다시 시도
+              {t("assignmentGradePage.retry")}
             </Button>
             <Link href={`/instructor/assignment/${resolvedParams.assignmentId}`}>
-              <Button variant="outline">돌아가기</Button>
+              <Button variant="outline">{t("assignmentGradePage.goBack")}</Button>
             </Link>
           </div>
         </div>
@@ -353,29 +355,29 @@ export default function AssignmentGradePage({
             <div className="flex items-center gap-4 mb-4">
               <Button variant="outline" size="sm" onClick={handleBackClick}>
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                과제로 돌아가기
+                {t("assignmentGradePage.backToAssignment")}
               </Button>
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold">
-                  {sessionData.student.name} 학생 채점
+                  {t("assignmentGradePage.studentGradeTitle", { studentName: sessionData.student.name })}
                 </h1>
                 <div className="text-muted-foreground space-y-1 mt-2">
                   <p>
-                    제출일:{" "}
+                    {t("assignmentGradePage.submittedAt")}{" "}
                     {new Date(sessionData.session.submitted_at).toLocaleString()}
                   </p>
                   {sessionData.student.student_number && (
-                    <p>학번: {sessionData.student.student_number}</p>
+                    <p>{t("assignmentGradePage.studentNumber", { number: sessionData.student.student_number })}</p>
                   )}
                   {sessionData.student.school && (
-                    <p>학교: {sessionData.student.school}</p>
+                    <p>{t("assignmentGradePage.school", { school: sessionData.student.school })}</p>
                   )}
                 </div>
                 {sessionData.overallScore !== null && (
                   <p className="text-lg font-semibold mt-2">
-                    전체 점수: {sessionData.overallScore}점
+                    {t("assignmentGradePage.overallScore", { score: sessionData.overallScore })}
                   </p>
                 )}
               </div>
@@ -387,10 +389,10 @@ export default function AssignmentGradePage({
               <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
               <div>
                 <p className="font-medium text-amber-800 dark:text-amber-200">
-                  마감 시 자동 제출된 과제
+                  {t("assignmentGradePage.autoSubmittedBannerTitle")}
                 </p>
                 <p className="text-sm text-amber-600 dark:text-amber-400">
-                  학생이 직접 제출하지 않았으며, 마감 시점에 진행 중이던 내용이 자동으로 제출되었습니다.
+                  {t("assignmentGradePage.autoSubmittedBannerDesc")}
                 </p>
               </div>
             </div>
@@ -421,13 +423,13 @@ export default function AssignmentGradePage({
                     <Loader2 className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 animate-spin" />
                     <div>
                       <p className="font-medium text-blue-800 dark:text-blue-200">
-                        AI 채점이 진행 중입니다
+                        {t("assignmentGradePage.gradingInProgressTitle")}
                       </p>
                       <p className="text-sm text-blue-600 dark:text-blue-400">
-                        {total > 0 ? `${done}/${total} 문제 완료` : "채점 대기 중"}
+                        {total > 0 ? t("assignmentGradePage.gradingProgress", { done, total }) : t("assignmentGradePage.gradingWaiting")}
                         {gp && gp.failed > 0 && (
                           <span className="ml-2 text-red-600 dark:text-red-400">
-                            (실패 {gp.failed})
+                            ({t("assignmentGradePage.gradingFailed", { count: gp.failed })})
                           </span>
                         )}
                       </p>
@@ -445,12 +447,11 @@ export default function AssignmentGradePage({
               );
             }
 
-            const title = isFailed ? "AI 채점 실패" : "자동 채점 결과가 없습니다";
+            const title = isFailed ? t("assignmentGradePage.gradingFailedTitle") : t("assignmentGradePage.noGradesTitle");
+            const progressPart = total > 0 ? ` (${done}/${total})` : "";
             const desc = isFailed
-              ? `일부(또는 전체) 문제의 AI 채점이 실패했습니다.${
-                  total > 0 ? ` (${done}/${total})` : ""
-                } AI 재채점을 실행하거나 수동으로 채점해주세요.`
-              : "배경 자동 채점이 실행되지 않았거나 실패했습니다. AI 재채점을 실행해주세요.";
+              ? t("assignmentGradePage.gradingFailedDesc", { progressPart })
+              : t("assignmentGradePage.gradingAbsentDesc");
 
             return (
               <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg flex items-center justify-between gap-4">
@@ -474,12 +475,12 @@ export default function AssignmentGradePage({
                   {isRegrading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      큐 등록 중...
+                      {t("assignmentGradePage.queuingLabel")}
                     </>
                   ) : (
                     <>
                       <RefreshCw className="h-4 w-4 mr-2" />
-                      AI 재채점
+                      {t("assignmentGradePage.regradeButton")}
                     </>
                   )}
                 </Button>

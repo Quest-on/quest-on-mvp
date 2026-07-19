@@ -1,0 +1,70 @@
+{
+  "nav": {
+    "dashboard": "대시보드",
+    "newExam": "시험 만들기",
+    "myExams": "내 시험",
+    "joinExam": "시험 참여"
+  },
+  "auth": {
+    "signIn": "로그인",
+    "signUp": "회원가입"
+  },
+  "brand": {
+    "logoAlt": "Quest-On Logo",
+    "name": "Quest-On"
+  },
+  "exam": {
+    "quit": "그만두기"
+  },
+  "footer": {
+    "contactUs": "문의하기",
+    "description": "AI와 함께하는 차세대 교육 평가 시스템.\n사고의 과정을 데이터로 증명합니다."
+  },
+  "errorAlert": {
+    "retry": "다시 시도"
+  },
+  "loadingMessage": {
+    "timeout": "작업이 지연되고 있습니다. 잠시만 더 기다려주세요...",
+    "networkHint": "네트워크 상태에 따라 시간이 더 소요될 수 있습니다."
+  },
+  "answerTextarea": {
+    "placeholder": "여기에 상세한 답안을 작성하세요..."
+  },
+  "richTextEditor": {
+    "placeholder": "여기에 입력하세요...",
+    "insertTable": "테이블 삽입",
+    "addColumnBefore": "왼쪽에 열 추가",
+    "addColumnAfter": "오른쪽에 열 추가",
+    "addRowBefore": "위에 행 추가",
+    "addColumnBeforeShort": "← 열",
+    "addColumnAfterShort": "열 →",
+    "addRowBeforeShort": "↑ 행",
+    "addRowAfterShort": "행 ↓",
+    "addRowAfter": "아래에 행 추가",
+    "deleteColumn": "열 삭제",
+    "deleteRow": "행 삭제",
+    "deleteTable": "테이블 삭제"
+  },
+  "simpleRichTextEditor": {
+    "placeholder": "여기에 입력하세요...",
+    "bold": "굵게 (Ctrl+B)",
+    "italic": "기울임 (Ctrl+I)",
+    "heading1": "제목 1",
+    "heading2": "제목 2",
+    "bulletList": "글머리 기호 목록",
+    "orderedList": "번호 매기기 목록",
+    "alignLeft": "왼쪽 정렬",
+    "alignCenter": "가운데 정렬",
+    "alignRight": "오른쪽 정렬"
+  },
+  "progressBar": {
+    "chat": {
+      "label": "대화",
+      "description": "문제 풀이 및 AI 도움"
+    },
+    "answer": {
+      "label": "최종답안",
+      "description": "답안 작성 및 제출"
+    }
+  }
+}

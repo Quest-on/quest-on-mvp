@@ -39,6 +39,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   cancelAgentRun,
   startAgentRun,
@@ -128,6 +129,7 @@ export function AgentRunControllerProvider({
   children,
 }: AgentRunControllerProviderProps) {
   const router = useRouter();
+  const t = useTranslations("admin.agent");
 
   const [activeRun, setActiveRun] = useState<AgentRun | null>(null);
   const [phase, setPhase] = useState<AgentRunPhase>("idle");
@@ -189,7 +191,7 @@ export function AgentRunControllerProvider({
           results.push({
             id: envelope.id,
             ok: false,
-            error: "강사가 작업을 중단했습니다.",
+            error: t("errors.cancelledByInstructor"),
           });
           continue;
         }
@@ -218,7 +220,7 @@ export function AgentRunControllerProvider({
               error:
                 err instanceof Error
                   ? err.message
-                  : "페이지 이동에 실패했습니다.",
+                  : t("errors.navigateFailed"),
             });
           }
           continue;
@@ -234,8 +236,7 @@ export function AgentRunControllerProvider({
           results.push({
             id: envelope.id,
             ok: false,
-            error:
-              "편집기가 준비되지 않았습니다. 시험 생성 페이지로 이동이 필요합니다.",
+            error: t("errors.editorNotReady"),
           });
           continue;
         }
@@ -254,7 +255,7 @@ export function AgentRunControllerProvider({
             error:
               err instanceof Error
                 ? err.message
-                : "액션 실행 중 오류가 발생했습니다.",
+                : t("errors.actionFailed"),
           });
         }
       }
@@ -313,7 +314,7 @@ export function AgentRunControllerProvider({
         setSummary(
           err instanceof Error
             ? err.message
-            : "에이전트 실행 중 오류가 발생했습니다.",
+            : t("errors.runFailed"),
         );
       } finally {
         loopRunningRef.current = false;
@@ -358,7 +359,7 @@ export function AgentRunControllerProvider({
         setSummary(
           err instanceof Error
             ? err.message
-            : "에이전트 실행을 시작하지 못했습니다.",
+            : t("errors.startFailed"),
         );
       }
     },

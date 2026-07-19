@@ -2,6 +2,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { currentUser } from "@/lib/get-current-user";
 import { successJson, errorJson } from "@/lib/api-response";
 import { logError } from "@/lib/logger";
+import { preferExamTitleForExamNode } from "@/lib/exam-node-title";
 
 const supabase = getSupabaseServer();
 
@@ -131,7 +132,7 @@ export async function getFolderContents(data: {
     if (examResult.error) throw examResult.error;
 
     const folderNodes = folderResult.data || [];
-    const examNodesRaw = examResult.data || [];
+    const examNodesRaw = (examResult.data || []).map(preferExamTitleForExamNode);
     const total = examResult.count ?? 0;
     const hasMoreExams = examOffset + examLimit < total;
 

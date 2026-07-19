@@ -10,6 +10,7 @@ import {
   type ScoreWeights,
 } from "@/lib/grade-utils";
 import { buildCopiedExamPayload, type CopyableExamSource } from "@/lib/exam-copy";
+import { stripSensitiveQuestionFields } from "@/lib/sanitize-exam-questions";
 
 // Lazy Supabase client getter — creates a fresh client per invocation
 // to avoid stale connections in serverless environments
@@ -470,6 +471,30 @@ export async function updateExam(data: {
       throw error;
     }
 
+    if (typeof updateWithoutRubric.title === "string") {
+      const nodeUpdate: Record<string, unknown> = {
+        name: updateWithoutRubric.title,
+      };
+      if (typeof updateWithoutRubric.updated_at === "string") {
+        nodeUpdate.updated_at = updateWithoutRubric.updated_at;
+      }
+
+      const { error: nodeTitleError } = await getSupabase()
+        .from("exam_nodes")
+        .update(nodeUpdate)
+        .eq("exam_id", data.id)
+        .eq("instructor_id", user.id)
+        .eq("kind", "exam");
+
+      if (nodeTitleError) {
+        logError("[updateExam] Failed to sync exam node title", nodeTitleError, {
+          path: "/api/supa/exam-handlers",
+          user_id: user.id,
+          additionalData: { examId: data.id },
+        });
+      }
+    }
+
     // Audit log: exam status change (awaited for critical operations)
     if (data.update.status) {
       await auditLog({
@@ -503,10 +528,15 @@ export async function getExam(data: { code: string }) {
     }
 
     // Strip sensitive data from public endpoint:
-    // Remove rubric when rubric_public is false (respects instructor privacy setting)
+    // - Remove answer key / grading context from each question (correctOptionIndex,
+    //   ai_context, core_ability) so a bare exam code can't reveal answers.
+    // - Remove per-question rubric unless the instructor made the rubric public.
+    // - Null the top-level rubric when rubric_public is false (existing privacy gate).
+    const rubricPublic = exam.rubric_public === true;
     const sanitizedExam = {
       ...exam,
-      ...(exam.rubric_public === false ? { rubric: null } : {}),
+      questions: stripSensitiveQuestionFields(exam.questions, { keepRubric: rubricPublic }),
+      ...(rubricPublic ? {} : { rubric: null }),
     };
 
     return successJson({ exam: sanitizedExam });

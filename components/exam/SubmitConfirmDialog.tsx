@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +27,7 @@ export function SubmitConfirmDialog({
   onOpenChange,
   onConfirm,
 }: SubmitConfirmDialogProps) {
+  const t = useTranslations("exam");
   const [now, setNow] = useState(() => Date.now());
   const [cooldownDeadline, setCooldownDeadline] = useState<number | null>(null);
 
@@ -62,18 +64,18 @@ export function SubmitConfirmDialog({
       <AlertDialogContent data-testid="submit-confirm-dialog" className="max-w-md">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-lg sm:text-xl font-bold">
-            시험 제출 확인
+            {t("submitConfirm.title")}
           </AlertDialogTitle>
           <AlertDialogDescription className="text-sm sm:text-base">
-            정말로 시험을 제출하시겠습니까?
+            {t("submitConfirm.description")}
             <br />
             <span className="font-semibold text-foreground mt-2 block">
-              제출 후에는 답안을 수정할 수 없습니다.
+              {t("submitConfirm.warning")}
             </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="gap-2 sm:gap-3">
-          <AlertDialogCancel className="min-h-[44px]">취소</AlertDialogCancel>
+          <AlertDialogCancel className="min-h-[44px]">{t("submitConfirm.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             onClick={() => {
               if (isCoolingDown) return;
@@ -85,10 +87,10 @@ export function SubmitConfirmDialog({
             {isCoolingDown ? (
               <>
                 <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-destructive-foreground border-t-transparent" aria-hidden="true" />
-                제출하기 ({remainingSeconds}초)
+                {t("submitConfirm.submitCooldown", { seconds: remainingSeconds })}
               </>
             ) : (
-              "제출하기"
+              t("submitConfirm.submit")
             )}
           </AlertDialogAction>
         </AlertDialogFooter>

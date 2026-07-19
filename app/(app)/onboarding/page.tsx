@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import { useRouter } from "next/navigation";
 import {
@@ -38,6 +39,7 @@ interface University {
 }
 
 export default function OnboardingPage() {
+  const t = useTranslations("onboarding.page");
   const { user, isLoaded } = useAppUser();
   const router = useRouter();
 
@@ -145,15 +147,15 @@ export default function OnboardingPage() {
     setError("");
 
     if (!name.trim()) {
-      setError("이름을 입력해주세요.");
+      setError(t("nameRequired"));
       return;
     }
     if (!school.trim()) {
-      setError("학교를 선택해주세요.");
+      setError(t("schoolRequired"));
       return;
     }
     if (role === "student" && !studentNumber.trim()) {
-      setError("학번을 입력해주세요.");
+      setError(t("studentNumberRequired"));
       return;
     }
 
@@ -216,7 +218,7 @@ export default function OnboardingPage() {
         window.location.href = "/student";
       }
     } catch {
-      setError("저장에 실패했습니다. 다시 시도해주세요.");
+      setError(t("saveFailed"));
       setIsSubmitting(false);
     }
   };
@@ -226,7 +228,7 @@ export default function OnboardingPage() {
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto mb-4" />
-          <p className="text-muted-foreground">로딩 중...</p>
+          <p className="text-muted-foreground">{t("loading")}</p>
         </div>
       </div>
     );
@@ -242,10 +244,10 @@ export default function OnboardingPage() {
         <Card className="w-full shadow-xl border-0">
           <CardHeader className="text-center pb-6">
             <CardTitle className="text-2xl">
-              Quest-On에 오신 것을 환영합니다!
+              {t("welcomeTitle")}
             </CardTitle>
             <CardDescription className="text-base">
-              시작하려면 역할을 선택해주세요
+              {t("welcomeDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -261,7 +263,7 @@ export default function OnboardingPage() {
                   htmlFor="instructor"
                   className="text-base cursor-pointer flex-1"
                 >
-                  강사 (시험 출제자)
+                  {t("instructorRole")}
                 </Label>
               </div>
               <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
@@ -270,7 +272,7 @@ export default function OnboardingPage() {
                   htmlFor="student"
                   className="text-base cursor-pointer flex-1"
                 >
-                  학생 (시험 응시자)
+                  {t("studentRole")}
                 </Label>
               </div>
             </RadioGroup>
@@ -279,7 +281,7 @@ export default function OnboardingPage() {
               onClick={() => setShowConfirm(true)}
               className="w-full h-12 text-lg"
             >
-              계속하기
+              {t("continueBtn")}
             </Button>
           </CardContent>
         </Card>
@@ -290,11 +292,11 @@ export default function OnboardingPage() {
             <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto">
               <User className="w-8 h-8 text-primary-foreground" />
             </div>
-            <CardTitle className="text-2xl">프로필 설정</CardTitle>
+            <CardTitle className="text-2xl">{t("profileTitle")}</CardTitle>
             <CardDescription className="text-base">
               {role === "student"
-                ? "학생 정보를 입력해주세요"
-                : "강사 정보를 입력해주세요"}
+                ? t("profileDescStudent")
+                : t("profileDescInstructor")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -303,12 +305,12 @@ export default function OnboardingPage() {
               <div className="space-y-2">
                 <Label htmlFor="name" className="flex items-center gap-2">
                   <User className="w-4 h-4" />
-                  이름
+                  {t("nameLabel")}
                 </Label>
                 <Input
                   id="name"
                   type="text"
-                  placeholder="이름을 입력하세요"
+                  placeholder={t("namePlaceholder")}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
@@ -323,12 +325,12 @@ export default function OnboardingPage() {
                     className="flex items-center gap-2"
                   >
                     <Hash className="w-4 h-4" />
-                    학번
+                    {t("studentNumberLabel")}
                   </Label>
                   <Input
                     id="studentNumber"
                     type="text"
-                    placeholder="학번을 입력하세요"
+                    placeholder={t("studentNumberPlaceholder")}
                     value={studentNumber}
                     onChange={(e) => setStudentNumber(e.target.value)}
                     required
@@ -340,7 +342,7 @@ export default function OnboardingPage() {
               <div className="space-y-2">
                 <Label htmlFor="school" className="flex items-center gap-2">
                   <GraduationCap className="w-4 h-4" />
-                  {role === "student" ? "학교" : "소속 기관"}
+                  {role === "student" ? t("schoolLabelStudent") : t("schoolLabelInstructor")}
                 </Label>
                 <div className="relative">
                   <Input
@@ -349,8 +351,8 @@ export default function OnboardingPage() {
                     type="text"
                     placeholder={
                       role === "student"
-                        ? "학교명을 검색하세요"
-                        : "소속 기관명을 검색하세요"
+                        ? t("schoolPlaceholderStudent")
+                        : t("schoolPlaceholderInstructor")
                     }
                     value={schoolSearchQuery}
                     onChange={(e) => {
@@ -389,8 +391,7 @@ export default function OnboardingPage() {
                 </div>
                 {school && (
                   <p className="text-sm text-muted-foreground">
-                    선택된 학교:{" "}
-                    <span className="font-medium">{school}</span>
+                    {t("selectedSchool", { school })}
                   </p>
                 )}
               </div>
@@ -405,7 +406,7 @@ export default function OnboardingPage() {
                   disabled={isSubmitting}
                 >
                   <ArrowLeft className="w-4 h-4 mr-1" />
-                  이전
+                  {t("backBtn")}
                 </Button>
                 <Button
                   type="submit"
@@ -420,10 +421,10 @@ export default function OnboardingPage() {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      저장 중...
+                      {t("saving")}
                     </>
                   ) : (
-                    "완료"
+                    t("submitBtn")
                   )}
                 </Button>
               </div>
@@ -436,21 +437,19 @@ export default function OnboardingPage() {
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>역할을 확인해주세요</AlertDialogTitle>
+            <AlertDialogTitle>{t("confirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              <span className="font-semibold text-foreground">
-                {role === "instructor"
-                  ? "강사 (시험 출제자)"
-                  : "학생 (시험 응시자)"}
-              </span>
-              (으)로 시작합니다. 역할 선택 후에도 프로필 설정에서 변경할 수
-              있습니다.
+              {t("confirmDescSuffix", {
+                role: role === "instructor"
+                  ? t("confirmDescInstructor")
+                  : t("confirmDescStudent"),
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>다시 선택하기</AlertDialogCancel>
+            <AlertDialogCancel>{t("reSelectBtn")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleRoleConfirm}>
-              확인
+              {t("confirmBtn")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

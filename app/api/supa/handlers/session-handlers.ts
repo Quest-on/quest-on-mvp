@@ -6,6 +6,7 @@ import { auditLog } from "@/lib/audit";
 import { logError } from "@/lib/logger";
 import { triggerGradingIfNeeded } from "@/lib/grading-trigger";
 import { sanitizeUserInput } from "@/lib/sanitize";
+import { stripSensitiveQuestionFields } from "@/lib/sanitize-exam-questions";
 
 /** 5-second grace period for network latency (shared across heartbeat/initExamSession/feedback) */
 const GRACE_PERIOD_MS = 5_000;
@@ -342,13 +343,12 @@ export async function initExamSession(data: {
       }
     }
 
-    // core_ability(핵심 역량) 필드는 제거되었으므로, 세션 init 응답에서도 제거한다.
+    // 응시자에게 내려가는 문항에서 정답키/채점 컨텍스트(correctOptionIndex, ai_context)
+    // 와 레거시 core_ability 를 제거한다. 채점은 서버에서 원본 exam 을 다시 읽어 수행하므로
+    // 클라이언트에는 이 필드들이 필요 없다. rubric(채점 기준)은 강사가 공개한 경우에만 유지.
     if (exam.questions && Array.isArray(exam.questions)) {
-      exam.questions = exam.questions.map((q: Record<string, unknown>) => {
-        const { core_ability, ...rest } = q as Record<string, unknown> & {
-          core_ability?: unknown;
-        };
-        return rest;
+      exam.questions = stripSensitiveQuestionFields(exam.questions, {
+        keepRubric: exam.rubric_public === true,
       });
     }
 

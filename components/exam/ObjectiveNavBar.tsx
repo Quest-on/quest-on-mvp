@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,7 @@ export function ObjectiveNavBar({
   onPrev,
   className,
 }: ObjectiveNavBarProps) {
+  const t = useTranslations("exam");
   const isLast = currentIndex >= total - 1;
 
   return (
@@ -44,13 +46,13 @@ export function ObjectiveNavBar({
       {canPrev && onPrev && (
         <Button
           variant="outline"
-          aria-label="이전 문제"
+          aria-label={t("objectiveNav.prevAriaLabel")}
           onClick={onPrev}
           data-testid="exam-prev-btn"
           className="min-h-[44px] gap-1.5"
         >
           <ChevronLeft className="size-4" aria-hidden="true" />
-          이전
+          {t("objectiveNav.prev")}
         </Button>
       )}
 
@@ -61,13 +63,13 @@ export function ObjectiveNavBar({
       {!isLast && (
         <Button
           variant="default"
-          aria-label="다음 문제"
+          aria-label={t("objectiveNav.nextAriaLabel")}
           disabled={!canNext}
           onClick={() => onNavigate(currentIndex + 1)}
           data-testid="exam-next-btn"
           className="min-h-[44px] gap-1.5"
         >
-          다음
+          {t("objectiveNav.next")}
           <ChevronRight className="size-4" aria-hidden="true" />
         </Button>
       )}

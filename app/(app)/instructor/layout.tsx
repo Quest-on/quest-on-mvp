@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GraduationCap, LayoutDashboard, Plus, FileEdit } from "lucide-react";
@@ -29,22 +30,23 @@ export default function InstructorLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { isSignedIn, isLoaded, user, profile } = useAppUser();
+  const t = useTranslations("instructor");
 
   const navigationItems = [
     {
-      title: "대시보드",
+      title: t("nav.dashboard"),
       href: "/instructor",
       icon: LayoutDashboard,
       active: pathname === "/instructor",
     },
     {
-      title: "새 시험 생성",
+      title: t("nav.newExam"),
       href: "/instructor/new",
       icon: Plus,
       active: pathname === "/instructor/new",
     },
     {
-      title: "과제 만들기",
+      title: t("nav.newAssignment"),
       href: "/instructor/assignment/new",
       icon: FileEdit,
       active: pathname === "/instructor/assignment/new",
@@ -104,19 +106,19 @@ export default function InstructorLayout({
               />
             </div>
             <CardTitle className="text-xl font-bold">
-              로그인이 필요합니다
+              {t("auth.loginRequired")}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              강사 페이지에 접근하려면 로그인해주세요
+              {t("auth.loginDesc")}
             </p>
           </CardHeader>
           <CardContent className="text-center pb-8">
             <Button
               onClick={() => router.replace("/sign-in")}
               className="w-full min-h-[44px]"
-              aria-label="강사로 로그인"
+              aria-label={t("auth.loginButton")}
             >
-              강사로 로그인
+              {t("auth.loginButton")}
             </Button>
           </CardContent>
         </Card>
@@ -166,6 +168,7 @@ export default function InstructorLayout({
                       alt="Quest-On"
                       width={28}
                       height={28}
+                      aria-label="Quest-On"
                     />
                     <UserMenu />
                   </div>

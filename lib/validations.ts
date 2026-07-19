@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { sanitizeUserInput } from "@/lib/sanitize";
 
+// AI 문항 생성 상한. 스트림 라우트가 문항당 병렬 OpenAI 호출을 발사하므로
+// (비용·rate-limit 폭주 방지) 보수적으로 유지한다.
+const MAX_GENERATED_QUESTION_COUNT = 10;
+
 // Reusable field schemas
 const sessionId = z.string().uuid("Invalid session ID format");
 
@@ -531,7 +535,7 @@ export const generateCaseQuestionsSchema = z.object({
   examTitle: z.string().min(1).max(500),
   topics: z.string().max(500).optional(),
   difficulty: z.enum(["basic", "intermediate", "advanced"]).default("intermediate"),
-  questionCount: z.number().int().min(1).max(5).default(2),
+  questionCount: z.number().int().min(1).max(MAX_GENERATED_QUESTION_COUNT).default(2),
   customInstructions: z.string().max(2000).optional(),
   materialsText: z.array(z.object({
     url: z.string(),

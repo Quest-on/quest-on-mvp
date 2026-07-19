@@ -1,6 +1,7 @@
 "use client";
 
 import { LogOut } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,7 @@ export function ExamQuestionNav({
   onExit,
   className,
 }: ExamQuestionNavProps) {
+  const t = useTranslations("exam");
   return (
     <>
       {/* Desktop: left vertical timeline */}
@@ -52,7 +54,7 @@ export function ExamQuestionNav({
           "hidden md:flex h-full flex-col shrink-0 border-r border-border bg-muted/30 w-16 lg:w-20",
           className,
         )}
-        aria-label="문항 진행 상황"
+        aria-label={t("nav.ariaLabel")}
       >
         <div className="flex flex-col items-center gap-2 py-4 px-2 overflow-y-auto hide-scrollbar flex-1 min-h-0">
           {questions.map((q, idx) => (
@@ -73,10 +75,10 @@ export function ExamQuestionNav({
             size="sm"
             onClick={onExit}
             className="w-full min-h-[44px] flex flex-col gap-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30 px-1"
-            aria-label="시험 나가기"
+            aria-label={t("nav.exitAriaLabel")}
           >
             <LogOut className="size-4 shrink-0" aria-hidden="true" />
-            <span>나가기</span>
+            <span>{t("nav.exit")}</span>
           </Button>
         </div>
       </nav>
@@ -84,7 +86,7 @@ export function ExamQuestionNav({
       {/* Mobile: bottom horizontal timeline */}
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-background/95 backdrop-blur-sm"
-        aria-label="문항 진행 상황"
+        aria-label={t("nav.ariaLabel")}
       >
         <div className="flex items-center gap-2 px-3 py-2 overflow-x-auto hide-scrollbar">
           {questions.map((q, idx) => (
@@ -103,9 +105,9 @@ export function ExamQuestionNav({
             size="sm"
             onClick={onExit}
             className="shrink-0 min-h-[40px] text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
-            aria-label="시험 나가기"
+            aria-label={t("nav.exitAriaLabel")}
           >
-            나가기
+            {t("nav.exit")}
           </Button>
         </div>
       </nav>
@@ -129,6 +131,7 @@ function QuestionPill({
   hasChat: boolean;
   layout: "vertical" | "horizontal";
 }) {
+  const t = useTranslations("exam");
   const typeBadge = questionNavTypeBadge(questionType);
 
   return (
@@ -143,7 +146,7 @@ function QuestionPill({
             ? "bg-primary/15 border-primary/30 text-primary"
             : "bg-background border-border text-muted-foreground",
       )}
-      aria-label={`문제 ${index + 1}${typeBadge ? ` (${typeBadge})` : ""}${isCurrent ? " (현재)" : ""}${hasAnswer ? " (작성됨)" : " (미작성)"}${hasChat ? " (채팅 있음)" : ""}`}
+      aria-label={`문제 ${index + 1}${typeBadge ? ` (${typeBadge})` : ""}${isCurrent ? t("nav.currentLabel") : ""}${hasAnswer ? t("nav.answeredLabel") : t("nav.unansweredLabel")}${hasChat ? t("nav.chatLabel") : ""}`}
       aria-current={isCurrent ? "step" : undefined}
     >
       {index + 1}

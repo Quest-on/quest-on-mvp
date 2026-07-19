@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { useTranslations } from "next-intl";
 import {
   ReactFlow,
   Controls,
@@ -70,6 +71,7 @@ function fromFlowEdges(edges: Edge[]): ErdEdge[] {
 }
 
 export function ErdCanvas({ initialState, onChange, readOnly = false }: ErdCanvasProps) {
+  const t = useTranslations("assignment");
   const [nodes, setNodes, onNodesChange] = useNodesState(toFlowNodes(initialState.nodes));
   const [edges, setEdges, onEdgesChange] = useEdgesState(toFlowEdges(initialState.edges));
 
@@ -161,11 +163,11 @@ export function ErdCanvas({ initialState, onChange, readOnly = false }: ErdCanva
         <div className="flex items-center gap-2 px-2 py-1.5 border-b border-border bg-card/50">
           <Button type="button" variant="outline" size="sm" onClick={addTable} className="h-7 gap-1 text-xs">
             <Plus className="w-3 h-3" />
-            테이블 추가
+            {t("erdCanvas.addTable")}
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={deleteSelected} className="h-7 gap-1 text-xs">
             <Trash2 className="w-3 h-3" />
-            선택 삭제
+            {t("erdCanvas.deleteSelected")}
           </Button>
         </div>
       )}

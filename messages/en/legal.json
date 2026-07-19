@@ -1,0 +1,301 @@
+{
+  "footerLinks": {
+    "terms": "Terms of service",
+    "privacy": "Privacy policy",
+    "security": "Data security",
+    "cookies": "Cookie policy"
+  },
+  "lastModified": "Last updated: January 1, 2025",
+  "cookies": {
+    "title": "Cookie Policy",
+    "section1": {
+      "heading": "1. What are cookies?",
+      "body": "Cookies are small text files stored in your browser when you visit a website. They are used to maintain login sessions, save preferences, and analyze usage statistics."
+    },
+    "section2": {
+      "heading": "2. How we use cookies",
+      "item1": "Core functionality (login session management, security tokens)",
+      "item2": "Preference storage (dark mode, language)",
+      "item3": "Usage statistics for service improvement (visit and navigation flows)"
+    },
+    "section3": {
+      "heading": "3. Types of cookies",
+      "essential": {
+        "heading": "Strictly necessary cookies",
+        "body": "These cookies are required for login and security. Blocking them may prevent certain features from working."
+      },
+      "functional": {
+        "heading": "Functional cookies",
+        "body": "These cookies remember your preferences (such as dark mode and language) so you get a consistent experience on future visits."
+      },
+      "analytics": {
+        "heading": "Analytics cookies",
+        "body": "These cookies collect anonymized usage data to help us improve the user experience. No personally identifiable information is collected."
+      }
+    },
+    "section4": {
+      "heading": "4. Cookies we use",
+      "table": {
+        "name": "Cookie name",
+        "purpose": "Purpose",
+        "type": "Type",
+        "retention": "Retention"
+      },
+      "rows": {
+        "session": {
+          "purpose": "Login session management",
+          "type": "Strictly necessary",
+          "retention": "Until browser is closed"
+        },
+        "csrf": {
+          "purpose": "Security (CSRF protection)",
+          "type": "Strictly necessary",
+          "retention": "24 hours"
+        },
+        "theme": {
+          "purpose": "Dark mode preference",
+          "type": "Functional",
+          "retention": "1 year"
+        },
+        "analytics": {
+          "purpose": "Usage statistics",
+          "type": "Analytics",
+          "retention": "2 years"
+        }
+      }
+    },
+    "section5": {
+      "heading": "5. Managing your cookie settings",
+      "body": "You can refuse or delete cookies through your browser settings. However, blocking strictly necessary cookies may prevent certain features — such as login — from working.",
+      "browserSettings": {
+        "heading": "How to manage cookies in major browsers",
+        "chrome": "Settings → Privacy and security → Cookies and other site data",
+        "firefox": "Settings → Privacy & Security → Cookies and Site Data",
+        "safari": "Preferences → Privacy → Cookies and Website Data",
+        "edge": "Settings → Cookies and site permissions → Cookies and site data"
+      },
+      "note": "Note: Consent for analytics cookies can be individually withdrawn on the settings page within the service. (Coming soon)",
+      "noteLabel": "Note:",
+      "noteBody": "Consent for analytics cookies can be individually withdrawn on the settings page within the service. (Coming soon)"
+    }
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "section1": {
+      "heading": "1. Data we collect",
+      "required": {
+        "heading": "Required",
+        "item1": "Name, email, institution, role (educator/examinee), login identifier",
+        "item1Label": "Account information:",
+        "item2": "Exam code, session time, submitted answers, rubric scores, feedback logs",
+        "item2Label": "Exam data:",
+        "item3": "Clarification questions/answers, reflection Q&A logs",
+        "item3Label": "AI interaction records:",
+        "item4": "IP address, browser/OS, access timestamps, logs (for security and error analysis)",
+        "item4Label": "Device and access information:"
+      },
+      "optional": {
+        "heading": "Optional",
+        "item1": "Support inquiry content and attachments"
+      }
+    },
+    "section2": {
+      "heading": "2. How we use your data",
+      "item1": "Account registration, identity verification, and role assignment (educator/examinee)",
+      "item2": "Exam administration (taking exams, submitting answers), score calculation, and report delivery",
+      "item3": "AI features (Q&A, feedback) and misuse detection",
+      "item4": "Customer support and service announcements",
+      "item5": "Service stability (error and security log analysis)"
+    },
+    "section3": {
+      "heading": "3. Retention periods",
+      "item1": "Retained for 30 days after account deletion, then permanently removed (or as required by law)",
+      "item1Label": "Account information:",
+      "item2": "For 1 year after the institution's contract ends, or as configured by the instructor",
+      "item2Label": "Exam / answer / AI logs:",
+      "item3": "Retained for 90 days for security purposes",
+      "item3Label": "Access logs:",
+      "principle": "All data is retained for the minimum period necessary."
+    },
+    "section4": {
+      "heading": "4. Third-party sharing and processors",
+      "thirdParty": {
+        "heading": "Third-party sharing",
+        "body": "We do not share personal data with third parties except as described in this policy."
+      },
+      "processing": {
+        "heading": "Data processors",
+        "body": "We engage the following service providers to operate the service:",
+        "table": {
+          "vendor": "Vendor",
+          "task": "Service",
+          "retention": "Retention"
+        },
+        "rows": {
+          "cloud": {
+            "name": "Cloud hosting provider",
+            "task": "Data storage and server operations",
+            "retention": "Duration of service"
+          },
+          "email": {
+            "name": "Email delivery provider",
+            "task": "Email delivery",
+            "retention": "Until delivery is complete"
+          },
+          "llm": {
+            "name": "LLM API provider",
+            "task": "AI feature processing",
+            "retention": "Until processing is complete"
+          }
+        }
+      }
+    },
+    "section5": {
+      "heading": "5. International transfers",
+      "body": "If AI APIs or cloud services use overseas servers, your personal data may be transferred internationally.",
+      "country": "Destination country:",
+      "countryValue": "United States",
+      "items": "Data transferred:",
+      "itemsValue": "Submitted answers, AI question/answer logs",
+      "purpose": "Purpose:",
+      "purposeValue": "AI feature processing",
+      "retention": "Retention:",
+      "retentionValue": "Until processing is complete",
+      "optOut": "How to opt out:",
+      "optOutValue": "Processing stops when you stop using the service"
+    },
+    "section6": {
+      "heading": "6. Your rights",
+      "body": "You may request access to, correction of, deletion of, or restriction on processing of your personal data. Submit requests through the following channels:",
+      "email": "Email: questonkr@gmail.com",
+      "support": "Support: Contact us within the service",
+      "minor": "Requests on behalf of minors may be submitted by a legal guardian."
+    },
+    "section7": {
+      "heading": "7. Security measures",
+      "body": "We apply the following technical and organizational measures in accordance with applicable data protection laws:",
+      "item1": "Access controls and permission management",
+      "item2": "Encryption (in transit and at rest)",
+      "item3": "Access log retention and review",
+      "item4": "Security software installation and updates",
+      "item5": "Regular security audits and staff training"
+    },
+    "section8": {
+      "heading": "8. Contact",
+      "officer": "Data Protection Officer",
+      "email": "Email: questonkr@gmail.com",
+      "contact": "For inquiries, complaints, or dispute resolution regarding personal data, please contact us at the address above."
+    }
+  },
+  "security": {
+    "title": "Data Security",
+    "subtitle": "Quest-On places the protection of personal and exam data above all else.",
+    "principles": {
+      "heading": "Data protection principles",
+      "body": "Quest-On applies the principles of data minimization, least privilege, encryption, audit logging, and incident response to protect personal and exam data. We comply with the security requirements of applicable laws and regulations."
+    },
+    "technical": {
+      "heading": "Technical safeguards",
+      "encryption": {
+        "heading": "Encryption in transit",
+        "body": "All data is transmitted over HTTPS/TLS 1.3. An additional security layer is applied when transmitting sensitive information."
+      },
+      "storageEncryption": {
+        "heading": "Encryption at rest",
+        "body": "Sensitive data stored in databases and storage systems is encrypted. Encryption keys are securely managed and rotated on a regular schedule."
+      },
+      "accessControl": {
+        "heading": "Access control and permission management",
+        "body": "Role-based access control (RBAC) enforces the principle of least privilege. Administrator access requires multi-factor authentication, and all access is logged."
+      },
+      "session": {
+        "heading": "Session and authentication security",
+        "body": "Secure session tokens are issued with expiration times to require re-authentication. CSRF protection mechanisms are in place to prevent attacks."
+      },
+      "logging": {
+        "heading": "Logging and monitoring",
+        "body": "Audit logs are maintained for critical events, and an anomaly detection system is in operation. Alerts are issued immediately upon detecting incidents or security events."
+      },
+      "backup": {
+        "heading": "Backup and recovery",
+        "body": "Data backups are performed regularly and validated through recovery testing to ensure integrity. Backup data is encrypted and stored separately."
+      }
+    },
+    "operational": {
+      "heading": "Operational and administrative measures",
+      "personnel": {
+        "heading": "Personnel management",
+        "body": "Employee access privileges are reviewed regularly, and security training is conducted. Access is revoked immediately upon termination."
+      },
+      "vulnerability": {
+        "heading": "Vulnerability scanning and patching",
+        "body": "Regular security vulnerability assessments are conducted, and identified vulnerabilities are patched promptly. Comprehensive security updates — including dependency updates — are applied on an ongoing basis."
+      },
+      "incident": {
+        "heading": "Incident response",
+        "body": "Security incidents are handled through a structured process: detection → containment → notification → remediation. Affected authorities and users are notified promptly."
+      }
+    },
+    "reporting": {
+      "heading": "Security disclosure",
+      "body": "If you discover a security vulnerability, please report it through the following channel:",
+      "email": "Email: security@queston.co.kr",
+      "process": "Disclosure process: Receipt → Review → Remediation → Follow-up",
+      "disclosure": "We follow responsible disclosure principles and are committed to responding promptly."
+    }
+  },
+  "terms": {
+    "title": "Terms of Service",
+    "section1": {
+      "heading": "1. Purpose and definitions",
+      "article1": {
+        "heading": "Article 1 — Purpose",
+        "body": "These Terms of Service govern the rights, obligations, and responsibilities of Quest-On (the \"Company\") and users of the Company's AI-powered exam and assessment platform service."
+      },
+      "article2": {
+        "heading": "Article 2 — Definitions",
+        "user": "\"User\" refers to both educators (professors, instructors, and administrators) and examinees.",
+        "content": "\"Content\" means exams, rubrics, submitted answers, AI conversation logs, feedback, and uploaded materials.",
+        "service": "\"Service\" refers to the Company's AI-powered exam and assessment platform in its entirety."
+      }
+    },
+    "section2": {
+      "heading": "2. Accounts and access",
+      "body": "Users must provide accurate information. Account sharing, lending, and transfer are prohibited. The Company may restrict access to the extent necessary for security if anomalous activity is detected (e.g., simultaneous logins, abnormal requests)."
+    },
+    "section3": {
+      "heading": "3. Service scope and AI feature disclosure",
+      "intro": "The Service provides the following features:",
+      "item1": "Exam creation and distribution",
+      "item2": "AI-assisted clarification questions for examinees",
+      "item3": "Answer submission",
+      "item4": "AI-powered feedback, reflection, and result reports",
+      "warning": "AI-generated responses and feedback are based on statistical models and may be inaccurate or incomplete. Users are solely responsible for their final answers and submissions.",
+      "warningLabel": "Important:"
+    },
+    "section4": {
+      "heading": "4. Prohibited conduct",
+      "intro": "Users must not engage in the following:",
+      "item1": "Any act that compromises the integrity of an exam or assessment (including impersonation, account sharing, or unauthorized material use or disclosure)",
+      "item2": "Automated requests, crawling, or reverse engineering that places excessive load on the service or servers",
+      "item3": "Uploading illegal content or infringing on the personal information or intellectual property rights of others",
+      "item4": "Any other conduct that violates applicable laws or these Terms of Service"
+    },
+    "section5": {
+      "heading": "5. Content rights and license",
+      "body": "Rights to materials uploaded and answers submitted by users belong, in principle, to the user (or their institution or instructor). However, the Company may process (store, transmit, and analyze) Content to the extent necessary for service provision, improvement, security, and dispute resolution."
+    },
+    "section6": {
+      "heading": "6. Suspension and termination",
+      "body": "If a user violates these Terms or creates a security risk, the Company may restrict access after prior notice. In urgent cases, notice may be provided after the fact."
+    },
+    "section7": {
+      "heading": "7. Limitation of liability",
+      "body": "The Company is not liable for service interruptions caused by force majeure events such as natural disasters, system failures, or telecommunications issues (to the extent permitted by applicable law). The Company makes no warranties regarding the accuracy or suitability of AI-generated results."
+    },
+    "section8": {
+      "heading": "8. Governing law and disputes",
+      "body": "These Terms are governed by the laws of the Republic of Korea. Any disputes shall be subject to the exclusive jurisdiction of the Seoul Central District Court."
+    }
+  }
+}

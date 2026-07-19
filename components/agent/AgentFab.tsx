@@ -14,8 +14,10 @@ import { BotMessageSquare } from "@/components/animate-ui/icons/bot-message-squa
 import { useAgentPanel } from "@/components/agent/AgentPanelProvider";
 import { useAgentRunController } from "@/components/agent/AgentRunController";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 export function AgentFab() {
+  const t = useTranslations("admin");
   const { open, setOpen } = useAgentPanel();
   const { phase } = useAgentRunController();
   const running = phase === "running";
@@ -24,7 +26,7 @@ export function AgentFab() {
     <button
       type="button"
       onClick={() => setOpen(true)}
-      aria-label="AI 에이전트 열기"
+      aria-label={t("agent.fab.ariaLabel")}
       className={cn(
         "fixed bottom-6 right-6 z-50 hidden md:flex h-14 w-14 items-center justify-center",
         "rounded-full bg-primary text-primary-foreground shadow-lg",

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface LoadingMessageProps {
   loading: boolean;
@@ -16,8 +17,10 @@ export function LoadingMessage({
   messages,
   interval = 3000,
   timeout = 30000,
-  timeoutMessage = "작업이 지연되고 있습니다. 잠시만 더 기다려주세요...",
+  timeoutMessage,
 }: LoadingMessageProps) {
+  const t = useTranslations("common.loadingMessage");
+  const resolvedTimeoutMessage = timeoutMessage ?? t("timeout");
   const [messageIndex, setMessageIndex] = useState(0);
   const [isLongLoading, setIsLongLoading] = useState(false);
 
@@ -51,13 +54,13 @@ export function LoadingMessage({
       <div className="flex items-center gap-2 text-muted-foreground animate-pulse">
         <Loader2 className="w-4 h-4 animate-spin" />
         <span className="text-sm font-medium">
-          {isLongLoading ? timeoutMessage : messages[messageIndex]}
+          {isLongLoading ? resolvedTimeoutMessage : messages[messageIndex]}
         </span>
       </div>
       {isLongLoading && (
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
           <AlertCircle className="w-3 h-3" />
-          <span>네트워크 상태에 따라 시간이 더 소요될 수 있습니다.</span>
+          <span>{t("networkHint")}</span>
         </div>
       )}
     </div>

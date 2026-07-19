@@ -7,6 +7,7 @@ import {
   useImperativeHandle,
   type Ref,
 } from "react";
+import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -90,18 +91,19 @@ function getStageMessage(
   stage: string,
   current: number,
   total: number,
+  t: ReturnType<typeof useTranslations<"authoring">>,
 ): string {
   switch (stage) {
     case "started":
-      return "시험 내용 분석 중...";
+      return t("caseQuestionGenerator.stageStarted");
     case "generating":
       return total > 1
-        ? `문제 생성 중 (${current}/${total})...`
-        : "문제 생성 중...";
+        ? t("caseQuestionGenerator.stageGenerating", { current, total })
+        : t("caseQuestionGenerator.stageGeneratingSingle");
     case "complete":
-      return "생성 완료!";
+      return t("caseQuestionGenerator.stageComplete");
     default:
-      return "준비 중...";
+      return t("caseQuestionGenerator.stageDefault");
   }
 }
 
@@ -115,6 +117,7 @@ export function CaseQuestionGenerator({
   variant = "card",
   agentHandleRef,
 }: CaseQuestionGeneratorProps) {
+  const t = useTranslations("authoring");
   const [isOpen, setIsOpen] = useState(true);
   const difficulty = "basic" as const;
   const [questionCount, setQuestionCount] = useState(1);
@@ -166,7 +169,7 @@ export function CaseQuestionGenerator({
             correctOptionIndex: q.correctOptionIndex,
           })),
         );
-        toast.success(`${all.length}개 문제가 추가되었습니다.`);
+        toast.success(t("caseQuestionGenerator.questionsAdded", { count: all.length }));
       }
     }
     wasGeneratingRef.current = isGenerating;
@@ -201,12 +204,12 @@ export function CaseQuestionGenerator({
 
   const handleGenerate = async () => {
     if (!examTitle.trim()) {
-      toast.error(isAssignmentMode ? "과제 제목을 먼저 입력해주세요." : "시험 제목을 먼저 입력해주세요.");
+      toast.error(isAssignmentMode ? t("caseQuestionGenerator.toastTitleRequiredAssignment") : t("caseQuestionGenerator.toastTitleRequired"));
       return;
     }
 
     if (isAssignmentMode && !freeformPrompt.trim()) {
-      toast.error("학생에게 시킬 리서치 주제를 입력해주세요.");
+      toast.error(t("caseQuestionGenerator.toastResearchRequired"));
       return;
     }
 
@@ -256,11 +259,10 @@ export function CaseQuestionGenerator({
         generationProgress.stage,
         generationProgress.current,
         generationProgress.total,
+        t,
       )
     : "";
-  const displayStageMessage = isAssignmentMode
-    ? stageMessage.replace("시험 내용", "리서치 과제")
-    : stageMessage;
+  const displayStageMessage = stageMessage;
 
   if (variant === "line") {
     return (
@@ -276,7 +278,7 @@ export function CaseQuestionGenerator({
             <SelectContent>
               {[1, 2, 3, 4, 5].map((n) => (
                 <SelectItem key={n} value={n.toString()}>
-                  {n}개
+                  {t("caseQuestionGenerator.countItem", { n })}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -287,8 +289,8 @@ export function CaseQuestionGenerator({
             onChange={(e) => setFreeformPrompt(e.target.value)}
             placeholder={
               isAssignmentMode
-                ? "예: 국내 배달앱 3사의 최근 수익성 변화를 조사해오시오"
-                : "예: 한국 기업 사례 중심으로 1문제 만들어줘"
+                ? t("caseQuestionGenerator.placeholderAssignment")
+                : t("caseQuestionGenerator.placeholderExam")
             }
             maxLength={2000}
             className="min-h-11 resize-none py-2.5"
@@ -302,7 +304,7 @@ export function CaseQuestionGenerator({
               className="h-11 gap-2"
             >
               <Sparkles className="w-4 h-4" />
-              {isGenerating ? "생성 중" : "생성"}
+              {isGenerating ? t("caseQuestionGenerator.buttonGenerating") : t("caseQuestionGenerator.buttonGenerate")}
             </Button>
             {isGenerating && (
               <Button
@@ -311,7 +313,7 @@ export function CaseQuestionGenerator({
                 size="icon"
                 onClick={cancelGeneration}
                 className="size-11"
-                aria-label="생성 취소"
+                aria-label={t("caseQuestionGenerator.ariaCancel")}
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -325,8 +327,7 @@ export function CaseQuestionGenerator({
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <FileText className="w-3.5 h-3.5" />
               <span>
-                업로드 자료 {extractionStatus?.size || availableTexts.size}개를
-                참고합니다.
+                {t("caseQuestionGenerator.uploadedMaterialsHint", { count: extractionStatus?.size || availableTexts.size })}
               </span>
               {extractionStatus &&
                 Array.from(extractionStatus.entries()).map(([fileName, status]) => (
@@ -351,8 +352,8 @@ export function CaseQuestionGenerator({
         {isDisabled && (
           <p className="text-xs text-muted-foreground">
             {isAssignmentMode
-              ? "과제 제목과 리서치 주제를 입력해야 생성할 수 있습니다."
-              : "시험 제목을 먼저 입력해야 생성할 수 있습니다."}
+              ? t("caseQuestionGenerator.disabledHintAssignment")
+              : t("caseQuestionGenerator.disabledHintExam")}
           </p>
         )}
 
@@ -388,7 +389,7 @@ export function CaseQuestionGenerator({
         {(generatedQuestions.length > 0 || skeletonCount > 0) && (
           <div className="space-y-3 rounded-md border bg-muted/20 p-3">
             <p className="text-xs font-medium text-muted-foreground">
-              생성 완료 시 문제 목록에 자동 추가됩니다.
+              {t("caseQuestionGenerator.autoAddHintLine")}
             </p>
             <AnimatePresence mode="popLayout">
               {generatedQuestions.map((q, idx) => (
@@ -453,10 +454,10 @@ export function CaseQuestionGenerator({
           <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors rounded-t-xl">
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
-              {isAssignmentMode ? "AI 리서치 과제 생성" : "AI 사례형 문제 생성"}
+              {isAssignmentMode ? t("caseQuestionGenerator.cardTitleAssignment") : t("caseQuestionGenerator.cardTitleExam")}
               {generatedQuestions.length > 0 && (
                 <span className="text-xs font-normal bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                  {generatedQuestions.length}개 생성됨
+                  {t("caseQuestionGenerator.generatedCount", { count: generatedQuestions.length })}
                 </span>
               )}
             </CardTitle>
@@ -474,7 +475,7 @@ export function CaseQuestionGenerator({
           <CardContent className="space-y-4">
             {/* Question count */}
             <div className="space-y-1.5">
-              <Label className="text-sm">생성할 문제 수</Label>
+              <Label className="text-sm">{t("caseQuestionGenerator.labelQuestionCount")}</Label>
               <Select
                 value={questionCount.toString()}
                 onValueChange={(v) => setQuestionCount(Number(v))}
@@ -485,7 +486,7 @@ export function CaseQuestionGenerator({
                 <SelectContent>
                   {[1, 2, 3, 4, 5].map((n) => (
                     <SelectItem key={n} value={n.toString()}>
-                      {n}개
+                      {t("caseQuestionGenerator.countItem", { n })}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -495,10 +496,10 @@ export function CaseQuestionGenerator({
             {/* Freeform prompt */}
             <div className="space-y-1.5">
               <Label className="text-sm">
-                {isAssignmentMode ? "학생에게 어떤 리서치를 시킬까요?" : "어떤 문제를 만들어드릴까요?"}
+                {isAssignmentMode ? t("caseQuestionGenerator.labelPromptAssignment") : t("caseQuestionGenerator.labelPromptExam")}
                 {!isAssignmentMode && (
                   <span className="text-muted-foreground font-normal ml-1">
-                    (선택)
+                    {t("caseQuestionGenerator.optional")}
                   </span>
                 )}
               </Label>
@@ -508,8 +509,8 @@ export function CaseQuestionGenerator({
                 onChange={(e) => setFreeformPrompt(e.target.value)}
                 placeholder={
                   isAssignmentMode
-                    ? "예: 국내 배달앱 3사의 최근 수익성 변화를 조사해오시오"
-                    : "예: 시장조사 과제, 한국 기업 사례 중심, 난이도 높게..."
+                    ? t("caseQuestionGenerator.placeholderAssignment2")
+                    : t("caseQuestionGenerator.placeholderExam2")
                 }
                 maxLength={2000}
                 className="min-h-[80px] resize-none"
@@ -526,9 +527,7 @@ export function CaseQuestionGenerator({
                     className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <FileText className="w-3.5 h-3.5" />
-                    업로드된 자료{" "}
-                    {extractionStatus?.size || availableTexts.size}개가 문제
-                    생성에 활용됩니다.
+                    {t("caseQuestionGenerator.uploadedMaterialsDetail", { count: extractionStatus?.size || availableTexts.size })}
                     <ChevronDown className="w-3 h-3" />
                   </button>
                 </CollapsibleTrigger>
@@ -559,7 +558,7 @@ export function CaseQuestionGenerator({
                               </span>
                               {status === "failed" && (
                                 <span className="text-red-500">
-                                  (추출 실패)
+                                  {t("caseQuestionGenerator.extractionFailed")}
                                 </span>
                               )}
                             </div>
@@ -596,7 +595,7 @@ export function CaseQuestionGenerator({
                 className="gap-2"
               >
                 <Sparkles className="w-4 h-4" />
-                {isAssignmentMode ? "리서치 과제 생성하기" : "문제 생성하기"}
+                {isAssignmentMode ? t("caseQuestionGenerator.buttonGenerateAssignment") : t("caseQuestionGenerator.buttonGenerateExam")}
               </Button>
               {isGenerating && (
                 <Button
@@ -607,15 +606,15 @@ export function CaseQuestionGenerator({
                   className="gap-1.5"
                 >
                   <X className="w-3.5 h-3.5" />
-                  취소
+                  {t("caseQuestionGenerator.buttonCancel")}
                 </Button>
               )}
             </div>
             {isDisabled && (
               <p className="text-xs text-muted-foreground">
                 {isAssignmentMode
-                  ? "과제 제목과 리서치 주제를 입력해야 과제를 생성할 수 있습니다."
-                  : "시험 제목을 먼저 입력해야 문제를 생성할 수 있습니다."}
+                  ? t("caseQuestionGenerator.disabledHintAssignmentCard")
+                  : t("caseQuestionGenerator.disabledHintExamCard")}
               </p>
             )}
 
@@ -657,10 +656,10 @@ export function CaseQuestionGenerator({
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">
-                      AI 생성 미리보기
+                      {t("caseQuestionGenerator.previewTitle")}
                     </h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      생성 완료 시 자동으로 문제 목록에 추가됩니다.
+                      {t("caseQuestionGenerator.autoAddHint")}
                     </p>
                   </div>
                 </div>

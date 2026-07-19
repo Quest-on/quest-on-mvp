@@ -53,6 +53,7 @@ import {
 import type { ChatMessage, GeneratedQuestion } from "@/hooks/useQuestionGeneration";
 import { useBulkQuestionGeneration } from "@/hooks/useBulkQuestionGeneration";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 
 type ExtractionStatus = "uploading" | "extracting" | "done" | "failed";
 
@@ -117,18 +118,15 @@ interface SimpleExamAuthoringFormProps {
   onRemoveExistingFile?: (index: number) => void;
 }
 
-function getStatusText(status?: ExtractionStatus): string {
+type StatusTextKey = "simpleExamAuthoringForm.statusUploading" | "simpleExamAuthoringForm.statusExtracting" | "simpleExamAuthoringForm.statusDone" | "simpleExamAuthoringForm.statusFailed" | "simpleExamAuthoringForm.statusWaiting";
+
+function getStatusTextKey(status?: ExtractionStatus): StatusTextKey {
   switch (status) {
-    case "uploading":
-      return "업로드 중";
-    case "extracting":
-      return "분석 중";
-    case "done":
-      return "완료";
-    case "failed":
-      return "실패";
-    default:
-      return "대기";
+    case "uploading": return "simpleExamAuthoringForm.statusUploading";
+    case "extracting": return "simpleExamAuthoringForm.statusExtracting";
+    case "done": return "simpleExamAuthoringForm.statusDone";
+    case "failed": return "simpleExamAuthoringForm.statusFailed";
+    default: return "simpleExamAuthoringForm.statusWaiting";
   }
 }
 
@@ -142,6 +140,7 @@ function Field({
   htmlFor,
   required,
   optional,
+  optionalLabel = "선택",
   helper,
   action,
   children,
@@ -150,6 +149,7 @@ function Field({
   htmlFor?: string;
   required?: boolean;
   optional?: boolean;
+  optionalLabel?: string;
   helper?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
@@ -170,7 +170,7 @@ function Field({
             )}
             {optional && (
               <span className="text-xs font-normal text-muted-foreground">
-                선택
+                {optionalLabel}
               </span>
             )}
           </Label>
@@ -184,24 +184,20 @@ function Field({
 }
 
 /** 문제 추가 다이얼로그에서 고르는 문제 유형. */
-const QUESTION_TYPE_OPTIONS: {
+const QUESTION_TYPE_OPTION_KEYS: {
   type: Question["type"];
-  label: string;
-  description: string;
+  labelKey: "simpleExamAuthoringForm.typeMcqLabel" | "simpleExamAuthoringForm.typeOxLabel" | "simpleExamAuthoringForm.typeEssayLabel";
+  descKey: "simpleExamAuthoringForm.typeMcqDesc" | "simpleExamAuthoringForm.typeOxDesc" | "simpleExamAuthoringForm.typeEssayDesc";
 }[] = [
-  {
-    type: "multiple-choice",
-    label: "사지선다",
-    description: "4지선다 객관식",
-  },
-  { type: "true-false", label: "O·X", description: "참·거짓 O/X" },
-  { type: "essay", label: "사례형", description: "서술형 사례" },
+  { type: "multiple-choice", labelKey: "simpleExamAuthoringForm.typeMcqLabel", descKey: "simpleExamAuthoringForm.typeMcqDesc" },
+  { type: "true-false", labelKey: "simpleExamAuthoringForm.typeOxLabel", descKey: "simpleExamAuthoringForm.typeOxDesc" },
+  { type: "essay", labelKey: "simpleExamAuthoringForm.typeEssayLabel", descKey: "simpleExamAuthoringForm.typeEssayDesc" },
 ];
 
-const SCORE_BUCKET_LABELS: Record<ScoreWeightBucket, string> = {
-  "multiple-choice": "사지선다",
-  "true-false": "O/X",
-  case: "사례형",
+const SCORE_BUCKET_LABEL_KEYS: Record<ScoreWeightBucket, "simpleExamAuthoringForm.scoreBucketMcq" | "simpleExamAuthoringForm.scoreBucketOx" | "simpleExamAuthoringForm.scoreBucketCase"> = {
+  "multiple-choice": "simpleExamAuthoringForm.scoreBucketMcq",
+  "true-false": "simpleExamAuthoringForm.scoreBucketOx",
+  case: "simpleExamAuthoringForm.scoreBucketCase",
 };
 
 const SCORE_BUCKET_COLORS: Record<ScoreWeightBucket, string> = {
@@ -209,6 +205,16 @@ const SCORE_BUCKET_COLORS: Record<ScoreWeightBucket, string> = {
   "true-false": "bg-primary/65",
   case: "bg-primary/35",
 };
+
+const QUICK_QUESTION_COUNTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
+// 한 번에 추가/생성할 수 있는 최대 문항 수. AI 생성 라우트가 문항당 병렬
+// OpenAI 호출을 발사하므로(비용·rate-limit 폭주 방지) 상한을 보수적으로 유지한다.
+export const MAX_QUESTION_ADD_COUNT = 10;
+
+function normalizeQuestionCount(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.max(1, Math.min(MAX_QUESTION_ADD_COUNT, Math.floor(value)));
+}
 
 function getPresentScoreBuckets(questions: Question[]): ScoreWeightBucket[] {
   const buckets = new Set<ScoreWeightBucket>();
@@ -239,23 +245,25 @@ function formatScoreValue(value: number): string {
 function QuestionTypePicker({
   value,
   onChange,
+  t,
 }: {
   value: Question["type"];
   onChange: (type: Question["type"]) => void;
+  t: ReturnType<typeof useTranslations<"authoring">>;
 }) {
   const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
     const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"];
     if (!keys.includes(e.key)) return;
     e.preventDefault();
-    const currentIndex = QUESTION_TYPE_OPTIONS.findIndex(
+    const currentIndex = QUESTION_TYPE_OPTION_KEYS.findIndex(
       (o) => o.type === value,
     );
     const delta =
       e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1;
     const nextIndex =
-      (currentIndex + delta + QUESTION_TYPE_OPTIONS.length) %
-      QUESTION_TYPE_OPTIONS.length;
-    const next = QUESTION_TYPE_OPTIONS[nextIndex];
+      (currentIndex + delta + QUESTION_TYPE_OPTION_KEYS.length) %
+      QUESTION_TYPE_OPTION_KEYS.length;
+    const next = QUESTION_TYPE_OPTION_KEYS[nextIndex];
     onChange(next.type);
     document.getElementById(`question-type-${next.type}`)?.focus();
   };
@@ -263,10 +271,10 @@ function QuestionTypePicker({
   return (
     <div
       role="radiogroup"
-      aria-label="문제 유형"
+      aria-label={t("simpleExamAuthoringForm.ariaQuestionType")}
       className="grid grid-cols-1 gap-3 sm:grid-cols-3"
     >
-      {QUESTION_TYPE_OPTIONS.map((option) => {
+      {QUESTION_TYPE_OPTION_KEYS.map((option) => {
         const isSelected = value === option.type;
         return (
           <button
@@ -284,9 +292,9 @@ function QuestionTypePicker({
                 : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
             }`}
           >
-            <span className="text-base font-semibold">{option.label}</span>
+            <span className="text-base font-semibold">{t(option.labelKey)}</span>
             <span className="text-xs text-muted-foreground">
-              {option.description}
+              {t(option.descKey)}
             </span>
           </button>
         );
@@ -338,6 +346,7 @@ export function SimpleExamAuthoringForm({
   existingFiles,
   onRemoveExistingFile,
 }: SimpleExamAuthoringFormProps) {
+  const t = useTranslations("authoring");
   const [showAdvancedGrading, setShowAdvancedGrading] = useState(false);
   // "+" 문제 추가 — 문제 유형을 고르는 Dialog 의 열림 상태.
   const [isAddPickerOpen, setIsAddPickerOpen] = useState(false);
@@ -385,7 +394,7 @@ export function SimpleExamAuthoringForm({
 
     // 에러 알림
     if (errorTypes.length > 0) {
-      toast.error("일부 문제 생성에 실패했습니다. 다시 시도해주세요.");
+      toast.error(t("simpleExamAuthoringForm.toastGenerateFailed"));
     }
 
     // 전부 성공이면 Dialog 닫기 (에러가 있으면 열린 채로 프롬프트 유지)
@@ -400,16 +409,17 @@ export function SimpleExamAuthoringForm({
 
   // "추가" 버튼 핸들러
   const handleAdd = useCallback(async () => {
+    const safePickedCount = normalizeQuestionCount(pickedCount);
     if (!pickedPrompt.trim()) {
       // 프롬프트 없음 → 빈 문제 추가
-      onQuestionAdd(pickedType, pickedCount);
+      onQuestionAdd(pickedType, safePickedCount);
       setIsAddPickerOpen(false);
       setPickedCount(1);
       return;
     }
     // 프롬프트 있음 → AI 생성
     if (!title?.trim()) {
-      toast.error("AI 문제 생성 전에 시험 제목을 입력해주세요.");
+      toast.error(t("simpleExamAuthoringForm.toastTitleRequired"));
       return;
     }
     const slots = [
@@ -421,7 +431,7 @@ export function SimpleExamAuthoringForm({
             ? "true-false"
             : "case") as "mcq" | "true-false" | "case",
         prompt: pickedPrompt,
-        count: pickedCount,
+        count: safePickedCount,
       },
     ];
     await generateAll(slots, {
@@ -497,15 +507,15 @@ export function SimpleExamAuthoringForm({
   };
 
   const materialSummary = useMemo(() => {
-    if (files.length === 0) return "자료 없음";
+    if (files.length === 0) return t("simpleExamAuthoringForm.materialSummaryNone");
     const statuses = Array.from(extractionStatus?.values() ?? []);
     const failed = statuses.filter((status) => status === "failed").length;
     const inProgress = statuses.filter(
       (status) => status === "uploading" || status === "extracting",
     ).length;
-    if (failed > 0) return `${files.length}개 중 ${failed}개 실패`;
-    if (inProgress > 0) return `${files.length}개 분석 중`;
-    return `${files.length}개 준비됨`;
+    if (failed > 0) return t("simpleExamAuthoringForm.materialSummaryFailed", { total: files.length, failed });
+    if (inProgress > 0) return t("simpleExamAuthoringForm.materialSummaryAnalyzing", { total: files.length });
+    return t("simpleExamAuthoringForm.materialSummaryReady", { total: files.length });
   }, [extractionStatus, files.length]);
 
   const [durationInput, setDurationInput] = useState<string>(
@@ -513,18 +523,20 @@ export function SimpleExamAuthoringForm({
   );
   const parsedDurationInput =
     durationInput === "" ? null : Number.parseInt(durationInput, 10);
+  const DURATION_REASON_EMPTY = t("simpleExamAuthoringForm.fieldDurationLabel") + ":empty";
+  const DURATION_REASON_SHORT = t("simpleExamAuthoringForm.fieldDurationLabel") + ":short";
   const durationSubmitReason =
     !isUnlimited && durationInput === ""
-      ? "시험 시간을 입력해주세요"
+      ? DURATION_REASON_EMPTY
       : !isUnlimited &&
           parsedDurationInput !== null &&
           parsedDurationInput < 15
-        ? "시험 시간은 15분 이상이거나 무제한이어야 합니다"
+        ? DURATION_REASON_SHORT
         : null;
   const visibleSubmitReasons = durationSubmitReason
     ? [
-        ...submitReasons.filter((reason) => !reason.includes("시험 시간")),
-        durationSubmitReason,
+        ...submitReasons.filter((reason) => !reason.startsWith(t("simpleExamAuthoringForm.fieldDurationLabel"))),
+        durationSubmitReason === DURATION_REASON_EMPTY ? t("examInfoForm.durationWarning") : t("simpleExamAuthoringForm.durationWarning"),
       ]
     : submitReasons;
   const formReady = visibleSubmitReasons.length === 0;
@@ -533,10 +545,10 @@ export function SimpleExamAuthoringForm({
     parsedDurationInput !== null &&
     parsedDurationInput < 15;
   const durationBadgeLabel = isUnlimited
-    ? "무제한"
+    ? t("simpleExamAuthoringForm.switchUnlimited")
     : durationInput === ""
-      ? "시간 미입력"
-      : `${parsedDurationInput ?? duration}분`;
+      ? t("simpleExamAuthoringForm.fieldDurationLabel")
+      : `${parsedDurationInput ?? duration}${t("simpleExamAuthoringForm.unitMinutes")}`;
 
   const handleDurationInputChange = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -689,7 +701,7 @@ export function SimpleExamAuthoringForm({
         });
         return data;
       } catch {
-        toast.error("문제 수정에 실패했습니다.");
+        toast.error(t("questionsList.toastAdjustFailed"));
         return null;
       } finally {
         setIsAdjusting(false);
@@ -703,18 +715,18 @@ export function SimpleExamAuthoringForm({
       <div className="space-y-10">
         {/* 시험 제목 */}
         <Field
-          label="시험 제목"
+          label={t("simpleExamAuthoringForm.fieldTitleLabel")}
           htmlFor="simple-title"
           required
-          helper="학생이 입장 화면과 결과지에서 보게 될 이름입니다."
+          helper={t("simpleExamAuthoringForm.fieldTitleHelper")}
         >
           <Input
             ref={titleRef}
             id="simple-title"
-            aria-label="시험 제목"
+            aria-label={t("simpleExamAuthoringForm.fieldTitleAria")}
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
-            placeholder="예) 국제경영론 25-1 중간고사"
+            placeholder={t("simpleExamAuthoringForm.fieldTitlePlaceholder")}
             className="h-12 text-base bg-white"
             required
           />
@@ -723,16 +735,16 @@ export function SimpleExamAuthoringForm({
         {/* 시험 코드 — 편집 모드에서만 표시 */}
         {examCode != null && (
           <Field
-            label="시험 코드"
+            label={t("simpleExamAuthoringForm.fieldCodeLabel")}
             required
-            helper="학생이 시험에 입장할 때 사용하는 코드입니다. 변경 시 학생들에게 새 코드를 알려주세요."
+            helper={t("simpleExamAuthoringForm.fieldCodeHelper")}
           >
             <div className="flex items-center gap-2">
               <Input
                 value={examCode}
                 readOnly
                 className="h-11 w-40 font-mono text-base tracking-widest bg-white"
-                aria-label="시험 코드"
+                aria-label={t("simpleExamAuthoringForm.fieldCodeAria")}
               />
               {onCodeRegenerate && (
                 <Button
@@ -741,7 +753,7 @@ export function SimpleExamAuthoringForm({
                   size="sm"
                   onClick={onCodeRegenerate}
                 >
-                  재생성
+                  {t("simpleExamAuthoringForm.buttonRegenerate")}
                 </Button>
               )}
             </div>
@@ -750,9 +762,9 @@ export function SimpleExamAuthoringForm({
 
         {/* 시험 시간 */}
         <Field
-          label="시험 시간"
+          label={t("simpleExamAuthoringForm.fieldDurationLabel")}
           htmlFor="simple-duration"
-          helper="응시 제한 시간입니다. 무제한으로 두면 과제형으로 출제됩니다."
+          helper={t("simpleExamAuthoringForm.fieldDurationHelper")}
         >
           <div className="flex flex-wrap items-center gap-2">
             <Input
@@ -764,10 +776,10 @@ export function SimpleExamAuthoringForm({
               disabled={isUnlimited}
               onChange={handleDurationInputChange}
               onBlur={handleDurationInputBlur}
-              placeholder={isUnlimited ? "무제한" : "60"}
+              placeholder={isUnlimited ? t("simpleExamAuthoringForm.placeholderUnlimited") : t("simpleExamAuthoringForm.placeholderDuration")}
               className="h-11 w-28 text-center bg-white"
             />
-            <span className="text-sm text-muted-foreground">분</span>
+            <span className="text-sm text-muted-foreground">{t("simpleExamAuthoringForm.unitMinutes")}</span>
             {[30, 60, 90, 120].map((value) => (
               <Button
                 key={value}
@@ -803,13 +815,13 @@ export function SimpleExamAuthoringForm({
                 htmlFor="simple-unlimited"
                 className="cursor-pointer text-sm"
               >
-                무제한
+                {t("simpleExamAuthoringForm.switchUnlimited")}
               </Label>
             </div>
             {showDurationWarning && (
               <p className="flex basis-full items-center gap-1.5 text-sm text-amber-600 dark:text-amber-400">
                 <AlertTriangle className="h-4 w-4" />
-                출제하려면 15분 이상으로 설정하세요.
+                {t("simpleExamAuthoringForm.durationWarning")}
               </p>
             )}
           </div>
@@ -817,9 +829,10 @@ export function SimpleExamAuthoringForm({
 
         {/* 수업 자료 */}
         <Field
-          label="수업 자료"
+          label={t("simpleExamAuthoringForm.fieldMaterialsLabel")}
           optional
-          helper="업로드하면 AI가 자료를 근거로 문제를 만듭니다."
+          optionalLabel={t("simpleExamAuthoringForm.optional")}
+          helper={t("simpleExamAuthoringForm.fieldMaterialsHelper")}
         >
           <div className="space-y-3">
             <Input
@@ -853,11 +866,11 @@ export function SimpleExamAuthoringForm({
               )}
               <span className="text-sm font-medium">
                 {isDragOver
-                  ? "파일을 여기에 놓으세요"
-                  : "파일을 드래그하거나 클릭하여 선택"}
+                  ? t("simpleExamAuthoringForm.dropHint")
+                  : t("simpleExamAuthoringForm.uploadHint")}
               </span>
               <span className="text-xs text-muted-foreground">
-                PPT · PDF · 워드 · 엑셀 · CSV · 한글 · 이미지 (최대 50MB)
+                {t("simpleExamAuthoringForm.uploadSupportedFormats")}
               </span>
             </button>
             {/* 기존 파일 chips (편집 모드에서 DB에서 로드한 파일) */}
@@ -877,7 +890,7 @@ export function SimpleExamAuthoringForm({
                         size="icon"
                         className="size-6 shrink-0"
                         onClick={() => onRemoveExistingFile(index)}
-                        aria-label={`${name} 삭제`}
+                        aria-label={t("simpleExamAuthoringForm.ariaDeleteExistingFile", { name })}
                       >
                         <X className="h-3.5 w-3.5" />
                       </Button>
@@ -911,7 +924,7 @@ export function SimpleExamAuthoringForm({
                       )}
                       <span className="truncate">{file.name}</span>
                       <span className="shrink-0 text-xs opacity-75">
-                        {getStatusText(status)}
+                        {t(getStatusTextKey(status))}
                       </span>
                       <Button
                         type="button"
@@ -919,7 +932,7 @@ export function SimpleExamAuthoringForm({
                         size="icon"
                         className="size-6 shrink-0"
                         onClick={() => onRemoveFile(index)}
-                        aria-label={`${file.name} 삭제`}
+                        aria-label={t("simpleExamAuthoringForm.ariaDeleteFile", { name: file.name })}
                       >
                         <X className="h-3.5 w-3.5" />
                       </Button>
@@ -936,8 +949,8 @@ export function SimpleExamAuthoringForm({
 
         {/* AI 응답 언어 */}
         <Field
-          label="AI 응답 언어"
-          helper="학생이 시험 중 AI 튜터와 대화할 때 사용할 언어입니다."
+          label={t("simpleExamAuthoringForm.fieldLanguageLabel")}
+          helper={t("simpleExamAuthoringForm.fieldLanguageHelper")}
         >
           <Select
             value={language}
@@ -947,20 +960,20 @@ export function SimpleExamAuthoringForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ko">한국어 AI</SelectItem>
-              <SelectItem value="en">English AI</SelectItem>
+              <SelectItem value="ko">{t("simpleExamAuthoringForm.languageKo")}</SelectItem>
+              <SelectItem value="en">{t("simpleExamAuthoringForm.languageEn")}</SelectItem>
             </SelectContent>
           </Select>
         </Field>
 
         {/* 문제 — "+" 버튼이 문제 추가 Dialog(유형/개수/AI 프롬프트)를 연다. */}
         <Field
-          label="문제"
+          label={t("simpleExamAuthoringForm.fieldQuestionsLabel")}
           required
           helper={
             questions.length > 0
-              ? `${questions.length}개 작성됨`
-              : "최소 1개 이상 필요합니다."
+              ? t("simpleExamAuthoringForm.fieldQuestionsHelperHas", { count: questions.length })
+              : t("simpleExamAuthoringForm.fieldQuestionsHelperEmpty")
           }
         >
           <div className="space-y-8" data-testid="manual-questions-section">
@@ -983,7 +996,7 @@ export function SimpleExamAuthoringForm({
                       className="size-7"
                       disabled={index === 0}
                       onClick={() => onQuestionMove(index, "up")}
-                      aria-label="위로 이동"
+                      aria-label={t("simpleExamAuthoringForm.ariaUp")}
                     >
                       <ArrowUp className="h-3.5 w-3.5" />
                     </Button>
@@ -994,7 +1007,7 @@ export function SimpleExamAuthoringForm({
                       className="size-7"
                       disabled={index === questions.length - 1}
                       onClick={() => onQuestionMove(index, "down")}
-                      aria-label="아래로 이동"
+                      aria-label={t("simpleExamAuthoringForm.ariaDown")}
                     >
                       <ArrowDown className="h-3.5 w-3.5" />
                     </Button>
@@ -1016,7 +1029,7 @@ export function SimpleExamAuthoringForm({
             <button
               type="button"
               onClick={() => setIsAddPickerOpen(true)}
-              aria-label="문제 추가"
+              aria-label={t("simpleExamAuthoringForm.fieldQuestionsLabel")}
               data-testid={
                 questions.length === 0
                   ? "empty-add-question-btn"
@@ -1026,10 +1039,10 @@ export function SimpleExamAuthoringForm({
             >
               <Plus className="h-8 w-8 text-muted-foreground" />
               <span className="text-sm font-medium">
-                {questions.length === 0 ? "첫 문제 추가" : "문제 추가"}
+                {questions.length === 0 ? t("simpleExamAuthoringForm.buttonAddFirstQuestion") : t("simpleExamAuthoringForm.buttonAddQuestion")}
               </span>
               <span className="text-xs text-muted-foreground">
-                직접 작성하거나 AI로 생성하세요
+                {t("simpleExamAuthoringForm.addQuestionHint")}
               </span>
             </button>
           </div>
@@ -1037,16 +1050,16 @@ export function SimpleExamAuthoringForm({
 
         {/* 최종 점수 비중 */}
         <Field
-          label="최종 점수 비중"
+          label={t("simpleExamAuthoringForm.fieldScoreWeightsLabel")}
           required
-          helper="유형별 배점을 직접 정하세요. 합계는 자유이며 최종 점수는 100점 만점으로 환산됩니다. 같은 유형 안의 문항은 동일하게 나눠 계산됩니다."
+          helper={t("simpleExamAuthoringForm.fieldScoreWeightsHelper")}
         >
           <div className="rounded-md border bg-muted/20 p-3">
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm text-muted-foreground">
                 {scoreWeights && presentScoreBuckets.length > 0
-                  ? "유형별 배점을 자유롭게 정할 수 있습니다."
-                  : "문항을 추가하면 문제 유형별 점수 배분이 자동으로 설정됩니다."}
+                  ? t("simpleExamAuthoringForm.scoreWeightsHintFree")
+                  : t("simpleExamAuthoringForm.scoreWeightsHintEmpty")}
               </span>
               {scoreWeights && presentScoreBuckets.length > 1 && (
                 <Button
@@ -1058,7 +1071,7 @@ export function SimpleExamAuthoringForm({
                   }
                   className="ml-auto"
                 >
-                  균등 재분배
+                  {t("simpleExamAuthoringForm.buttonRedistribute")}
                 </Button>
               )}
             </div>
@@ -1075,7 +1088,7 @@ export function SimpleExamAuthoringForm({
                           style={{
                             width: `${totalScoreWeight > 0 ? (weight / totalScoreWeight) * 100 : 0}%`,
                           }}
-                          title={`${SCORE_BUCKET_LABELS[bucket]} ${weight}%`}
+                          title={`${t(SCORE_BUCKET_LABEL_KEYS[bucket])} ${weight}%`}
                         />
                       );
                     })}
@@ -1091,7 +1104,7 @@ export function SimpleExamAuthoringForm({
                           <span
                             className={`h-2 w-2 rounded-full ${SCORE_BUCKET_COLORS[bucket]}`}
                           />
-                          {SCORE_BUCKET_LABELS[bucket]} {weight}%
+                          {t(SCORE_BUCKET_LABEL_KEYS[bucket])} {weight}%
                         </span>
                       );
                     })}
@@ -1100,7 +1113,7 @@ export function SimpleExamAuthoringForm({
 
                 {presentScoreBuckets.length === 1 && (
                   <p className="rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
-                    현재 문제 유형이 하나뿐이라 전체 점수를 이 유형에 배정합니다.
+                    {t("simpleExamAuthoringForm.scoreWeightsSingleType")}
                   </p>
                 )}
 
@@ -1121,14 +1134,13 @@ export function SimpleExamAuthoringForm({
                               className={`h-2.5 w-2.5 rounded-full ${SCORE_BUCKET_COLORS[bucket]}`}
                             />
                             <span className="text-sm font-medium">
-                              {SCORE_BUCKET_LABELS[bucket]}
+                              {t(SCORE_BUCKET_LABEL_KEYS[bucket])}
                             </span>
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            {scoreBucketCounts[bucket]}문항
                             {perQuestionScore !== null
-                              ? ` · 문항당 ${formatScoreValue(perQuestionScore)}점`
-                              : ""}
+                              ? t("simpleExamAuthoringForm.scoreWeightsPerQuestion", { count: scoreBucketCounts[bucket], score: formatScoreValue(perQuestionScore) })
+                              : t("simpleExamAuthoringForm.scoreWeightsCount", { count: scoreBucketCounts[bucket] })}
                           </p>
                         </div>
                         <Slider
@@ -1138,7 +1150,7 @@ export function SimpleExamAuthoringForm({
                           max={maxWeight}
                           step={1}
                           disabled={isOnlyBucket}
-                          aria-label={`${SCORE_BUCKET_LABELS[bucket]} 비중`}
+                          aria-label={t("simpleExamAuthoringForm.ariaSliderBucket", { bucket: t(SCORE_BUCKET_LABEL_KEYS[bucket]) })}
                         />
                         <div className="flex items-center gap-2 sm:justify-end">
                           <Input
@@ -1154,9 +1166,9 @@ export function SimpleExamAuthoringForm({
                               )
                             }
                             className="h-9 w-20 bg-white text-center"
-                            aria-label={`${SCORE_BUCKET_LABELS[bucket]} 비중`}
+                            aria-label={t("simpleExamAuthoringForm.ariaInputBucket", { bucket: t(SCORE_BUCKET_LABEL_KEYS[bucket]) })}
                           />
-                          <span className="text-sm text-muted-foreground">%</span>
+                          <span className="text-sm text-muted-foreground">{t("simpleExamAuthoringForm.unitPercent")}</span>
                         </div>
                       </div>
                     );
@@ -1169,7 +1181,7 @@ export function SimpleExamAuthoringForm({
                       {scoreWeightErrors.map((error) => (
                         <p key={error} className="flex items-center gap-1.5">
                           <AlertTriangle className="h-4 w-4" />
-                          저장된 비중이 현재 문제 구성과 맞지 않습니다. {error}
+                          {t("simpleExamAuthoringForm.scoreWeightsError", { error })}
                         </p>
                       ))}
                     </div>
@@ -1181,7 +1193,7 @@ export function SimpleExamAuthoringForm({
                         onScoreWeightsChange(buildDefaultScoreWeights(questions))
                       }
                     >
-                      현재 문제 기준으로 복구
+                      {t("simpleExamAuthoringForm.buttonRestoreWeights")}
                     </Button>
                   </div>
                 )}
@@ -1192,15 +1204,16 @@ export function SimpleExamAuthoringForm({
 
         {/* 채점 비중 */}
         <Field
-          label="채점 비중"
+          label={t("simpleExamAuthoringForm.fieldChatWeightLabel")}
           optional
-          helper="AI 대화 과정과 최종 답안을 채점에 반영하는 비율입니다. 비워두면 기본값 50:50으로 채점됩니다."
+          optionalLabel={t("simpleExamAuthoringForm.optional")}
+          helper={t("simpleExamAuthoringForm.fieldChatWeightHelper")}
         >
           <div className="rounded-md border bg-muted/20 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <FileText className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">
-                대화 {effectiveWeight}% / 최종 답안 {100 - effectiveWeight}%
+                {t("simpleExamAuthoringForm.chatWeightDisplay", { chat: effectiveWeight, final: 100 - effectiveWeight })}
               </span>
               <Button
                 type="button"
@@ -1209,7 +1222,7 @@ export function SimpleExamAuthoringForm({
                 onClick={() => setShowAdvancedGrading((prev) => !prev)}
                 className="ml-auto"
               >
-                조정
+                {t("simpleExamAuthoringForm.buttonAdjust")}
               </Button>
             </div>
             {showAdvancedGrading && (
@@ -1223,7 +1236,7 @@ export function SimpleExamAuthoringForm({
                     }
                   />
                   <Label htmlFor="simple-custom-weight" className="text-sm">
-                    직접 설정
+                    {t("simpleExamAuthoringForm.switchCustomWeight")}
                   </Label>
                 </div>
                 {isCustomWeight && (
@@ -1246,10 +1259,10 @@ export function SimpleExamAuthoringForm({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap gap-2">
               <Badge variant={formReady ? "default" : "outline"}>
-                {formReady ? "출제 가능" : "확인 필요"}
+                {formReady ? t("simpleExamAuthoringForm.badgeReady") : t("simpleExamAuthoringForm.badgeCheck")}
               </Badge>
               <Badge variant="outline">{durationBadgeLabel}</Badge>
-              <Badge variant="outline">문제 {questions.length}개</Badge>
+              <Badge variant="outline">{t("simpleExamAuthoringForm.badgeQuestionCount", { count: questions.length })}</Badge>
               <Badge variant="outline">{materialSummary}</Badge>
             </div>
             {visibleSubmitReasons.length > 0 && (
@@ -1265,12 +1278,12 @@ export function SimpleExamAuthoringForm({
           </div>
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={onCancel}>
-              취소
+              {t("simpleExamAuthoringForm.buttonCancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting || !formReady}>
               {isSubmitting
-                ? (submitButtonText ? "저장 중..." : "출제 중...")
-                : (submitButtonText ?? "출제하기")}
+                ? (submitButtonText ? t("simpleExamAuthoringForm.buttonSaving") : t("simpleExamAuthoringForm.buttonSubmitting"))
+                : (submitButtonText ?? t("simpleExamAuthoringForm.buttonSubmit"))}
             </Button>
           </div>
         </div>
@@ -1303,34 +1316,36 @@ export function SimpleExamAuthoringForm({
           data-testid="add-question-picker"
         >
           <DialogHeader>
-            <DialogTitle>문제 추가</DialogTitle>
+            <DialogTitle>{t("simpleExamAuthoringForm.dialogAddTitle")}</DialogTitle>
             <DialogDescription>
-              추가할 문제 유형을 선택하세요.
+              {t("simpleExamAuthoringForm.dialogAddDescription")}
             </DialogDescription>
           </DialogHeader>
-          <QuestionTypePicker value={pickedType} onChange={setPickedType} />
+          <QuestionTypePicker value={pickedType} onChange={setPickedType} t={t} />
           <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Label htmlFor="add-question-count" className="text-sm">
-                개수
+                {t("simpleExamAuthoringForm.dialogCountLabel")}
               </Label>
               <Select
                 value={pickedCount.toString()}
                 onValueChange={(value) =>
-                  setPickedCount(Number.parseInt(value, 10))
+                  setPickedCount(
+                    normalizeQuestionCount(Number.parseInt(value, 10)),
+                  )
                 }
               >
                 <SelectTrigger
                   id="add-question-count"
-                  className="h-9 w-20"
+                  className="h-9 w-28"
                   data-testid="add-question-count"
                 >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[1, 2, 3, 4, 5].map((n) => (
+                  {QUICK_QUESTION_COUNTS.map((n) => (
                     <SelectItem key={n} value={n.toString()}>
-                      {n}개
+                      {t("caseQuestionGenerator.countItem", { n })}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1341,13 +1356,13 @@ export function SimpleExamAuthoringForm({
           {/* 프롬프트 입력란 */}
           <div className="mt-1">
             <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-              어떤 문제를 만들고 싶은지 입력하세요{" "}
-              <span className="text-xs">(비워두면 빈 문제 추가)</span>
+              {t("simpleExamAuthoringForm.dialogPromptLabel")}{" "}
+              <span className="text-xs">{t("simpleExamAuthoringForm.dialogPromptOptional")}</span>
             </label>
             <Textarea
               value={pickedPrompt}
               onChange={(e) => setPickedPrompt(e.target.value)}
-              placeholder="예: AI 기술이 의료 산업에 미치는 영향을 분석하는 문제"
+              placeholder={t("simpleExamAuthoringForm.dialogPromptPlaceholder")}
               rows={3}
               className="resize-none"
               disabled={isBulkGenerating}
@@ -1364,15 +1379,15 @@ export function SimpleExamAuthoringForm({
               {isBulkGenerating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  생성 중...
+                  {t("simpleExamAuthoringForm.buttonGenerating")}
                 </>
               ) : pickedPrompt.trim() ? (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  AI로 {pickedCount}개 생성
+                  {t("simpleExamAuthoringForm.buttonAIGenerate", { count: pickedCount })}
                 </>
               ) : (
-                "추가"
+                t("simpleExamAuthoringForm.buttonAddManual")
               )}
             </Button>
           </div>

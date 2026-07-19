@@ -6,6 +6,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   Sheet,
   SheetContent,
@@ -41,6 +42,7 @@ function AdminSidebarLinks({
 }: {
   onNavigate?: () => void;
 }) {
+  const t = useTranslations("admin");
   const pathname = usePathname();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
@@ -74,7 +76,7 @@ function AdminSidebarLinks({
       <SidebarPanelContent>
         <nav
           className="flex-1 space-y-1 overflow-y-auto p-3 sm:p-4"
-          aria-label="주요 네비게이션"
+          aria-label={t("shell.mainNav")}
         >
           {ADMIN_NAVIGATION_ITEMS.map((item) => {
             const Icon = item.icon;
@@ -95,10 +97,10 @@ function AdminSidebarLinks({
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 )}
                 aria-current={isActive ? "page" : undefined}
-                title={isCollapsed ? item.title : undefined}
+                title={isCollapsed ? t(item.titleKey) : undefined}
               >
                 <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                {!isCollapsed && <span>{item.title}</span>}
+                {!isCollapsed && <span>{t(item.titleKey)}</span>}
               </Link>
             );
           })}
@@ -111,6 +113,7 @@ function AdminSidebarLinks({
 }
 
 export function AdminShell({ title, icon: HeaderIcon, children }: AdminShellProps) {
+  const t = useTranslations("admin");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -127,7 +130,7 @@ export function AdminShell({ title, icon: HeaderIcon, children }: AdminShellProp
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-64 p-0">
           <SheetHeader className="sr-only">
-            <SheetTitle>메뉴</SheetTitle>
+            <SheetTitle>{t("shell.menuTitle")}</SheetTitle>
           </SheetHeader>
           <div className="flex h-full flex-col bg-sidebar">
             <SidebarProvider defaultOpen={true}>

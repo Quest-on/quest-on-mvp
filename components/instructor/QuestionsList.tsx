@@ -20,6 +20,7 @@ import type { Question } from "./QuestionEditor";
 import { QuestionAdjustSheet } from "./QuestionAdjustSheet";
 import type { ChatMessage } from "@/hooks/useQuestionGeneration";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 
 interface QuestionsListProps {
   questions: Question[];
@@ -45,6 +46,7 @@ interface AdjustResult {
 }
 
 export function QuestionsList({ questions, highlightedIds, defaultOpen = true, mode = "exam", language, variant = "line", onUpdate, onRemove, onAdd, onMove }: QuestionsListProps) {
+  const t = useTranslations("authoring");
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [adjustHistories, setAdjustHistories] = useState<Map<string, ChatMessage[]>>(new Map());
@@ -91,7 +93,7 @@ export function QuestionsList({ questions, highlightedIds, defaultOpen = true, m
       });
       return data;
     } catch {
-      toast.error("수정에 실패했습니다.");
+      toast.error(t("questionsList.toastAdjustFailed"));
       return null;
     } finally {
       setIsAdjusting(false);
@@ -127,10 +129,10 @@ export function QuestionsList({ questions, highlightedIds, defaultOpen = true, m
           >
             <CardTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5 text-primary" />
-              문제 직접 작성
+              {t("questionsList.cardTitle")}
               {questions.length > 0 && (
                 <span className="text-xs font-normal bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                  {questions.length}개
+                  {t("questionsList.countBadge", { count: questions.length })}
                 </span>
               )}
             </CardTitle>
@@ -147,7 +149,7 @@ export function QuestionsList({ questions, highlightedIds, defaultOpen = true, m
         <CollapsibleContent>
           <CardContent>
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-muted-foreground">{mode === "assignment" ? "과제 문제를 입력하세요" : "시험 문제를 입력하세요"}</p>
+              <p className="text-sm text-muted-foreground">{mode === "assignment" ? t("questionsList.hintAssignment") : t("questionsList.hintExam")}</p>
               {onAdd && (
                 <Button
                   type="button"
@@ -158,7 +160,7 @@ export function QuestionsList({ questions, highlightedIds, defaultOpen = true, m
                   data-testid="add-question-btn"
                 >
                   <Plus className="w-4 h-4" />
-                  문제 추가
+                  {t("questionsList.buttonAddQuestion")}
                 </Button>
               )}
             </div>
@@ -182,7 +184,7 @@ export function QuestionsList({ questions, highlightedIds, defaultOpen = true, m
                           className="size-7"
                           disabled={index === 0}
                           onClick={() => onMove(index, "up")}
-                          aria-label="위로 이동"
+                          aria-label={t("questionsList.ariaUp")}
                         >
                           <ArrowUp className="w-3.5 h-3.5" />
                         </Button>
@@ -193,7 +195,7 @@ export function QuestionsList({ questions, highlightedIds, defaultOpen = true, m
                           className="size-7"
                           disabled={index === questions.length - 1}
                           onClick={() => onMove(index, "down")}
-                          aria-label="아래로 이동"
+                          aria-label={t("questionsList.ariaDown")}
                         >
                           <ArrowDown className="w-3.5 h-3.5" />
                         </Button>
@@ -214,7 +216,7 @@ export function QuestionsList({ questions, highlightedIds, defaultOpen = true, m
             )}
             {questions.length === 0 && onAdd && (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-3">아직 문제가 없습니다</p>
+                <p className="text-muted-foreground mb-3">{t("questionsList.emptyState")}</p>
                 <Button
                   type="button"
                   variant="outline"
@@ -223,7 +225,7 @@ export function QuestionsList({ questions, highlightedIds, defaultOpen = true, m
                   data-testid="empty-add-question-btn"
                 >
                   <Plus className="w-4 h-4" />
-                  첫 문제 추가하기
+                  {t("questionsList.buttonAddFirst")}
                 </Button>
               </div>
             )}

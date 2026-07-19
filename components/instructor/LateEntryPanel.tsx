@@ -9,6 +9,7 @@ import { Clock, UserCheck, UserX, Loader2 } from "lucide-react";
 import { createSupabaseClient } from "@/lib/supabase-client";
 import { qk } from "@/lib/query-keys";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 
 interface LateStudent {
   id: string;
@@ -25,6 +26,7 @@ interface LateEntryPanelProps {
 }
 
 export function LateEntryPanel({ examId, examStatus }: LateEntryPanelProps) {
+  const t = useTranslations("grading");
   const queryClient = useQueryClient();
   const queryKey = qk.instructor.lateStudents(examId);
   const isRunning = examStatus === "running";
@@ -78,17 +80,17 @@ export function LateEntryPanel({ examId, examStatus }: LateEntryPanelProps) {
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err.message || "요청 실패");
+        throw new Error(err.message || t("lateEntry.requestFail"));
       }
       return response.json();
     },
     onSuccess: (_, { action }) => {
-      toast.success(action === "approve" ? "학생 입장을 승인했습니다." : "학생 입장을 거부했습니다.");
+      toast.success(action === "approve" ? t("lateEntry.approveSuccess") : t("lateEntry.denySuccess"));
       queryClient.invalidateQueries({ queryKey });
       queryClient.invalidateQueries({ queryKey: qk.instructor.examDetail(examId) });
     },
     onError: (error: Error) => {
-      toast.error(`오류: ${error.message}`);
+      toast.error(t("lateEntry.errorMsg", { message: error.message }));
     },
   });
 
@@ -101,10 +103,10 @@ export function LateEntryPanel({ examId, examStatus }: LateEntryPanelProps) {
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2 text-amber-700 dark:text-amber-400">
           <Clock className="h-4 w-4" />
-          지각 학생 대기
+          {t("lateEntry.cardTitle")}
           {lateStudents.length > 0 && (
             <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-              {lateStudents.length}명
+              {t("lateEntry.countBadge", { count: lateStudents.length })}
             </Badge>
           )}
         </CardTitle>
@@ -113,11 +115,11 @@ export function LateEntryPanel({ examId, examStatus }: LateEntryPanelProps) {
         {isLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span>불러오는 중...</span>
+            <span>{t("lateEntry.loading")}</span>
           </div>
         ) : lateStudents.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-2">
-            지각 대기 중인 학생이 없습니다.
+            {t("lateEntry.empty")}
           </p>
         ) : (
           <div className="space-y-3">
@@ -139,7 +141,7 @@ export function LateEntryPanel({ examId, examStatus }: LateEntryPanelProps) {
                       <p className="text-xs text-muted-foreground">{student.student_number}</p>
                     )}
                     <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-                      {waitingMin}분 {waitingSec}초 대기 중
+                      {t("lateEntry.waitingTime", { min: waitingMin, sec: waitingSec })}
                     </p>
                   </div>
                   <div className="flex gap-2 shrink-0">
@@ -153,7 +155,7 @@ export function LateEntryPanel({ examId, examStatus }: LateEntryPanelProps) {
                       }
                     >
                       <UserCheck className="h-3.5 w-3.5 mr-1" />
-                      승인
+                      {t("lateEntry.approveButton")}
                     </Button>
                     <Button
                       size="sm"
@@ -165,7 +167,7 @@ export function LateEntryPanel({ examId, examStatus }: LateEntryPanelProps) {
                       }
                     >
                       <UserX className="h-3.5 w-3.5 mr-1" />
-                      거부
+                      {t("lateEntry.denyButton")}
                     </Button>
                   </div>
                 </div>

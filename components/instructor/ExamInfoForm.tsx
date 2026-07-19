@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Card,
   CardContent,
@@ -5,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -30,8 +33,10 @@ import {
 } from "@/components/ui/select";
 import { HelpCircle, AlertTriangle, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
-import { ko } from "date-fns/locale";
+import { ko, enUS } from "date-fns/locale";
 import { useState, useEffect } from "react";
+import { useLocale } from "next-intl";
+import { formatDate } from "@/lib/i18n/format";
 
 interface ExamInfoFormProps {
   title: string;
@@ -75,6 +80,9 @@ export function ExamInfoForm({
   titleRef,
   codeReadOnly = false,
 }: ExamInfoFormProps) {
+  const t = useTranslations("authoring");
+  const locale = useLocale() as "ko" | "en";
+  const dateFnsLocale = locale === "ko" ? ko : enUS;
   const [durationInput, setDurationInput] = useState<string>(
     duration === 0 ? "" : duration.toString()
   );
@@ -157,23 +165,21 @@ export function ExamInfoForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{mode === "assignment" ? "과제 정보" : "시험 정보"}</CardTitle>
-        <CardDescription>{mode === "assignment" ? "과제의 기본 세부사항" : "시험의 기본 세부사항"}</CardDescription>
+        <CardTitle>{mode === "assignment" ? t("examInfoForm.cardTitleAssignment") : t("examInfoForm.cardTitleExam")}</CardTitle>
+        <CardDescription>{mode === "assignment" ? t("examInfoForm.cardDescriptionAssignment") : t("examInfoForm.cardDescriptionExam")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label htmlFor="title">{mode === "assignment" ? "과제 제목" : "시험 제목"}</Label>
+              <Label htmlFor="title">{mode === "assignment" ? t("examInfoForm.labelTitleAssignment") : t("examInfoForm.labelTitleExam")}</Label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs">
-                    시험의 제목을 입력하세요. 예: &quot;국제경영론 25-1
-                    중간고사&quot;와 같이 과목명과 시험 정보를 포함하면
-                    좋습니다.
+                    {t("examInfoForm.tooltipTitle")}
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -183,7 +189,7 @@ export function ExamInfoForm({
               id="title"
               value={title}
               onChange={(e) => onTitleChange(e.target.value)}
-              placeholder="예) 국제경영론 25-1 중간고사"
+              placeholder={t("examInfoForm.placeholderTitle")}
               required
               className={titleError ? "border-red-500 focus-visible:ring-red-500" : ""}
             />
@@ -193,15 +199,14 @@ export function ExamInfoForm({
           </div>
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label htmlFor="code">{mode === "assignment" ? "과제 코드" : "시험 코드"}</Label>
+              <Label htmlFor="code">{mode === "assignment" ? t("examInfoForm.labelCodeAssignment") : t("examInfoForm.labelCodeExam")}</Label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs">
-                    학생들이 시험에 접속할 때 사용하는 고유 코드입니다. 자동으로
-                    생성되며, 재생성 버튼을 눌러 변경할 수 있습니다.
+                    {t("examInfoForm.tooltipCode")}
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -218,7 +223,7 @@ export function ExamInfoForm({
               />
               {!codeReadOnly && (
                 <Button type="button" variant="outline" onClick={onGenerateCode}>
-                  재생성
+                  {t("examInfoForm.buttonRegenerate")}
                 </Button>
               )}
             </div>
@@ -228,15 +233,14 @@ export function ExamInfoForm({
         {onLanguageChange && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label htmlFor="language">AI 언어</Label>
+              <Label htmlFor="language">{t("examInfoForm.labelLanguage")}</Label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs">
-                    AI 튜터 및 자동 채점이 사용할 언어를 선택합니다. 학생 UI에는
-                    영향이 없습니다. 영어 강의/시험이면 English를 선택하세요.
+                    {t("examInfoForm.tooltipLanguage")}
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -249,8 +253,8 @@ export function ExamInfoForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ko">한국어 (기본)</SelectItem>
-                <SelectItem value="en">English</SelectItem>
+                <SelectItem value="ko">{t("examInfoForm.languageKo")}</SelectItem>
+                <SelectItem value="en">{t("examInfoForm.languageEn")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -259,15 +263,14 @@ export function ExamInfoForm({
         {mode === "assignment" ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label>제출 기한</Label>
+              <Label>{t("examInfoForm.labelDeadline")}</Label>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p className="max-w-xs">
-                    학생들이 과제를 제출해야 하는 마감 기한을 설정하세요.
-                    선택한 날짜 23:59:59까지 제출 가능합니다.
+                    {t("examInfoForm.tooltipDeadline")}
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -280,13 +283,13 @@ export function ExamInfoForm({
                   className={`w-full max-w-xs justify-start font-normal ${!deadline ? "text-muted-foreground" : ""} ${deadlineError ? "border-red-500" : ""}`}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {deadline ? format(new Date(deadline), "PPP", { locale: ko }) : "날짜 선택"}
+                  {deadline ? formatDate(new Date(deadline), locale) : t("examInfoForm.deadlinePlaceholder")}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
-                  locale={ko}
+                  locale={dateFnsLocale}
                   selected={deadline ? new Date(deadline) : undefined}
                   onSelect={(date) => {
                     if (date) {
@@ -305,17 +308,14 @@ export function ExamInfoForm({
         ) : (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label htmlFor="duration">시험 시간</Label>
+            <Label htmlFor="duration">{t("examInfoForm.labelDuration")}</Label>
             <Tooltip>
               <TooltipTrigger asChild>
                 <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
               </TooltipTrigger>
               <TooltipContent>
                 <p className="max-w-xs">
-                  학생들이 시험을 치르는 데 주어지는 시간을 설정하세요.
-                  슬라이더를 조절하거나 직접 입력할 수 있습니다. 무제한으로
-                  설정하면 시간 제한 없이 제출할 때까지 풀 수 있습니다.
-                  최소 1분부터 최대 1440분(24시간)까지 설정 가능합니다.
+                  {t("examInfoForm.tooltipDuration")}
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -332,7 +332,7 @@ export function ExamInfoForm({
                 htmlFor="unlimited"
                 className="text-sm font-medium cursor-pointer"
               >
-                시간 무제한 (과제형)
+                {t("examInfoForm.unlimitedLabel")}
               </Label>
             </div>
 
@@ -348,10 +348,10 @@ export function ExamInfoForm({
                   onChange={handleDurationInputChange}
                   onBlur={handleDurationInputBlur}
                   disabled={isUnlimited}
-                  placeholder={isUnlimited ? "무제한" : "분"}
+                  placeholder={isUnlimited ? t("examInfoForm.placeholderUnlimited") : t("examInfoForm.placeholderMinutes")}
                   className="w-20 text-center"
                 />
-                <span className="text-sm text-muted-foreground">분</span>
+                <span className="text-sm text-muted-foreground">{t("examInfoForm.unitMinutes")}</span>
               </div>
               <Slider
                 min={1}
@@ -387,14 +387,14 @@ export function ExamInfoForm({
                   disabled={isUnlimited}
                   className="text-xs"
                 >
-                  {time}분
+                  {t("examInfoForm.quickSelectMin", { time })}
                 </Button>
               ))}
             </div>
             {showDurationWarning && (
               <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span className="text-sm">시험 시간은 최소 15분 이상이어야 합니다.</span>
+                <span className="text-sm">{t("examInfoForm.durationWarning")}</span>
               </div>
             )}
           </div>

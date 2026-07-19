@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+import { useLocale } from "next-intl";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +25,8 @@ import {
 import { ThemeTogglerButton } from "@/components/animate-ui/components/buttons/theme-toggler";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { formatDate } from "@/lib/i18n/format";
+import type { Locale } from "@/lib/i18n/config";
 
 interface StudentProfile {
   id: string;
@@ -35,6 +39,8 @@ interface StudentProfile {
 }
 
 export default function ProfilePage() {
+  const t = useTranslations("auth.profile");
+  const locale = useLocale() as Locale;
   const { user, profile, isLoaded } = useAppUser();
   const router = useRouter();
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(
@@ -90,10 +96,10 @@ export default function ProfilePage() {
   const userRole = (profile?.role as string) || "student";
   const roleLabel =
     userRole === "instructor"
-      ? "강사"
+      ? t("roleInstructor")
       : userRole === "admin"
-      ? "관리자"
-      : "학생";
+      ? t("roleAdmin")
+      : t("roleStudent");
 
   const getUserInitials = () => {
     if (profile?.fullName) {
@@ -109,9 +115,9 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold">프로필</h1>
+          <h1 className="text-3xl font-bold">{t("heading")}</h1>
           <p className="text-muted-foreground mt-2">
-            계정 정보 및 개인 설정을 확인하세요
+            {t("subtitle")}
           </p>
         </div>
 
@@ -119,15 +125,15 @@ export default function ProfilePage() {
           {/* Profile Card */}
           <Card>
             <CardHeader>
-              <CardTitle>프로필 정보</CardTitle>
-              <CardDescription>기본 계정 정보</CardDescription>
+              <CardTitle>{t("profileInfoTitle")}</CardTitle>
+              <CardDescription>{t("profileInfoDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center space-x-6">
                 <Avatar className="h-24 w-24">
                   <AvatarImage
                     src={profile?.avatarUrl ?? undefined}
-                    alt={profile?.fullName || "User"}
+                    alt={profile?.fullName || t("avatarAlt")}
                   />
                   <AvatarFallback className="text-2xl">
                     {getUserInitials()}
@@ -135,7 +141,7 @@ export default function ProfilePage() {
                 </Avatar>
                 <div className="flex-1">
                   <h2 className="text-2xl font-bold">
-                    {profile?.fullName || "이름 없음"}
+                    {profile?.fullName || t("noName")}
                   </h2>
                   <div className="flex items-center space-x-2 mt-2">
                     <Badge
@@ -155,9 +161,9 @@ export default function ProfilePage() {
                     <Mail className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">이메일</p>
+                    <p className="text-sm text-muted-foreground">{t("emailLabel")}</p>
                     <p className="font-medium">
-                      {user?.email || "이메일 없음"}
+                      {user?.email || t("noEmail")}
                     </p>
                   </div>
                 </div>
@@ -167,15 +173,11 @@ export default function ProfilePage() {
                     <Calendar className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">가입일</p>
+                    <p className="text-sm text-muted-foreground">{t("joinedLabel")}</p>
                     <p className="font-medium">
                       {user.created_at
-                        ? new Date(user.created_at).toLocaleDateString("ko-KR", {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })
-                        : "날짜 없음"}
+                        ? formatDate(user.created_at, locale)
+                        : t("noDate")}
                     </p>
                   </div>
                 </div>
@@ -184,7 +186,7 @@ export default function ProfilePage() {
               {/* Student Profile Information */}
               {userRole === "student" && (
                 <div className="pt-4 border-t">
-                  <h3 className="text-lg font-semibold mb-4">학생 정보</h3>
+                  <h3 className="text-lg font-semibold mb-4">{t("studentInfoTitle")}</h3>
                   {isLoadingProfile ? (
                     <div className="flex items-center justify-center py-4">
                       <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
@@ -196,9 +198,9 @@ export default function ProfilePage() {
                           <User className="w-5 h-5 text-muted-foreground" />
                         </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">이름</p>
+                          <p className="text-sm text-muted-foreground">{t("nameLabel")}</p>
                           <p className="font-medium">
-                            {studentProfile.name || "미입력"}
+                            {studentProfile.name || t("notEntered")}
                           </p>
                         </div>
                       </div>
@@ -208,9 +210,9 @@ export default function ProfilePage() {
                           <Hash className="w-5 h-5 text-muted-foreground" />
                         </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">학번</p>
+                          <p className="text-sm text-muted-foreground">{t("studentNumberLabel")}</p>
                           <p className="font-medium">
-                            {studentProfile.student_number || "미입력"}
+                            {studentProfile.student_number || t("notEntered")}
                           </p>
                         </div>
                       </div>
@@ -220,9 +222,9 @@ export default function ProfilePage() {
                           <GraduationCap className="w-5 h-5 text-muted-foreground" />
                         </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">학교</p>
+                          <p className="text-sm text-muted-foreground">{t("schoolLabel")}</p>
                           <p className="font-medium">
-                            {studentProfile.school || "미입력"}
+                            {studentProfile.school || t("notEntered")}
                           </p>
                         </div>
                       </div>
@@ -230,13 +232,13 @@ export default function ProfilePage() {
                   ) : (
                     <div className="text-center py-4">
                       <p className="text-sm text-muted-foreground mb-4">
-                        프로필 정보가 없습니다.
+                        {t("noProfileInfo")}
                       </p>
                       <Button
                         onClick={() => router.push("/student/profile-setup")}
                         variant="outline"
                       >
-                        프로필 설정하기
+                        {t("setupProfileBtn")}
                       </Button>
                     </div>
                   )}
@@ -248,15 +250,15 @@ export default function ProfilePage() {
           {/* Account Details */}
           <Card>
             <CardHeader>
-              <CardTitle>계정 세부 정보</CardTitle>
-              <CardDescription>추가 계정 정보</CardDescription>
+              <CardTitle>{t("accountDetailsTitle")}</CardTitle>
+              <CardDescription>{t("accountDetailsDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between py-2">
                 <div className="flex items-center space-x-3">
                   <User className="w-5 h-5 text-muted-foreground" />
                   <div>
-                    <p className="font-medium">사용자 ID</p>
+                    <p className="font-medium">{t("userIdLabel")}</p>
                     <p className="text-sm text-muted-foreground font-mono">
                       {user.id}
                     </p>
@@ -269,7 +271,7 @@ export default function ProfilePage() {
                   <div className="flex items-center space-x-3">
                     <User className="w-5 h-5 text-muted-foreground" />
                     <div>
-                      <p className="font-medium">이름</p>
+                      <p className="font-medium">{t("fullNameLabel")}</p>
                       <p className="text-sm text-muted-foreground">
                         {profile.fullName}
                       </p>
@@ -282,7 +284,7 @@ export default function ProfilePage() {
                 <div className="flex items-center space-x-3">
                   <Shield className="w-5 h-5 text-muted-foreground" />
                   <div>
-                    <p className="font-medium">역할</p>
+                    <p className="font-medium">{t("roleLabel")}</p>
                     <p className="text-sm text-muted-foreground">{roleLabel}</p>
                   </div>
                 </div>
@@ -293,8 +295,8 @@ export default function ProfilePage() {
           {/* Theme Settings */}
           <Card>
             <CardHeader>
-              <CardTitle>테마 설정</CardTitle>
-              <CardDescription>화면 테마를 변경할 수 있습니다</CardDescription>
+              <CardTitle>{t("themeTitle")}</CardTitle>
+              <CardDescription>{t("themeDesc")}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between py-2">
@@ -303,9 +305,9 @@ export default function ProfilePage() {
                     <Palette className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="font-medium">테마 모드</p>
+                    <p className="font-medium">{t("themeModeLabel")}</p>
                     <p className="text-sm text-muted-foreground">
-                      라이트 모드 또는 다크 모드를 선택하세요
+                      {t("themeModeSubtitle")}
                     </p>
                   </div>
                 </div>
@@ -321,16 +323,16 @@ export default function ProfilePage() {
           {/* Actions */}
           <div className="flex justify-end space-x-4">
             <Button variant="outline" onClick={() => router.back()}>
-              돌아가기
+              {t("backBtn")}
             </Button>
             {userRole === "instructor" && (
               <Button onClick={() => router.push("/instructor")}>
-                강사 대시보드
+                {t("instructorDashboardBtn")}
               </Button>
             )}
             {userRole === "student" && (
               <Button onClick={() => router.push("/student")}>
-                학생 대시보드
+                {t("studentDashboardBtn")}
               </Button>
             )}
           </div>

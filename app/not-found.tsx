@@ -3,10 +3,12 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Home, ArrowLeft, Search } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 
 export default function NotFound() {
+  const t = useTranslations("auth.notFound");
   const router = useRouter();
 
   return (
@@ -17,7 +19,7 @@ export default function NotFound() {
           <div className="flex items-center justify-center gap-3 mb-8">
             <Image
               src="/qlogo_icon.png"
-              alt="Quest-On Logo"
+              alt={t("logoAlt")}
               width={48}
               height={48}
               className="h-12 w-12"
@@ -47,12 +49,12 @@ export default function NotFound() {
           {/* Error Message */}
           <div className="space-y-4">
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-foreground">
-              페이지를 찾을 수 없습니다
+              {t("heading")}
             </h2>
             <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
-              요청하신 페이지가 존재하지 않거나 이동되었을 수 있습니다.
+              {t("body1")}
               <br className="hidden sm:block" />
-              URL을 다시 확인해 주세요.
+              {t("body2")}
             </p>
           </div>
 
@@ -65,7 +67,7 @@ export default function NotFound() {
               className="w-full sm:w-auto"
             >
               <ArrowLeft className="w-5 h-5" />
-              이전 페이지로
+              {t("backBtn")}
             </Button>
             <Link href="/" className="w-full sm:w-auto">
               <Button
@@ -87,7 +89,7 @@ export default function NotFound() {
                 }}
               >
                 <Home className="w-5 h-5" />
-                홈으로 돌아가기
+                {t("homeBtn")}
               </Button>
             </Link>
           </div>
@@ -95,7 +97,7 @@ export default function NotFound() {
           {/* Helpful Links */}
           <div className="pt-12 border-t border-border/50">
             <p className="text-sm text-muted-foreground mb-4">
-              찾고 계신 것이 있나요?
+              {t("helpText")}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
               <Link
@@ -103,26 +105,26 @@ export default function NotFound() {
                 className="text-sm font-medium text-primary hover:underline flex items-center gap-2"
               >
                 <Home className="w-4 h-4" />
-                메인 페이지
+                {t("mainPage")}
               </Link>
               <Link
                 href="/sign-in"
                 className="text-sm font-medium text-primary hover:underline flex items-center gap-2"
               >
-                로그인
+                {t("signIn")}
               </Link>
               <Link
                 href="/sign-up"
                 className="text-sm font-medium text-primary hover:underline flex items-center gap-2"
               >
-                회원가입
+                {t("signUp")}
               </Link>
               <a
-                href="mailto:questonkr@gmail.com?subject=문의사항"
+                href={`mailto:questonkr@gmail.com?subject=${t("mailtoSubject")}`}
                 className="text-sm font-medium text-primary hover:underline flex items-center gap-2"
               >
                 <Search className="w-4 h-4" />
-                문의하기
+                {t("contact")}
               </a>
             </div>
           </div>

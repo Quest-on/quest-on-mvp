@@ -17,6 +17,7 @@ import { AnimateIcon } from "@/components/animate-ui/icons/icon";
 import AIMessageRenderer from "@/components/chat/AIMessageRenderer";
 import { CopyMessageButton } from "@/components/chat/CopyMessageButton";
 import { ArrowUp, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 type InstructorChatMessage = {
   role: "user" | "assistant";
@@ -35,18 +36,22 @@ export interface InstructorChatSidebarProps {
 export function InstructorChatSidebar({
   context,
   sessionIdSeed,
-  scopeDescription = "이 페이지의 데이터",
-  title = "시험 패널",
-  subtitle = "이 페이지에서 궁금한 것을 물어보세요.",
+  scopeDescription,
+  title,
+  subtitle,
 }: InstructorChatSidebarProps) {
+  const t = useTranslations("grading");
+  const resolvedScopeDescription = scopeDescription ?? (t("chatSidebar.defaultScope") as string);
+  const resolvedTitle = title ?? (t("chatSidebar.defaultTitle") as string);
+  const resolvedSubtitle = subtitle ?? (t("chatSidebar.defaultSubtitle") as string);
   return (
     <>
       <InternalSidebar
         context={context}
         sessionIdSeed={sessionIdSeed}
-        scopeDescription={scopeDescription}
-        title={title}
-        subtitle={subtitle}
+        scopeDescription={resolvedScopeDescription}
+        title={resolvedTitle}
+        subtitle={resolvedSubtitle}
       />
       <FloatingTrigger />
     </>
@@ -55,6 +60,7 @@ export function InstructorChatSidebar({
 
 function FloatingTrigger() {
   const { toggleSidebar, open, isMobile, openMobile } = useSidebar();
+  const t = useTranslations("grading");
   const isOpen = isMobile ? openMobile : open;
   const [scrollY, setScrollY] = useState(0);
   const [delayedScrollY, setDelayedScrollY] = useState(0);
@@ -102,7 +108,7 @@ function FloatingTrigger() {
         <button
           type="button"
           onClick={toggleSidebar}
-          aria-label="설정 사이드바 열기"
+          aria-label={t("chatSidebar.openAriaLabel")}
           className="gradient-animated flex h-14 w-14 items-center justify-center rounded-3xl rounded-br-none text-white shadow-lg hover:shadow-xl transition-shadow"
         >
           <BotMessageSquare size={32} className="-scale-x-100" />
@@ -150,6 +156,7 @@ function InternalSidebar({
 
 function SidebarCloseButton() {
   const { setOpen, isMobile, setOpenMobile } = useSidebar();
+  const t = useTranslations("grading");
   return (
     <Button
       type="button"
@@ -157,7 +164,7 @@ function SidebarCloseButton() {
       size="icon"
       className="h-8 w-8"
       onClick={() => (isMobile ? setOpenMobile(false) : setOpen(false))}
-      aria-label="설정 사이드바 닫기"
+      aria-label={t("chatSidebar.closeAriaLabel")}
     >
       <X className="h-4 w-4" />
     </Button>
@@ -173,6 +180,7 @@ function ChatPanel({
   sessionIdSeed: string;
   scopeDescription: string;
 }) {
+  const t = useTranslations("grading");
   const { user, profile } = useAppUser();
   const userId = user?.id ?? "instructor_unknown";
 
@@ -210,9 +218,7 @@ function ChatPanel({
 
       // 405 에러를 명시적으로 처리
       if (res.status === 405) {
-        throw new Error(
-          "API 메서드가 허용되지 않습니다. 서버 설정을 확인해주세요."
-        );
+        throw new Error(t("chatSidebar.methodNotAllowed"));
       }
 
       const data = await res.json().catch(() => ({}));
@@ -233,11 +239,11 @@ function ChatPanel({
         err instanceof Error
           ? err.message.includes("405") ||
             err.message.includes("Method Not Allowed")
-            ? "죄송합니다. 응답을 생성하는 중에 오류가 발생했습니다. 다시 시도해주세요."
-            : err.message.includes("API 메서드가 허용되지 않습니다")
-            ? "죄송합니다. 응답을 생성하는 중에 오류가 발생했습니다. 다시 시도해주세요."
-            : `오류: ${err.message}`
-          : "죄송합니다. 응답을 생성하는 중에 오류가 발생했습니다. 다시 시도해주세요.";
+            ? t("chatSidebar.genericError")
+            : err.message.includes(t("chatSidebar.methodNotAllowed"))
+            ? t("chatSidebar.genericError")
+            : t("chatSidebar.errorWithMsg", { message: err.message })
+          : t("chatSidebar.genericError");
 
       setMessages((prev) => [
         ...prev,
@@ -277,10 +283,10 @@ function ChatPanel({
               </div>
               <div className="space-y-1 max-w-[260px]">
                 <p className="text-sm font-medium text-foreground">
-                  이 페이지에 대해 무엇이든 물어보세요
+                  {t("chatSidebar.emptyTitle")}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {scopeDescription} 범위에서만 답변합니다.
+                  {t("chatSidebar.emptyDesc", { scope: scopeDescription })}
                 </p>
               </div>
             </div>
@@ -315,7 +321,7 @@ function ChatPanel({
           {mutation.isPending && (
             <div className="flex justify-start">
               <AIMessageRenderer
-                content={"답변 생성 중..."}
+                content={t("chatSidebar.thinking")}
                 timestamp={new Date().toISOString()}
                 variant="plain"
               />
@@ -330,7 +336,7 @@ function ChatPanel({
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="무엇을 도와드릴까요?"
+            placeholder={t("chatSidebar.placeholder")}
             className="min-h-[42px] resize-none border-0 shadow-none focus-visible:ring-0 focus-visible:border-0 px-2 py-2 text-base"
             disabled={mutation.isPending}
             onKeyDown={(e) => {
@@ -347,7 +353,7 @@ function ChatPanel({
             className="h-10 w-10 rounded-full"
             onClick={send}
             disabled={mutation.isPending || !input.trim()}
-            aria-label="전송"
+            aria-label={t("chatSidebar.sendAriaLabel")}
           >
             <ArrowUp className="h-5 w-5" />
           </Button>

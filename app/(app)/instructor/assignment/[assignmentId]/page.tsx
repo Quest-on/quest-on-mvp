@@ -47,6 +47,8 @@ import { cn } from "@/lib/utils";
 import { getScoreColor } from "@/lib/grading-utils";
 import type { InstructorStudent } from "@/lib/types/exam";
 import type { StudentFilterSortOption } from "@/hooks/useStudentFiltering";
+import { useTranslations, useLocale } from "next-intl";
+import { formatDate, formatDateTime } from "@/lib/i18n/format";
 
 type BulkGradeProgress = {
   total: number;
@@ -65,20 +67,21 @@ type BulkGradeStatusData = {
 
 function getStatusBadge(
   status: string,
+  t: (key: string) => string,
   submittedAt?: string,
   isGraded?: boolean,
   autoSubmitted?: boolean
 ) {
   if (isGraded) {
-    return <Badge className="bg-blue-100 text-blue-800 text-xs">채점완료</Badge>;
+    return <Badge className="bg-blue-100 text-blue-800 text-xs">{t("assignmentDetail.statusGraded")}</Badge>;
   }
   if (status === "completed" && submittedAt && autoSubmitted) {
     return (
-      <Badge className="bg-amber-100 text-amber-800 text-xs">마감 자동제출</Badge>
+      <Badge className="bg-amber-100 text-amber-800 text-xs">{t("assignmentDetail.statusAutoSubmitted")}</Badge>
     );
   }
   if (status === "completed" && submittedAt) {
-    return <Badge className="bg-green-100 text-green-800 text-xs">제출완료</Badge>;
+    return <Badge className="bg-green-100 text-green-800 text-xs">{t("assignmentDetail.statusSubmitted")}</Badge>;
   }
   if (status === "in-progress") {
     return (
@@ -87,11 +90,11 @@ function getStatusBadge(
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-600 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-600"></span>
         </span>
-        진행중
+        {t("assignmentDetail.statusInProgress")}
       </Badge>
     );
   }
-  return <Badge className="bg-gray-100 text-gray-800 text-xs">미제출</Badge>;
+  return <Badge className="bg-gray-100 text-gray-800 text-xs">{t("assignmentDetail.statusNotSubmitted")}</Badge>;
 }
 
 export default function AssignmentDashboard({
@@ -101,6 +104,8 @@ export default function AssignmentDashboard({
 }) {
   const resolvedParams = use(params);
   const { isSignedIn, isLoaded, user, profile } = useAppUser();
+  const t = useTranslations("instructor");
+  const locale = useLocale() as "ko" | "en";
 
   const [examInfoOpen, setExamInfoOpen] = useState(false);
   const [questionsOpen, setQuestionsOpen] = useState(false);
@@ -160,7 +165,7 @@ export default function AssignmentDashboard({
       );
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || "일괄 채점 상태를 불러오지 못했습니다.");
+        throw new Error(data.message || t("assignmentDetail.bulkGradeLoadFail"));
       }
       return response.json() as Promise<BulkGradeStatusData>;
     },
@@ -198,33 +203,33 @@ export default function AssignmentDashboard({
   const bulkGradingDone = bulkGradeSessionStatus === "grading_done";
   const bulkGradingCommitted = bulkGradeSessionStatus === "committed";
   const bulkCtaTitle = isBulkGrading
-    ? "과제 AI 가채점 진행 중"
+    ? t("assignmentDetail.bulkGradeStatus.inProgress")
     : bulkGradingFailed
-      ? "과제 AI 가채점 실패"
+      ? t("assignmentDetail.bulkGradeStatus.failed")
       : bulkGradingCommitted
-        ? "과제 채점 결과"
+        ? t("assignmentDetail.bulkGradeStatus.committed")
         : bulkGradingDone
-          ? "과제 제안 점수 생성 완료"
-          : "과제 AI 가채점하기";
+          ? t("assignmentDetail.bulkGradeStatus.done")
+          : t("assignmentDetail.bulkGradeStatus.idle");
   const bulkCtaDescription =
     isBulkGrading && bulkGradeProgress && bulkGradeProgress.total > 0
-      ? `백그라운드 가채점 중 · ${bulkGradeProcessed}/${bulkGradeProgress.total}명 처리`
+      ? t("assignmentDetail.bulkGradeStatus.descInProgress", { processed: bulkGradeProcessed, total: bulkGradeProgress.total })
       : bulkGradingFailed
-        ? "실패 원인을 확인하고 다시 채점을 시작할 수 있습니다"
+        ? t("assignmentDetail.bulkGradeStatus.descFailed")
         : bulkGradingCommitted
-          ? "확정된 결과와 가채점 대화 기록을 확인합니다"
+          ? t("assignmentDetail.bulkGradeStatus.descCommitted")
           : bulkGradingDone
-            ? "제안 점수를 검토한 뒤 확정해주세요"
-            : "강사의 자연어 기준으로 학생 답안을 일괄 가채점합니다";
+            ? t("assignmentDetail.bulkGradeStatus.descDone")
+            : t("assignmentDetail.bulkGradeStatus.descIdle");
   const bulkCtaButtonLabel = isBulkGrading
-    ? "진행 상황 보기"
+    ? t("assignmentDetail.bulkGradeStatus.btnInProgress")
     : bulkGradingCommitted
-      ? "결과/채팅 보기"
+      ? t("assignmentDetail.bulkGradeStatus.btnCommitted")
       : bulkGradingDone
-        ? "검토/확정"
+        ? t("assignmentDetail.bulkGradeStatus.btnDone")
         : bulkGradingFailed
-          ? "다시 보기"
-          : "가채점 시작";
+          ? t("assignmentDetail.bulkGradeStatus.btnFailed")
+          : t("assignmentDetail.bulkGradeStatus.btnIdle");
 
   useEffect(() => {
     if (sortOption === "score") {
@@ -275,12 +280,12 @@ export default function AssignmentDashboard({
     return (
       <div className="container mx-auto p-6">
         <div className="text-center py-12">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">오류 발생</h2>
+          <h2 className="text-xl font-semibold text-red-600 mb-2">{t("assignmentDetail.error")}</h2>
           <p className="text-muted-foreground">
-            {error || "과제 데이터를 불러올 수 없습니다."}
+            {error || t("assignmentDetail.loadFail")}
           </p>
           <Link href="/instructor" className="inline-block mt-4">
-            <Button variant="outline">목록으로 돌아가기</Button>
+            <Button variant="outline">{t("assignmentDetail.backToList")}</Button>
           </Link>
         </div>
       </div>
@@ -298,21 +303,21 @@ export default function AssignmentDashboard({
     if (deadline && now > deadline) {
       return (
         <Badge variant="outline" className="border-gray-500 text-gray-700">
-          마감됨
+          {t("assignmentDetail.statusClosed")}
         </Badge>
       );
     }
     if (start && now >= start) {
       return (
         <Badge variant="outline" className="border-green-500 text-green-700">
-          진행중
+          {t("assignmentDetail.statusActive")}
         </Badge>
       );
     }
     if (start && now < start) {
       return (
         <Badge variant="outline" className="border-yellow-500 text-yellow-700">
-          예정
+          {t("assignmentDetail.statusScheduled")}
         </Badge>
       );
     }
@@ -334,7 +339,7 @@ export default function AssignmentDashboard({
               <div className="min-w-0">
                 <h1 className="text-2xl sm:text-3xl font-bold">{exam.title}</h1>
                 <p className="text-muted-foreground">
-                  과제 코드: <span className="exam-code">{exam.code}</span>
+                  {t("assignmentDetail.assignmentCode")} <span className="exam-code">{exam.code}</span>
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -348,26 +353,26 @@ export default function AssignmentDashboard({
                       <span>
                         <Button variant="outline" size="sm" disabled>
                           <Pencil className="h-4 w-4 mr-1" />
-                          편집
+                          {t("assignmentDetail.edit")}
                         </Button>
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      참여한 학생이 있어 편집할 수 없습니다
+                      {t("assignmentDetail.editDisabledTip")}
                     </TooltipContent>
                   </Tooltip>
                 ) : (
                   <Link href={`/instructor/assignment/${resolvedParams.assignmentId}/edit`}>
                     <Button variant="outline" size="sm">
                       <Pencil className="h-4 w-4 mr-1" />
-                      편집
+                      {t("assignmentDetail.edit")}
                     </Button>
                   </Link>
                 )}
                 <Link href="/instructor">
                   <Button variant="outline" size="sm">
-                    <span className="sm:hidden">대시보드</span>
-                    <span className="hidden sm:inline">대시보드로 돌아가기</span>
+                    <span className="sm:hidden">{t("assignmentDetail.backToDashboardShort")}</span>
+                    <span className="hidden sm:inline">{t("assignmentDetail.backToDashboard")}</span>
                   </Button>
                 </Link>
               </div>
@@ -382,7 +387,7 @@ export default function AssignmentDashboard({
                   <CollapsibleTrigger className="w-full">
                     <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-3">
-                        <h3 className="font-semibold">과제 정보</h3>
+                        <h3 className="font-semibold">{t("assignmentDetail.assignmentInfo")}</h3>
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
@@ -391,9 +396,9 @@ export default function AssignmentDashboard({
                             setTimeout(() => setCodeCopied(false), 2000);
                           }}
                           className={`text-sm cursor-pointer border-b border-dashed transition-colors ${codeCopied ? "text-green-600 border-green-500" : "text-muted-foreground border-muted-foreground/50 hover:text-foreground hover:border-foreground"}`}
-                          title="클릭하여 복사"
+                          title={t("assignmentDetail.copyCode")}
                         >
-                          {codeCopied ? "복사됨!" : exam.code}
+                          {codeCopied ? t("assignmentDetail.codeCopied") : exam.code}
                         </span>
                       </div>
                       {examInfoOpen ? (
@@ -409,7 +414,7 @@ export default function AssignmentDashboard({
                         <div className="flex items-start gap-2 text-sm">
                           <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
                           <div>
-                            <span className="text-muted-foreground">과제 설명: </span>
+                            <span className="text-muted-foreground">{t("assignmentDetail.assignmentDesc")} </span>
                             <span className="whitespace-pre-wrap">{exam.assignment_prompt}</span>
                           </div>
                         </div>
@@ -418,15 +423,15 @@ export default function AssignmentDashboard({
                         <div className="flex items-start gap-2 text-sm">
                           <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
                           <div>
-                            <span className="text-muted-foreground">설명: </span>
+                            <span className="text-muted-foreground">{t("assignmentDetail.description")} </span>
                             <span>{exam.description}</span>
                           </div>
                         </div>
                       )}
                       {exam.createdAt && (
                         <div className="text-sm text-muted-foreground">
-                          생성일:{" "}
-                          {new Date(exam.createdAt).toLocaleDateString("ko-KR")}
+                          {t("assignmentDetail.createdAt")}{" "}
+                          {formatDate(exam.createdAt, locale)}
                         </div>
                       )}
                     </div>
@@ -441,11 +446,11 @@ export default function AssignmentDashboard({
                   <CollapsibleTrigger className="w-full">
                     <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-3">
-                        <h3 className="font-semibold">문제 보기</h3>
+                        <h3 className="font-semibold">{t("assignmentDetail.viewQuestions")}</h3>
                         <span className="text-sm text-muted-foreground">
                           {questionsCount !== null
-                            ? `${questionsCount}개 문제`
-                            : "문제 로딩 중..."}
+                            ? t("assignmentDetail.questionsCountLabel", { count: questionsCount })
+                            : t("assignmentDetail.questionsLoading")}
                         </span>
                       </div>
                       {questionsOpen ? (
@@ -505,7 +510,7 @@ export default function AssignmentDashboard({
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
-                  placeholder="학생 이름, 이메일, 학번, 학교로 검색..."
+                  placeholder={t("assignmentDetail.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9"
@@ -516,11 +521,11 @@ export default function AssignmentDashboard({
                 onValueChange={(v) => setSortOption(v as StudentFilterSortOption)}
               >
                 <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue placeholder="정렬 기준" />
+                  <SelectValue placeholder={t("assignmentDetail.sortBy")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="submittedAt">제출 빠른 순</SelectItem>
-                  <SelectItem value="answerLength">답안 길이 순</SelectItem>
+                  <SelectItem value="submittedAt">{t("assignmentDetail.sortBySubmittedAt")}</SelectItem>
+                  <SelectItem value="answerLength">{t("assignmentDetail.sortByAnswerLength")}</SelectItem>
                 </SelectContent>
               </Select>
               <Button
@@ -532,7 +537,7 @@ export default function AssignmentDashboard({
                     queryKey: qk.instructor.examDetail(resolvedParams.assignmentId),
                   });
                 }}
-                title="새로고침"
+                title={t("assignmentDetail.refresh")}
               >
                 <RefreshCw className="h-4 w-4" />
               </Button>
@@ -543,11 +548,11 @@ export default function AssignmentDashboard({
               {/* Table Header */}
               <div className="bg-muted/50 border-b px-4 py-3">
                 <div className="grid grid-cols-[1fr_130px_70px_90px_70px] gap-4 items-center text-sm font-medium text-muted-foreground">
-                  <span>학생</span>
-                  <span>제출일시</span>
-                  <span>점수</span>
-                  <span>상태</span>
-                  <span className="text-center">액션</span>
+                  <span>{t("assignmentDetail.tableColStudent")}</span>
+                  <span>{t("assignmentDetail.tableColSubmittedAt")}</span>
+                  <span>{t("assignmentDetail.tableColScore")}</span>
+                  <span>{t("assignmentDetail.tableColStatus")}</span>
+                  <span className="text-center">{t("assignmentDetail.tableColAction")}</span>
                 </div>
               </div>
 
@@ -570,7 +575,7 @@ export default function AssignmentDashboard({
                 </div>
               ) : allStudents.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">
-                  <p>제출한 학생이 없습니다.</p>
+                  <p>{t("assignmentDetail.noStudents")}</p>
                 </div>
               ) : (
                 <div className="divide-y">
@@ -587,9 +592,9 @@ export default function AssignmentDashboard({
             </div>
 
             <div className="text-sm text-muted-foreground">
-              총 {allStudents.length}명
+              {t("assignmentDetail.totalStudents", { count: allStudents.length })}
               {gradedStudents.length > 0 &&
-                ` (채점완료: ${gradedStudents.length}명)`}
+                ` ${t("assignmentDetail.gradedCount", { count: gradedStudents.length })}`}
             </div>
           </div>
         </div>
@@ -619,6 +624,8 @@ function StudentRow({
   assignmentId: string;
   analyticsData?: Record<string, unknown> | null;
 }) {
+  const t = useTranslations("instructor");
+  const locale = useLocale() as "ko" | "en";
   return (
     <div className="grid grid-cols-[1fr_130px_70px_90px_70px] gap-4 items-center px-4 py-3 hover:bg-muted/50 transition-colors">
       {/* Student info */}
@@ -644,7 +651,7 @@ function StudentRow({
       {/* Submitted at */}
       <div className="text-xs text-muted-foreground">
         {student.submittedAt
-          ? new Date(student.submittedAt).toLocaleString("ko-KR", {
+          ? formatDateTime(student.submittedAt, locale, {
               month: "short",
               day: "numeric",
               hour: "2-digit",
@@ -656,7 +663,7 @@ function StudentRow({
       {/* Score — 확정(commit)된 과제 점수만 표시 */}
       <div className="text-sm font-semibold">
         {student.isGraded && student.score != null ? (
-          <span className={getScoreColor(student.score)}>{student.score}점</span>
+          <span className={getScoreColor(student.score)}>{student.score}{t("assignmentDetail.scoreUnit")}</span>
         ) : (
           <span className="text-muted-foreground font-normal">-</span>
         )}
@@ -664,7 +671,7 @@ function StudentRow({
 
       {/* Status */}
       <div>
-        {getStatusBadge(student.status, student.submittedAt, student.isGraded, student.autoSubmitted)}
+        {getStatusBadge(student.status, t, student.submittedAt, student.isGraded, student.autoSubmitted)}
       </div>
 
       {/* Action */}
@@ -693,7 +700,7 @@ function StudentRow({
               variant="outline"
               className="text-blue-600 border-blue-600 hover:bg-blue-50 h-7 px-2 text-xs"
             >
-              {student.isGraded ? "재채점" : "채점"}
+              {student.isGraded ? t("assignmentDetail.regrade") : t("assignmentDetail.grade")}
             </Button>
           </Link>
         )}

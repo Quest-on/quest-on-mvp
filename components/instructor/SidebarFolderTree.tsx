@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/collapsible";
 import { qk } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 interface FolderNode {
   id: string;
@@ -57,6 +58,7 @@ const SidebarFolderNode = memo(function SidebarFolderNode({
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const t = useTranslations("instructor");
 
   const { data: children = [], isLoading } = useQuery({
     queryKey: qk.drive.sidebarTree(folder.id, userId),
@@ -100,7 +102,7 @@ const SidebarFolderNode = memo(function SidebarFolderNode({
             {isLoading && (
               <SidebarMenuSubItem>
                 <span className="px-2 py-1 text-xs text-muted-foreground">
-                  로딩 중...
+                  {t("sidebar.folderLoading")}
                 </span>
               </SidebarMenuSubItem>
             )}
@@ -110,7 +112,7 @@ const SidebarFolderNode = memo(function SidebarFolderNode({
               subFolders.length === 0 && (
                 <SidebarMenuSubItem>
                   <span className="px-2 py-1 text-xs text-muted-foreground">
-                    비어 있음
+                    {t("sidebar.nodeEmpty")}
                   </span>
                 </SidebarMenuSubItem>
               )}
@@ -141,6 +143,7 @@ const SidebarFolderNode = memo(function SidebarFolderNode({
 });
 
 export function SidebarFolderTree({ userId }: { userId?: string }) {
+  const t = useTranslations("instructor");
   const { data: rootItems = [], isLoading } = useQuery({
     queryKey: qk.drive.sidebarTree(null, userId),
     queryFn: ({ signal }) => fetchFolderContents(null, signal),
@@ -161,7 +164,7 @@ export function SidebarFolderTree({ userId }: { userId?: string }) {
                 disabled
                 className="text-muted-foreground text-xs"
               >
-                로딩 중...
+                {t("sidebar.folderLoading")}
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
@@ -171,7 +174,7 @@ export function SidebarFolderTree({ userId }: { userId?: string }) {
                 disabled
                 className="text-muted-foreground text-xs"
               >
-                폴더 없음
+                {t("sidebar.folderEmpty")}
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}

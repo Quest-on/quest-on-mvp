@@ -88,7 +88,8 @@ export function useExamChat({
       examId: exam?.id,
       studentId: userId,
       currentQuestionText: exam?.questions?.[currentQuestion]?.text,
-      currentQuestionAiContext: exam?.questions?.[currentQuestion]?.ai_context,
+      // currentQuestionAiContext 는 보내지 않는다: 강사 채점 컨텍스트는 학생 응답에서
+      // 스트립되므로 서버가 원본 exam 에서 직접 파생한다(민감 필드 신뢰 경계 정리).
     };
 
     try {
