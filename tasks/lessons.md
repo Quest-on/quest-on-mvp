@@ -2,6 +2,11 @@
 
 - Before any update or merge work, explicitly confirm the current branch is not `main`, and create or rename a task branch before touching files when the user is worried about branch safety.
 
+## 2026-07-20 — 주간 콘텐츠 원문 탐색
+
+- 사용자가 특정 기능을 기억해 내면 현재 주간 구간만 다시 훑지 않는다. 최근 4~8주 대화의 동의어와 저장소 구현을 함께 검색해, `이번 주에 나온 신호`와 `이전에 논의했지만 지금 콘텐츠화할 기능`을 구분한다.
+- 기능명이 같은 경우도 목적을 분리한다. 이번 사례의 `채점 기준 인터뷰`와 `케이스 면접 연습`처럼 사용자·문제·구현 상태가 다른 기능을 하나로 묶지 않는다.
+
 ## 2026-03-06
 
 - QA 증상을 제품 정책으로 즉시 해석하지 않는다.
