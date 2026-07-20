@@ -26,7 +26,7 @@ const assetDir = path.join(
   "assets",
   "2026-07-22",
 );
-const outputPath = path.join(assetDir, "grading-interview-linkedin.png");
+const outputPath = path.join(assetDir, "grading-interview-product-ui-reference.png");
 
 const examId = "00000000-0000-4000-8000-000000000722";
 const gradingSessionId = "grading-session-linkedin-0722";
