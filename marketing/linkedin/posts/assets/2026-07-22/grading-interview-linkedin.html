@@ -9,7 +9,6 @@
         font-family: "Quest Sans";
         src: url("../../../../../public/fonts/NanumGothic-Regular.ttf") format("truetype");
         font-weight: 400;
-        font-style: normal;
         font-display: swap;
       }
 
@@ -17,7 +16,6 @@
         font-family: "Quest Sans";
         src: url("../../../../../public/fonts/NanumGothic-Bold.ttf") format("truetype");
         font-weight: 700;
-        font-style: normal;
         font-display: swap;
       }
 
@@ -25,21 +23,19 @@
         font-family: "Quest Sans";
         src: url("../../../../../public/fonts/NanumGothic-ExtraBold.ttf") format("truetype");
         font-weight: 800;
-        font-style: normal;
         font-display: swap;
       }
 
       :root {
         --ink: #111827;
-        --text: #273348;
-        --muted: #667085;
-        --quiet: #8a95a6;
-        --line: #dce2ea;
+        --text: #344156;
+        --muted: #68758a;
+        --line: #d7deea;
         --canvas: #f3f6fb;
         --paper: #ffffff;
         --blue: #365fc6;
         --blue-dark: #27479e;
-        --blue-wash: #edf3ff;
+        --blue-wash: #eef3ff;
         --aqua: #57cdff;
       }
 
@@ -62,11 +58,6 @@
         word-break: keep-all;
       }
 
-      button,
-      textarea {
-        font: inherit;
-      }
-
       .card {
         position: relative;
         width: 1080px;
@@ -85,8 +76,8 @@
       .topline {
         position: absolute;
         top: 64px;
-        left: 66px;
-        right: 66px;
+        left: 74px;
+        right: 74px;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -99,7 +90,6 @@
         color: #18243c;
         font-size: 24px;
         font-weight: 800;
-        letter-spacing: -0.5px;
       }
 
       .brand-mark {
@@ -116,15 +106,15 @@
 
       .hero {
         position: absolute;
-        top: 145px;
-        left: 66px;
-        right: 66px;
+        top: 150px;
+        left: 74px;
+        right: 74px;
       }
 
       .eyebrow {
-        display: inline-flex;
+        display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 11px;
         color: var(--blue-dark);
         font-size: 17px;
         font-weight: 800;
@@ -132,14 +122,13 @@
       }
 
       .eyebrow::before {
-        width: 24px;
+        width: 25px;
         height: 3px;
         content: "";
         background: var(--aqua);
       }
 
       h1 {
-        max-width: 910px;
         margin: 18px 0 0;
         font-size: 62px;
         font-weight: 800;
@@ -152,32 +141,30 @@
       }
 
       .hero-sub {
-        margin: 17px 0 0;
-        color: #526176;
+        margin: 18px 0 0;
+        color: #536178;
         font-size: 22px;
-        font-weight: 400;
         letter-spacing: -0.45px;
       }
 
       .product-window {
         position: absolute;
-        top: 414px;
-        left: 66px;
-        width: 948px;
-        height: 748px;
+        top: 438px;
+        left: 90px;
+        width: 900px;
+        height: 655px;
         overflow: hidden;
-        border: 1px solid #cdd5e2;
-        border-radius: 26px;
+        border: 1px solid #cbd4e1;
+        border-radius: 28px;
         background: var(--paper);
-        box-shadow: 0 30px 70px rgba(36, 52, 82, 0.17), 0 4px 14px rgba(36, 52, 82, 0.08);
+        box-shadow: 0 30px 70px rgba(36, 52, 82, 0.16), 0 4px 14px rgba(36, 52, 82, 0.08);
       }
 
       .window-bar {
-        height: 69px;
+        height: 78px;
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 0 25px;
+        padding: 0 30px;
         border-bottom: 1px solid var(--line);
         background: #fbfcfe;
       }
@@ -185,7 +172,7 @@
       .window-dots {
         display: flex;
         gap: 7px;
-        margin-right: 5px;
+        margin-right: 18px;
       }
 
       .window-dots span {
@@ -195,15 +182,15 @@
         background: #d2d8e2;
       }
 
-      .crumb {
-        color: #4b596e;
-        font-size: 15px;
-        font-weight: 700;
+      .window-title {
+        color: #273449;
+        font-size: 18px;
+        font-weight: 800;
       }
 
-      .window-badge {
+      .window-state {
         margin-left: auto;
-        padding: 7px 11px;
+        padding: 8px 12px;
         border: 1px solid #d6e1fb;
         border-radius: 999px;
         color: var(--blue-dark);
@@ -212,286 +199,103 @@
         font-weight: 700;
       }
 
-      .workspace {
-        display: grid;
-        grid-template-columns: 37% 63%;
-        height: calc(100% - 69px);
+      .interview {
+        padding: 42px 52px 44px;
       }
 
-      .sample-pane {
-        position: relative;
-        padding: 30px 28px;
-        border-right: 1px solid var(--line);
-        background: #f8fafc;
-      }
-
-      .pane-kicker {
+      .context {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        color: #768297;
-        font-size: 13px;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-      }
-
-      .pane-kicker strong {
-        color: var(--blue);
-        font-weight: 800;
-      }
-
-      .case-title {
-        margin: 20px 0 0;
-        color: var(--ink);
-        font-size: 24px;
-        font-weight: 800;
-        letter-spacing: -0.7px;
-      }
-
-      .case-prompt {
-        margin: 10px 0 0;
-        color: #4b596e;
-        font-size: 15px;
-        line-height: 1.55;
-      }
-
-      .answer-card {
-        margin-top: 24px;
-        padding: 20px;
-        border: 1px solid #e0e6ef;
-        border-radius: 15px;
-        background: #ffffff;
-      }
-
-      .answer-label {
-        color: #7d8898;
-        font-size: 12px;
+        gap: 12px;
+        color: #536178;
+        font-size: 17px;
         font-weight: 700;
       }
 
-      .answer-lines {
-        margin-top: 15px;
+      .context-icon {
+        width: 38px;
+        height: 38px;
         display: grid;
-        gap: 9px;
-      }
-
-      .answer-lines span {
-        height: 8px;
-        border-radius: 999px;
-        background: #e8edf4;
-      }
-
-      .answer-lines span:nth-child(1) {
-        width: 92%;
-      }
-
-      .answer-lines span:nth-child(2) {
-        width: 100%;
-      }
-
-      .answer-lines span:nth-child(3) {
-        width: 78%;
-      }
-
-      .answer-lines span:nth-child(4) {
-        width: 88%;
-      }
-
-      .signals {
-        margin-top: 18px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      .signal {
-        padding: 7px 9px;
-        border: 1px solid #d8e0ea;
-        border-radius: 8px;
-        color: #536176;
-        background: #fbfcfe;
-        font-size: 12px;
-        font-weight: 700;
-      }
-
-      .signal.missing {
-        border-color: #d8e3fb;
-        color: var(--blue-dark);
+        place-items: center;
+        border-radius: 11px;
+        color: var(--blue);
         background: var(--blue-wash);
       }
 
-      .chat-trail {
-        position: absolute;
-        right: 28px;
-        bottom: 28px;
-        left: 28px;
-        padding-top: 20px;
-        border-top: 1px solid #dde4ed;
-      }
-
-      .trail-label {
-        color: #69768a;
-        font-size: 13px;
-        font-weight: 700;
-      }
-
-      .trail-items {
-        margin-top: 12px;
-        display: flex;
-        gap: 7px;
-      }
-
-      .trail-items span {
-        padding: 7px 9px;
-        border-radius: 7px;
-        color: #657187;
-        background: #e9edf3;
-        font-size: 11px;
-        font-weight: 700;
-      }
-
-      .interview-pane {
-        padding: 25px 30px 26px;
-        background: #ffffff;
-      }
-
-      .interview-head {
-        display: flex;
-        align-items: baseline;
-        gap: 10px;
-      }
-
-      .interview-head h2 {
-        margin: 0;
-        color: var(--ink);
-        font-size: 19px;
-        font-weight: 800;
-        letter-spacing: -0.4px;
-      }
-
-      .interview-head span {
-        color: #8490a1;
-        font-size: 13px;
-      }
-
-      .context-note {
-        margin-top: 15px;
-        padding: 12px 14px;
-        border-radius: 10px;
-        color: #526076;
-        background: #f5f7fa;
-        font-size: 13px;
-        line-height: 1.45;
-      }
-
-      .question-block {
-        position: relative;
-        margin-top: 18px;
-        padding: 19px 22px 20px 24px;
-        border: 1px solid #cddafa;
-        border-left: 7px solid var(--blue);
-        border-radius: 5px 15px 15px 5px;
+      .question-card {
+        margin-top: 30px;
+        padding: 36px 42px 38px;
+        border: 1px solid #c9d7fa;
+        border-left: 8px solid var(--blue);
+        border-radius: 6px 20px 20px 6px;
         background: #f7f9ff;
       }
 
       .question-label {
         color: var(--blue);
-        font-size: 12px;
+        font-size: 14px;
         font-weight: 800;
-        letter-spacing: 0.9px;
+        letter-spacing: 1px;
       }
 
       .question {
-        margin: 11px 0 0;
-        color: #18233a;
-        font-size: 29px;
+        margin: 14px 0 0;
+        color: #162138;
+        font-size: 43px;
         font-weight: 800;
-        letter-spacing: -1.25px;
-        line-height: 1.43;
+        letter-spacing: -2px;
+        line-height: 1.4;
+      }
+
+      .choices-label {
+        margin-top: 28px;
+        color: #7a8698;
+        font-size: 13px;
+        font-weight: 700;
       }
 
       .choices {
-        margin-top: 17px;
         display: grid;
-        gap: 9px;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-top: 12px;
       }
 
       .choice {
-        min-height: 48px;
+        height: 62px;
         display: flex;
         align-items: center;
-        gap: 11px;
-        padding: 9px 13px;
+        justify-content: center;
         border: 1px solid var(--line);
-        border-radius: 10px;
-        color: #344156;
+        border-radius: 12px;
+        color: #354258;
         background: #ffffff;
-        font-size: 13px;
-        font-weight: 700;
-        line-height: 1.35;
-      }
-
-      .choice-no {
-        width: 24px;
-        height: 24px;
-        flex: 0 0 24px;
-        display: grid;
-        place-items: center;
-        border: 1px solid #aeb9ca;
-        border-radius: 50%;
-        color: #5f6d82;
-        font-size: 11px;
+        font-size: 17px;
         font-weight: 800;
       }
 
-      .skip-button {
-        width: 100%;
-        height: 42px;
-        margin-top: 13px;
-        border: 0;
-        border-radius: 9px;
-        color: #4e5b70;
-        background: #eef1f5;
-        font-size: 12px;
-        font-weight: 700;
+      .choice:last-child {
+        color: #5f6c80;
+        background: #f7f8fa;
       }
 
-      .composer {
-        height: 58px;
-        margin-top: 12px;
+      .flow-card {
+        position: absolute;
+        top: 1133px;
+        left: 90px;
+        width: 900px;
+        height: 105px;
         display: flex;
         align-items: center;
-        padding: 0 11px 0 15px;
-        border: 1px solid #cfd7e3;
-        border-radius: 12px;
-        color: #8b96a6;
-        background: #ffffff;
-        font-size: 13px;
-      }
-
-      .send {
-        width: 34px;
-        height: 34px;
-        margin-left: auto;
-        display: grid;
-        place-items: center;
-        border-radius: 8px;
-        color: #ffffff;
-        background: var(--blue);
+        padding: 0 28px;
+        border: 1px solid #d5deea;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.8);
       }
 
       .flow {
-        position: absolute;
-        top: 1194px;
-        left: 66px;
-        right: 66px;
-        height: 76px;
         display: flex;
         align-items: center;
-        padding: 0 21px;
-        border: 1px solid #d7dfeb;
-        border-radius: 15px;
-        background: rgba(255, 255, 255, 0.76);
       }
 
       .flow-step {
@@ -504,8 +308,8 @@
       }
 
       .flow-step b {
-        width: 28px;
-        height: 28px;
+        width: 30px;
+        height: 30px;
         display: grid;
         place-items: center;
         border-radius: 8px;
@@ -515,7 +319,7 @@
       }
 
       .flow-arrow {
-        margin: 0 17px;
+        margin: 0 16px;
         color: #9aa6b7;
         font-size: 22px;
       }
@@ -524,10 +328,10 @@
         margin-left: auto;
         display: flex;
         align-items: center;
-        gap: 9px;
-        color: #5d6a7e;
-        font-size: 14px;
-        font-weight: 700;
+        gap: 10px;
+        color: #344156;
+        font-size: 19px;
+        font-weight: 800;
       }
 
       .human-note::before {
@@ -541,13 +345,13 @@
 
       .footer {
         position: absolute;
-        right: 66px;
-        bottom: 40px;
-        left: 66px;
+        right: 74px;
+        bottom: 42px;
+        left: 74px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        color: #7b8798;
+        color: #778498;
         font-size: 14px;
         font-weight: 700;
       }
@@ -596,71 +400,42 @@
       <section class="product-window" aria-label="CASE AI 가채점 인터뷰 더미 화면">
         <div class="window-bar">
           <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
-          <div class="crumb">마케팅 전략론 · CASE 답안</div>
-          <div class="window-badge">샘플 검토 중 · 1 / 3</div>
+          <div class="window-title">CASE AI 가채점</div>
+          <div class="window-state">채점 전 인터뷰</div>
         </div>
 
-        <div class="workspace">
-          <aside class="sample-pane">
-            <div class="pane-kicker"><span>샘플 답안</span><strong>자동 선정</strong></div>
-            <h2 class="case-title">CASE 01</h2>
-            <p class="case-prompt">신규 시장 진입 전략을 제안하고, 선택한 근거를 설명하세요.</p>
+        <div class="interview">
+          <div class="context">
+            <span class="context-icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M8 6h8M8 10h5M6 19l-3 2v-5a8 8 0 1 1 3 3Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+            <span>자동 선정 샘플과 학생–AI 대화를 먼저 살펴봤습니다.</span>
+          </div>
 
-            <div class="answer-card">
-              <div class="answer-label">제출 답안 · 더미</div>
-              <div class="answer-lines" aria-hidden="true">
-                <span></span><span></span><span></span><span></span>
-              </div>
-              <div class="signals">
-                <span class="signal">논리 구조 명확</span>
-                <span class="signal missing">핵심 개념 누락</span>
-              </div>
-            </div>
+          <div class="question-card">
+            <div class="question-label">AI 질문</div>
+            <p class="question">논리는 탄탄하지만 핵심 개념이 빠진 답안은 몇 점인가요?</p>
+          </div>
 
-            <div class="chat-trail">
-              <div class="trail-label">학생–AI 대화도 함께 참고</div>
-              <div class="trail-items"><span>근거 확인</span><span>반론 검토</span><span>대화 맥락</span></div>
-            </div>
-          </aside>
-
-          <section class="interview-pane">
-            <div class="interview-head">
-              <h2>CASE AI 가채점</h2>
-            </div>
-
-            <div class="context-note">샘플 답안 3개와 학생–AI 대화를 먼저 살펴봤습니다.</div>
-
-            <div class="question-block">
-              <div class="question-label">AI 질문</div>
-              <p class="question">논리는 탄탄하지만<br />핵심 개념이 빠진 답안은<br />몇 점인가요?</p>
-            </div>
-
-            <div class="choices" aria-label="더미 답변 선택지">
-              <div class="choice"><span class="choice-no">1</span><span>핵심 개념이 빠지면 70점대를 넘기지 않습니다.</span></div>
-              <div class="choice"><span class="choice-no">2</span><span>논리가 좋다면 80점대까지 인정합니다.</span></div>
-              <div class="choice"><span class="choice-no">3</span><span>개념의 중요도에 따라 다르게 봅니다.</span></div>
-            </div>
-
-            <button class="skip-button" type="button">여기까지만 질문받고 일단 채점 진행</button>
-            <div class="composer">
-              <span>인터뷰 질문에 답변하세요</span>
-              <span class="send" aria-hidden="true">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="m22 2-7 20-4-9-9-4 20-7Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                  <path d="M22 2 11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                </svg>
-              </span>
-            </div>
-          </section>
+          <div class="choices-label">빠른 답변 · 직접 입력도 가능</div>
+          <div class="choices" aria-label="더미 답변 선택지">
+            <div class="choice">70점대</div>
+            <div class="choice">80점대</div>
+            <div class="choice">직접 입력</div>
+          </div>
         </div>
       </section>
 
-      <section class="flow" aria-label="채점 흐름">
-        <div class="flow-step"><b>01</b><span>샘플 답안</span></div>
-        <div class="flow-arrow">→</div>
-        <div class="flow-step"><b>02</b><span>교수 인터뷰</span></div>
-        <div class="flow-arrow">→</div>
-        <div class="flow-step"><b>03</b><span>제안 점수</span></div>
+      <section class="flow-card" aria-label="채점 흐름">
+        <div class="flow">
+          <div class="flow-step"><b>01</b><span>샘플 답안</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step"><b>02</b><span>교수 인터뷰</span></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step"><b>03</b><span>제안 점수</span></div>
+        </div>
         <div class="human-note">최종 확정: 교수님</div>
       </section>
 
