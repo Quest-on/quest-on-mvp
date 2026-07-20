@@ -252,8 +252,8 @@ try {
   browser = await chromium.launch(executablePath ? { executablePath } : {});
 
   const context = await browser.newContext({
-    viewport: { width: 1024, height: 675 },
-    deviceScaleFactor: 2,
+    viewport: { width: 1024, height: 396 },
+    deviceScaleFactor: 2.0454545454545454,
     colorScheme: "light",
     locale: "ko-KR",
   });
@@ -366,24 +366,23 @@ try {
   await page.waitForTimeout(450);
 
   const panelBox = await panel.boundingBox();
-  if (!panelBox || Math.abs(panelBox.width - 528) > 0.5 || Math.abs(panelBox.height - 675) > 0.5) {
+  if (!panelBox || Math.abs(panelBox.width - 528) > 0.5 || Math.abs(panelBox.height - 396) > 0.5) {
     throw new Error(`Unexpected product panel size: ${JSON.stringify(panelBox)}`);
   }
 
   const devicePixelRatio = await page.evaluate(() => window.devicePixelRatio);
-  if (devicePixelRatio !== 2) {
+  if (Math.abs(devicePixelRatio - 2.0454545454545454) > 0.001) {
     throw new Error(`Unexpected devicePixelRatio: ${devicePixelRatio}`);
   }
 
-  await page.screenshot({
+  await panel.screenshot({
     path: outputPath,
     type: "png",
     animations: "disabled",
-    clip: { x: 484, y: 0, width: 540, height: 675 },
   });
 
   console.error(`Saved actual Quest-On UI screenshot: ${outputPath}`);
-  console.error(`Captured desktop crop: 540x675 @ 2x = 1080x1350`);
+  console.error(`Captured actual panel: 528x396 @ 2.04545x = 1080x810`);
   console.error(`Mocked API requests: ${[...new Set(handledApiRequests)].join(", ")}`);
 } finally {
   if (browser) await browser.close();

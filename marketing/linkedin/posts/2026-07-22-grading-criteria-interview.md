@@ -85,7 +85,7 @@ Quest-On의 기본 가채점 흐름에서 AI는 제출된 답안 중 최대 3개
 
 ## 최종 첨부 비주얼
 
-- 발행 파일: [assets/2026-07-22/grading-interview-linkedin.png](assets/2026-07-22/grading-interview-linkedin.png) — `1080×1350`, LinkedIn 4:5.
+- 발행 파일: [assets/2026-07-22/grading-interview-linkedin.png](assets/2026-07-22/grading-interview-linkedin.png) — `1080×810`, 실제 데스크톱 UI에 맞춘 4:3.
 - 재생성: `node scripts/shoot-linkedin-grading-interview.mjs`.
 - 실제 시험 상세 페이지의 `BulkGradingPanel` 컴포넌트를 그대로 렌더한 화면이다. 별도 마케팅 카드, 헤드라인, 도식은 넣지 않았다.
 - API 요청은 캡처 스크립트가 전부 로컬 더미 응답으로 가로챈다. 실사용자 이름·답안·시험명·점수와 운영 DB는 사용하지 않는다.
