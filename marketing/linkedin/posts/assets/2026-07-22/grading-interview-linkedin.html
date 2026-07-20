@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quest-On · AI 채점 인터뷰</title>
+    <style>
+      @font-face {
+        font-family: "Quest Sans";
+        src: url("../../../../../public/fonts/NanumGothic-Regular.ttf") format("truetype");
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      @font-face {
+        font-family: "Quest Sans";
+        src: url("../../../../../public/fonts/NanumGothic-Bold.ttf") format("truetype");
+        font-weight: 700;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      @font-face {
+        font-family: "Quest Sans";
+        src: url("../../../../../public/fonts/NanumGothic-ExtraBold.ttf") format("truetype");
+        font-weight: 800;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      :root {
+        --ink: #111827;
+        --text: #273348;
+        --muted: #667085;
+        --quiet: #8a95a6;
+        --line: #dce2ea;
+        --canvas: #f3f6fb;
+        --paper: #ffffff;
+        --blue: #365fc6;
+        --blue-dark: #27479e;
+        --blue-wash: #edf3ff;
+        --aqua: #57cdff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 1080px;
+        height: 1350px;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      body {
+        font-family: "Quest Sans", "Apple SD Gothic Neo", sans-serif;
+        color: var(--ink);
+        background: #dfe5ef;
+        word-break: keep-all;
+      }
+
+      button,
+      textarea {
+        font: inherit;
+      }
+
+      .card {
+        position: relative;
+        width: 1080px;
+        height: 1350px;
+        overflow: hidden;
+        background: var(--canvas);
+      }
+
+      .spine {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 13px;
+        background: var(--blue);
+      }
+
+      .topline {
+        position: absolute;
+        top: 64px;
+        left: 66px;
+        right: 66px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        color: #18243c;
+        font-size: 24px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+      }
+
+      .brand-mark {
+        width: 38px;
+        height: 40px;
+      }
+
+      .note-no {
+        color: #6d7889;
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 1.8px;
+      }
+
+      .hero {
+        position: absolute;
+        top: 145px;
+        left: 66px;
+        right: 66px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--blue-dark);
+        font-size: 17px;
+        font-weight: 800;
+        letter-spacing: 1.3px;
+      }
+
+      .eyebrow::before {
+        width: 24px;
+        height: 3px;
+        content: "";
+        background: var(--aqua);
+      }
+
+      h1 {
+        max-width: 910px;
+        margin: 18px 0 0;
+        font-size: 62px;
+        font-weight: 800;
+        letter-spacing: -3.25px;
+        line-height: 1.24;
+      }
+
+      h1 .accent {
+        color: var(--blue);
+      }
+
+      .hero-sub {
+        margin: 17px 0 0;
+        color: #526176;
+        font-size: 22px;
+        font-weight: 400;
+        letter-spacing: -0.45px;
+      }
+
+      .product-window {
+        position: absolute;
+        top: 414px;
+        left: 66px;
+        width: 948px;
+        height: 748px;
+        overflow: hidden;
+        border: 1px solid #cdd5e2;
+        border-radius: 26px;
+        background: var(--paper);
+        box-shadow: 0 30px 70px rgba(36, 52, 82, 0.17), 0 4px 14px rgba(36, 52, 82, 0.08);
+      }
+
+      .window-bar {
+        height: 69px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 25px;
+        border-bottom: 1px solid var(--line);
+        background: #fbfcfe;
+      }
+
+      .window-dots {
+        display: flex;
+        gap: 7px;
+        margin-right: 5px;
+      }
+
+      .window-dots span {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #d2d8e2;
+      }
+
+      .crumb {
+        color: #4b596e;
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .window-badge {
+        margin-left: auto;
+        padding: 7px 11px;
+        border: 1px solid #d6e1fb;
+        border-radius: 999px;
+        color: var(--blue-dark);
+        background: var(--blue-wash);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: 37% 63%;
+        height: calc(100% - 69px);
+      }
+
+      .sample-pane {
+        position: relative;
+        padding: 30px 28px;
+        border-right: 1px solid var(--line);
+        background: #f8fafc;
+      }
+
+      .pane-kicker {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #768297;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      }
+
+      .pane-kicker strong {
+        color: var(--blue);
+        font-weight: 800;
+      }
+
+      .case-title {
+        margin: 20px 0 0;
+        color: var(--ink);
+        font-size: 24px;
+        font-weight: 800;
+        letter-spacing: -0.7px;
+      }
+
+      .case-prompt {
+        margin: 10px 0 0;
+        color: #4b596e;
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      .answer-card {
+        margin-top: 24px;
+        padding: 20px;
+        border: 1px solid #e0e6ef;
+        border-radius: 15px;
+        background: #ffffff;
+      }
+
+      .answer-label {
+        color: #7d8898;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .answer-lines {
+        margin-top: 15px;
+        display: grid;
+        gap: 9px;
+      }
+
+      .answer-lines span {
+        height: 8px;
+        border-radius: 999px;
+        background: #e8edf4;
+      }
+
+      .answer-lines span:nth-child(1) {
+        width: 92%;
+      }
+
+      .answer-lines span:nth-child(2) {
+        width: 100%;
+      }
+
+      .answer-lines span:nth-child(3) {
+        width: 78%;
+      }
+
+      .answer-lines span:nth-child(4) {
+        width: 88%;
+      }
+
+      .signals {
+        margin-top: 18px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .signal {
+        padding: 7px 9px;
+        border: 1px solid #d8e0ea;
+        border-radius: 8px;
+        color: #536176;
+        background: #fbfcfe;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .signal.missing {
+        border-color: #d8e3fb;
+        color: var(--blue-dark);
+        background: var(--blue-wash);
+      }
+
+      .chat-trail {
+        position: absolute;
+        right: 28px;
+        bottom: 28px;
+        left: 28px;
+        padding-top: 20px;
+        border-top: 1px solid #dde4ed;
+      }
+
+      .trail-label {
+        color: #69768a;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .trail-items {
+        margin-top: 12px;
+        display: flex;
+        gap: 7px;
+      }
+
+      .trail-items span {
+        padding: 7px 9px;
+        border-radius: 7px;
+        color: #657187;
+        background: #e9edf3;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .interview-pane {
+        padding: 25px 30px 26px;
+        background: #ffffff;
+      }
+
+      .interview-head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+
+      .interview-head h2 {
+        margin: 0;
+        color: var(--ink);
+        font-size: 19px;
+        font-weight: 800;
+        letter-spacing: -0.4px;
+      }
+
+      .interview-head span {
+        color: #8490a1;
+        font-size: 13px;
+      }
+
+      .context-note {
+        margin-top: 15px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        color: #526076;
+        background: #f5f7fa;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .question-block {
+        position: relative;
+        margin-top: 18px;
+        padding: 19px 22px 20px 24px;
+        border: 1px solid #cddafa;
+        border-left: 7px solid var(--blue);
+        border-radius: 5px 15px 15px 5px;
+        background: #f7f9ff;
+      }
+
+      .question-label {
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.9px;
+      }
+
+      .question {
+        margin: 11px 0 0;
+        color: #18233a;
+        font-size: 29px;
+        font-weight: 800;
+        letter-spacing: -1.25px;
+        line-height: 1.43;
+      }
+
+      .choices {
+        margin-top: 17px;
+        display: grid;
+        gap: 9px;
+      }
+
+      .choice {
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 9px 13px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        color: #344156;
+        background: #ffffff;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.35;
+      }
+
+      .choice-no {
+        width: 24px;
+        height: 24px;
+        flex: 0 0 24px;
+        display: grid;
+        place-items: center;
+        border: 1px solid #aeb9ca;
+        border-radius: 50%;
+        color: #5f6d82;
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .skip-button {
+        width: 100%;
+        height: 42px;
+        margin-top: 13px;
+        border: 0;
+        border-radius: 9px;
+        color: #4e5b70;
+        background: #eef1f5;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .composer {
+        height: 58px;
+        margin-top: 12px;
+        display: flex;
+        align-items: center;
+        padding: 0 11px 0 15px;
+        border: 1px solid #cfd7e3;
+        border-radius: 12px;
+        color: #8b96a6;
+        background: #ffffff;
+        font-size: 13px;
+      }
+
+      .send {
+        width: 34px;
+        height: 34px;
+        margin-left: auto;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        color: #ffffff;
+        background: var(--blue);
+      }
+
+      .flow {
+        position: absolute;
+        top: 1194px;
+        left: 66px;
+        right: 66px;
+        height: 76px;
+        display: flex;
+        align-items: center;
+        padding: 0 21px;
+        border: 1px solid #d7dfeb;
+        border-radius: 15px;
+        background: rgba(255, 255, 255, 0.76);
+      }
+
+      .flow-step {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #303e54;
+        font-size: 16px;
+        font-weight: 800;
+      }
+
+      .flow-step b {
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        color: var(--blue);
+        background: var(--blue-wash);
+        font-size: 12px;
+      }
+
+      .flow-arrow {
+        margin: 0 17px;
+        color: #9aa6b7;
+        font-size: 22px;
+      }
+
+      .human-note {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        color: #5d6a7e;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .human-note::before {
+        width: 8px;
+        height: 8px;
+        content: "";
+        border-radius: 50%;
+        background: var(--aqua);
+        box-shadow: 0 0 0 5px rgba(87, 205, 255, 0.14);
+      }
+
+      .footer {
+        position: absolute;
+        right: 66px;
+        bottom: 40px;
+        left: 66px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #7b8798;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .dummy {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .dummy::before {
+        width: 7px;
+        height: 7px;
+        content: "";
+        border-radius: 50%;
+        background: #9ba6b6;
+      }
+
+      .site {
+        color: #4b596f;
+        letter-spacing: 0.4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="linkedin-card" class="card" aria-label="Quest-On AI 채점 인터뷰 소개 이미지">
+      <div class="spine" aria-hidden="true"></div>
+
+      <header class="topline">
+        <div class="brand">
+          <svg class="brand-mark" viewBox="0 0 988 1040" fill="none" aria-hidden="true">
+            <path d="M910.075 873.575L781.96 981.077L492.83 636.506L518 538.5L620.946 529.004L910.075 873.575ZM494 59C748.603 59 955 265.397 955 520C955 616.478 925.362 706.033 874.696 780.06L720.444 596.229C728.585 572.141 733 546.336 733 519.5C733 387.228 625.772 280 493.5 280C361.228 280 254 387.228 254 519.5C254 651.772 361.228 759 493.5 759C511.358 759 528.76 757.044 545.503 753.337L697.075 933.975C635.806 964.087 566.879 981 494 981C239.397 981 33 774.603 33 520C33 265.397 239.397 59 494 59Z" fill="#365FC6" />
+            <path d="M779.5 0C782.927 113.15 859.529 203.939 955 208C859.529 212.061 782.927 302.85 779.5 416C776.073 302.85 699.471 212.061 604 208C699.471 203.939 776.073 113.15 779.5 0Z" fill="#57CDFF" />
+          </svg>
+          <span>Quest-On</span>
+        </div>
+        <div class="note-no">PRODUCT NOTE · 01</div>
+      </header>
+
+      <section class="hero">
+        <div class="eyebrow">AI GRADING INTERVIEW</div>
+        <h1>AI에게 채점을 시키기 전에,<br /><span class="accent">교수님을 먼저 인터뷰</span>하게 했습니다</h1>
+        <p class="hero-sub">루브릭에 다 적히지 않는 경계 사례를 실제 답안을 놓고 묻습니다.</p>
+      </section>
+
+      <section class="product-window" aria-label="CASE AI 가채점 인터뷰 더미 화면">
+        <div class="window-bar">
+          <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="crumb">마케팅 전략론 · CASE 답안</div>
+          <div class="window-badge">샘플 검토 중 · 1 / 3</div>
+        </div>
+
+        <div class="workspace">
+          <aside class="sample-pane">
+            <div class="pane-kicker"><span>샘플 답안</span><strong>자동 선정</strong></div>
+            <h2 class="case-title">CASE 01</h2>
+            <p class="case-prompt">신규 시장 진입 전략을 제안하고, 선택한 근거를 설명하세요.</p>
+
+            <div class="answer-card">
+              <div class="answer-label">제출 답안 · 더미</div>
+              <div class="answer-lines" aria-hidden="true">
+                <span></span><span></span><span></span><span></span>
+              </div>
+              <div class="signals">
+                <span class="signal">논리 구조 명확</span>
+                <span class="signal missing">핵심 개념 누락</span>
+              </div>
+            </div>
+
+            <div class="chat-trail">
+              <div class="trail-label">학생–AI 대화도 함께 참고</div>
+              <div class="trail-items"><span>근거 확인</span><span>반론 검토</span><span>대화 맥락</span></div>
+            </div>
+          </aside>
+
+          <section class="interview-pane">
+            <div class="interview-head">
+              <h2>CASE AI 가채점</h2>
+            </div>
+
+            <div class="context-note">샘플 답안 3개와 학생–AI 대화를 먼저 살펴봤습니다.</div>
+
+            <div class="question-block">
+              <div class="question-label">AI 질문</div>
+              <p class="question">논리는 탄탄하지만<br />핵심 개념이 빠진 답안은<br />몇 점인가요?</p>
+            </div>
+
+            <div class="choices" aria-label="더미 답변 선택지">
+              <div class="choice"><span class="choice-no">1</span><span>핵심 개념이 빠지면 70점대를 넘기지 않습니다.</span></div>
+              <div class="choice"><span class="choice-no">2</span><span>논리가 좋다면 80점대까지 인정합니다.</span></div>
+              <div class="choice"><span class="choice-no">3</span><span>개념의 중요도에 따라 다르게 봅니다.</span></div>
+            </div>
+
+            <button class="skip-button" type="button">여기까지만 질문받고 일단 채점 진행</button>
+            <div class="composer">
+              <span>인터뷰 질문에 답변하세요</span>
+              <span class="send" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="m22 2-7 20-4-9-9-4 20-7Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M22 2 11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+              </span>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="flow" aria-label="채점 흐름">
+        <div class="flow-step"><b>01</b><span>샘플 답안</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><b>02</b><span>교수 인터뷰</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><b>03</b><span>제안 점수</span></div>
+        <div class="human-note">최종 확정: 교수님</div>
+      </section>
+
+      <footer class="footer">
+        <span class="dummy">더미 화면 · 식별정보 없음</span>
+        <span class="site">quest-on.app</span>
+      </footer>
+    </main>
+  </body>
+</html>
