@@ -1,7 +1,7 @@
 # Quest-On LinkedIn, AI가 채점 전에 교수를 인터뷰하는 이유 (target 2026-07-22)
 
 > 플레이북: [../PLAYBOOK.md](../PLAYBOOK.md)
-> 카피 상태: **발행 후보 v5 — 코드·Git 이력·기존 보이스·한국 LinkedIn·유사 서비스·평가 연구·4:5 A/B 경계 사례 비주얼 교차검증 반영**.
+> 카피 상태: **발행 후보 v6 — 기존 발행본 4개·수정 이력·코드 사실·4:5 A/B 비주얼을 다시 맞춰 회사/개인 본문 전면 재작성**.
 > 앵글(이번 주): **소구점 = "AI가 점수를 낸 뒤에만 사람을 두지 않고, 채점 전에 샘플의 경계 사례를 놓고 교수에게 먼저 묻는다."** 경쟁사의 `빠른 채점·일관성·교사 최종 통제`와 겹치는 표현보다, Quest-On의 구체적인 앞단 메커니즘을 보여준다.
 > 메인 서사: 초기 화면의 `채점 기준을 입력해주세요` → 빈 입력칸이 교수에게 가장 어려운 일을 돌려준다는 발견 → 샘플 답안 기반 AI 인터뷰로 변경. 현재 형태의 기능은 2026-06-22 커밋 `60f179e`, 후속 개선은 `b89aec6`에서 도입됐다.
 > 구현 표현 가드: **기본 가채점 흐름**, **최대 3개 자동 선정 샘플**, **제출된 서술형·CASE 답안의 제안 점수**, **기준과 점수 범위까지 묻도록 설계**, **교수 검토·점수 수정·확정**까지만 말한다. 실제 사용량·시간 절감·정확도·공정성은 주장하지 않는다.
@@ -11,21 +11,23 @@
 
 ## 1. 회사 페이지 (한국어 본문)
 
-Quest-On의 CASE AI 가채점에 ‘채점 기준 인터뷰’를 추가했습니다.
+설명용으로 만든 두 가상 답안 중 어느 쪽을 더 높게 채점하시겠어요?
 
-이제 AI는 바로 점수를 내지 않습니다. 먼저 제출된 답안 중 최대 3개 샘플과 학생-AI 대화를 보고 교수님께 묻습니다.
+A는 실행 근거가 구체적이지만 STP와 4P 일부가 빠졌습니다. B는 핵심 개념을 모두 언급했지만 근거가 얕습니다.
 
-“논리는 탄탄하지만 핵심 개념이 빠진 답안은 몇 점인가요?”
+논리, 핵심 개념, 완성도. 여기까지는 적을 수 있습니다. 그런데 실제 답안을 앞에 놓으면 적어둔 말만으로 잘 갈리지 않는 순간이 생깁니다. 질문은 깊었지만 최종 답안이 약한 학생, 여러 조건을 빠짐없이 다뤘지만 자기 근거가 얕은 학생처럼요.
 
-루브릭에 ‘논리 40 · 개념 30 · 완성도 30’이라고 적어도 경계는 남습니다. 질문은 깊었지만 최종 답안이 약한 학생을 어디까지 인정할지, 여러 조건을 두루 다룬 답과 하나를 깊게 파고든 답 중 무엇을 더 높게 볼지는 숫자만으로 정하기 어렵습니다.
+교수님이 기준을 모르는 게 아니었습니다. 루브릭에 적은 말과 실제 답안을 보며 내리는 판단 사이에 거리가 있었습니다.
 
-교수님의 답에 따라 AI는 애매한 사례를 하나씩 더 묻습니다. 기준과 점수 범위를 정리한 뒤에야 제출된 서술형·CASE 답안의 제안 점수를 만듭니다.
+그래서 Quest-On은 점수를 내기 전에 질문부터 합니다. 제출된 샘플 답안과 학생-AI 대화를 먼저 보고 애매한 지점을 하나씩 교수님께 묻습니다. 답을 들으면 다른 경계 사례를 이어서 묻고 점수 범위까지 맞춘 뒤 가채점을 시작합니다.
 
-최종 점수는 교수님이 피드백을 확인하고 필요한 점수를 수정한 뒤 별도로 확정합니다.
+점수는 초안으로 남습니다. 교수님이 답안과 피드백을 확인하고 필요한 부분을 고친 뒤 확정합니다.
 
-루브릭을 더 길게 쓰게 하기보다, 실제 답안을 보며 이미 하고 있는 판단을 질문으로 꺼내고 싶었습니다.
+루브릭을 더 길게 쓰게 하기보다 실제 답안을 놓고 이미 하고 있는 판단을 말로 꺼내는 쪽을 택했습니다.
 
-실제 채점에서 루브릭만으로 설명하기 어려운 기준은 무엇인가요?
+채점 AI를 만들면서 점수를 잘 내는 법보다 사람에게 무엇을 먼저 물어야 할지를 더 오래 보고 있습니다.
+
+실제 채점에서는 어떤 답안 앞에서 적어둔 기준만으로 결정하기 어려워지나요?
 
 English version & 데모 링크는 첫 댓글에 👇
 
@@ -37,19 +39,21 @@ English version & 데모 링크는 첫 댓글에 👇
 
 > 게시 후 30초 이내에 본인이 직접. 데모 링크를 넣으면 총 1,250자 이내인지 다시 확인한다.
 
-Before Quest-On drafts a score, its default grading flow interviews the instructor:
+Which answer would you grade higher?
 
-“How would you score an answer with strong reasoning but a missing core concept?”
+In this illustrative example, A gives concrete reasons but misses part of STP and 4P. B covers the core concepts but barely connects them to evidence.
 
-A rubric may say reasoning 40, concepts 30, completeness 30. It still cannot settle every borderline case: a thoughtful research process with a weak final answer, or a broad answer versus one deep insight.
+The first version of Quest-On’s AI grading screen had one large field: “Enter your grading criteria.” It sounded reasonable. In practice, it handed the hardest part of grading back to the instructor.
 
-Quest-On first reviews up to three submitted samples and the students’ AI conversations. It then asks one question at a time, following up on the instructor’s priorities and difficult cases. The flow is designed to turn the conversation into grading criteria, including a score range, before drafting scores for the submitted open-ended responses.
+An instructor can write reasoning, concepts, and completeness. Borderline answers still remain. The criteria become clearer when there is an actual answer in front of them.
 
-The scores remain drafts. The instructor reviews the feedback, edits scores where needed, and confirms the final grades.
+So we removed the empty field. Before drafting scores, Quest-On reviews submitted samples and the students’ AI conversations, then asks the instructor about one difficult case at a time. It follows the answers, clarifies the score range, and only then begins pre-grading.
 
-Human oversight should not begin only after an AI produces an answer. It should shape the standards the AI works from.
+The scores remain drafts. The instructor reviews the answers and feedback, edits them where needed, and confirms the final grades.
 
-What do you look for in grading that no rubric fully captures?
+We are learning that human judgment cannot begin only after AI produces a score. It has to shape the criteria first.
+
+Which kinds of answers are hardest to settle with a written rubric alone?
 
 Demo: https://quest-on.app
 
@@ -57,26 +61,29 @@ Demo: https://quest-on.app
 
 ## 3. 영준 개인 계정 (오리지널, 1인칭), 메인 권장
 
-저희가 처음 만든 AI 가채점 화면에는 빈칸이 하나 있었습니다.
+설명용으로 가상 답안 둘을 만들어봤습니다. A는 실행 근거가 구체적이지만 STP와 4P 일부가 빠졌고 B는 핵심 개념을 다 썼지만 근거가 얕습니다. 그런데 처음 만든 AI 가채점 화면은 이런 경우에도 교수님께 이렇게 말했습니다.
+
 “채점 기준을 입력해주세요.”
 
-처음엔 자연스러워 보였습니다. 그런데 화면을 다시 보니, 채점에서 가장 어려운 일을 교수님께 그대로 돌려준 셈이었습니다.
+지금 보면 좀 무책임한 문장이었습니다. 채점을 도와주겠다면서 가장 어려운 일은 다시 교수님께 넘겨놓았으니까요.
 
-‘논리 40 · 개념 30 · 완성도 30’이라고 적어도 애매함은 남았습니다. 논리는 탄탄한데 핵심 개념을 빠뜨린 답안은 몇 점일까요? 질문은 깊었지만 최종 답안이 약한 학생은 어디까지 인정해야 할까요?
+처음 화면은 기준을 입력받으면 그다음부터 AI가 처리하는 구조였습니다. 논리, 핵심 개념, 완성도 같은 항목과 비중을 적는 방식이었어요.
 
-교수님이 기준을 모르는 게 아니었습니다. 실제 기준은 이런 답안을 앞에 놓았을 때 훨씬 구체적으로 드러났습니다.
+그런데 두 답안 사이를 가르려 하면 금세 막힙니다.
 
-그래서 입력칸 대신 AI가 먼저 질문하도록 바꿨습니다.
+둘 중 어느 쪽을 더 높게 봐야 할까요?
 
-Quest-On의 기본 가채점 흐름에서 AI는 제출된 답안 중 최대 3개의 샘플과 학생-AI 대화를 먼저 봅니다. 그리고 교수님께 한 번에 질문 하나를 던집니다.
+여기서 ‘논리 40, 개념 30’이라는 숫자는 별 도움이 되지 않았습니다. 과목에서 무엇을 가르쳤는지, 이 문제에서 무엇을 보려 했는지에 따라 판단이 달라집니다.
 
-교수님이 답하면 다른 경계 사례를 이어서 묻습니다. 무엇을 더 중요하게 보는지, 예외는 어디까지 인정할지, 점수 범위는 어떻게 잡을지 대화로 정리하도록 설계했습니다. 그 다음에야 제출된 서술형·CASE 답안의 제안 점수를 만듭니다.
+교수님이 기준을 모르는 게 아니었습니다. 저희가 만든 빈칸이 그 기준을 꺼내지 못하고 있었어요.
 
-제안 점수는 최종 성적이 아닙니다. 교수님이 피드백을 확인하고 필요한 점수를 고친 뒤 확정합니다.
+그래서 그 입력칸을 없앴습니다.
 
-기능을 만들면서 알게 된 건, 사람을 마지막 검토 단계에만 두면 늦다는 점이었습니다. AI가 어떤 기준으로 일할지 정하는 순간부터 교수님의 판단이 들어가야 한다고 봤습니다.
+지금은 AI가 점수를 내기 전에 먼저 제출된 답안과 학생이 AI와 나눈 대화를 읽습니다. 애매한 답안을 하나 짚어 교수님께 묻고 답을 들으면 비슷하게 어려운 경우를 하나 더 묻습니다. 그렇게 기준을 맞춘 뒤에야 가채점을 시작합니다.
 
-실제 채점에서 루브릭으로 다 설명하기 어려운 기준은 어떻게 꺼내고 계신가요?
+점수는 여전히 교수님이 고치고 확정합니다. 처음 화면에서 사람의 역할은 마지막 검토에 가까웠습니다. 지금은 그때면 늦다고 봅니다. AI가 어떤 기준으로 일할지 정하는 순간부터 사람의 판단이 필요했습니다.
+
+채점 AI를 만들다가 결국 질문부터 다시 만들게 됐습니다.
 
 #에듀테크 #스타트업 #AI평가
 
@@ -189,5 +196,8 @@ DB 확인 범위:
 - 이번 글은 6/24 `학생의 사고 과정` → 6/30 `과정 기반 과제 참여` 다음에 오는 `교수의 판단 과정` 편이다.
 - 원격 `cursor/professor-grading-roi-linkedin-e263`의 7/8 초안은 `AI 가채점 초안 + 교수 확정`이 중심이다. 이번 글은 그보다 앞단인 `기준을 어떻게 얻는가`를 다루므로 중복되지 않는다.
 - 7/8 초안의 `교수가 기준을 한 번 말하거나 적는다`는 설명은 최신 선행 인터뷰 흐름을 충분히 반영하지 못한다. 이번 문서의 구현 가드를 우선한다.
-- 개인 글은 제품 기능 나열보다 `입력창으로 받을 수 없는 암묵지`를 발견한 빌더의 학습을 중심으로 썼다.
+- v6에서 기존 6/6·6/14·6/24·6/30 발행본과 6/6 탈AI화 수정 이력을 다시 읽었다. 회사 글은 `기능 추가` 훅을 버리고 A/B 경계 사례에서 시작하도록, 개인 글은 빈 입력칸을 만든 사람의 잘못된 가정과 설계 수정이 시간 순서로 보이도록 전면 재작성했다.
+- 이미지가 메커니즘을 설명하므로 본문에서는 `최대 3개`, `서술형·CASE`, 세부 인터뷰 라운드 같은 사양 나열을 덜어냈다.
+- 개인 글은 제품 기능 나열보다 `입력칸으로 받을 수 없는 판단을 발견한 빌더의 학습`을 중심으로 썼다.
+- `humanize-korean` 보수 윤문(2026-07-20-001): 회사·개인 한국어 본문 변경률 2.14%, 자체검증 6/6, S1 잔존 0건. 연결어미 뒤 쉼표와 추상적인 문장만 정리했고 수치·기능 사실·고유명사는 보존했다.
 - 현장 실측이나 교수 후기 없이도 성립하도록 기능·설계 철학만 사용했다.
