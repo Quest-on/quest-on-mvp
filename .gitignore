@@ -62,3 +62,6 @@ next-env.d.ts
 
 # impact-review per-run agent brief artifact (best-effort cleanup; guard against commit)
 .impact-review-brief.*.json
+# GajaeCode agent runtime state (per-device, do not version)
+.gjc/
+**/.gjc/

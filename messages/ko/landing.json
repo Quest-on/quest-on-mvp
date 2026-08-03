@@ -58,6 +58,53 @@
       "line2": "혁신이 시작되었습니다."
     }
   },
+  "deployment": {
+    "badge": "현장 도입 기록",
+    "sectionTitle": {
+      "line1": "실제 강의 현장에서",
+      "line2": "증명된 평가 시스템"
+    },
+    "subtitle": "3개 대학의 학부와 대학원 수업에서 11개의 실제 시험과 과제를 운영했습니다.",
+    "metrics": {
+      "attempts": "응시 횟수",
+      "signups": "가입자 수",
+      "exams": "시험과 과제 수",
+      "universities": "도입 대학 수"
+    },
+    "milestones": {
+      "hongik": {
+        "date": "2025년 2학기",
+        "title": "홍익대학교에서 첫 수업",
+        "description": "처음 만든 버전을 들고 찾아간 경영학과 강의가 시작이었습니다. 교수님과 함께 학생들의 반응을 살피며 제품을 다듬었고, 두 학기 연속으로 이어지고 있습니다.",
+        "alt": "홍익대학교 강의실에서 Quest-On으로 수업 중인 학생들"
+      },
+      "donggukMidterm": {
+        "date": "2026년 4월",
+        "title": "동국대학교 두 강의에서 중간고사",
+        "description": "100명이 넘는 학생이 노트북으로 답안을 쓴 첫 대규모 시험이었습니다. 팀은 강의실 앞에서 시험이 끝날 때까지 함께 살폈습니다.",
+        "alt": "동국대학교 강의실에서 Quest-On으로 중간고사를 치르는 학생들"
+      },
+      "sookmyung": {
+        "date": "2026년 5월",
+        "title": "숙명여자대학교 초청 강의",
+        "description": "학생들 앞에 서서 Quest-On이 어떤 제품인지, 어떤 문제의식에서 시작했는지 직접 이야기했습니다.",
+        "alt": "숙명여자대학교 강의실에서 Quest-On 팀이 초청 강의를 하는 모습"
+      },
+      "donggukMba": {
+        "date": "2026년 6월",
+        "title": "동국대학교 MBA 정식 시험",
+        "description": "현직 경영자와 개발자들이 학점이 걸린 시험을 Quest-On으로 치렀습니다. 학부를 넘어 대학원 평가까지 들어간 자리였습니다.",
+        "alt": "동국대학교 MBA 강의실 스크린에 띄워진 Quest-On"
+      },
+      "koreaExtraCredit": {
+        "date": "2026년 6월",
+        "title": "고려대학교 경영대학 Extra Credit 과제",
+        "description": "최종 성적에 최대 5%가 걸린 선택 과제. 교수님은 10명 남짓을 예상하셨지만 50명이 넘게 참여했습니다.",
+        "alt": "고려대학교 extra credit 과제 안남문"
+      }
+    },
+    "sourcePrefix": "연혁과 사진 출처: Quest-On"
+  },
   "logoCloud": {
     "caption": "함께하는 교수진"
   },

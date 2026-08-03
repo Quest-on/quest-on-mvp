@@ -2,13 +2,13 @@
   "hero": {
     "headline": {
       "cheating": "AI cheating",
-      "cannotStop": " — if you can't stop it,",
+      "cannotStop": ", if you can't stop it,",
       "partOf": "make it part of",
       "makePart": "the assessment."
     },
     "subheadline": {
       "line1": "Quest-On turns generative AI from a cheating tool into a thinking partner.",
-      "line2": "We don't just grade answers — we assess the entire reasoning process."
+      "line2": "We don't just grade answers. We assess the entire reasoning process."
     },
     "cta": {
       "start": "Get started",
@@ -23,7 +23,7 @@
       "line2": "and prove learning outcomes."
     },
     "body": {
-      "line1": "Go beyond rote memorization — capture the thinking process as data.",
+      "line1": "Go beyond rote memorization and capture the thinking process as data.",
       "line2": "Start for free and experience a smarter way to assess."
     },
     "button": "Start for free"
@@ -57,6 +57,53 @@
       "line1": "Educators around the world",
       "line2": "are already transforming their classrooms."
     }
+  },
+  "deployment": {
+    "badge": "Deployment history",
+    "sectionTitle": {
+      "line1": "Proven in real classrooms",
+      "line2": "across universities"
+    },
+    "subtitle": "We ran 11 real exams and assignments in undergraduate and graduate courses at 3 universities.",
+    "metrics": {
+      "attempts": "exam attempts",
+      "signups": "signups",
+      "exams": "exams and assignments",
+      "universities": "universities"
+    },
+    "milestones": {
+      "hongik": {
+        "date": "Fall 2025",
+        "title": "First class at Hongik University",
+        "description": "It started in a business course we walked into with our very first build. We watched student reactions and refined the product with the professor, and it has continued for two semesters in a row.",
+        "alt": "Students using Quest-On in a Hongik University classroom"
+      },
+      "donggukMidterm": {
+        "date": "April 2026",
+        "title": "Midterms in two Dongguk University courses",
+        "description": "Our first large scale exam, with more than 100 students writing answers on laptops. The team stayed at the front of the classroom until the exam was over.",
+        "alt": "Students taking a midterm on Quest-On at Dongguk University"
+      },
+      "sookmyung": {
+        "date": "May 2026",
+        "title": "Guest lecture at Sookmyung Women's University",
+        "description": "We stood in front of students and shared what Quest-On is and why we started building it.",
+        "alt": "The Quest-On team giving a guest lecture at Sookmyung Women's University"
+      },
+      "donggukMba": {
+        "date": "June 2026",
+        "title": "Official MBA exam at Dongguk University",
+        "description": "Working executives and developers took a credit bearing exam on Quest-On. It was our first step from undergraduate courses into graduate assessment.",
+        "alt": "Quest-On on the screens of a Dongguk University MBA classroom"
+      },
+      "koreaExtraCredit": {
+        "date": "June 2026",
+        "title": "Extra credit at Korea University Business School",
+        "description": "An optional assignment worth up to 5% of the final grade. The professor expected about ten students, but more than fifty took part.",
+        "alt": "Korea University extra credit assignment announcement"
+      }
+    },
+    "sourcePrefix": "Milestones and photos: Quest-On on"
   },
   "logoCloud": {
     "caption": "Trusted by faculty"
