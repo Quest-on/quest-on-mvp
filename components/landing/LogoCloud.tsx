@@ -5,8 +5,9 @@
 import { useTranslations } from "next-intl";
 
 const PARTNERS = [
-  { name: "고려대학교", logo: "Korea University" },
   { name: "홍익대학교", logo: "Hongik University" },
+  { name: "동국대학교", logo: "Dongguk University" },
+  { name: "고려대학교", logo: "Korea University" },
   { name: "경기과학기술대학교", logo: "GTEC" },
 ];
 
@@ -34,14 +35,14 @@ export default function LogoCloud({
           >
             {t("logoCloud.caption")}
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 w-full max-w-4xl mx-auto gap-8 sm:gap-12 opacity-70 grayscale hover:grayscale-0 transition-all duration-500">
+          <div className="grid grid-cols-2 lg:grid-cols-4 w-full max-w-5xl mx-auto gap-8 sm:gap-10 lg:gap-12 opacity-70 grayscale hover:grayscale-0 transition-all duration-500">
             {PARTNERS.map((partner) => (
               <div
                 key={partner.name}
                 className="flex flex-col items-center justify-center gap-3 group min-w-0 py-4"
               >
                 <div
-                  className={`text-xl sm:text-2xl md:text-3xl font-black tracking-tighter text-center ${
+                  className={`text-lg sm:text-xl md:text-2xl font-black tracking-tighter text-center ${
                     isDark ? "text-white" : "text-[#1F1F1F]"
                   }`}
                 >
