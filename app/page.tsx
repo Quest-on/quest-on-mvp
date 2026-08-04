@@ -14,6 +14,10 @@ const TestimonialSection = dynamic(
   () => import("@/components/landing/TestimonialSection"),
   { loading: () => <div className="min-h-[600px]" /> }
 );
+const DeploymentSection = dynamic(
+  () => import("@/components/landing/DeploymentSection"),
+  { loading: () => <div className="min-h-[400px]" /> }
+);
 const LogoCloud = dynamic(
   () => import("@/components/landing/LogoCloud"),
   { loading: () => <div className="min-h-[400px]" /> }
@@ -81,6 +85,8 @@ export default async function LandingPage() {
       <section id="features">
         <TestimonialSection mode="light" />
       </section>
+      {/* Deployment Section - 실제 강의 현장 트랙션 */}
+      <DeploymentSection mode="light" />
       {/* Partners Section - 파트너십 */}
       <LogoCloud mode="light" />
       {/* Footer */}
