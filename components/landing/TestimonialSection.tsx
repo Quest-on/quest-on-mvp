@@ -62,6 +62,15 @@ const TESTIMONIALS = [
   },
   {
     quote:
+      "AI시대 새롭게 요구되는 인재상에 대비할 수 있는 방법입니다. 많은 교수자님께서도 관심과 응원 부탁드립니다.",
+    name: "이중학 교수님",
+    title: "동국대학교",
+    avatar: "/lee_pf-avatar.png",
+    logo: "/dongguk_emblem.png",
+    avatarFade: true, // 정장 하단이 딱 잘려 보여 아랫면만 흐림 처리(크기는 기본 규격)
+  },
+  {
+    quote:
       "AI 시대에 꼭 필요한 '사고 과정' 평가의 해답. 공정성과 설명 가능성을 모두 갖춘 혁신적인 플랫폼입니다.",
     name: "권효찬 교수님",
     title: "경기과학기술대학교",
@@ -121,7 +130,7 @@ function TestimonialCard({
             className="h-full w-full object-contain object-right-bottom"
             loading="lazy"
           />
-          {testimonial.avatarSize === "small" && (
+          {(testimonial.avatarSize === "small" || testimonial.avatarFade) && (
             <div
               className={`absolute inset-x-0 bottom-0 h-2/5 pointer-events-none bg-gradient-to-t ${
                 isDark ? "from-zinc-900" : "from-white"
