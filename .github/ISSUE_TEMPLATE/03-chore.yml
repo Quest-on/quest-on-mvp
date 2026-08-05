@@ -1,0 +1,34 @@
+name: "Chore — 정리 / 기술부채 / 설정"
+description: "사용자에게 보이는 동작 변화가 없는 작업."
+title: "chore: "
+labels: ["type:chore", "status:ready"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 무엇을 왜
+      description: "지금 안 하면 뭐가 나빠지는지 한 문단."
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: 영향 범위
+      value: |
+        - 건드리는 것:
+        - 절대 안 건드리는 것:
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: "동작 불변 증명 방법"
+      description: "리팩터링/설정 변경이면 '기존 테스트가 그대로 통과한다'가 증명입니다."
+      value: |
+        ```bash
+        npx tsc --noEmit && npm run lint && npx vitest run
+        ```
+    validations:
+      required: true
