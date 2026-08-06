@@ -473,6 +473,7 @@ export default function ExamDetail({
                         duration={exam.duration}
                         createdAt={exam.createdAt}
                         examCode={exam.code}
+                        examTitle={exam.title}
                       />
                     </div>
                   </CollapsibleContent>
