@@ -1,4 +1,4 @@
-# 라벨 원본. 적용: bash .github/scripts/sync-labels.sh
+# 라벨 원본. 적용: node scripts/sync-labels.mjs
 # 축은 3개뿐이다: type(무엇) / status(누가 집을 수 있나) / area(어디).
 - name: "type:epic"
   color: "5319E7"

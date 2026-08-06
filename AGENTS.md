@@ -3,9 +3,11 @@
 Quest-On: AI 기반 시험/과제 플랫폼. 교수자가 출제 → 학생이 AI 대화로 응시 → AI 채점 → 교수자 검수.
 Next.js 16 App Router / React 19 / TS strict / Tailwind 4 / Supabase(Postgres) + Prisma / Clerk / OpenAI / Upstash / Vercel.
 
+**코드가 SSOT다.** 이 파일을 포함한 어떤 문서도 진실의 원천이 아니다. 문서·스펙·이슈 본문이 코드와 어긋나면 코드가 맞고, 문서를 고친다. 판단은 문서가 아니라 코드를 읽고 한다.
+
 ## 작업 시작 전
 
-이슈 없이 코드를 만들지 않는다. 이슈 본문이 스펙이고, 모호하면 `status:needs-spec` 으로 두고 멈춘다.
+이슈 없이 코드를 만들지 않는다. 이슈 본문은 "무엇을 할지"의 착수 근거이지 "무엇이 참인지"의 근거가 아니다. 모호하면 `status:needs-spec` 으로 두고 멈춘다.
 
 ```bash
 git fetch origin && git checkout -b feat/<짧은-설명> origin/main   # 종류: feat / fix / docs / chore

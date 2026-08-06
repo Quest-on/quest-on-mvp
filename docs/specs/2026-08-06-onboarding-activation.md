@@ -1,5 +1,11 @@
 # Deep Interview Spec: 교수자·학생 온보딩 (Onboarding Activation)
 
+> **이 문서는 결정 기록이다. SSOT가 아니다.**
+> 작성 시점(2026-08-06)에 무엇을 왜 그렇게 정했는지를 남기기 위해 존재한다.
+> 진실의 원천은 코드이고 집행자는 테스트다. **이 문서와 코드가 다르면 코드가 맞다.**
+> 구현 중 더 나은 방법이 보이면 코드를 바꾸고 PR에 이유를 적는다. 이 문서를 지키려고 나쁜 코드를 쓰지 않는다.
+> 읽을 가치가 있는 부분은 "무엇을 만들지"가 아니라 **어떤 대안을 왜 버렸는지**(Assumptions Exposed & Resolved, Trigger Metadata)다.
+
 ## Metadata
 - Interview ID: a7f3c1e2-9b4d-4c8a-8e21-5d0f6a3b7c94
 - Rounds: 13 (+ Round 0 topology gate)
