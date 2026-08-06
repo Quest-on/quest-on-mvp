@@ -28,6 +28,7 @@ import {
 import { CenteredViewportShell } from "@/components/layout/CenteredViewportShell";
 import { User, Hash, GraduationCap, Loader2, ArrowLeft } from "lucide-react";
 import { ErrorAlert } from "@/components/ui/error-alert";
+import { resolveSignupRole } from "@/lib/onboarding-role";
 
 interface University {
   name: string;
@@ -40,7 +41,7 @@ interface University {
 
 export default function OnboardingPage() {
   const t = useTranslations("onboarding.page");
-  const { user, isLoaded } = useAppUser();
+  const { user, profile, isLoaded } = useAppUser();
   const router = useRouter();
 
   // Step: "role" | "profile"
@@ -63,13 +64,21 @@ export default function OnboardingPage() {
   // Student-only fields
   const [studentNumber, setStudentNumber] = useState("");
 
-  // Get role from localStorage if available
+  // AC-1: 가입 시점의 역할 의도를 해석할 수 있으면 역할 단계를 건너뛴다.
+  // 해석할 수 없으면(예: OAuth 쿠키 소실) 역할 단계를 그대로 보여준다 —
+  // 추측해서 건너뛰면 잘못된 역할로 계정이 굳는다.
   useEffect(() => {
-    const savedRole = localStorage.getItem("selectedRole");
-    if (savedRole && (savedRole === "instructor" || savedRole === "student")) {
-      setRole(savedRole as "instructor" | "student");
+    if (!isLoaded) return;
+    const resolved = resolveSignupRole({
+      // 이미 역할이 확정된 기존 사용자(프로필 수정 진입)는 profiles.role 이 권위다.
+      metadataRole: profile?.role ?? user?.user_metadata?.role,
+      cookieString: typeof document === "undefined" ? null : document.cookie,
+    });
+    if (resolved) {
+      setRole(resolved);
+      setStep("profile");
     }
-  }, []);
+  }, [isLoaded, user, profile]);
 
   useEffect(() => {
     if (isLoaded && !user) {
@@ -177,28 +186,29 @@ export default function OnboardingPage() {
       });
       if (!profileRes.ok) throw new Error("Profile update failed");
 
-      // role별 추가 프로필 테이블에도 저장 (기존 API들이 여기서 읽음)
-      if (role === "student") {
-        await fetch("/api/student/profile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: name.trim(),
-            student_number: studentNumber.trim(),
-            school: school.trim(),
-          }),
-        });
-      } else {
-        await fetch("/api/instructor/profile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: name.trim(),
-            email: user.email,
-            school: school.trim(),
-          }),
-        });
-      }
+      // role별 추가 프로필 테이블에도 저장 (기존 API들이 여기서 읽음).
+      // AC-2: 이 호출의 실패를 삼키면 프로필이 반쪽만 저장된 유저가 생긴다.
+      const roleProfileRes =
+        role === "student"
+          ? await fetch("/api/student/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: name.trim(),
+                student_number: studentNumber.trim(),
+                school: school.trim(),
+              }),
+            })
+          : await fetch("/api/instructor/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: name.trim(),
+                email: user.email,
+                school: school.trim(),
+              }),
+            });
+      if (!roleProfileRes.ok) throw new Error("Role profile update failed");
 
       // Clear localStorage
       localStorage.removeItem("selectedRole");
