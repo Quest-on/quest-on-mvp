@@ -45,6 +45,7 @@ DB 백엔드 테스트와 `e2e/helpers/seed.ts::cleanupTestData()` 는 사용자
 
 | 주제 | 문서 |
 |---|---|
+| 이슈·PR 추적 규칙, 스프린트 운영 | `docs/WORKFLOW.md` |
 | 시스템 전체 지도(라우트·스키마·연동) | `ARCHITECTURE.md` |
 | 인증·환경변수·CORS·레이트리밋·입력검증 | `docs/SECURITY.md` |
 | 테스트 명령과 기대치 | `docs/TESTING.md` |
