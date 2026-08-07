@@ -65,3 +65,7 @@ next-env.d.ts
 # GajaeCode agent runtime state (per-device, do not version)
 .gjc/
 **/.gjc/
+
+# QA 레인 산출물 (에이전트 런타임, 버전관리 대상 아님)
+.redteam/
+**/.redteam/
