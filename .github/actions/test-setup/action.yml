@@ -117,13 +117,19 @@ runs:
         "
       shell: bash
 
-    - name: Apply SQL functions (RPCs)
+    - name: Apply SQL functions (RPCs) and security migrations
       run: |
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -f database/016_chat_message_idempotency.sql \
           -f sql/006_submit_exam_atomic.sql \
           -f sql/007_index_optimization.sql \
           -f sql/012_create_exam_with_node.sql
+        # 018 은 RLS/REVOKE 를 포함한다. 여기서 적용하지 않으면 plan_limits 가
+        # 아래 blanket GRANT 아래에서 RLS 없이 남아, CI 만 운영과 다른 보안 상태가
+        # 된다(전역 한도 테이블을 anon 이 수정 가능). 컬럼/테이블 생성은 전부
+        # IF NOT EXISTS 라 prisma db push 와 중복돼도 안전하다.
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -f database/018_onboarding_activation.sql
         # Reload PostgREST schema cache so new functions are immediately callable
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -c "NOTIFY pgrst, 'reload schema';"
@@ -142,6 +148,12 @@ runs:
           GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
           GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
           GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+          -- 이 blanket GRANT 는 018 이 건 REVOKE 를 되돌린다. 두 테이블은
+          -- service_role 전용이므로 다시 회수해 CI 를 운영과 같은 자세로 맞춘다.
+          -- (RLS 가 실질 방어선이라 이게 없어도 데이터는 안 뚫리지만, CI 와 운영이
+          --  다른 권한 상태로 갈라지면 나중에 판단을 그르친다.)
+          REVOKE ALL ON public.plan_limits FROM anon, authenticated;
+          REVOKE ALL ON public.onboarding_events FROM anon, authenticated;
           NOTIFY pgrst, 'reload schema';
         "
       shell: bash
