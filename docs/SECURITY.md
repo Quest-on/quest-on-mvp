@@ -8,8 +8,13 @@
 - When adding new env vars: update all three locations — `.env.local`, Vercel, and CI secrets.
 - Server-only secrets must NOT use `NEXT_PUBLIC_` prefix.
 
-Required secrets:
-`CLERK_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `OPENAI_API_KEY`, `ADMIN_SESSION_SECRET`, `INTERNAL_API_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+환경별 필수/금지 목록의 SSOT 는 `lib/env-manifest.ts` 다. 배포된 환경은 `/api/health`(관리자)로, 파일은 `npm run env:check -- --env <환경> --file <파일>` 로 검증한다.
+
+Required secrets (배포 환경 공통):
+`SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `ADMIN_SESSION_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `INTERNAL_API_SECRET`, `CRON_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`
+
+Forbidden in deployed environments (프로덕션·스테이징):
+`TEST_BYPASS_SECRET`, `NEXT_PUBLIC_TEST_BYPASS_ENABLED` — 존재하면 `lib/supabase-auth.ts` 가 throw 한다. 스테이징 절차는 `docs/STAGING.md`.
 
 ---
 

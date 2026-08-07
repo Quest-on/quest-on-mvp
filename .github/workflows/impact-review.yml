@@ -1,14 +1,15 @@
 name: impact-review
 
-# 변경 영향/회귀 자동 리뷰. main 대상 모든 PR(브랜치/작성자 무관) + main 직푸시에서 발동.
+# 변경 영향/회귀 자동 리뷰. main·staging 대상 모든 PR(브랜치/작성자 무관) + 두 브랜치 직푸시에서 발동.
+# 작업 PR 의 base 는 staging 이므로 실질적인 리뷰 지점은 staging 이다.
 # 결정적 Critical → job 실패(빨간 체크). AI-only Critical → 기본 코멘트-only.
 # read-only: Supabase/DB/.env 미전달. pull_request_target 사용 금지.
 on:
   pull_request:
-    branches: [main]
+    branches: [main, staging]
     types: [opened, synchronize, reopened, ready_for_review]
   push:
-    branches: [main]
+    branches: [main, staging]
 
 permissions:
   contents: write # push 이벤트의 commit comment용

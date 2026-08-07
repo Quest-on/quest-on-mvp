@@ -37,6 +37,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# 값이 없는 템플릿은 커밋한다 (환경 매니페스트의 사람이 읽는 사본)
+!.env.example
+!.env.staging.example
 
 # vercel
 .vercel
@@ -62,6 +65,8 @@ next-env.d.ts
 
 # impact-review per-run agent brief artifact (best-effort cleanup; guard against commit)
 .impact-review-brief.*.json
-# GajaeCode agent runtime state (per-device, do not version)
+# 에이전트 런타임 상태 (기기별, 버전관리 대상 아님)
 .gjc/
 **/.gjc/
+.orca/
+**/.orca/

@@ -1,23 +1,23 @@
 #!/bin/sh
-# main 브랜치 직접 커밋 차단 (메인테이너 제외).
+# 보호 브랜치(main, staging) 직접 커밋 차단 (메인테이너 제외).
 DIR="$(dirname "$0")"
 . "$DIR/_lib.sh"
 
 # 테스트 seam: GUARD_TEST_BRANCH 가 있으면 그 값을 현재 브랜치로 간주.
 branch="${GUARD_TEST_BRANCH:-$(git symbolic-ref --short HEAD 2>/dev/null)}"
 
-if [ "$branch" = "$PROTECTED_BRANCH" ]; then
+if is_protected_branch "$branch"; then
   if is_maintainer; then
     exit 0
   fi
   echo ""
-  echo "⛔  main 브랜치에는 직접 커밋할 수 없습니다."
+  echo "⛔  $branch 브랜치에는 직접 커밋할 수 없습니다."
   echo ""
   echo "    작업용 브랜치를 만들어 진행하세요:"
   echo ""
-  echo "        git checkout -b feat/내작업이름"
+  echo "        git checkout -b feat/내작업이름 origin/staging"
   echo ""
-  echo "    (main 은 Pull Request 로만 반영합니다. 자세한 내용: CONTRIBUTING.md)"
+  echo "    (main·staging 은 Pull Request 로만 반영합니다. 자세한 내용: CONTRIBUTING.md)"
   echo ""
   exit 1
 fi

@@ -3,24 +3,30 @@
 > 이 저장소는 포크 기반 협업을 사용한다. `main` 은 메인테이너(@jcmaker)만 머지한다.
 > **AI 코딩 도구(Cursor / Claude Code / Codex)로 작업할 때, 아래 절차를 먼저 수행한 뒤 코드를 건드린다.**
 
-1. **`main` 에서 직접 작업/커밋/푸시 금지.** (git hook 이 차단한다. 자세한 워크플로: `CONTRIBUTING.md`)
-2. **작업 시작 전 항상 최신 main 으로 동기화한다:**
+브랜치는 2단계다. 작업 PR 은 전부 `staging` 으로 올리고, 스테이징에서 QA 를 통과한 것만 `staging` → `main` 승격 PR 로 프로덕션에 나간다. (환경 구성: `docs/STAGING.md`)
+
+```
+feat/xxx ──PR──▶ staging ──배포·QA──▶ PR ──▶ main ──▶ 프로덕션
+```
+
+1. **`main` · `staging` 에서 직접 작업/커밋/푸시 금지.** (git hook 이 차단한다. 자세한 워크플로: `CONTRIBUTING.md`)
+2. **작업 시작 전 항상 최신 staging 으로 동기화한다:**
    ```bash
-   git checkout main
+   git checkout staging
    git fetch upstream
-   git reset --hard upstream/main
+   git reset --hard upstream/staging
    ```
 3. **새 작업 브랜치를 만들고 거기서만 작업한다:**
    ```bash
    git checkout -b feat/<짧은-설명>     # 종류: feat / fix / docs / chore
    ```
-4. **커밋은 작게, 자주.** 한 브랜치 = 한 가지 변경. 끝나면 **자기 포크로 push** 후 **Pull Request** 를 안내한다.
+4. **커밋은 작게, 자주.** 한 브랜치 = 한 가지 변경. 끝나면 **자기 포크로 push** 후 **base 를 `staging` 으로** Pull Request 를 안내한다.
    ```bash
    git push -u origin feat/<짧은-설명>
    ```
 5. **머지 후 충돌이 나면**, PR 작성자가 자기 브랜치에서 해결한다:
    ```bash
-   git fetch upstream && git rebase upstream/main && git push --force-with-lease
+   git fetch upstream && git rebase upstream/staging && git push --force-with-lease
    ```
 6. **`.env*` 등 비밀정보는 절대 커밋하지 않는다.** 운영 DB 접속정보로 로컬을 돌리지 않는다(아래 DB Safety).
 
