@@ -60,6 +60,10 @@ describe("StudentProfileSetupPage", () => {
   it("전달만 하고 판정하지 않는다 — 검증은 소비 지점(/onboarding)의 책임", async () => {
     // 여기서 걸러내면 검증이 두 곳으로 갈라진다. 목적지에서 safeInternalPath 로 막는다.
     const target = await callPage({ redirect: "//evil.com" });
-    expect(new URL(target, "https://quest-on.app").pathname).toBe("/onboarding");
+    const url = new URL(target, "https://quest-on.app");
+
+    expect(url.pathname).toBe("/onboarding");
+    // 값도 그대로 실려야 한다 — 여기서 조용히 바꾸면 소비 지점 검증이 의미를 잃는다.
+    expect(url.searchParams.get("redirect")).toBe("//evil.com");
   });
 });
