@@ -25,5 +25,13 @@ export function safeInternalPath(value: string | null | undefined): string | nul
   // 제어문자(개행·탭·NUL)로 파서를 속이는 입력 차단.
   if (/[\u0000-\u001F\u007F]/.test(trimmed)) return null;
 
+  // 보이지 않는 문자(제로폭·NBSP·BOM·양방향 제어·줄구분자)도 거부한다.
+  // 이것들만으로 오리진이 바뀌지는 않는다 — `new URL("/\u200Bevil.com", origin)`
+  // 은 여전히 우리 오리진의 경로다. 다만 리다이렉트 목적지에 안 보이는 문자를
+  // 넣을 정당한 이유가 없고, 로그·사람 눈으로 하는 검증을 흐리기만 한다.
+  if (/[\u0085\u00A0\u1680\u180E\u2000-\u200F\u2028\u2029\u202A-\u202F\u205F-\u2064\u2066-\u206F\u3000\uFEFF]/.test(trimmed)) {
+    return null;
+  }
+
   return trimmed;
 }

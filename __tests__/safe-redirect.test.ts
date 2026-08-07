@@ -49,6 +49,24 @@ describe("safeInternalPath", () => {
     expect(safeInternalPath("/exam\u0000")).toBeNull();
   });
 
+  // 레드팀 지적. 이것들만으로 오리진이 바뀌지는 않지만(아래 교차 검증 참고),
+  // 리다이렉트 목적지에 안 보이는 문자를 넣을 정당한 이유가 없다.
+  it("보이지 않는 문자를 거부한다 — 제로폭·NBSP·BOM·양방향 제어", () => {
+    expect(safeInternalPath("/\u200Bevil.com")).toBeNull();
+    expect(safeInternalPath("/\u00A0evil.com")).toBeNull();
+    expect(safeInternalPath("/\uFEFFevil.com")).toBeNull();
+    expect(safeInternalPath("/\u2028evil.com")).toBeNull();
+    expect(safeInternalPath("/\u202Eevil.com")).toBeNull();
+    expect(safeInternalPath("/\u0085//evil.com")).toBeNull();
+  });
+
+  it("거부한 보이지 않는 문자들은 원래도 오리진을 바꾸지는 못했다 (사실 기록)", () => {
+    // 이 차단은 심층 방어이지 오리진 탈출 수정이 아니라는 근거를 남긴다.
+    for (const value of ["/\u200Bevil.com", "/\u00A0evil.com", "/\uFEFFevil.com"]) {
+      expect(new URL(value, "https://quest-on.app").origin).toBe("https://quest-on.app");
+    }
+  });
+
   it("값이 없으면 null 이다 — 호출부가 기본 목적지를 쓴다", () => {
     expect(safeInternalPath(null)).toBeNull();
     expect(safeInternalPath(undefined)).toBeNull();
