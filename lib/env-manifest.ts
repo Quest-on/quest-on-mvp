@@ -18,8 +18,6 @@ export type EnvSpec = {
   purpose: string;
   /** 환경별 정책. 지정하지 않은 환경은 "optional". */
   levels: Partial<Record<AppEnv, EnvLevel>>;
-  /** true 면 값이 노출돼도 되는 공개 변수 (NEXT_PUBLIC_*). */
-  publicValue?: boolean;
 };
 
 const ALL_DEPLOYED: Partial<Record<AppEnv, EnvLevel>> = {
@@ -33,26 +31,26 @@ export const ENV_MANIFEST: readonly EnvSpec[] = [
     purpose:
       "런타임 환경 선언. 스테이징을 별도 Vercel 프로젝트로 두면 VERCEL_ENV=production 이라 이 값이 없으면 프로덕션으로 오인된다.",
     levels: { staging: "required", production: "optional" },
-    publicValue: true,
+
   },
   {
     name: "NEXT_PUBLIC_APP_URL",
     purpose:
       "이 배포의 안정 도메인. QStash 콜백/절대 URL 생성 기준 (배포마다 바뀌는 VERCEL_URL 폴백 방지).",
     levels: ALL_DEPLOYED,
-    publicValue: true,
+
   },
   {
     name: "NEXT_PUBLIC_SUPABASE_URL",
     purpose: "Supabase 프로젝트 URL. 스테이징은 프로덕션과 다른 프로젝트여야 한다.",
     levels: { production: "required", staging: "required", development: "required" },
-    publicValue: true,
+
   },
   {
     name: "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     purpose: "브라우저 Supabase 클라이언트 / 인증 세션 키.",
     levels: { production: "required", staging: "required", development: "required" },
-    publicValue: true,
+
   },
   {
     name: "SUPABASE_SERVICE_ROLE_KEY",
@@ -143,7 +141,7 @@ export const ENV_MANIFEST: readonly EnvSpec[] = [
     name: "NEXT_PUBLIC_TEST_BYPASS_ENABLED",
     purpose: "클라이언트 측 바이패스 활성 플래그. 배포 환경 금지.",
     levels: { production: "forbidden", staging: "forbidden", test: "optional" },
-    publicValue: true,
+
   },
 ];
 

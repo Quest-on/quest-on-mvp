@@ -109,10 +109,6 @@ export function isProductionApp(): boolean {
   return getAppEnv() === "production";
 }
 
-export function isStagingApp(): boolean {
-  return getAppEnv() === "staging";
-}
-
 /**
  * 테스트 바이패스(TEST_BYPASS_SECRET) 를 켤 수 있는 환경인가.
  *

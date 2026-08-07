@@ -5,7 +5,6 @@ import {
   appEnvDeclarationConflict,
   getAppEnv,
   isProductionApp,
-  isStagingApp,
   isAuthBypassAllowedEnv,
 } from "../lib/app-env";
 
@@ -84,7 +83,6 @@ describe("environment predicates", () => {
   it("reads process.env at call time", () => {
     vi.stubEnv("NEXT_PUBLIC_APP_ENV", "staging");
     expect(getAppEnv()).toBe("staging");
-    expect(isStagingApp()).toBe(true);
     expect(isProductionApp()).toBe(false);
   });
 
