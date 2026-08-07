@@ -14,6 +14,14 @@ interface ExamDetailsCardProps {
   createdAt: string;
   examCode: string;
   examTitle?: string;
+  /**
+   * 이 시험에서 학생이 AI 채팅을 쓸 수 있는가(= 서술형/CASE 문항이 있는가).
+   *
+   * 선택 prop 이 아니라 필수다. 기본값을 두면 호출부가 빠뜨렸을 때 조용히
+   * 잘못된 공지문이 나간다 — MCQ/OX 전용 시험에 "AI에게 질문하세요"라고
+   * 적힌 안내를 뿌리는 것이 정확히 그 사고다.
+   */
+  aiChatAvailable: boolean;
 }
 
 export function ExamDetailsCard({
@@ -22,6 +30,7 @@ export function ExamDetailsCard({
   createdAt,
   examCode,
   examTitle = "",
+  aiChatAvailable,
 }: ExamDetailsCardProps) {
   const t = useTranslations("authoring");
   const tExam = useTranslations("exam");
@@ -48,11 +57,16 @@ export function ExamDetailsCard({
         examTitle,
         codeLabel: t("examDetailsCard.noticeCodeLabel"),
         examCode,
-        policyLines: [
-          tExam("preflight.aiDisclosureAllowed"),
-          tExam("preflight.aiDisclosureGraded"),
-          tExam("preflight.aiDisclosureVisible"),
-        ],
+        // MCQ/OX 전용 시험은 학생 화면에 AI 채팅이 아예 렌더되지 않는다
+        // (exam/[code]/page.tsx 가 !isCurrentObjective 일 때만 ExamChatSidebar 노출).
+        // 그런 시험의 공지문에 "AI에게 질문하세요"를 넣으면 문구 자체가 거짓이 된다.
+        policyLines: aiChatAvailable
+          ? [
+              tExam("preflight.aiDisclosureAllowed"),
+              tExam("preflight.aiDisclosureGraded"),
+              tExam("preflight.aiDisclosureVisible"),
+            ]
+          : [],
         footer: t("examDetailsCard.noticeFooter"),
       });
       await navigator.clipboard.writeText(notice);

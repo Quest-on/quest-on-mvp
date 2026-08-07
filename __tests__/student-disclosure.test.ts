@@ -67,6 +67,20 @@ describe("buildStudentNotice (AC-16)", () => {
     expect(out).toContain("입장 코드: MATH01");
   });
 
+  // 리뷰 P2: MCQ/OX 전용 시험은 학생 화면에 AI 채팅이 렌더되지 않는다
+  // (exam/[code]/page.tsx 가 !isCurrentObjective 일 때만 ExamChatSidebar 노출).
+  // ExamDetailsCard 는 aiChatAvailable=false 일 때 policyLines 를 [] 로 넘기며,
+  // 그 결과 공지문에 "AI에게 질문하세요" 류가 한 줄도 들어가지 않아야 한다.
+  it("AI 채팅이 없는 시험의 공지문에는 AI 안내가 한 줄도 없다", () => {
+    const out = buildStudentNotice({ ...base, policyLines: [] });
+
+    expect(out).not.toMatch(/AI/);
+    expect(out).not.toContain("질문");
+    // 그래도 공지문으로서 최소한의 쓸모(제목·입장 코드)는 유지된다.
+    expect(out).toContain("경영전략 중간고사");
+    expect(out).toContain("입장 코드: MATH01");
+  });
+
   it("결과는 항상 문자열이며 후행 공백 줄로 끝나지 않는다", () => {
     const out = buildStudentNotice(base);
     expect(typeof out).toBe("string");

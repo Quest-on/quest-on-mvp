@@ -48,6 +48,9 @@ import type { InstructorExam } from "@/lib/types/exam";
 import type { ExamStudentSummary } from "@/lib/types/student-summary";
 import { BulkGradingPanel } from "@/components/instructor/BulkGradingPanel";
 import { useTranslations } from "next-intl";
+// 학생 페이지(exam/[code]/page.tsx)가 채팅 노출을 판정할 때 쓰는 것과 동일한 함수를
+// 쓴다. 판정이 갈리면 공지문과 실제 화면이 어긋난다.
+import { isObjectiveQuestion } from "@/lib/grading-helpers";
 
 function isCaseGradingQuestionType(type?: string): boolean {
   return type === "case" || type === "essay" || type === "short-answer";
@@ -219,6 +222,16 @@ export default function ExamDetail({
       students.some((s) => s.caseProgress.total > 0)
     );
   }, [examDetailData, students]);
+
+  // 학생 화면에 AI 채팅이 실제로 뜨는 시험인가(= 서술형/CASE 문항 존재).
+  // 문항 정보를 아직 못 받았으면 false 로 둔다 — 확인 못 한 것을 공지문에
+  // 사실처럼 적는 것보다 빠뜨리는 편이 낫다.
+  const aiChatAvailable = useMemo(() => {
+    const detailQuestions = Array.isArray(examDetailData?.questionsRaw)
+      ? examDetailData.questionsRaw
+      : [];
+    return detailQuestions.some((q) => !isObjectiveQuestion(q.type));
+  }, [examDetailData]);
 
   const hasSubmittedCaseStudents = useMemo(() => {
     return students.some(
@@ -474,6 +487,7 @@ export default function ExamDetail({
                         createdAt={exam.createdAt}
                         examCode={exam.code}
                         examTitle={exam.title}
+                        aiChatAvailable={aiChatAvailable}
                       />
                     </div>
                   </CollapsibleContent>
