@@ -131,6 +131,14 @@ describe("isAuthBypassAllowedEnv — 배포 신호 hard-deny (리뷰 P1)", () =>
     expect(isAuthBypassAllowedEnv()).toBe(false);
   });
 
+  // 레드팀 지적: 빈 문자열은 falsy 라 통과하던 경로.
+  // Vercel 은 VERCEL_ENV 를 항상 채우므로 빈 값은 사람이 손으로 넣은 것이다.
+  it("VERCEL_ENV 가 빈 문자열이어도 배포 신호로 본다", () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_ENV", "development");
+    vi.stubEnv("VERCEL_ENV", "");
+    expect(isAuthBypassAllowedEnv()).toBe(false);
+  });
+
   it("NODE_ENV=production 이면 라벨이 development 여도 거부한다 — 변경 전 동작 유지", () => {
     vi.stubEnv("NEXT_PUBLIC_APP_ENV", "development");
     vi.stubEnv("NODE_ENV", "production");

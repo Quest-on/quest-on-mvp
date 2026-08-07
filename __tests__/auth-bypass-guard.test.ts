@@ -55,6 +55,33 @@ describe("currentUser test bypass", () => {
     await expect(currentUser()).rejects.toThrow(/TEST_BYPASS_SECRET/);
   });
 
+  // 레드팀 지적: 라벨이 development/test 로 잘못 들어간 배포에서 유효한
+  // 바이패스 헤더가 실제로 통과하는지. 배포 신호가 라벨을 이겨야 한다.
+  it("throws when a deployment signal is present even if the label says development", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_ENV", "development");
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("TEST_BYPASS_SECRET", "leaked-secret");
+    headerStore.set("x-test-bypass-token", "leaked-secret");
+    headerStore.set("x-test-user-id", "attacker");
+    headerStore.set("x-test-user-role", "instructor");
+
+    const currentUser = await loadCurrentUser();
+    await expect(currentUser()).rejects.toThrow(/TEST_BYPASS_SECRET/);
+  });
+
+  it("throws when VERCEL_ENV is present but empty — a hand-set value is not trustworthy", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_ENV", "test");
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("VERCEL_ENV", "");
+    vi.stubEnv("TEST_BYPASS_SECRET", "leaked-secret");
+    headerStore.set("x-test-bypass-token", "leaked-secret");
+    headerStore.set("x-test-user-id", "attacker");
+
+    const currentUser = await loadCurrentUser();
+    await expect(currentUser()).rejects.toThrow(/TEST_BYPASS_SECRET/);
+  });
+
   it("resolves the bypass user in development", async () => {
     vi.stubEnv("NEXT_PUBLIC_APP_ENV", "development");
     vi.stubEnv("TEST_BYPASS_SECRET", "local-secret");

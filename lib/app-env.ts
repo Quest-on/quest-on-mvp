@@ -127,8 +127,10 @@ export function isProductionApp(): boolean {
  */
 export function isAuthBypassAllowedEnv(): boolean {
   // 플랫폼이 주입하는 배포 신호. 라벨보다 우선한다.
-  if (process.env.VERCEL === "1") return false;
-  if (process.env.VERCEL_ENV) return false;
+  // VERCEL_ENV 는 **존재 여부**로 판정한다. Vercel 은 항상 값을 채우므로,
+  // 빈 문자열이라면 사람이 손으로 넣었다는 뜻이고 그건 신뢰할 근거가 못 된다.
+  if (process.env.VERCEL) return false;
+  if (process.env.VERCEL_ENV !== undefined) return false;
   if (process.env.NODE_ENV === "production") return false;
 
   const appEnv = getAppEnv();
