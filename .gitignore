@@ -70,3 +70,5 @@ next-env.d.ts
 **/.gjc/
 .orca/
 **/.orca/
+.redteam/
+**/.redteam/
