@@ -53,9 +53,9 @@ status:needs-spec  →  status:ready  →  status:in-progress  →  (PR 머지�
 
 ## PR
 
-- 제목이 아니라 본문의 `Closes #<번호>` 가 추적의 실체다. 반드시 넣는다.
+- 제목이 아니라 본문의 `Closes #<번호>` 가 추적의 실체다. 반드시 넣는다. **`pr-hygiene` 워크플로가 이를 검사한다** — 번호 없는 `Closes #` 를 그대로 두면 PR 이 막힌다. 이슈 없이 가야 하는 예외는 본문에 `No issue: <이유>` 를 적어 명시적으로 선언한다.
 - **실행한 명령과 실제 출력을 붙인다.** 사람이 안 보므로 "확인했습니다"는 아무 의미가 없다.
-- CI(quality / api-e2e / browser-e2e / impact-review)가 전부 초록이어야 머지한다.
+- CI(quality / api-e2e / browser-e2e / impact-review / pr-hygiene)가 전부 초록이어야 머지한다.
 - 이슈 범위 밖으로 나간 파일이 있으면 PR 본문에 이유와 함께 적는다. 조용히 섞으면 리뷰가 없는 이 저장소에서는 아무도 못 잡는다.
 
 ## 스프린트 종료
