@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildStudentNotice } from "@/lib/student-notice";
+import { buildStudentNotice, studentNoticePolicyLines } from "@/lib/student-notice";
 import { hasAiChatQuestions } from "@/lib/grading-helpers";
 
 const base = {
@@ -128,5 +128,54 @@ describe("hasAiChatQuestions — AI 채팅 노출 판정 (리뷰 P2 공통 원�
     // isObjectiveQuestion(undefined) === false 이므로 !objective = true.
     // 문항 타입이 유실됐을 때 채팅이 뜨는 쪽이 기존 학생 화면 동작이다.
     expect(hasAiChatQuestions([{}])).toBe(true);
+  });
+});
+
+/**
+ * 카드가 실제로 복사하는 문자열의 AI 문구 포함 여부.
+ *
+ * 이전 테스트는 `policyLines: []` 를 테스트가 직접 넘겨서, 카드가 다시 무조건
+ * AI 문구를 넣도록 되돌아가도 통과했다. 판정을 순수 함수로 빼고 그 함수 +
+ * 조립 결과를 함께 고정한다 (ExamDetailsCard 는 이 함수만 호출한다).
+ */
+describe("studentNoticePolicyLines + 최종 복사 문자열", () => {
+  const t = {
+    allowed: "막히면 AI에게 질문하세요. 질문은 부정행위가 아니라 시험의 일부입니다.",
+    graded: "질문한 내용 자체도 평가 대상입니다.",
+    visible: "AI와 나눈 대화는 교수자에게 그대로 공개됩니다.",
+  };
+
+  it("AI 채팅이 있으면 안내 3줄을 순서대로 넣는다", () => {
+    expect(studentNoticePolicyLines(true, t)).toEqual([
+      t.allowed,
+      t.graded,
+      t.visible,
+    ]);
+  });
+
+  it("AI 채팅이 없으면 한 줄도 넣지 않는다", () => {
+    expect(studentNoticePolicyLines(false, t)).toEqual([]);
+  });
+
+  it("객관식 전용 시험에서 복사되는 문자열에는 AI 문구가 없다", () => {
+    const notice = buildStudentNotice({
+      ...base,
+      policyLines: studentNoticePolicyLines(false, t),
+    });
+
+    expect(notice).not.toMatch(/AI/);
+    expect(notice).not.toContain("질문");
+    expect(notice).toContain("입장 코드: MATH01");
+  });
+
+  it("서술형이 있는 시험에서 복사되는 문자열에는 AI 문구 3줄이 있다", () => {
+    const notice = buildStudentNotice({
+      ...base,
+      policyLines: studentNoticePolicyLines(true, t),
+    });
+
+    expect(notice).toContain(`- ${t.allowed}`);
+    expect(notice).toContain(`- ${t.graded}`);
+    expect(notice).toContain(`- ${t.visible}`);
   });
 });

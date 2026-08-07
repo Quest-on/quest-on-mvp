@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Copy, Megaphone } from "lucide-react";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
-import { buildStudentNotice } from "@/lib/student-notice";
+import { buildStudentNotice, studentNoticePolicyLines } from "@/lib/student-notice";
 
 interface ExamDetailsCardProps {
   description: string;
@@ -60,13 +60,12 @@ export function ExamDetailsCard({
         // MCQ/OX 전용 시험은 학생 화면에 AI 채팅이 아예 렌더되지 않는다
         // (exam/[code]/page.tsx 가 !isCurrentObjective 일 때만 ExamChatSidebar 노출).
         // 그런 시험의 공지문에 "AI에게 질문하세요"를 넣으면 문구 자체가 거짓이 된다.
-        policyLines: aiChatAvailable
-          ? [
-              tExam("preflight.aiDisclosureAllowed"),
-              tExam("preflight.aiDisclosureGraded"),
-              tExam("preflight.aiDisclosureVisible"),
-            ]
-          : [],
+        // 판정은 studentNoticePolicyLines 가 갖고 있고 테스트로 고정돼 있다.
+        policyLines: studentNoticePolicyLines(aiChatAvailable, {
+          allowed: tExam("preflight.aiDisclosureAllowed"),
+          graded: tExam("preflight.aiDisclosureGraded"),
+          visible: tExam("preflight.aiDisclosureVisible"),
+        }),
         footer: t("examDetailsCard.noticeFooter"),
       });
       await navigator.clipboard.writeText(notice);

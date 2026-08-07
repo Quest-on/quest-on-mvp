@@ -26,6 +26,24 @@ export type StudentNoticeInput = {
 };
 
 /**
+ * AI 사용 안내 문장을 넣을지 말지 정한다.
+ *
+ * 이 판정을 컴포넌트 안에 두면 "카드가 항상 AI 문구를 넣도록 되돌아가도"
+ * 공지문 조립 테스트는 그대로 통과한다(테스트가 policyLines 를 직접 넘기므로).
+ * 그래서 판정만 순수 함수로 빼서 여기서 고정한다.
+ *
+ * `aiChatAvailable` 은 `hasAiChatQuestions()` 의 결과다 — MCQ/OX 전용 시험은
+ * 학생 화면에 채팅이 아예 없으므로 "AI에게 질문하세요"가 거짓이 된다.
+ */
+export function studentNoticePolicyLines(
+  aiChatAvailable: boolean,
+  lines: { allowed: string; graded: string; visible: string }
+): string[] {
+  if (!aiChatAvailable) return [];
+  return [lines.allowed, lines.graded, lines.visible];
+}
+
+/**
  * 붙여넣기 가능한 평문 공지문을 만든다.
  *
  * 평문인 이유: 교수자가 실제로 쓰는 채널(LMS 공지, 카카오톡, 이메일)이 전부
