@@ -1,0 +1,29 @@
+/**
+ * 사용자 입력으로 들어온 리다이렉트 목적지를 **같은 출처의 경로**로만 좁힌다.
+ *
+ * `value.startsWith("/")` 만으로는 부족하다. `//evil.com` 은 프로토콜 상대 URL 이라
+ * `location.href` 에 넣는 순간 외부 사이트로 나가고, 브라우저는 `/\evil.com` 의
+ * 역슬래시를 슬래시로 정규화하므로 이것도 같은 결과가 된다.
+ *
+ *   new URL("https://quest-on.app" + "//evil.com")  -> https://quest-on.app//evil.com
+ *   location.href = "//evil.com"                    -> https://evil.com   ← 외부
+ *
+ * 로그인/온보딩 직후처럼 "방금 우리 도메인에서 인증했다"는 맥락에서 외부로 튕기면
+ * 피싱 신뢰도가 그대로 넘어간다. 판정은 소비 지점 한 곳에서만 한다.
+ *
+ * @returns 안전하면 정규화된 경로, 아니면 null (호출부가 기본 목적지를 쓴다)
+ */
+export function safeInternalPath(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("/")) return null;
+
+  // //host, /\host — 프로토콜 상대 URL. 외부로 나간다.
+  if (/^\/[\\/]/.test(trimmed)) return null;
+
+  // 제어문자(개행·탭·NUL)로 파서를 속이는 입력 차단.
+  if (/[\u0000-\u001F\u007F]/.test(trimmed)) return null;
+
+  return trimmed;
+}

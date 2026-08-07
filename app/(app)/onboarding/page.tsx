@@ -29,6 +29,7 @@ import { CenteredViewportShell } from "@/components/layout/CenteredViewportShell
 import { User, Hash, GraduationCap, Loader2, ArrowLeft } from "lucide-react";
 import { ErrorAlert } from "@/components/ui/error-alert";
 import { resolveSignupRole } from "@/lib/onboarding-role";
+import { safeInternalPath } from "@/lib/safe-redirect";
 
 interface University {
   name: string;
@@ -255,13 +256,20 @@ export default function OnboardingPage() {
       localStorage.removeItem("selectedRole");
 
       // 4. Redirect
+      //
+      // redirect 는 URL 쿼리(= 사용자 입력)로 들어온다. `/student/profile-setup`
+      // 이 쿼리를 그대로 넘겨주므로 이 지점이 유일한 소비 지점이자 검증 지점이다.
+      // `startsWith("/")` 만으로는 `//evil.com`(프로토콜 상대 URL)이 통과해
+      // 로그인 직후 외부 사이트로 튕긴다. safeInternalPath 로 좁힌다.
       const params = new URLSearchParams(window.location.search);
       const redirectUrl =
         params.get("redirect") || localStorage.getItem("onboarding_redirect");
       localStorage.removeItem("onboarding_redirect");
 
-      if (redirectUrl && redirectUrl.startsWith("/")) {
-        window.location.href = redirectUrl;
+      const redirectTarget = safeInternalPath(redirectUrl);
+
+      if (redirectTarget) {
+        window.location.href = redirectTarget;
       } else if (role === "instructor") {
         window.location.href = "/instructor-pending";
       } else {
