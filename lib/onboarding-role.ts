@@ -49,8 +49,8 @@ export function readRoleCookie(cookieString: string | undefined | null): SignupR
 /**
  * 역할 의도를 해석한다 (AC-1).
  *
- * 우선순위는 auth metadata → 쿠키. metadata 는 가입 시점에 서버가 받은 값이라
- * 쿠키보다 신뢰도가 높다.
+ * 우선순위는 auth metadata → 쿠키 → localStorage. metadata 는 가입 시점에 서버가
+ * 받은 값이라 가장 신뢰도가 높다.
  *
  * **해석할 수 없으면 null 을 돌려준다.** 호출부는 이때 역할 단계를 보여줘야 한다.
  * 추측해서 건너뛰면 잘못된 역할로 계정이 굳는다.
@@ -58,7 +58,16 @@ export function readRoleCookie(cookieString: string | undefined | null): SignupR
 export function resolveSignupRole(sources: {
   metadataRole?: unknown;
   cookieString?: string | null;
+  /**
+   * 전환기 폴백. #87 이 쿠키 라이터를 넣기 전까지 OAuth 가입자의 역할 의도는
+   * `CustomSignUp.handleOAuth` 가 쓴 `localStorage.selectedRole` 에만 존재한다.
+   * 이걸 빼면 OAuth 사용자만 역할 단계를 다시 보게 되어 기존보다 나빠진다.
+   * 신뢰도가 가장 낮으므로 마지막에 본다. #87 머지 후 제거한다.
+   */
+  localStorageRole?: unknown;
 }): SignupRole | null {
   if (isSignupRole(sources.metadataRole)) return sources.metadataRole;
-  return readRoleCookie(sources.cookieString);
+  const fromCookie = readRoleCookie(sources.cookieString);
+  if (fromCookie) return fromCookie;
+  return isSignupRole(sources.localStorageRole) ? sources.localStorageRole : null;
 }

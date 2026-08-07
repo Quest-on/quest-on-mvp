@@ -73,12 +73,53 @@ export default function OnboardingPage() {
       // 이미 역할이 확정된 기존 사용자(프로필 수정 진입)는 profiles.role 이 권위다.
       metadataRole: profile?.role ?? user?.user_metadata?.role,
       cookieString: typeof document === "undefined" ? null : document.cookie,
+      // #87 이 쿠키 라이터를 넣기 전까지 OAuth 가입자의 역할은 여기에만 있다.
+      localStorageRole:
+        typeof window === "undefined"
+          ? null
+          : window.localStorage.getItem("selectedRole"),
     });
     if (resolved) {
       setRole(resolved);
       setStep("profile");
     }
   }, [isLoaded, user, profile]);
+
+  // 기존 프로필 프리필. 삭제된 /student/profile-setup 은 마운트 시
+  // /api/student/profile 을 읽어 이름·학번·학교를 채웠다. 통합하면서 이걸
+  // 빠뜨리면 프로필을 고치러 온 학생이 빈 폼을 마주하고, 그대로 저장하면
+  // 기존 값이 지워진 것처럼 보인다.
+  //
+  // 학생 전용이다. /api/instructor/profile 에는 GET 이 없고(POST 전용),
+  // 삭제된 페이지도 학생 프로필만 다뤘다.
+  useEffect(() => {
+    if (!isLoaded || !user || step !== "profile" || role !== "student") return;
+
+    let cancelled = false;
+    const endpoint = "/api/student/profile";
+
+    (async () => {
+      try {
+        const res = await fetch(endpoint);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        const p = data?.profile;
+        if (!p || cancelled) return;
+
+        // 사용자가 이미 입력을 시작했으면 덮어쓰지 않는다.
+        setName((prev) => prev || p.name || "");
+        setSchool((prev) => prev || p.school || "");
+        setSchoolSearchQuery((prev) => prev || p.school || "");
+        setStudentNumber((prev) => prev || p.student_number || "");
+      } catch {
+        // 프리필 실패가 온보딩을 막아서는 안 된다. 빈 폼으로 진행한다.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, user, step, role]);
 
   useEffect(() => {
     if (isLoaded && !user) {

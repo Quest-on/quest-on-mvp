@@ -91,4 +91,33 @@ describe("resolveSignupRole (AC-1)", () => {
       })
     ).toBe("instructor");
   });
+  // 리뷰 P2: #87 이 쿠키 라이터를 넣기 전까지 OAuth 가입자의 역할 의도는
+  // CustomSignUp.handleOAuth 가 쓴 localStorage.selectedRole 에만 존재한다.
+  // 이 폴백이 없으면 OAuth 사용자만 역할 단계를 다시 보게 되어 기존보다 나빠진다.
+  it("localStorage 의 역할을 마지막 폴백으로 해석한다 — #87 전 OAuth 경로", () => {
+    expect(resolveSignupRole({ localStorageRole: "instructor" })).toBe("instructor");
+  });
+
+  it("우선순위는 metadata > 쿠키 > localStorage 다", () => {
+    expect(
+      resolveSignupRole({
+        metadataRole: "instructor",
+        cookieString: `${ONBOARDING_ROLE_COOKIE}=student`,
+        localStorageRole: "student",
+      })
+    ).toBe("instructor");
+
+    expect(
+      resolveSignupRole({
+        cookieString: `${ONBOARDING_ROLE_COOKIE}=student`,
+        localStorageRole: "instructor",
+      })
+    ).toBe("student");
+  });
+
+  it("localStorage 값이 역할이 아니면 무시한다", () => {
+    expect(resolveSignupRole({ localStorageRole: "admin" })).toBeNull();
+    expect(resolveSignupRole({ localStorageRole: "" })).toBeNull();
+  });
+
 });
