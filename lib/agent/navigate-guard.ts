@@ -28,13 +28,22 @@ export function safeAgentRoute(route: unknown): string | null {
   const path = safeInternalPath(route);
   if (!path) return null;
 
+  // 접두사 검사는 **정규화 후** 해야 한다. `/instructor/../admin` 은 문자열로는
+  // /instructor 로 시작하지만 실제로는 /admin 으로 간다 — 문자열 비교만 하면
+  // allowlist 가 뚫린다. 파서에 한 번 통과시켜 최종 경로로 판정하고, 통과시킨
+  // 값도 그 정규화된 형태로 돌려준다(검증한 것과 이동하는 것이 같아야 한다).
+  let normalized: URL;
+  try {
+    normalized = new URL(path, "https://agent-route.invalid");
+  } catch {
+    return null;
+  }
+
   const allowed = ALLOWED_ROUTE_PREFIXES.some(
     (prefix) =>
-      path === prefix ||
-      path.startsWith(`${prefix}/`) ||
-      path.startsWith(`${prefix}?`) ||
-      path.startsWith(`${prefix}#`)
+      normalized.pathname === prefix || normalized.pathname.startsWith(`${prefix}/`)
   );
+  if (!allowed) return null;
 
-  return allowed ? path : null;
+  return `${normalized.pathname}${normalized.search}${normalized.hash}`;
 }

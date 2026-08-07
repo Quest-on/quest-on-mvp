@@ -42,6 +42,29 @@ describe("safeAgentRoute", () => {
     expect(safeAgentRoute("/instructor-evil/page")).toBeNull();
   });
 
+  // 문자열 접두사만 보면 뚫린다: /instructor/../admin 은 실제로 /admin 으로 간다.
+  it("경로 정규화 후 allowlist 를 벗어나는 입력을 거부한다", () => {
+    expect(safeAgentRoute("/instructor/../admin")).toBeNull();
+    expect(safeAgentRoute("/instructor/../../admin/users")).toBeNull();
+    expect(safeAgentRoute("/instructor/new/../../student")).toBeNull();
+  });
+
+  it("정규화가 allowlist 안에 머무르면 정규화된 형태로 통과시킨다", () => {
+    expect(safeAgentRoute("/instructor/./new")).toBe("/instructor/new");
+    expect(safeAgentRoute("/instructor/new/../abc123")).toBe("/instructor/abc123");
+    // 검증한 값과 실제 이동 값이 같아야 한다
+    expect(safeAgentRoute("/instructor?tab=1#top")).toBe("/instructor?tab=1#top");
+  });
+
+  it("퍼센트 인코딩된 구분자는 경로 세그먼트로 남아 allowlist 를 벗어나지 않는다", () => {
+    // %2F 는 파서가 경로 구분자로 풀지 않는다 — /instructor 하위에 머문다.
+    const encoded = safeAgentRoute("/instructor/..%2Fadmin");
+    expect(encoded).not.toBeNull();
+    expect(
+      new URL(encoded!, "https://quest-on.app").pathname.startsWith("/instructor/")
+    ).toBe(true);
+  });
+
   it("문자열이 아니거나 비어 있으면 거부한다", () => {
     expect(safeAgentRoute(undefined)).toBeNull();
     expect(safeAgentRoute(null)).toBeNull();
