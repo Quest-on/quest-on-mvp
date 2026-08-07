@@ -58,6 +58,20 @@ VALUES
   ('verified', NULL, NULL, true)
 ON CONFLICT (plan) DO NOTHING;
 
+-- RLS: plan_limits 는 전역 엔타이틀먼트 테이블이다. Supabase 의 노출된 public 스키마에
+--   RLS 없이 두면 표준 grant(anon/authenticated 에 대한 GRANT ALL — 이 저장소의
+--   .github/actions/test-setup/action.yml:141-143 이 실제로 그렇게 준다) 아래에서
+--   PostgREST 클라이언트가 전역 한도 행을 직접 UPDATE 할 수 있다.
+--   예: free.max_publishes 를 NULL 로 바꿔 모든 계정의 발행 한도를 무력화.
+--   앱은 이 테이블을 service_role(getSupabaseServer)로만 읽으므로 클라이언트 접근이
+--   필요 없다. RLS 를 켜고 grant 자체를 회수한다.
+ALTER TABLE public.plan_limits ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.plan_limits FROM anon, authenticated;
+
+DROP POLICY IF EXISTS "service_role_all" ON public.plan_limits;
+CREATE POLICY "service_role_all" ON public.plan_limits
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
 -- ─────────────────────────────────────────────────────────────
 -- 3. onboarding_events: 액티베이션 퍼널 마일스톤
 -- ─────────────────────────────────────────────────────────────
@@ -83,7 +97,11 @@ CREATE INDEX IF NOT EXISTS idx_onboarding_events_event_occurred
   ON public.onboarding_events (event, occurred_at DESC);
 
 -- RLS: ai_events 패턴을 그대로 따른다 — service_role만 접근, 백엔드 API 전용.
+--   RLS 만으로는 부족하다. Supabase 표준 grant 가 anon/authenticated 에 테이블 권한을
+--   주므로, 정책이 없더라도 grant 가 남아 있으면 향후 정책 추가 시 의도치 않게 열린다.
+--   클라이언트 접근이 필요 없는 테이블이므로 grant 자체를 회수한다.
 ALTER TABLE public.onboarding_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.onboarding_events FROM anon, authenticated;
 
 DROP POLICY IF EXISTS "service_role_all" ON public.onboarding_events;
 CREATE POLICY "service_role_all" ON public.onboarding_events
