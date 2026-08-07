@@ -199,6 +199,26 @@ export function isObjectiveQuestion(type?: string): boolean {
   return type === "multiple-choice" || type === "true-false";
 }
 
+/**
+ * 학생 화면에 AI 채팅이 실제로 뜨는 시험인가.
+ *
+ * 학생 페이지는 서술형/CASE 문항에서만 `ExamChatSidebar` 를 렌더한다
+ * (`app/(app)/exam/[code]/page.tsx` 의 `!isCurrentObjective`). 그래서 MCQ/OX 전용
+ * 시험에는 채팅이 아예 없다.
+ *
+ * 사전 고지 모달과 교수자 공지문이 "AI에게 질문하세요"를 말할지 여부가 이 판정에
+ * 걸려 있는데, 같은 식을 화면마다 따로 쓰면 한쪽만 고쳐졌을 때 공지문이 조용히
+ * 거짓이 된다. 판정은 여기 하나뿐이어야 한다.
+ *
+ * 문항 목록을 아직 못 받았으면 false — 확인하지 못한 것을 사실처럼 고지하지 않는다.
+ */
+export function hasAiChatQuestions(
+  questions: ReadonlyArray<{ type?: string } | null | undefined> | null | undefined
+): boolean {
+  if (!Array.isArray(questions)) return false;
+  return questions.some((q) => !!q && !isObjectiveQuestion(q.type));
+}
+
 /** True when a question belongs to the instructor/AI case-grading surface. */
 export function isCaseQuestion(type?: string): boolean {
   return type === "case" || type === "essay" || type === "short-answer";

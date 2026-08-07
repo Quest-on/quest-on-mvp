@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildStudentNotice } from "@/lib/student-notice";
+import { hasAiChatQuestions } from "@/lib/grading-helpers";
 
 const base = {
   heading: "[퀘스트온] 시험 안내",
@@ -85,5 +86,47 @@ describe("buildStudentNotice (AC-16)", () => {
     const out = buildStudentNotice(base);
     expect(typeof out).toBe("string");
     expect(out.endsWith("\n")).toBe(false);
+  });
+});
+
+/**
+ * 고지·공지문을 켤지 끌지 정하는 판정 자체.
+ *
+ * 리뷰 P2 2건의 공통 원인은 "학생 화면에는 채팅이 없는데 문구는 있다" 였다.
+ * 학생 페이지(examHasEssay)와 교수자 상세 페이지(aiChatAvailable)가 같은 식을
+ * 각자 들고 있으면 한쪽만 고쳐졌을 때 다시 어긋난다. 그래서 판정을 이 헬퍼
+ * 하나로 모았고, 여기서 계약을 고정한다.
+ */
+describe("hasAiChatQuestions — AI 채팅 노출 판정 (리뷰 P2 공통 원인)", () => {
+  it("서술형/CASE 가 하나라도 있으면 true — 그 문항에서 채팅이 뜬다", () => {
+    expect(hasAiChatQuestions([{ type: "essay" }])).toBe(true);
+    expect(hasAiChatQuestions([{ type: "case" }])).toBe(true);
+    expect(hasAiChatQuestions([{ type: "short-answer" }])).toBe(true);
+    expect(
+      hasAiChatQuestions([{ type: "multiple-choice" }, { type: "essay" }])
+    ).toBe(true);
+  });
+
+  it("MCQ/OX 전용 시험은 false — 학생 화면에 채팅이 아예 없다", () => {
+    expect(
+      hasAiChatQuestions([{ type: "multiple-choice" }, { type: "true-false" }])
+    ).toBe(false);
+  });
+
+  it("문항이 비었거나 아직 안 왔으면 false — 확인 못 한 걸 고지하지 않는다", () => {
+    expect(hasAiChatQuestions([])).toBe(false);
+    expect(hasAiChatQuestions(undefined)).toBe(false);
+    expect(hasAiChatQuestions(null)).toBe(false);
+  });
+
+  it("깨진 항목이 섞여도 던지지 않는다", () => {
+    expect(hasAiChatQuestions([null, undefined])).toBe(false);
+    expect(hasAiChatQuestions([null, { type: "essay" }])).toBe(true);
+  });
+
+  it("타입이 없는 문항은 채점 대상 서술형으로 본다 — 기존 판정과 동일", () => {
+    // isObjectiveQuestion(undefined) === false 이므로 !objective = true.
+    // 문항 타입이 유실됐을 때 채팅이 뜨는 쪽이 기존 학생 화면 동작이다.
+    expect(hasAiChatQuestions([{}])).toBe(true);
   });
 });
