@@ -46,6 +46,7 @@ import {
   submitAgentActionResults,
 } from "@/lib/agent/client";
 import type { AgentRun } from "@/lib/agent/types";
+import { safeAgentRoute } from "@/lib/agent/navigate-guard";
 import type {
   AgentPageState,
   AgentTurnResponse,
@@ -201,7 +202,17 @@ export function AgentRunControllerProvider({
         // ── navigate — 컨트롤러가 직접 처리 ──────────────────────
         if (action.type === "navigate") {
           try {
-            const route = action.route;
+            // route 는 모델이 만든 문자열이다. 검증 없이 router.push 하면
+            // javascript: 실행이나 외부 이동으로 이어진다 (이슈 #101).
+            const route = safeAgentRoute(action.route);
+            if (!route) {
+              results.push({
+                id: envelope.id,
+                ok: false,
+                error: t("errors.navigateFailed"),
+              });
+              continue;
+            }
             const alreadyThere =
               typeof window !== "undefined" &&
               window.location.pathname === route;
