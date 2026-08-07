@@ -12,9 +12,8 @@ feat/xxx ──PR──▶ staging ──배포·QA──▶ PR ──▶ main �
 1. **`main` · `staging` 에서 직접 작업/커밋/푸시 금지.** (git hook 이 차단한다. 자세한 워크플로: `CONTRIBUTING.md`)
 2. **작업 시작 전 항상 최신 staging 으로 동기화한다:**
    ```bash
-   git checkout staging
-   git fetch upstream
-   git reset --hard upstream/staging
+   git fetch upstream staging                 # staging 이 없던 클론(single-branch 포함)에서도 받아온다
+   git checkout -B staging FETCH_HEAD         # 없으면 만들고, 있으면 그 자리로 맞춘다
    ```
 3. **새 작업 브랜치를 만들고 거기서만 작업한다:**
    ```bash

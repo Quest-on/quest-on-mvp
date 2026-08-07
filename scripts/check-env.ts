@@ -9,7 +9,12 @@
  */
 
 import { readFileSync } from "fs";
-import { APP_ENVS, type AppEnv, resolveAppEnv } from "../lib/app-env";
+import {
+  APP_ENVS,
+  type AppEnv,
+  resolveAppEnv,
+  appEnvDeclarationConflict,
+} from "../lib/app-env";
 import {
   ENV_MANIFEST,
   auditEnv,
@@ -48,6 +53,17 @@ function main() {
   }
 
   const appEnv: AppEnv = (args.env as AppEnv) ?? resolveAppEnv(source);
+
+  // 요청한 환경과 파일/셸의 선언이 어긋나면 감사 자체가 무의미하다.
+  // (staging 정책으로 검사했는데 파일은 production 으로 뜨는 경우)
+  const conflict = args.env
+    ? appEnvDeclarationConflict(source.NEXT_PUBLIC_APP_ENV, appEnv)
+    : null;
+  if (conflict) {
+    console.error(`DECLARATION CONFLICT: ${conflict}`);
+    process.exit(1);
+  }
+
   const audit = auditEnv(source, appEnv);
 
   console.log(`env: ${appEnv}${args.file ? ` (file: ${args.file})` : " (process env)"}`);

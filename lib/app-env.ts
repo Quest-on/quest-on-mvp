@@ -68,6 +68,31 @@ export function invalidAppEnvDeclaration(
 }
 
 /**
+ * 감사 대상(파일 또는 셸 환경)의 선언이 요청한 환경과 어긋나는지 검사한다.
+ *
+ * `npm run env:check -- --env staging --file .env.staging` 은 "이 파일을 스테이징
+ * 정책으로 감사하라"는 뜻인데, 정작 파일 안에 `NEXT_PUBLIC_APP_ENV=production` 이
+ * 들어 있으면 감사만 통과하고 실제 배포는 프로덕션으로 뜬다 — 색인 허용,
+ * 배지 없음, 프로덕션 CORS 기본값. 프리플라이트가 막으려던 상황이 그대로 난다.
+ *
+ * 선언이 아예 없으면 어긋남이 아니다(프로덕션은 선언이 선택 사항이다).
+ */
+export function appEnvDeclarationConflict(
+  declared: string | undefined,
+  requested: AppEnv
+): string | null {
+  if (!declared || !declared.trim()) return null;
+
+  const invalid = invalidAppEnvDeclaration(declared);
+  if (invalid) return invalid;
+
+  const parsed = parseDeclared(declared);
+  if (parsed === requested) return null;
+
+  return `NEXT_PUBLIC_APP_ENV="${declared.trim()}" contradicts the requested environment "${requested}". The deployment would honor "${parsed}".`;
+}
+
+/**
  * NEXT_PUBLIC_* 은 빌드 시 인라인되므로 반드시 리터럴 접근으로 읽는다
  * (process.env[name] 같은 동적 접근은 클라이언트 번들에서 undefined 가 된다).
  */
@@ -91,11 +116,25 @@ export function isStagingApp(): boolean {
 /**
  * 테스트 바이패스(TEST_BYPASS_SECRET) 를 켤 수 있는 환경인가.
  *
- * 스테이징은 **허용하지 않는다**. 스테이징에는 Vercel 계정이 없는 외부 QA 참여자가
+ * 두 단계로 막는다.
+ *
+ * 1. **배포 신호 hard-deny.** `VERCEL`/`VERCEL_ENV` 가 있거나 `NODE_ENV=production`
+ *    이면 라벨이 뭐라고 적혀 있든 무조건 거부한다. `NEXT_PUBLIC_APP_ENV` 는 사람이
+ *    Vercel 대시보드에 손으로 넣는 값이라 `development` 나 `test` 로 잘못 들어갈 수
+ *    있는데, 그 오타 하나가 인증 바이패스를 여는 일은 없어야 한다. 이 신호들은
+ *    플랫폼이 주입하므로 라벨보다 신뢰도가 높다.
+ * 2. 그다음 APP_ENV 가 development/test 일 때만 허용.
+ *
+ * 스테이징도 허용하지 않는다. 스테이징에는 Vercel 계정이 없는 외부 QA 참여자가
  * 실제 도메인으로 들어오므로, 인증 경로가 프로덕션과 100% 같아야 한다. 헤더/쿠키
  * 하나로 임의 사용자가 되는 문은 로컬과 CI 에만 존재한다.
  */
 export function isAuthBypassAllowedEnv(): boolean {
+  // 플랫폼이 주입하는 배포 신호. 라벨보다 우선한다.
+  if (process.env.VERCEL === "1") return false;
+  if (process.env.VERCEL_ENV) return false;
+  if (process.env.NODE_ENV === "production") return false;
+
   const appEnv = getAppEnv();
   return appEnv === "development" || appEnv === "test";
 }

@@ -68,9 +68,8 @@
 
 ### 1) 최신 staging 받아오기 (작업 시작 전 항상)
 ```bash
-git checkout staging
-git fetch upstream
-git reset --hard upstream/staging   # 내 staging 을 원본과 똑같이 맞춤
+git fetch upstream staging            # staging 을 아직 모르는 클론에서도 받아온다
+git checkout -B staging FETCH_HEAD    # 내 staging 을 원본과 똑같이 맞춤 (없으면 새로 만듦)
 ```
 
 ### 2) 작업용 브랜치 만들기
