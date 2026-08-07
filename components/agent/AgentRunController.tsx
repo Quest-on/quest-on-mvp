@@ -46,7 +46,7 @@ import {
   submitAgentActionResults,
 } from "@/lib/agent/client";
 import type { AgentRun } from "@/lib/agent/types";
-import { safeAgentRoute } from "@/lib/agent/navigate-guard";
+import { decideNavigate } from "@/lib/agent/navigate-guard";
 import type {
   AgentPageState,
   AgentTurnResponse,
@@ -204,8 +204,13 @@ export function AgentRunControllerProvider({
           try {
             // route 는 모델이 만든 문자열이다. 검증 없이 router.push 하면
             // javascript: 실행이나 외부 이동으로 이어진다 (이슈 #101).
-            const route = safeAgentRoute(action.route);
-            if (!route) {
+            // 판정은 decideNavigate 가 갖고 있고 테스트로 고정돼 있다.
+            const decision = decideNavigate(
+              action.route,
+              typeof window !== "undefined" ? window.location.pathname : null
+            );
+
+            if (!decision.ok) {
               results.push({
                 id: envelope.id,
                 ok: false,
@@ -213,14 +218,12 @@ export function AgentRunControllerProvider({
               });
               continue;
             }
-            const alreadyThere =
-              typeof window !== "undefined" &&
-              window.location.pathname === route;
-            if (!alreadyThere) {
+
+            if (decision.navigate) {
               // 새 페이지가 마운트되며 기존 executor 가 떨어져 나가는 것을
               // 명시적으로 표시 — 다음 편집기 액션은 재등록을 기다린다.
               executorRef.current = null;
-              router.push(route);
+              router.push(decision.route);
               await sleep(NAVIGATE_SETTLE_MS);
             }
             results.push({ id: envelope.id, ok: true });

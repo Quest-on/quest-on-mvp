@@ -47,3 +47,27 @@ export function safeAgentRoute(route: unknown): string | null {
 
   return `${normalized.pathname}${normalized.search}${normalized.hash}`;
 }
+
+/**
+ * navigate 액션 실행 결정 (실행 가능한 seam).
+ *
+ * 컨트롤러가 이 결정을 인라인으로 갖고 있으면 "거부된 route 에서 push 가 정말
+ * 호출되지 않는가"를 실행으로 검증할 수 없다(저장소에 React 렌더 테스트 인프라가
+ * 없다). 결정만 순수 함수로 빼서 push 스파이로 검증한다.
+ *
+ * @param push 실제 이동 함수 (`router.push`)
+ * @param currentPathname 현재 경로. 같으면 이동하지 않는다.
+ */
+export function decideNavigate(
+  route: unknown,
+  currentPathname: string | null
+): { ok: false } | { ok: true; navigate: false } | { ok: true; navigate: true; route: string } {
+  const target = safeAgentRoute(route);
+  if (!target) return { ok: false };
+
+  if (currentPathname !== null && currentPathname === target) {
+    return { ok: true, navigate: false };
+  }
+
+  return { ok: true, navigate: true, route: target };
+}
