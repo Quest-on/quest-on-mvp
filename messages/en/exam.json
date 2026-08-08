@@ -181,7 +181,11 @@
     "rulesCheckLabel": "I have read and agree to follow the time policy and exam rules above.",
     "aiLogCheckLabel": "I understand that AI chat logs are recorded and will honestly indicate where I received AI assistance.",
     "cancelButton": "Cancel",
-    "acceptButton": "Confirm and enter"
+    "acceptButton": "Confirm and enter",
+    "aiDisclosureTitle": "About using AI",
+    "aiDisclosureAllowed": "Stuck? Ask the AI. Asking is not cheating — it is part of the exam.",
+    "aiDisclosureGraded": "What you ask is itself graded. Holding back questions works against you.",
+    "aiDisclosureVisible": "Your conversation with the AI is shown to your instructor as-is."
   },
   "waitingRoom": {
     "title": "Waiting Room",
