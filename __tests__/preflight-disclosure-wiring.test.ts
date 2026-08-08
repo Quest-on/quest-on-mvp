@@ -16,14 +16,15 @@ import { readFileSync } from "fs";
 const source = readFileSync("components/exam/PreflightModal.tsx", "utf8");
 
 /** `{examHasEssay && (` 로 열리는 블록 안에 특정 키가 있는지. */
-function isGated(translationKey: string): boolean {
-  const idx = source.indexOf(translationKey);
+function isGated(translationKey: string, text = source): boolean {
+  const idx = text.indexOf(translationKey);
   if (idx === -1) return false;
-  const before = source.slice(0, idx);
+  const before = text.slice(0, idx);
   const lastGate = before.lastIndexOf("{examHasEssay && (");
   if (lastGate === -1) return false;
-  const gateEnd = source.slice(lastGate).search(/\n\s*\)\}/);
-  return gateEnd > idx - lastGate && source.slice(lastGate, lastGate + gateEnd).includes(translationKey);
+  const gateIndent = text.slice(text.lastIndexOf("\n", lastGate) + 1, lastGate);
+  const gateEnd = text.slice(lastGate).search(new RegExp(`\\n${gateIndent}\\)\\}`));
+  return gateEnd > idx - lastGate && text.slice(lastGate, lastGate + gateEnd).includes(translationKey);
 }
 
 describe("PreflightModal AI 고지 게이팅", () => {
@@ -39,6 +40,20 @@ describe("PreflightModal AI 고지 게이팅", () => {
     ]) {
       expect(isGated(key), `${key} 가 게이팅되지 않았다`).toBe(true);
     }
+  });
+
+  it("multiline 번역 식이 바깥 게이트를 닫지 않는다", () => {
+    const nestedSource = `
+          {examHasEssay && (
+            <div>
+              {t(
+                "preflight.aiDisclosureAllowed"
+              )}
+              {t("preflight.aiDisclosureVisible")}
+            </div>
+          )}`;
+
+    expect(isGated("preflight.aiDisclosureVisible", nestedSource)).toBe(true);
   });
 
   it("AI 로그 동의 체크박스와 수락 조건도 함께 게이팅된다", () => {
