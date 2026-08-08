@@ -35,3 +35,27 @@ export function safeInternalPath(value: string | null | undefined): string | nul
 
   return trimmed;
 }
+
+/**
+ * OAuth 콜백이 돌아갈 절대 URL 을 만든다.
+ *
+ * 문자열 결합(`${origin}${next}`)이 위험한 이유: URL 파서는 결합된 문자열을 다시
+ * 해석하므로 `next` 가 호스트를 바꿔치기할 수 있다.
+ *
+ *   new URL("https://quest-on.app" + "@evil.com")  ->  https://quest-on.app@evil.com/
+ *                                                       ^ userinfo        ^ 실제 호스트
+ *
+ * 즉 `/auth/callback?code=<유효>&next=@evil.com` 이면 **로그인에 성공한 직후**
+ * 외부 사이트로 튕긴다. 우리 도메인에서 방금 인증을 마친 맥락이라 피싱 신뢰도가
+ * 그대로 넘어간다.
+ *
+ * 그래서 (1) safeInternalPath 로 경로만 통과시키고 (2) 결합 대신 base 인자를 쓴다.
+ */
+export function buildCallbackRedirectUrl(
+  origin: string,
+  next: string | null | undefined,
+  fallback = "/"
+): string {
+  const safeNext = safeInternalPath(next) ?? fallback;
+  return new URL(safeNext, origin).toString();
+}
