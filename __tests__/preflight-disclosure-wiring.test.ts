@@ -22,8 +22,8 @@ function isGated(translationKey: string): boolean {
   const before = source.slice(0, idx);
   const lastGate = before.lastIndexOf("{examHasEssay && (");
   if (lastGate === -1) return false;
-  // 게이트와 키 사이에 그 게이트를 닫는 `)}` 가 없어야 한다.
-  return !before.slice(lastGate).includes(")}\n");
+  const gateEnd = source.slice(lastGate).search(/\n\s*\)\}/);
+  return gateEnd > idx - lastGate && source.slice(lastGate, lastGate + gateEnd).includes(translationKey);
 }
 
 describe("PreflightModal AI 고지 게이팅", () => {
