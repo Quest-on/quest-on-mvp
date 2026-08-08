@@ -1,3 +1,9 @@
+## 2026-08-06
+
+- 코드가 SSOT다. 문서·스펙·플랜은 SSOT가 아니다. 둘이 어긋나면 코드가 맞고 문서를 고친다.
+- 추적 사슬의 종착점은 문서가 아니라 테스트다. 인수 조건은 통과/실패가 찍히는 테스트로 착지시키고, 스펙 문서는 "왜 그렇게 정했나"의 기록으로만 둔다.
+- `docs/specs/` 산출물은 작성 시점의 결정 기록이다. 살아있는 계약처럼 취급하지 않는다. 구현이 끝나면 스펙을 고치려 들지 말고 코드와 테스트를 근거로 삼는다.
+
 ## 2026-07-08
 
 - Before any update or merge work, explicitly confirm the current branch is not `main`, and create or rename a task branch before touching files when the user is worried about branch safety.
