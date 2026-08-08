@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 작업 규칙 / 브랜치 워크플로
+    url: https://github.com/jcmaker/quest-on/blob/main/CONTRIBUTING.md
+    about: 브랜치·커밋·PR 절차는 여기를 먼저 읽으세요.
+  - name: 에이전트 운영 규칙 (AGENTS.md)
+    url: https://github.com/jcmaker/quest-on/blob/main/AGENTS.md
+    about: AI 코딩 도구로 작업할 때 지켜야 할 최소 규칙.

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { buildCallbackRedirectUrl } from "@/lib/safe-redirect";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -25,9 +26,13 @@ export async function GET(request: Request) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      // next 는 사용자가 URL 로 넣는 값이다. 문자열 결합하면 next=@evil.com 이
+      // 호스트를 바꿔치기해 로그인 성공 직후 외부로 튕긴다 (이슈 #99).
+      return NextResponse.redirect(buildCallbackRedirectUrl(origin, next));
     }
   }
 
-  return NextResponse.redirect(`${origin}/sign-in?error=auth_callback_failed`);
+  return NextResponse.redirect(
+    buildCallbackRedirectUrl(origin, "/sign-in?error=auth_callback_failed")
+  );
 }

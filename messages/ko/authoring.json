@@ -107,7 +107,13 @@
     "durationMin": "{duration}분",
     "labelCreatedAt": "생성일",
     "labelExamCode": "시험 코드",
-    "buttonCopy": "복사"
+    "buttonCopy": "복사",
+    "buttonCopyNotice": "학생 공지문 복사",
+    "toastNoticeCopied": "공지문을 복사했습니다",
+    "toastNoticeCopyFailed": "공지문 복사에 실패했습니다",
+    "noticeHeading": "[퀘스트온] 시험 안내",
+    "noticeCodeLabel": "입장 코드",
+    "noticeFooter": "문의는 담당 교수자에게 해주세요."
   },
   "examInfoForm": {
     "cardTitleAssignment": "과제 정보",

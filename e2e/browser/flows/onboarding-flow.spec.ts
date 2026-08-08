@@ -4,7 +4,7 @@ import { cleanupTestData } from "../helpers/test-data-builder";
 import { OnboardingPage, ProfileSetupPage } from "../pages";
 import { TIMEOUTS } from "../../constants";
 
-/** Mock the profile API to return no existing profile (GET) and accept saves (POST). */
+/** Mock profile APIs to return no existing profile (GET) and accept saves (PATCH/POST). */
 async function setupProfileApiMock(page: Page) {
   await page.route("**/api/student/profile", (route) => {
     if (route.request().method() === "GET") {
@@ -15,6 +15,16 @@ async function setupProfileApiMock(page: Page) {
       });
     }
     if (route.request().method() === "POST") {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ success: true }),
+      });
+    }
+    return route.continue();
+  });
+  await page.route("**/api/user/profile", (route) => {
+    if (route.request().method() === "PATCH") {
       return route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -40,38 +50,19 @@ async function expectReachableByPageScroll(page: Page, locator: Locator) {
   expect(scrollY).toBeGreaterThan(0);
 }
 
-test.describe("Onboarding — Role Selection", () => {
+test.describe("Onboarding — Known Role", () => {
   test.afterEach(async () => {
     await cleanupTestData();
   });
 
-  test("role selection page renders correctly", async ({ studentPage }) => {
+  test("known student role skips role selection", async ({ studentPage }) => {
+    await setupProfileApiMock(studentPage);
+
     const onboarding = new OnboardingPage(studentPage);
     await onboarding.goto();
-    // Should show welcome message
-    await expect(onboarding.welcomeHeading).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
-  });
-
-  test("student radio is default selected", async ({ studentPage }) => {
-    const onboarding = new OnboardingPage(studentPage);
-    await onboarding.goto();
-    // Wait for the page to fully render
-    await expect(onboarding.welcomeHeading).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
-
-    // Student radio should be checked by default
-    await expect(onboarding.studentRadio).toHaveAttribute("data-state", "checked");
-  });
-
-  test("instructor radio can be selected", async ({ studentPage }) => {
-    const onboarding = new OnboardingPage(studentPage);
-    await onboarding.goto();
-    await expect(onboarding.welcomeHeading).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
-
-    // Click on instructor label/radio
-    await onboarding.instructorLabel.click();
-
-    // Instructor radio should now be checked
-    await expect(onboarding.instructorRadio).toHaveAttribute("data-state", "checked");
+    await expect(new ProfileSetupPage(studentPage).nameInput).toBeVisible({
+      timeout: TIMEOUTS.PAGE_LOAD,
+    });
   });
 });
 

@@ -19,7 +19,7 @@
                                        @jcmaker 리뷰 → CI 통과 → Squash 머지
 ```
 
-- **`main`에 직접 push 금지.** (애초에 권한이 없습니다.)
+- **`main`과 `staging`에 직접 push 금지.** (애초에 권한이 없습니다.)
 - **작업 1개 = 브랜치 1개 = PR 1개.** 작게, 자주.
 - **force-push(강제 푸시)는 내 포크의 내 브랜치에서만.** 공용 브랜치엔 절대 금지.
 
@@ -57,18 +57,19 @@
    ```bash
    npm install
    ```
-   > `npm install` 시 **안전장치(git hook)가 자동 설치**됩니다. 이후 `main`에 실수로 커밋·push하려 하면 git이 막아주고, 작업 브랜치로 안내합니다. (메인테이너 @jcmaker는 면제)
+   > `npm install` 시 **안전장치(git hook)가 자동 설치**됩니다. 이후 `main`이나 `staging`에 실수로 커밋·push하려 하면 git이 막아주고, 작업 브랜치로 안내합니다. (메인테이너 @jcmaker는 면제)
 5. @jcmaker에게 받은 **개발용 환경변수**를 `.env.local`에 넣기.
 
 ---
 
 ## 작업할 때마다 반복하는 흐름
 
-### 1) 최신 main 받아오기 (작업 시작 전 항상)
+> 브랜치는 2단계입니다. 작업 PR 은 전부 `staging` 으로 올리고, 스테이징(staging.quest-on.app)에서 QA 를 통과한 것만 `staging` → `main` 승격 PR 로 프로덕션에 나갑니다. 환경 설명은 `docs/STAGING.md`.
+
+### 1) 최신 staging 받아오기 (작업 시작 전 항상)
 ```bash
-git checkout main
-git fetch upstream
-git reset --hard upstream/main   # 내 main을 원본과 똑같이 맞춤
+git fetch upstream staging            # staging 을 아직 모르는 클론에서도 받아온다
+git checkout -B staging FETCH_HEAD    # 내 staging 을 원본과 똑같이 맞춤 (없으면 새로 만듦)
 ```
 
 ### 2) 작업용 브랜치 만들기
@@ -98,7 +99,7 @@ git push -u origin feat/login-button
 
 ### 5) Pull Request 열기
 - GitHub가 안내하는 **"Compare & pull request"** 버튼을 누르거나, 포크 페이지에서 **Contribute → Open pull request**.
-- base(받는 쪽)는 `jcmaker/quest-on : main`, compare(주는 쪽)는 내 브랜치.
+- base(받는 쪽)는 `jcmaker/quest-on : staging`, compare(주는 쪽)는 내 브랜치.
 - 템플릿에 따라 **무엇을·왜** 바꿨는지 적기.
 - **Draft PR**로 먼저 열어 진행 중임을 알려도 좋습니다.
 
@@ -117,7 +118,7 @@ git branch -d feat/login-button
 
 ## 하면 안 되는 것 (사고 방지)
 
-- ❌ `main`에서 바로 작업/커밋
+- ❌ `main` 또는 `staging`에서 바로 작업/커밋/푸시
 - ❌ 공용 브랜치에 `git push --force`
 - ❌ `.env*` 커밋, 운영 DB 접속정보 로컬 사용
 - ❌ 한 PR에 관계없는 변경 여러 개 섞기

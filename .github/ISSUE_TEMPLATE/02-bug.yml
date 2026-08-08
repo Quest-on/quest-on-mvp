@@ -1,0 +1,57 @@
+name: "Bug — 버그"
+description: "재현 가능한 결함. 에이전트는 회귀 테스트를 먼저 쓰고 고칩니다."
+title: "fix: "
+labels: ["type:bug", "status:ready"]
+body:
+  - type: textarea
+    id: symptom
+    attributes:
+      label: 증상
+      description: "기대 동작 vs 실제 동작. 한 줄씩."
+      value: |
+        - 기대:
+        - 실제:
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 재현 절차
+      description: "역할(교수자/학생/관리자)과 진입 URL부터 적으세요."
+      value: |
+        1. 학생 계정으로 `/join` 진입
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 증거
+      description: "에러 로그, 스크린샷, 네트워크 응답, request id. 붙일 게 없으면 `없음`."
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: regression_test
+    attributes:
+      label: 회귀 테스트 위치
+      description: "이 버그를 다시 잡아낼 테스트가 들어갈 파일. 추정이어도 적습니다."
+      placeholder: "__tests__/cors.test.ts 또는 e2e/browser-flows/..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 심각도
+      options:
+        - "sev3 — 불편하지만 우회 가능"
+        - "sev2 — 핵심 플로우 일부 차단"
+        - "sev1 — 시험/제출/채점 중단, 데이터 손상, 보안"
+      default: 0
+    validations:
+      required: true

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isAuthBypassAllowedEnv } from "@/lib/app-env";
 
 const isPublicRoute = (pathname: string) =>
   [
@@ -31,9 +32,9 @@ export async function proxy(request: NextRequest) {
   // API 라우트는 리다이렉트하지 않음
   if (pathname.startsWith("/api/")) return response;
 
-  // 테스트 바이패스: 쿠키 기반 (브라우저 E2E 테스트용)
+  // 테스트 바이패스: 쿠키 기반 (브라우저 E2E 테스트용). 프로덕션에서는 항상 꺼진다.
   const bypassSecret = process.env.TEST_BYPASS_SECRET;
-  if (bypassSecret && process.env.NODE_ENV !== "production") {
+  if (bypassSecret && isAuthBypassAllowedEnv()) {
     const bypassCookie = request.cookies.get("__test_bypass")?.value;
     if (bypassCookie === bypassSecret) {
       const role = request.cookies.get("__test_user_role")?.value || null;
