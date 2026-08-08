@@ -22,6 +22,19 @@ describe("onboarding activation migration safety", () => {
     );
   });
 
+  it("passes the non-Prisma table SQL as one psql argument", () => {
+    const testSetup = readFileSync(
+      path.join(root, ".github/actions/test-setup/action.yml"),
+      "utf8"
+    );
+    const action = testSetup.match(
+      /    - name: Create non-Prisma tables\n([\s\S]*?)\n    - name: Apply SQL functions/
+    )?.[1];
+
+    expect(action).toBeDefined();
+    expect(action!.match(/(?<!\\)"/g)).toHaveLength(2);
+  });
+
   it("keeps the onboarding event exam foreign key in Prisma", () => {
     const schema = readFileSync(path.join(root, "prisma/schema.prisma"), "utf8");
     const onboardingEvents = schema.match(/model onboarding_events \{([\s\S]*?)\n\}/)?.[1] ?? "";
