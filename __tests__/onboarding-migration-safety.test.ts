@@ -21,4 +21,17 @@ describe("onboarding activation migration safety", () => {
       /psql postgresql:\/\/postgres:postgres@127\.0\.0\.1:54322\/postgres \\\n+\s+-v ON_ERROR_STOP=1 \\\n+\s+-f database\/018_onboarding_activation\.sql/
     );
   });
+
+  it("keeps the onboarding event exam foreign key in Prisma", () => {
+    const schema = readFileSync(path.join(root, "prisma/schema.prisma"), "utf8");
+    const onboardingEvents = schema.match(/model onboarding_events \{([\s\S]*?)\n\}/)?.[1] ?? "";
+    const exams = schema.match(/model exams \{([\s\S]*?)\n\}/)?.[1] ?? "";
+
+    expect(onboardingEvents).toMatch(
+      /exams\s+exams\?\s+@relation\(fields: \[exam_id\], references: \[id\], onDelete: SetNull, onUpdate: NoAction\)/
+    );
+    expect(exams).toMatch(
+      /onboarding_events\s+onboarding_events\[\]/
+    );
+  });
 });

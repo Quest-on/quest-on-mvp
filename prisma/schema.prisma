@@ -73,6 +73,7 @@ model exams {
   exam_grading_sessions  exam_grading_sessions[]
   exam_nodes             exam_nodes[]
   exam_material_chunks   exam_material_chunks[]
+  onboarding_events      onboarding_events[]
   question_records       questions[]
   session_quiz_attempts  session_quiz_attempts[]
   sessions               sessions[]
@@ -105,6 +106,7 @@ model onboarding_events {
   role        String
   event       String
   exam_id     String?  @db.Uuid
+  exams       exams?   @relation(fields: [exam_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   metadata    Json     @default("{}")
   occurred_at DateTime @default(now()) @db.Timestamptz(6)
 
