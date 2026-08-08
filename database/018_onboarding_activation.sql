@@ -6,6 +6,8 @@
 --
 -- ⚠️ 반드시 소비 이슈보다 먼저 적용·배포할 것. 반대 순서면 컬럼 없는 DB에 쿼리가 날아간다.
 
+BEGIN;
+
 -- ─────────────────────────────────────────────────────────────
 -- 1. exams: 데모 구분과 최초 발행 시점
 -- ─────────────────────────────────────────────────────────────
@@ -106,6 +108,8 @@ REVOKE ALL ON public.onboarding_events FROM anon, authenticated;
 DROP POLICY IF EXISTS "service_role_all" ON public.onboarding_events;
 CREATE POLICY "service_role_all" ON public.onboarding_events
   FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+COMMIT;
 
 -- ─────────────────────────────────────────────────────────────
 -- 롤백 (소비 코드 머지 전이면 무손실)

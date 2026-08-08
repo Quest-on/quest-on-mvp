@@ -129,6 +129,7 @@ runs:
         # 된다(전역 한도 테이블을 anon 이 수정 가능). 컬럼/테이블 생성은 전부
         # IF NOT EXISTS 라 prisma db push 와 중복돼도 안전하다.
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
           -f database/018_onboarding_activation.sql
         # Reload PostgREST schema cache so new functions are immediately callable
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
