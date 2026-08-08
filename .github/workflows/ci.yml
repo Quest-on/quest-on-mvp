@@ -32,29 +32,27 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Check required secrets
-        id: check-secrets
-        run: |
-          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ]; then
-            echo "::warning::Skipping build — required secrets not configured"
-            echo "has_secrets=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_secrets=true" >> "$GITHUB_OUTPUT"
-          fi
+      # 빌드는 항상 실제로 돈다.
+      # 예전에는 시크릿이 없으면 next build 를 통째로 건너뛰고 job 을 성공으로 끝냈다.
+      # 그러면 빌드가 깨진 코드가 초록불을 받는다 — 게이트가 아니라 장식이 된다.
+      #
+      # NEXT_PUBLIC_* 은 빌드 시 번들에 인라인되어 브라우저에 그대로 노출되므로 애초에 비밀이 아니다.
+      # next build 는 이 값들의 "존재"만 필요하고 실제 접속은 하지 않으므로, E2E job 과 동일한
+      # 더미 값으로 빌드한다. 시크릿 설정 여부·포크 PR 여부와 무관하게 항상 동작한다.
+      #
+      # 진짜 프로덕션 환경변수 조합의 빌드는 Vercel 이 배포 때 검증한다.
+      - name: Build
+        run: npx next build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      - run: npx next build
-        if: steps.check-secrets.outputs.has_secrets == 'true'
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-          ADMIN_SESSION_SECRET: ${{ secrets.ADMIN_SESSION_SECRET }}
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WO_o0BQXj0V_fMnZXz7cz0yd2V0j2xN7OIRI
+          SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_dummy
+          CLERK_SECRET_KEY: sk_test_dummy
+          OPENAI_API_KEY: ci-build-key
+          ADMIN_USERNAME: ci-build-admin
+          ADMIN_PASSWORD: ci-build-password
+          ADMIN_SESSION_SECRET: ci-build-secret-for-hmac-signing-minimum-32-chars
 
   unit-test:
     name: Unit Tests
