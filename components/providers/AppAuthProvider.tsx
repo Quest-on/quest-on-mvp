@@ -8,6 +8,7 @@ import {
   useCallback,
 } from "react";
 import { createSupabaseClient } from "@/lib/supabase-client";
+import { isAuthBypassAllowedEnv } from "@/lib/app-env";
 import type { User } from "@supabase/supabase-js";
 
 export type AppProfile = {
@@ -36,7 +37,7 @@ const AuthContext = createContext<AppAuthState>({
 // proxy.ts가 서버에서 __test_bypass 쿠키를 이미 검증했으므로, 클라이언트에서는 쿠키 존재만 확인
 function getTestBypassUser(): { user: User; profile: AppProfile } | null {
   if (process.env.NEXT_PUBLIC_TEST_BYPASS_ENABLED !== "true") return null;
-  if (process.env.NODE_ENV === "production") return null;
+  if (!isAuthBypassAllowedEnv()) return null;
   if (typeof document === "undefined") return null;
 
   const cookies = document.cookie.split(";").reduce(

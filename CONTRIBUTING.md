@@ -64,11 +64,12 @@
 
 ## 작업할 때마다 반복하는 흐름
 
-### 1) 최신 main 받아오기 (작업 시작 전 항상)
+> 브랜치는 2단계입니다. 작업 PR 은 전부 `staging` 으로 올리고, 스테이징(staging.quest-on.app)에서 QA 를 통과한 것만 `staging` → `main` 승격 PR 로 프로덕션에 나갑니다. 환경 설명은 `docs/STAGING.md`.
+
+### 1) 최신 staging 받아오기 (작업 시작 전 항상)
 ```bash
-git checkout main
-git fetch upstream
-git reset --hard upstream/main   # 내 main을 원본과 똑같이 맞춤
+git fetch upstream staging            # staging 을 아직 모르는 클론에서도 받아온다
+git checkout -B staging FETCH_HEAD    # 내 staging 을 원본과 똑같이 맞춤 (없으면 새로 만듦)
 ```
 
 ### 2) 작업용 브랜치 만들기
@@ -98,7 +99,7 @@ git push -u origin feat/login-button
 
 ### 5) Pull Request 열기
 - GitHub가 안내하는 **"Compare & pull request"** 버튼을 누르거나, 포크 페이지에서 **Contribute → Open pull request**.
-- base(받는 쪽)는 `jcmaker/quest-on : main`, compare(주는 쪽)는 내 브랜치.
+- base(받는 쪽)는 `jcmaker/quest-on : staging`, compare(주는 쪽)는 내 브랜치.
 - 템플릿에 따라 **무엇을·왜** 바꿨는지 적기.
 - **Draft PR**로 먼저 열어 진행 중임을 알려도 좋습니다.
 

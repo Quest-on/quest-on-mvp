@@ -2,9 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
+  # base 를 제한하지 않는다. 스택 PR(작업 브랜치 위에 쌓은 PR)의 base 는 staging 도
+  # main 도 아니라서, 목록으로 제한하면 그 PR 들만 CI 없이 머지되는 구멍이 생긴다.
   pull_request:
-    branches: [main]
 
 jobs:
   quality:

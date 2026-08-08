@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { timingSafeEqual } from "crypto";
+import { isAuthBypassAllowedEnv } from "./app-env";
 
 export type AppUser = {
   id: string; // Supabase UUID
@@ -29,12 +30,15 @@ export async function getSupabaseAuthClient() {
 }
 
 export async function currentUser(): Promise<AppUser | null> {
-  // 테스트 바이패스 (기존 패턴 유지 — auth 시스템 비의존적)
+  // 테스트 바이패스 (로컬/CI E2E 전용). 판정 기준은 NODE_ENV 가 아니라 APP_ENV 다:
+  // Vercel 배포는 스테이징도 NODE_ENV=production 이라 둘을 구분할 수 없었다.
+  // 스테이징도 외부 QA 참여자가 들어오는 프로덕션급 환경이므로 바이패스를 허용하지
+  // 않는다 — 키가 실수로 주입되면 조용히 무시하지 말고 즉시 throw 한다.
   const bypassSecret = process.env.TEST_BYPASS_SECRET;
   if (bypassSecret) {
-    if (process.env.NODE_ENV === "production") {
+    if (!isAuthBypassAllowedEnv()) {
       throw new Error(
-        "[SECURITY] TEST_BYPASS_SECRET must not be set in production."
+        "[SECURITY] TEST_BYPASS_SECRET must not be set in a deployed environment (production/staging)."
       );
     }
     const { headers } = await import("next/headers");

@@ -1,8 +1,20 @@
 #!/bin/sh
 # 공용 가드 로직 — pre-commit / pre-push 가 함께 사용.
-# main 보호용. 단, 메인테이너(jcmaker)는 자유롭게 통과시킨다.
+# main·staging 보호용. 단, 메인테이너(jcmaker)는 자유롭게 통과시킨다.
+#
+# main    = 프로덕션(quest-on.app)
+# staging = 스테이징(staging.quest-on.app). 작업 PR 의 base 이므로 직접 커밋 금지.
+PROTECTED_BRANCHES="main staging"
 
-PROTECTED_BRANCH="main"
+# 인자로 받은 브랜치가 보호 대상인가.
+is_protected_branch() {
+  for _protected in $PROTECTED_BRANCHES; do
+    if [ "$1" = "$_protected" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
 
 # 메인테이너(= 자유 통과 대상)인지 판단.
 #   1) 로컬 git config `questOn.maintainer true`  (jcmaker 클론에만 설정, 커밋 안 됨)
