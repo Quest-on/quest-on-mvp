@@ -15,7 +15,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { QuestionPanel } from "@/components/exam/QuestionPanel";
 import { AnswerPanel } from "@/components/exam/AnswerPanel";
 import { ObjectiveAnswerPanel } from "@/components/exam/ObjectiveAnswerPanel";
-import { isObjectiveQuestion } from "@/lib/grading-helpers";
+import { isObjectiveQuestion, hasAiChatQuestions } from "@/lib/grading-helpers";
 import { SubmitConfirmDialog } from "@/components/exam/SubmitConfirmDialog";
 import { ExamChatSidebar } from "@/components/exam/ExamChatSidebar";
 import { MainContentWrapper } from "@/components/exam/MainContentWrapper";
@@ -205,9 +205,11 @@ export default function ExamPage() {
   const currentQuestionType = exam?.questions?.[currentQuestion]?.type;
   const isCurrentObjective = isObjectiveQuestion(currentQuestionType);
 
-  // 시험 단위로 한 번만 계산 — sidebar-width 게이팅, Preflight/Waiting 프롭 전달(추후)에 사용.
+  // 시험 단위로 한 번만 계산 — sidebar-width 게이팅, Preflight 고지 프롭 전달에 사용.
+  // 판정식은 lib/grading-helpers.ts 한 곳에만 둔다: 교수자 공지문(ExamDetailsCard)이
+  // 같은 판정을 쓰는데, 식을 화면마다 복제하면 한쪽만 고쳐졌을 때 공지가 거짓이 된다.
   const examHasEssay = useMemo(
-    () => exam?.questions?.some((q) => !isObjectiveQuestion(q.type)) ?? false,
+    () => hasAiChatQuestions(exam?.questions),
     [exam]
   );
 

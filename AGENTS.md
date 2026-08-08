@@ -1,77 +1,62 @@
-## 협업 규칙 (필독 — 모든 도구·모든 작업자 공통)
+# AGENTS.md
 
-> 이 저장소는 포크 기반 협업을 사용한다. `main` 은 메인테이너(@jcmaker)만 머지한다.
-> **AI 코딩 도구(Cursor / Claude Code / Codex)로 작업할 때, 아래 절차를 먼저 수행한 뒤 코드를 건드린다.**
+Quest-On: AI 기반 시험/과제 플랫폼. 교수자가 출제 → 학생이 AI 대화로 응시 → AI 채점 → 교수자 검수.
+Next.js 16 App Router / React 19 / TS strict / Tailwind 4 / Supabase(Postgres) + Prisma / Supabase Auth / OpenAI / Upstash / Vercel.
 
-브랜치는 2단계다. 작업 PR 은 전부 `staging` 으로 올리고, 스테이징에서 QA 를 통과한 것만 `staging` → `main` 승격 PR 로 프로덕션에 나간다. (환경 구성: `docs/STAGING.md`)
+**코드가 SSOT다.** 이 파일을 포함한 어떤 문서도 진실의 원천이 아니다. 문서·스펙·이슈 본문이 코드와 어긋나면 코드가 맞고, 문서를 고친다. 판단은 문서가 아니라 코드를 읽고 한다.
 
+## 작업 시작 전
+
+이슈 없이 코드를 만들지 않는다. 예외는 PR 본문에 `No issue: <이유>`를 명시한다. 이슈 본문은 "무엇을 할지"의 착수 근거이지 "무엇이 참인지"의 근거가 아니다. 모호하면 `status:needs-spec` 으로 두고 멈춘다.
+
+```bash
+git fetch origin && git checkout -b feat/<짧은-설명> origin/staging   # 종류: feat / fix / docs / chore
 ```
-feat/xxx ──PR──▶ staging ──배포·QA──▶ PR ──▶ main ──▶ 프로덕션
+
+`main` 과 `staging` 에서 직접 작업·커밋·푸시 금지 (git hook 차단). 포크로 작업 중이면 `origin` 대신 `upstream`.
+한 브랜치 = 한 이슈 = 한 PR. PR base 는 `staging` 이며, 커밋 메시지에 `Co-Authored-By` 넣지 않는다.
+
+## 끝내기 전 (필수)
+
+```bash
+npx tsc --noEmit && npm run lint
+npx vitest run <바꾼 것과 관련된 파일>
 ```
 
-1. **`main` · `staging` 에서 직접 작업/커밋/푸시 금지.** (git hook 이 차단한다. 자세한 워크플로: `CONTRIBUTING.md`)
-2. **작업 시작 전 항상 최신 staging 으로 동기화한다:**
-   ```bash
-   git fetch upstream staging                 # staging 이 없던 클론(single-branch 포함)에서도 받아온다
-   git checkout -B staging FETCH_HEAD         # 없으면 만들고, 있으면 그 자리로 맞춘다
-   ```
-3. **새 작업 브랜치를 만들고 거기서만 작업한다:**
-   ```bash
-   git checkout -b feat/<짧은-설명>     # 종류: feat / fix / docs / chore
-   ```
-4. **커밋은 작게, 자주.** 한 브랜치 = 한 가지 변경. 끝나면 **자기 포크로 push** 후 **base 를 `staging` 으로** Pull Request 를 안내한다.
-   ```bash
-   git push -u origin feat/<짧은-설명>
-   ```
-5. **머지 후 충돌이 나면**, PR 작성자가 자기 브랜치에서 해결한다:
-   ```bash
-   git fetch upstream && git rebase upstream/staging && git push --force-with-lease
-   ```
-6. **`.env*` 등 비밀정보는 절대 커밋하지 않는다.** 운영 DB 접속정보로 로컬을 돌리지 않는다(아래 DB Safety).
+사람 리뷰어가 없다. PR 본문에 실행한 명령과 실제 출력을 붙인다. "확인했습니다"는 증거가 아니다.
+버그 수정은 재현 테스트를 먼저 쓰고 고친다.
 
-작업자가 이 절차를 모르면, **에이전트가 대신 위 명령을 수행**하고 사람에게는 무엇을 했는지 한국어로 짧게 설명한다.
+## 이 저장소에서 틀리기 쉬운 것
 
-## Workflow Orchestration
+- 런타임 쿼리는 `getSupabaseServer()` (`lib/supabase-server.ts`). 라우트에 raw SQL 금지. DDL 은 `database/[NNN]_*.sql`.
+- 서버 입력은 Zod 검증. 인증/서명 검증 **전에** 데이터 접근 금지. 반환·수정 전 소유권 확인.
+- 쿼리 키는 `lib/query-keys.ts` 에서 가져온다. 문자열 하드코딩 금지.
+- 모든 AI 호출은 `ai_events` 에 기록(토큰·지연·비용).
+- 사용자 노출 문구는 next-intl 메시지로. 하드코딩된 한국어/영어 문자열 금지.
+- 패키지 추가는 `docs/DEPENDENCY_POLICY.md` 근거 필요.
+- `.env*` 커밋 금지.
 
-### 1. Plan Node Default
-- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
-- If something goes sideways, STOP and re-plan immediately - don't keep pushing
-- Use plan mode for verification steps, not just building
-- Write detailed specs upfront to reduce ambiguity
+## DB 안전 — 멈춤 규칙
 
-### 2. Subagent Strategy
-- Use subagents liberally to keep main context window clean
-- Offload research, exploration, and parallel analysis to subagents
-- For complex problems, throw more compute at it via subagents
-- One tack per subagent for focused execution
+Supabase / Prisma / Playwright E2E·API 테스트 / seed·cleanup 헬퍼 / `psql` / 마이그레이션을 건드리는 명령은 아래를 만족하지 않으면 실행하지 않는다.
+DB 백엔드 테스트와 `e2e/helpers/seed.ts::cleanupTestData()` 는 사용자가 **폐기 가능한 로컬 DB**임을 명시 확인하고 URL 이 localhost/127.0.0.1 일 때만 실행한다.
+테스트·검증 명령에 `.env.local` 을 절대 로드하지 않는다. `.env.test` 가 없거나 localhost 가 아니면 멈추고 묻는다.
+사용자가 데이터 손실을 보고하면 모든 DB 명령을 즉시 중단하고 로컬 파일·git 기록만 본다.
 
-### 3. Self-Improvement Loop
-- After ANY correction from the user: update `tasks/lessons.md` with the pattern
-- Write rules for yourself that prevent the same mistake
-- Ruthlessly iterate on these lessons until mistake rate drops
-- Review lessons at session start for relevant project
+## 어디를 볼 것인가
 
-### 4. Verification Before Done
-- Never mark a task complete without proving it works
-- Diff behavior between main and your changes when relevant
-- Ask yourself: "Would a staff engineer approve this?"
-- Run tests, check logs, demonstrate correctness
+| 주제 | 문서 |
+|---|---|
+| 이슈·PR 추적 규칙, 스프린트 운영 | `docs/WORKFLOW.md` |
+| 시스템 전체 지도(라우트·스키마·연동) | `ARCHITECTURE.md` |
+| 인증·환경변수·CORS·레이트리밋·입력검증 | `docs/SECURITY.md` |
+| 테스트 명령과 기대치 | `docs/TESTING.md` |
+| 채점/QStash/스위퍼 | `docs/GRADING_PIPELINE_RUNBOOK.md` |
+| 거울 쌍·qIdx·채점 불변식 | `.github/impact-review/rules.md` |
+| 제품 판단 기준 | `PRODUCT_PHILOSOPHY.md` |
+| 이 프로젝트에서 반복된 실수 | `tasks/lessons.md` |
+| 브랜치·PR 상세 절차 | `CONTRIBUTING.md` |
 
-### 5. Demand Elegance (Balanced)
-- For non-trivial changes: pause and ask "is there a more elegant way?"
-- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
-- Skip this for simple, obvious fixes - don't over-engineer
-- Challenge your own work before presenting it
+`app/api/`, `components/`, `prisma/` 하위에 영역별 규칙 파일이 있다. 그 디렉터리에서 작업할 때 읽는다.
 
-### 6. Autonomous Bug Fixing
-- When given a bug report: just fix it. Don't ask for hand-holding
-- Point at logs, errors, failing tests - then resolve them
-- Zero context switching required from the user
-- Go fix failing CI tests without being told how
-
-## DB Safety — Stop-Ship Rule
-
-- Before running any command that can touch Supabase, Prisma, Playwright E2E/API tests, seed helpers, cleanup helpers, Docker DB containers, `psql`, or migrations, read `docs/CODEX_DB_SAFETY.md`.
-- Never run DB-backed E2E/API tests or `e2e/helpers/seed.ts::cleanupTestData()` unless the user explicitly confirms a disposable local DB and the exact DB URL is localhost/127.0.0.1.
-- Never source `.env.local` for test or verification commands. If `.env.test` is missing or does not point to localhost, stop and ask.
-- If the user reports data loss or DB damage, immediately stop all DB-related commands and inspect only local files/git history until the user explicitly approves a next step.
+사용자가 같은 지적을 두 번 하면 `tasks/lessons.md` 에 한 줄 추가한다. 일회성 취향은 넣지 않는다.

@@ -107,7 +107,13 @@
     "durationMin": "{duration} min",
     "labelCreatedAt": "Created",
     "labelExamCode": "Exam Code",
-    "buttonCopy": "Copy"
+    "buttonCopy": "Copy",
+    "buttonCopyNotice": "Copy student notice",
+    "toastNoticeCopied": "Notice copied",
+    "toastNoticeCopyFailed": "Could not copy the notice",
+    "noticeHeading": "[Quest-On] Exam notice",
+    "noticeCodeLabel": "Entry code",
+    "noticeFooter": "Questions? Contact your instructor."
   },
   "examInfoForm": {
     "cardTitleAssignment": "Assignment Info",

@@ -67,10 +67,13 @@ model exams {
   canvas_config          Json?                  @default("{}") // Canvas config: { secondaryCanvas, layout, codeEnabled, erdEnabled }
   grades_released        Boolean?               @default(false) // 성적 공개 여부 (채점 확정)
   language               String                 @default("ko") // AI 시스템 프롬프트 언어 (ko | en)
+  is_demo                Boolean                @default(false) // 데모 시험: 목록·통계·발행 카운트에서 제외 (#80)
+  first_published_at     DateTime?              @db.Timestamptz(6) // 첫 학생 세션 생성 시 COALESCE 기록 (#84)
   ai_events              ai_events[]
   exam_grading_sessions  exam_grading_sessions[]
   exam_nodes             exam_nodes[]
   exam_material_chunks   exam_material_chunks[]
+  onboarding_events      onboarding_events[]
   question_records       questions[]
   session_quiz_attempts  session_quiz_attempts[]
   sessions               sessions[]
@@ -82,6 +85,34 @@ model exams {
   @@index([close_at], map: "idx_exams_close_at")
   @@index([status], map: "idx_exams_status")
   @@index([type], map: "idx_exams_type")
+  @@index([instructor_id, is_demo], map: "idx_exams_instructor_demo")
+  @@index([instructor_id, first_published_at], map: "idx_exams_instructor_first_published")
+}
+
+model plan_limits {
+  plan               String   @id
+  max_publishes      Int? // null = 무제한
+  max_students       Int? // null = 무제한
+  ai_demo_generation Boolean  @default(false)
+  updated_at         DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("plan_limits")
+}
+
+/// 온보딩 액티베이션 퍼널 마일스톤. UNIQUE(user_id, event)로 "최초 도달" 의미론을 강제한다.
+model onboarding_events {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String
+  role        String
+  event       String
+  exam_id     String?  @db.Uuid
+  exams       exams?   @relation(fields: [exam_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  metadata    Json     @default("{}")
+  occurred_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([user_id, event])
+  @@index([event, occurred_at(sort: Desc)], map: "idx_onboarding_events_event_occurred")
+  @@map("onboarding_events")
 }
 
 model grades {

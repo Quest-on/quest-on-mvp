@@ -28,6 +28,8 @@ import {
 import { CenteredViewportShell } from "@/components/layout/CenteredViewportShell";
 import { User, Hash, GraduationCap, Loader2, ArrowLeft } from "lucide-react";
 import { ErrorAlert } from "@/components/ui/error-alert";
+import { resolveSignupRole } from "@/lib/onboarding-role";
+import { safeInternalPath } from "@/lib/safe-redirect";
 
 interface University {
   name: string;
@@ -40,7 +42,7 @@ interface University {
 
 export default function OnboardingPage() {
   const t = useTranslations("onboarding.page");
-  const { user, isLoaded } = useAppUser();
+  const { user, profile, isLoaded } = useAppUser();
   const router = useRouter();
 
   // Step: "role" | "profile"
@@ -63,13 +65,62 @@ export default function OnboardingPage() {
   // Student-only fields
   const [studentNumber, setStudentNumber] = useState("");
 
-  // Get role from localStorage if available
+  // AC-1: 가입 시점의 역할 의도를 해석할 수 있으면 역할 단계를 건너뛴다.
+  // 해석할 수 없으면(예: OAuth 쿠키 소실) 역할 단계를 그대로 보여준다 —
+  // 추측해서 건너뛰면 잘못된 역할로 계정이 굳는다.
   useEffect(() => {
-    const savedRole = localStorage.getItem("selectedRole");
-    if (savedRole && (savedRole === "instructor" || savedRole === "student")) {
-      setRole(savedRole as "instructor" | "student");
+    if (!isLoaded) return;
+    const resolved = resolveSignupRole({
+      // 이미 역할이 확정된 기존 사용자(프로필 수정 진입)는 profiles.role 이 권위다.
+      metadataRole: profile?.role ?? user?.user_metadata?.role,
+      cookieString: typeof document === "undefined" ? null : document.cookie,
+      // #87 이 쿠키 라이터를 넣기 전까지 OAuth 가입자의 역할은 여기에만 있다.
+      localStorageRole:
+        typeof window === "undefined"
+          ? null
+          : window.localStorage.getItem("selectedRole"),
+    });
+    if (resolved) {
+      setRole(resolved);
+      setStep("profile");
     }
-  }, []);
+  }, [isLoaded, user, profile]);
+
+  // 기존 프로필 프리필. 삭제된 /student/profile-setup 은 마운트 시
+  // /api/student/profile 을 읽어 이름·학번·학교를 채웠다. 통합하면서 이걸
+  // 빠뜨리면 프로필을 고치러 온 학생이 빈 폼을 마주하고, 그대로 저장하면
+  // 기존 값이 지워진 것처럼 보인다.
+  //
+  // 학생 전용이다. /api/instructor/profile 에는 GET 이 없고(POST 전용),
+  // 삭제된 페이지도 학생 프로필만 다뤘다.
+  useEffect(() => {
+    if (!isLoaded || !user || step !== "profile" || role !== "student") return;
+
+    let cancelled = false;
+    const endpoint = "/api/student/profile";
+
+    (async () => {
+      try {
+        const res = await fetch(endpoint);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        const p = data?.profile;
+        if (!p || cancelled) return;
+
+        // 사용자가 이미 입력을 시작했으면 덮어쓰지 않는다.
+        setName((prev) => prev || p.name || "");
+        setSchool((prev) => prev || p.school || "");
+        setSchoolSearchQuery((prev) => prev || p.school || "");
+        setStudentNumber((prev) => prev || p.student_number || "");
+      } catch {
+        // 프리필 실패가 온보딩을 막아서는 안 된다. 빈 폼으로 진행한다.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, user, step, role]);
 
   useEffect(() => {
     if (isLoaded && !user) {
@@ -177,40 +228,48 @@ export default function OnboardingPage() {
       });
       if (!profileRes.ok) throw new Error("Profile update failed");
 
-      // role별 추가 프로필 테이블에도 저장 (기존 API들이 여기서 읽음)
-      if (role === "student") {
-        await fetch("/api/student/profile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: name.trim(),
-            student_number: studentNumber.trim(),
-            school: school.trim(),
-          }),
-        });
-      } else {
-        await fetch("/api/instructor/profile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: name.trim(),
-            email: user.email,
-            school: school.trim(),
-          }),
-        });
-      }
+      // role별 추가 프로필 테이블에도 저장 (기존 API들이 여기서 읽음).
+      // AC-2: 이 호출의 실패를 삼키면 프로필이 반쪽만 저장된 유저가 생긴다.
+      const roleProfileRes =
+        role === "student"
+          ? await fetch("/api/student/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: name.trim(),
+                student_number: studentNumber.trim(),
+                school: school.trim(),
+              }),
+            })
+          : await fetch("/api/instructor/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: name.trim(),
+                email: user.email,
+                school: school.trim(),
+              }),
+            });
+      if (!roleProfileRes.ok) throw new Error("Role profile update failed");
 
       // Clear localStorage
       localStorage.removeItem("selectedRole");
 
       // 4. Redirect
+      //
+      // redirect 는 URL 쿼리(= 사용자 입력)로 들어온다. `/student/profile-setup`
+      // 이 쿼리를 그대로 넘겨주므로 이 지점이 유일한 소비 지점이자 검증 지점이다.
+      // `startsWith("/")` 만으로는 `//evil.com`(프로토콜 상대 URL)이 통과해
+      // 로그인 직후 외부 사이트로 튕긴다. safeInternalPath 로 좁힌다.
       const params = new URLSearchParams(window.location.search);
       const redirectUrl =
         params.get("redirect") || localStorage.getItem("onboarding_redirect");
       localStorage.removeItem("onboarding_redirect");
 
-      if (redirectUrl && redirectUrl.startsWith("/")) {
-        window.location.href = redirectUrl;
+      const redirectTarget = safeInternalPath(redirectUrl);
+
+      if (redirectTarget) {
+        window.location.href = redirectTarget;
       } else if (role === "instructor") {
         window.location.href = "/instructor-pending";
       } else {

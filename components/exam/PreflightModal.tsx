@@ -88,6 +88,30 @@ export function PreflightModal({
             </ul>
           </div>
 
+          {/* AI 사용 안내 (AC-14).
+              대학생 54%가 시험에서 AI 사용을 부정행위로 인식한다. 우리 제품은
+              AI에게 묻는 것이 시험의 일부이고 질문 자체가 채점 대상인데,
+              학생이 그걸 모르면 겁먹고 질문을 안 해 점수가 낮게 나온다.
+              그래서 감시("기록됩니다") 프레임이 아니라 허용·투명성 프레임으로 쓴다.
+
+              단 examHasEssay 로 게이팅한다. MCQ/OX 전용 시험은
+              exam/[code]/page.tsx 가 !isCurrentObjective 일 때만 ExamChatSidebar 를
+              렌더하므로 채팅 자체가 없다. 없는 기능을 쓰라고 안내하면 고지가
+              거짓이 되고, 신뢰를 얻으려던 문구가 반대로 신뢰를 깎는다. */}
+          {examHasEssay && (
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <h3 className="font-semibold mb-2 flex items-center gap-2">
+                <Shield className="h-4 w-4 text-primary" />
+                {t("preflight.aiDisclosureTitle")}
+              </h3>
+              <ul className="space-y-1.5 text-sm">
+                <li>{t("preflight.aiDisclosureAllowed")}</li>
+                <li>{t("preflight.aiDisclosureGraded")}</li>
+                <li>{t("preflight.aiDisclosureVisible")}</li>
+              </ul>
+            </div>
+          )}
+
           {/* 시험 정보 */}
           {examTitle && (
             <div className="border rounded-lg p-4 bg-muted/50">

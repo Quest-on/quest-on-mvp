@@ -72,3 +72,6 @@ next-env.d.ts
 **/.orca/
 .redteam/
 **/.redteam/
+
+# Local isolated worktrees
+.worktrees/

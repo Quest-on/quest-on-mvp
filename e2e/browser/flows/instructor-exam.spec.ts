@@ -173,8 +173,12 @@ test.describe("Instructor — Exam & Grading Flow", () => {
     await expect(gradingPanel).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
     await expect(gradingPanel.getByText(/전체 CASE 가채점 중/)).toBeVisible();
     await expect(gradingPanel.getByText(/처리 0\/1명/)).toBeVisible();
+    // 전송 버튼은 로케일 안정적인 testid 로 잡는다.
+    // aria-label 은 i18n 이관 때 "가채점 대화 전송" → sendAriaLabelStart/Discuss 로
+    // 갈라졌고, 옛 문자열을 찾던 이 단언이 element-not-found 로 main CI 를 상시
+    // 빨강으로 만들고 있었다. 검증 의도(grading 상태에서 전송 불가)는 그대로다.
     await expect(
-      gradingPanel.getByRole("button", { name: "가채점 대화 전송" }),
+      gradingPanel.getByTestId("bulk-grade-send"),
     ).toBeDisabled();
     await expect(gradingPanel.getByTestId("bulk-grade-composer-input")).toBeVisible();
   });

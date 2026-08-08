@@ -17,12 +17,30 @@ describe("getCorsHeaders", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("ALLOWED_ORIGINS", "");
 
-    const req = makeRequest("https://quest-on.kr");
+    const req = makeRequest("https://quest-on.app");
     const headers = getCorsHeaders(req);
 
-    expect(headers["Access-Control-Allow-Origin"]).toBe("https://quest-on.kr");
+    expect(headers["Access-Control-Allow-Origin"]).toBe("https://quest-on.app");
     expect(headers["Access-Control-Allow-Methods"]).toContain("POST");
     expect(headers["Vary"]).toBe("Origin");
+  });
+
+  it("rejects localhost origins under the production fallback", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ALLOWED_ORIGINS", "");
+
+    for (const origin of ["http://localhost:3000", "http://localhost:3001"]) {
+      expect(Object.keys(getCorsHeaders(makeRequest(origin)))).toHaveLength(0);
+    }
+  });
+
+  it("rejects domains the project does not own under the production fallback", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ALLOWED_ORIGINS", "");
+
+    for (const origin of ["https://quest-on.kr", "https://www.quest-on.kr"]) {
+      expect(Object.keys(getCorsHeaders(makeRequest(origin)))).toHaveLength(0);
+    }
   });
 
   it("returns empty object for disallowed origin in production", () => {
@@ -68,7 +86,7 @@ describe("getCorsHeaders", () => {
     );
 
     // Default allowed origins are NOT in this custom list
-    const blockedHeaders = getCorsHeaders(makeRequest("https://quest-on.kr"));
+    const blockedHeaders = getCorsHeaders(makeRequest("https://quest-on.app"));
     expect(Object.keys(blockedHeaders)).toHaveLength(0);
   });
 
