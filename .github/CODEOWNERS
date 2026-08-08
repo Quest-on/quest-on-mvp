@@ -1,0 +1,10 @@
+# 기본 소유자: 모든 변경은 아래 두 명 중 최소 1명의 리뷰가 필요하다.
+# (Rulesets → "Require review from Code Owners" 와 함께 동작)
+* @jcmaker @yeongjunyoo
+
+# 배포/보안 파이프라인은 특히 눈여겨볼 영역
+/.github/          @jcmaker @yeongjunyoo
+/prisma/           @jcmaker @yeongjunyoo
+/database/         @jcmaker @yeongjunyoo
+/middleware.ts     @jcmaker @yeongjunyoo
+/lib/supabase*     @jcmaker @yeongjunyoo
