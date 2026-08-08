@@ -7,7 +7,7 @@ Next.js 16 App Router / React 19 / TS strict / Tailwind 4 / Supabase(Postgres) +
 
 ## 작업 시작 전
 
-이슈 없이 코드를 만들지 않는다. 이슈 본문은 "무엇을 할지"의 착수 근거이지 "무엇이 참인지"의 근거가 아니다. 모호하면 `status:needs-spec` 으로 두고 멈춘다.
+이슈 없이 코드를 만들지 않는다. 예외는 PR 본문에 `No issue: <이유>`를 명시한다. 이슈 본문은 "무엇을 할지"의 착수 근거이지 "무엇이 참인지"의 근거가 아니다. 모호하면 `status:needs-spec` 으로 두고 멈춘다.
 
 ```bash
 git fetch origin && git checkout -b feat/<짧은-설명> origin/staging   # 종류: feat / fix / docs / chore

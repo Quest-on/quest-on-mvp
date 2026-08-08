@@ -19,7 +19,7 @@
                                        @jcmaker 리뷰 → CI 통과 → Squash 머지
 ```
 
-- **`main`에 직접 push 금지.** (애초에 권한이 없습니다.)
+- **`main`과 `staging`에 직접 push 금지.** (애초에 권한이 없습니다.)
 - **작업 1개 = 브랜치 1개 = PR 1개.** 작게, 자주.
 - **force-push(강제 푸시)는 내 포크의 내 브랜치에서만.** 공용 브랜치엔 절대 금지.
 
@@ -57,7 +57,7 @@
    ```bash
    npm install
    ```
-   > `npm install` 시 **안전장치(git hook)가 자동 설치**됩니다. 이후 `main`에 실수로 커밋·push하려 하면 git이 막아주고, 작업 브랜치로 안내합니다. (메인테이너 @jcmaker는 면제)
+   > `npm install` 시 **안전장치(git hook)가 자동 설치**됩니다. 이후 `main`이나 `staging`에 실수로 커밋·push하려 하면 git이 막아주고, 작업 브랜치로 안내합니다. (메인테이너 @jcmaker는 면제)
 5. @jcmaker에게 받은 **개발용 환경변수**를 `.env.local`에 넣기.
 
 ---
@@ -118,7 +118,7 @@ git branch -d feat/login-button
 
 ## 하면 안 되는 것 (사고 방지)
 
-- ❌ `main`에서 바로 작업/커밋
+- ❌ `main` 또는 `staging`에서 바로 작업/커밋/푸시
 - ❌ 공용 브랜치에 `git push --force`
 - ❌ `.env*` 커밋, 운영 DB 접속정보 로컬 사용
 - ❌ 한 PR에 관계없는 변경 여러 개 섞기
