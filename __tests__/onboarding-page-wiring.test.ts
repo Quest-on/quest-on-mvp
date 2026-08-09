@@ -17,16 +17,33 @@ import { readFileSync } from "fs";
 const source = readFileSync("app/(app)/onboarding/page.tsx", "utf8");
 
 describe("온보딩 페이지 배선", () => {
-  it("역할 해석에 localStorage.selectedRole 을 넘긴다 (#87 전 OAuth 경로)", () => {
+  it("역할 해석에 metadata 와 쿠키를 넘긴다 — localStorage 는 제거됐다 (#87)", () => {
     const call = source.slice(
       source.indexOf("resolveSignupRole({"),
       source.indexOf("resolveSignupRole({") + 600
     );
 
     expect(call).toContain("metadataRole");
-    expect(call).toContain("cookieString");
-    expect(call).toContain("localStorageRole");
-    expect(call).toContain('localStorage.getItem("selectedRole")');
+    expect(call).toContain("document.cookie");
+    expect(call).not.toContain("localStorageRole");
+    expect(source).not.toContain('localStorage.getItem("selectedRole")');
+  });
+
+  it("인가 필드를 프로필 PATCH 에 싣지 않는다 (AC-20)", () => {
+    const patch = source.slice(
+      source.indexOf('fetch("/api/user/profile"'),
+      source.indexOf('fetch("/api/user/profile"') + 400
+    );
+
+    expect(patch).toContain("display_name");
+    // role·status 를 다시 실으면 서버가 400 으로 거부해 온보딩이 통째로 막힌다.
+    expect(patch).not.toMatch(/\brole,/);
+    expect(patch).not.toContain("status:");
+  });
+
+  it("역할이 없을 때만 역할 클레임 라우트를 부른다 (AC-21)", () => {
+    expect(source).toContain('fetch("/api/user/role"');
+    expect(source).toMatch(/if \(!profile\?\.role\) \{/);
   });
 
   it("프로필 단계에서 기존 학생 프로필을 조회한다", () => {
