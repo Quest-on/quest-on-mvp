@@ -83,9 +83,9 @@ Quest-On = **예비멘토링 8팀 중 연번 5, 배치 트랙.**
 
 ---
 
-## 1. 영준 개인 계정 (오리지널, 본편) — v4
+## 1. 회사 페이지 (한국어) — **오리지널 본문. 이게 메인이다** (v5)
 
-> v3 대비: 설명 문장 6개 제거로 약 300자 감축, **CTA에 상호성 추가**(§7-0 실측 — 도달 천장이 낮으므로 읽은 사람당 전환율이 전부다), 프라이머 인용을 원문에 더 밀착.
+> **v5에서 발행 구조를 정정했다.** v3~v4는 「개인 오리지널이 메인 + 회사 별도 발행 + 영문 독립 발행」으로 짰는데, 실제 운영 형식은 **회사 본문 → 영문 첫 댓글 → 개인 계정이 글귀와 함께 리포스트**다. 그래서 서사를 회사 본문으로 옮기고, 영문을 댓글 한도에 맞춰 압축하고, 개인 글은 리포스트 코멘터리로 새로 썼다.
 
 최종 선발 20팀 명단에 저희 이름은 없었습니다.
 
@@ -97,136 +97,87 @@ Quest-On = **예비멘토링 8팀 중 연번 5, 배치 트랙.**
 
 두 번째 표 각주에는 이렇게 적혀 있었습니다. "최종선발 팀이 아니지만, 성장 가능성 및 잠재력을 갖추고 있다고 평가한 팀."
 
-그날은 기쁜 건지 아쉬운 건지 정리가 안 됐습니다.
-
-며칠 뒤 엑셀 파일을 하나 받았습니다. 주간 KPI 양식이었습니다. 칸이 다섯 개였고, 맨 위에 한 줄이 있었습니다.
+며칠 뒤 주간 KPI 양식을 하나 받았습니다. 칸이 다섯 개였고, 맨 위에 한 줄이 있었습니다.
 
 "너무 많이 넣지 마세요."
 
-반가웠습니다. 적을 게 있다고 생각했으니까요.
+반가웠습니다. 적을 게 있다고 생각했으니까요. 지난 반년 동안 대학 세 곳에 배포했고, 실제 시험과 과제 11개가 저희 위에서 치러졌고, 응시가 441회 쌓였고, 351명이 가입했습니다.
 
-지난 반년을 저희 다섯이서 이렇게 보냈습니다. 대학 세 곳에 배포했고, 실제 시험과 과제 11개가 저희 위에서 치러졌고, 응시가 441회 쌓였고, 351명이 가입했습니다.
+그런데 총회원 칸에 351을 적으려다 멈췄습니다.
 
-총회원 칸에 351을 적으려다 멈췄습니다.
-
-교수님이 강의에서 시험 코드를 불러 주시면 그 수업 학생 전원이 그날 가입합니다. 학생들은 저희를 고른 적이 없습니다. 수업이 시켰습니다.
-
-351은 저희가 만든 수요가 아니라, 저희를 써 주신 교수님 몇 분의 강의 정원을 더한 값이었습니다. 큰 수업 하나만 더 받으면 400도 되고 500도 됩니다. 제품은 그대로인데요.
+교수님이 강의에서 시험 코드를 불러 주시면 그 수업 학생 전원이 그날 가입합니다. 학생들은 저희를 고른 적이 없습니다. 수업이 시켰습니다. 351은 저희가 만든 수요가 아니라, 저희를 써 주신 교수님 몇 분의 강의 정원을 더한 값이었습니다.
 
 돈을 내는 쪽은 학생이 아니라 교수님입니다. 회원의 정의를 교수로 바꿨습니다.
 
 총회원 3.
 
-한참 봤습니다. 반년 치 자랑을 제 손으로 지우는 일이었으니까요.
+3은 작습니다. 대신 3은 진짜입니다. 그 세 분 중 다음 학기에도 돈을 내고 다시 시험을 여신 분이 한 분, 동료 교수님을 소개해 주신 분이 한 분입니다. 둘 다 광고가 만든 게 아닙니다.
 
-그런데 3 쪽이 훨씬 많은 걸 알려줬습니다. 그 세 분 중 다음 학기에도 돈을 내고 다시 시험을 여신 분이 한 분, 동료 교수님께 저희를 소개해 주신 분이 한 분입니다. 반년 동안 저희가 만든 진짜 신호는 351이 아니라 그 두 건이었습니다.
-
-시트를 보다가 한 달 전에 읽은 글이 떠올랐습니다. 지원이 마감되던 날 프라이머 권도균 대표님이 올리신 글입니다. 저희 팀 이야기도 아니고 결과가 나오기 훨씬 전 글인데, 한 문장이 계속 남아 있었습니다.
+지원이 마감되던 날 프라이머 권도균 대표님이 올리신 글에 이런 문장이 있었습니다. 결과가 나오기 한 달 전 글이고 저희 팀 이야기도 아니지만, 시트를 채우는 내내 이 문장이 남았습니다.
 
 "이제 제품 만드는 것은 점점 쉬워져서, 개발자 도움 없이도 도메인 전문가들이 자신의 문제를 해결하는 것이 가능해졌다."
 
-저희가 반년 동안 자랑한 건 전부 만드는 쪽의 숫자였습니다. 배포한 대학 수, 치러진 시험 수, 쌓인 응시 수. 그게 시트에서 0, 0, 3, 0으로 나왔습니다.
+저희가 반년 동안 자랑한 숫자는 전부 만드는 쪽의 것이었습니다. 배포한 대학 수, 치러진 시험 수, 쌓인 응시 수. 회의록을 다시 읽어 보니 지난 반년 안건의 절반 이상이 이미 쓰고 계신 교수님들의 그날 문제를 막는 일이었습니다. 만드느라 듣지 못했습니다.
 
-회의록을 다시 읽어 봤습니다. 지난 반년 안건의 절반 이상이 이미 쓰고 계신 교수님들의 그날 문제를 막는 일이었습니다. 새로 만나서 들은 기록은 몇 줄 없었습니다.
-
-8월은 방학입니다. 앞으로 다섯 주간 매출도 신규도 활성도 전부 0입니다. 게을러서가 아니라 학기가 없어서 0입니다. 다섯 주 내내 0을 내면서 "방학이라서요"라고 쓸 수는 없었습니다.
-
-그래서 칸을 하나 직접 붙였습니다.
+8월은 방학입니다. 앞으로 다섯 주간 매출도 신규도 활성도 전부 0입니다. 게을러서가 아니라 학기가 없어서 0입니다. 그래서 칸을 하나 직접 붙였습니다.
 
 그 주에 실제로 성사된 교수님과의 대화 수.
 
 결과 안내 메일에도 이런 문장이 있었습니다. "내일부터는 다시 눈앞의 고객 한 명을 만나는 일로 돌아가시길 바랍니다."
 
-왜 20팀에 못 들어갔는지는 여기서 진단하지 않겠습니다. 아직 진행 중이고, 저 혼자 결론 낼 몫도 아닙니다. 대신 6개월 뒤에는 슬라이드 말고 성장 그래프를 들고 가려고 합니다.
-
-이번 여름에 늘릴 숫자는 하나입니다. 대화.
+이번 여름에 저희가 늘릴 숫자는 그것 하나입니다.
 
 시험이나 과제를 채점하시면서 학기마다 똑같은 지점에서 막히는 게 있으시다면, 30분만 내주실 수 있을까요. 제품 설명은 안 합니다. 대신 저희가 세 학교에서 본 것들은 그대로 말씀드리겠습니다. 학생들이 시험 중에 AI와 실제로 어떤 대화를 하는지, 교수님들이 채점하다가 어디서 손을 대시는지요.
 
-댓글이나 메시지 주시면 제가 찾아뵙겠습니다.
+영문 버전은 첫 댓글에 남겨두겠습니다.
 
 #에듀테크 #스타트업 #AI평가
 
-> 약 1,850자. **기승전결:** 기(명단에 없음 → 표가 하나 더) · 승(우리가 만든 것 → 351을 적으려다 멈춤) · 전(351→3, 그리고 "제품 만들기는 쉬워졌다"가 우리 시트를 설명한다) · 결(만드는 팀 → 듣는 팀 / 대화 / 성장 그래프).
-> **CTA 변경 근거:** §7-0에서 이 세그먼트 도달 천장이 100 반응 언저리로 실측됐다. 그러면 승부는 노출이 아니라 **읽은 사람당 전환**이다. 그래서 "30분 주세요"에서 끝내지 않고 **우리가 돌려줄 것(3개 대학에서 관측한 두 가지)** 을 명시했다. 요청만 있는 CTA보다 교환이 있는 CTA가 전환된다.
-
 ---
 
-## 2. 회사 페이지 (한국어) — v4
+## 2. 첫 댓글 (영문) — **게시 후 30초 이내, 본인이 직접** (v5)
 
-지난주 KPI 시트에 저희가 정직하게 적은 숫자는 0, 0, 3, 0이었습니다.
-
-가입한 학생은 351명입니다. 그런데 그 숫자를 적으려다 멈췄습니다.
-
-받은 양식은 다섯 칸이었습니다. 매출, 신규회원, 총회원, WAU, 재방문율. 조건은 한 줄이었습니다. "너무 많이 넣지 마세요."
-
-351을 적으면 시트가 예뻐집니다. 문제는 그 351이 만들어진 방식이었습니다. 교수님 한 분이 시험 코드를 공지하면 그날 그 수업 학생 전원이 가입합니다. 351은 수요의 크기가 아니라 강의 정원의 합계였습니다.
-
-저희에게 돈을 내는 쪽은 학생이 아니라 교수님입니다. 회원의 정의를 교수로 바꿨습니다.
-
-총회원은 3이 됐습니다.
-
-3은 작습니다. 대신 3은 진짜입니다. 그 세 분 중 다음 학기에도 돈을 내고 다시 시험을 여신 분이 한 분, 동료 교수님을 소개해 주신 분이 한 분입니다. 둘 다 광고가 만든 게 아닙니다.
-
-저희가 반년 동안 자랑한 숫자는 전부 만드는 쪽의 것이었습니다. 배포한 대학 수, 치러진 시험 수, 쌓인 응시 수. 지난 반년 회의 안건의 절반 이상도 이미 쓰고 계신 교수님들의 그날 문제를 처리하는 데 쓰였습니다. 만드느라 듣지 못했습니다.
-
-8월은 방학입니다. 매출도 신규도 활성도 앞으로 5주간 구조적으로 0입니다. 시트가 다섯 주 내내 0으로 채워질 예정이었습니다.
-
-그래서 여섯 번째 칸을 직접 추가했습니다. **그 주에 실제로 성사된 교수님과의 대화 수.**
-
-이번 학기 목표도 한 문장으로 바꿨습니다. 가을에 돈 내고 다시 시험을 연 교수님이 몇 분인가.
-
-시험이나 과제 평가에서 학기마다 똑같이 반복되는 문제가 있으시다면, 30분만 내주실 수 있을까요. 제품 이야기는 안 합니다. 대신 저희가 세 학교에서 관측한 것 — 학생들이 시험 중 AI와 나눈 대화의 패턴, 교수님들이 채점을 수정하시는 지점 — 은 그대로 공유해 드리겠습니다.
-
-여러분 팀의 시트에서, 예쁘지만 아무것도 말해주지 않는 칸은 어떤 칸인가요?
-
-#에듀테크 #AI평가 #AssessmentTech
-
-> 약 1,050자. 회사 채널은 선발 결과를 다루지 않는다 — 개인 글이 서사를 지고, 회사 글은 이전 가능한 인사이트(지표 재정의)만 진다.
-
----
-
-## 3. 회사 페이지 (영문) — v4, **번역이 아니라 독립 작성**
-
-> §7-0에서 한국어 B2B에는 바이럴 층이 없다는 게 실측됐다. **반응 5,000+ 층이 실재하는 쪽은 영문이다.** 그래서 영문판은 한국어 본문의 번역을 버리고, 영어권 훅 관습(짧은 문장·역설적 첫 줄·숫자 선행)으로 다시 썼다.
+> **한도 1,250자.** v4 영문판(1,940자)은 댓글에서 잘리므로 폐기하고 압축 재작성했다. 직전 발행본(2026-07-22) 영문 첫 댓글이 1,205자였으니 같은 밴드다. 링크는 넣지 않는다(§5-9).
 
 We have 351 users. Last week we deleted that number from our own investor report.
 
-The number that replaced it was 3.
+Our KPI template had five columns and one instruction: "don't add too many."
 
-Our investor sent a weekly KPI template. Five columns: revenue, new members, total members, WAU, repeat rate. One instruction sat above them — "don't add too many."
-
-351 would have looked good in the total members column. The problem was how the 351 happens. One instructor announces an exam code, and every student in that course signs up the same afternoon. That number is not demand. It is the sum of class rosters.
+351 would have looked good under total members. But one instructor announces an exam code, and every student in that course signs up the same afternoon. That number isn't demand. It's the sum of class rosters.
 
 Students use Quest-On. Instructors pay for it. So we redefined "member" as instructors.
 
 Three.
 
-Three is small. Three is also real. One of those three has paid to run us again in a following term. One introduced a colleague. Neither came from advertising.
+Three is small. Three is also real: one has paid to run us again in a following term, one introduced a colleague. Neither came from ads.
 
-Then we looked at the rest of the sheet. August is the semester break here, so revenue, new signups and weekly active instructors are all structurally zero for five straight weeks. We were about to file five identical rows of nothing.
+Every number we were proud of was a building number — universities deployed to, exams delivered, attempts logged. Meanwhile half of our team meetings for six months was same-day support for existing users. We were building, not listening.
 
-Every number we had been proud of was a building number: universities deployed to, exams delivered, attempts logged. Meanwhile, more than half the agenda across six months of team meetings was same-day support for instructors already using us. We were building. We were not listening.
+August is our semester break, so the next five weeks are structurally zero. So we added a sixth column: conversations with instructors that actually happened that week.
 
-So we added a sixth column ourselves.
+If grading breaks in the same place for you every term, would you give us 30 minutes? We won't pitch. We'll trade — you tell us where it breaks, and we'll tell you what we saw across three universities.
 
-**Conversations with instructors that actually happened that week.**
+---
 
-It is the only number we can move this summer, and it is the one we neglected most.
+## 3. 개인 계정 리포스트 코멘터리 (영준, 1인칭) — **회사 글을 「생각과 함께 리포스트」** (v5)
 
-If grading or assessment breaks in the same place for you every single term, would you give us 30 minutes? We won't pitch. We'll trade: you tell us where it breaks, and we'll tell you what we saw across three universities — how students actually talk to an AI mid-exam, and where instructors reach in and override the score.
+> **원문 반복 금지가 이 형식의 1번 규칙이다.** 리서치상 「repost with thoughts」는 원문을 되풀이하면 3배 언더퍼폼하고, 100자 이상 + 개인적일 때만 산다. 그래서 회사 본문에 있는 숫자·인용을 하나도 다시 쓰지 않고, **영준만 쓸 수 있는 1인칭 장면**으로만 채웠다.
 
-Which column on your dashboard looks good and tells you nothing?
+제가 그날 실제로 한 일은 엑셀 칸 하나를 고친 것뿐이었습니다.
 
-#EdTech #AssessmentTech #StartupMetrics
+숫자를 지우고 다시 적는 데는 십몇 초가 걸렸고, 그 앞에서 망설인 시간이 삼십 분쯤 됩니다. 반년 동안 어디 가서든 제일 먼저 꺼내던 숫자였으니까요.
 
-> 독립 발행 자산이다(플레이북 §-1.3 — LinkedIn은 AI 답변 인용 2위 도메인이고, 인용은 바이럴이 아니라 일관성·원본성에 붙는다). 첫 댓글용이면 절반으로 줄이고 링크는 넣지 않는다.
+그런데 지우고 나니까 이상하게 마음이 편했습니다. 시트는 못생겨졌는데, 다음에 뭘 해야 하는지가 처음으로 분명해졌거든요.
+
+만드는 일은 저희가 그래도 좀 합니다. 듣는 일은 지난 반년 동안 거의 안 했습니다. 이번 여름은 그것만 하려고 합니다.
+
+대학에서 평가나 채점 쪽 일을 하고 계시거나, 그런 분을 알고 계시면 연결해 주세요. 제가 찾아뵙겠습니다.
 
 ---
 
 ## 4. 첨부 이미지 — 셀렉과 크롭
 
-**개인 글 = 캐러셀 6장.** 앞 3장이 제공 캡처, 뒤 3장이 신규 제작. 근거: 문서 캐러셀 6.6% > 단일 이미지 4.85% > 텍스트 4%.
+**회사 본문(=오리지널)에 캐러셀로 첨부한다.** 1~3번은 **제작 완료**(assets/2026-08-12/, 1080x1350 4:5 통일), 4~6번은 미제작. 근거: 문서 캐러셀 6.6% > 단일 이미지 4.85% > 텍스트 4%.
 
 | # | 소스 | 크롭 | 역할 |
 |---|---|---|---|
@@ -243,7 +194,7 @@ Which column on your dashboard looks good and tells you nothing?
 - 4~6번에 **원본 파일명·발신자·투자 조건·멘토링 운영 세부 금지.** 열 이름과 제약 문구만 재구성하고 `열 구조 재구성, 값은 2026-08-03 주차 실측` 표기.
 - 교수 실명·소속·학생 데이터·시험 코드 0건. 전 슬라이드 대체 텍스트 필수(360Brew가 읽는다).
 
-**회사 KR/EN은 4~6번 3장만 재사용.** 1~3번은 개인 글 전용(§2 분업).
+**첨부는 회사 본문 한 곳에만 붙는다.** 영문은 첫 댓글이라 이미지가 안 붙고, 개인 계정은 리포스트라 원 게시물의 캐러셀을 그대로 물고 간다. 즉 1~3번 3장이 세 표면 전체를 커버한다.
 
 캐러셀이 늦으면 **발행을 미루지 말고** 2번 크롭 한 장만 단일 이미지로. 그 한 장이 훅을 그대로 증명한다.
 
@@ -251,16 +202,20 @@ Which column on your dashboard looks good and tells you nothing?
 
 ## 5. 발행 운영
 
-1. **D-1 (8/11 화):** 모바일 세로 미리보기. 이미지 첨부 상태에서 첫 3줄이 `더 보기` 전에 자기완결되는지. 본문 링크 0개.
-2. **프로필 앵커: 이상 없음(2026-08-09 로그인 실측으로 정정).** 헤드라인이 이미 `AI Product Engineer | cigro | Co-Founder, Quest-On`이라 이 글의 주제와 정합한다. v2에서 「구직 신호라 도달이 깎인다」고 쓴 것은 **철 지난 검색 스니펫에 근거한 오판이었고 철회한다.** 조치 불필요.
-3. **발행 8/12(수) 10~11시 KST**, 영준 개인 오리지널.
-4. **0~4시간 상주.** 골든 윈도우는 60분이 아니라 1~4시간, 평가창 3~8시간. 늦게 붙은 댓글도 유효.
-5. **답글 30분 이내, 30~80단어.** 30분 내 답 시 총 댓글 +64%, 조회 2.3배.
-6. **팀원 시딩은 시간을 흩뜨린다.** 일괄 좋아요·댓글 요청은 포드 감가. 각자 **실제 겪은 장면 1개**.
-7. **리포스트는 4시간 안에 생각 없이.** 직원 리포스트는 외부인 대비 -30%라 주력으로 계산하지 않는다.
-8. 회사 KR = **8/13(목)**, 영문 = 8/14(금) 또는 다음 주 화. 같은 날 중복 금지.
-9. 링크는 본문·첫 댓글 어디에도 없음. 데모는 **프로필 Featured** 상시.
-10. 24시간 내 재게시 금지. 이후 주 3~4회 복구.
+**발행 형식(확정):** 회사 페이지 한국어 본문이 **오리지널**이고, 영문은 그 글의 **첫 댓글**, 개인 계정은 그 포스트를 **글귀와 함께 리포스트**한다. 세 개를 따로 발행하지 않는다.
+
+1. **D-1 (8/11 화):** 회사 본문을 모바일 세로로 미리보기. 캐러셀 첨부 상태에서 첫 3줄이 `더 보기` 전에 자기완결되는지 확인. 본문 링크 0개 확인. 영문 댓글 글자수 재확인(한도 1,250자).
+2. **프로필 앵커: 이상 없음** — 2026-08-09 로그인 실측으로 확인됨(§5-2 아래 주). 조치 불필요.
+3. **T+0 (8/12 수 10~11시 KST): 회사 페이지에 한국어 본문 + 캐러셀 3장 발행.**
+4. **T+30초 이내: 영문을 첫 댓글로 본인이 직접 단다.** 링크는 넣지 않는다. 초기 분배 윈도우 안에 들어가야 한다.
+5. **T+5~30분: 영준 개인 계정에서 「생각과 함께 리포스트」.** 코멘터리는 §3을 쓴다. **원문 내용을 절대 반복하지 않는다** — 되풀이하면 3배 언더퍼폼한다.
+6. **T+0~4시간 상주.** 골든 윈도우는 60분이 아니라 1~4시간이고 평가창은 3~8시간이다. 늦게 붙은 댓글도 유효하다.
+7. **답글은 30분 이내, 30~80단어.** 30분 내 답 시 총 댓글 +64%, 조회 2.3배.
+8. **팀원 시딩은 시간을 흩뜨린다.** 일괄 좋아요·댓글 요청은 포드 감가 대상이다. 각자 **실제 겪은 장면 1개**를 다른 시간대에.
+9. 링크는 본문·댓글 어디에도 없다. 데모는 **프로필 Featured** 상시.
+10. 24시간 내 재게시 금지. 이후 주 3~4회 리듬 복구.
+
+⚠️ **이 형식이 감수하는 것(알고는 있어야 한다).** 2026 실측에서 개인 계정 오리지널이 회사 페이지 대비 도달 2.75배·참여 5배이고, 「리포스트 with thoughts」는 「instant repost」 대비 원 게시물 증폭 효과가 크게 떨어진다. 즉 이 순서는 **도달 상단을 일부 포기하는 대신 브랜드 자산을 회사 계정에 쌓는 선택**이다. 영준 지시 형식이므로 그대로 간다. 다음 회차에 「개인 오리지널 → 회사 리포스트」와 A/B 해볼 가치는 있다.
 
 **이 글의 KPI는 좋아요가 아니라 여섯 번째 칸이다.** 댓글·DM 대화 요청을 전부 그 주 시트 `디스커버리 콜`에 기입한다. 임프레션·좋아요는 KPI에서 명시적으로 제외돼 있다.
 
