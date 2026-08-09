@@ -8,45 +8,50 @@ name: Deploy
 #   배포가 조용히 멈춘다. 실제로 그 상태였다. 배포 주체를 사람에서 CI 로 옮겼다.
 #
 # 왜 `--prebuilt` 를 쓰지 않는가:
-#   `vercel build` 로 CI 에서 빌드하면 커밋당 빌드가 1회로 줄지만, 그러려면
-#   `vercel pull` 로 **프로덕션 환경변수 전량을 GitHub 러너에 내려받아야 한다**.
-#   DATABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY, QSTASH_TOKEN 이
-#   배포마다 러너 디스크에 떨어진다는 뜻이다. 학생 PII 를 다루는 서비스에서
-#   빌드 1~2분 아끼자고 감수할 거래가 아니다.
+#   `vercel build` 로 CI 에서 빌드하려면 `vercel pull` 로 **프로덕션 환경변수 전량을
+#   GitHub 러너에 내려받아야 한다**. DATABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+#   OPENAI_API_KEY, QSTASH_TOKEN 이 배포마다 러너 디스크에 떨어진다는 뜻이다.
 #   빌드는 Vercel 에서 수행하고, 프로덕션 시크릿은 Vercel 밖으로 나가지 않는다.
-#   코드 자체의 빌드 가능 여부는 CI 의 `Build` job 이 더미 값으로 이미 검증한다.
+#   코드의 빌드 가능 여부는 CI 의 `Build` job 이 더미 값으로 이미 검증한다.
+#
+# 왜 `--scope` 를 매번 넘기는가:
+#   VERCEL_ORG_ID 를 줘도 CLI 는 토큰의 기본 계정 컨텍스트로 붙는다. 팀 스코프 토큰이라도
+#   --scope 없이는 개인 계정으로 해석되어 "You don't have permission to create a
+#   Production Deployment" 로 실패한다. 실제로 이 함정을 밟았다.
 #
 # 필요한 설정:
 #   - secret  VERCEL_TOKEN       Vercel → Settings → Tokens (스코프: Quest-On 팀)
-#   - var     VERCEL_ORG_ID      팀 ID
-#   - var     VERCEL_PROJECT_ID  프로젝트 ID
+#   - var     VERCEL_ORG_ID / VERCEL_PROJECT_ID / VERCEL_TEAM_SLUG
 
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
     branches: [main]
-  # 수동 재배포 / 롤백 후 재시도용
   workflow_dispatch:
+    inputs:
+      target:
+        description: "배포 대상 (자격증명 점검은 preview 로)"
+        type: choice
+        options: [preview, production]
+        default: preview
 
-# 배포는 겹치면 안 된다. 앞선 배포를 취소하지 않고 순서대로 흘린다.
 concurrency:
-  group: deploy-production
+  group: deploy-${{ github.event.inputs.target || 'production' }}
   cancel-in-progress: false
 
 jobs:
-  production:
-    name: Deploy Production
+  deploy:
+    name: Deploy
     runs-on: ubuntu-latest
     # CI 가 초록일 때만 배포한다. main 에 들어왔다는 사실만으로는 배포하지 않는다.
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
-    environment:
-      name: production
-      url: https://quest-on.app
     env:
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      SCOPE: ${{ vars.VERCEL_TEAM_SLUG }}
+      TARGET: ${{ github.event.inputs.target || 'production' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,24 +64,27 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel@57.0.0 # 핀 고정(재현성; DEPENDENCY_POLICY 준수)
       - name: Verify token identity
-        # 배포가 실패했을 때 "토큰 문제인지 코드 문제인지"를 로그만 보고 가리기 위한 단계.
+        # 배포 실패 시 "토큰 문제인지 코드 문제인지"를 로그만 보고 가리기 위한 단계.
         # 계정/팀 이름만 찍히고 토큰 값은 노출되지 않는다.
         run: |
-          echo "인증 주체: $(vercel whoami --token="$VERCEL_TOKEN")"
-          echo "접근 가능한 팀:"
-          vercel teams ls --token="$VERCEL_TOKEN"
+          echo "인증 주체: $(vercel whoami --scope "$SCOPE" --token="$VERCEL_TOKEN")"
+          echo "배포 대상: $TARGET"
       - name: Deploy
         id: deploy
         run: |
-          url=$(vercel deploy --prod --yes --token="$VERCEL_TOKEN")
+          if [ "$TARGET" = "production" ]; then
+            url=$(vercel deploy --prod --yes --scope "$SCOPE" --token="$VERCEL_TOKEN")
+          else
+            url=$(vercel deploy --yes --scope "$SCOPE" --token="$VERCEL_TOKEN")
+          fi
           echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "배포 완료: $url"
+          echo "배포 완료($TARGET): $url"
       - name: Summary
         run: |
           {
-            echo "### 프로덕션 배포 완료"
+            echo "### 배포 완료 — $TARGET"
             echo ""
             echo "- 커밋: \`${{ github.event.workflow_run.head_sha || github.sha }}\`"
             echo "- 배포 URL: ${{ steps.deploy.outputs.url }}"
-            echo "- 도메인: https://quest-on.app"
+            if [ "$TARGET" = "production" ]; then echo "- 도메인: https://quest-on.app"; fi
           } >> "$GITHUB_STEP_SUMMARY"
