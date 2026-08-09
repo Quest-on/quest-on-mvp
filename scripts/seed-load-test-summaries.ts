@@ -4,7 +4,7 @@
  * 강사용 종합평가 생성 라우트(/api/instructor/generate-summary)와 동일한
  * 시스템 프롬프트 규칙(buildSummaryGenerationSystemPrompt) + user 프롬프트 구성을 그대로 재사용해,
  * 각 더미 학생의 실제 시험 데이터(답안 + 채팅 + 객관식)를 근거로 종합평가를 생성한다.
- * 모델만 경량 gpt-4o-mini 로 바꿔 비용을 낮춘다.
+ * 모델만 경량 gpt-5.6-luna 로 바꿔 비용을 낮춘다.
  *
  * 저장 스키마(리포트 ReportCardTemplate 가 읽는 형태):
  *   { sentiment, summary, strengths[], weaknesses[], keyQuotes[] }
@@ -25,7 +25,7 @@ import { buildSummaryGenerationSystemPrompt } from "../lib/prompts";
 dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
 
 const TAG = "loadtest-";
-const MODEL = process.env.AI_MODEL_SUMMARY_SCRIPT || "gpt-4o-mini";
+const MODEL = process.env.AI_MODEL_SUMMARY_SCRIPT || "gpt-5.6-luna";
 const CONCURRENCY = 4;
 const MAX_RETRY = 2;
 

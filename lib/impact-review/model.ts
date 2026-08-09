@@ -61,7 +61,7 @@ export function selectProviders(): ProviderConfig[] {
             name: "openai",
             apiKey,
             baseURL: env("OPENAI_BASE_URL"),
-            model: env("OPENAI_MODEL") || "gpt-5.3-chat-latest",
+            model: env("OPENAI_MODEL") || "gpt-5.6-luna",
           }
         : null;
     },

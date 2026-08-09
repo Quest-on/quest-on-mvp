@@ -22,7 +22,7 @@ import { buildAssignmentResearchSummarySystemPrompt } from "../lib/prompts";
 
 dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
 
-const MODEL = process.env.AI_MODEL_SUMMARY_SCRIPT || "gpt-4o-mini";
+const MODEL = process.env.AI_MODEL_SUMMARY_SCRIPT || "gpt-5.6-luna";
 const code = process.argv[2];
 if (!code) {
   console.error("사용법: npx tsx scripts/regenerate-assignment-summaries.ts <CODE>");
