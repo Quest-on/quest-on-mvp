@@ -2,24 +2,32 @@ name: Deploy
 
 # Vercel Git 연동 대신 CI 에서 배포한다.
 #
-# 왜 이렇게 하는가:
-#   1. Git 연동 배포는 "커밋한 사람의 Vercel 계정"에 배포 권한이 있어야 한다.
-#      팀원이 늘거나 바뀔 때마다 seat($20/월/인)를 사야 하고, 권한이 없는 사람이
-#      커밋하면 배포가 조용히 멈춘다. 실제로 그 상태였다.
-#   2. CI 가 이미 next build 를 돌린다. Vercel 이 또 빌드하면 커밋당 빌드가 2회다.
-#      `vercel build` + `vercel deploy --prebuilt` 로 빌드를 1회로 줄인다.
-#      https://vercel.com/kb/guide/how-can-i-use-github-actions-with-vercel
+# 왜 Git 연동을 안 쓰는가:
+#   Git 연동 배포는 "커밋한 사람의 Vercel 계정"에 배포 권한이 있어야 한다.
+#   팀원이 늘거나 바뀔 때마다 seat($20/월/인)를 사야 하고, 권한 없는 사람이 커밋하면
+#   배포가 조용히 멈춘다. 실제로 그 상태였다. 배포 주체를 사람에서 CI 로 옮겼다.
+#
+# 왜 `--prebuilt` 를 쓰지 않는가:
+#   `vercel build` 로 CI 에서 빌드하면 커밋당 빌드가 1회로 줄지만, 그러려면
+#   `vercel pull` 로 **프로덕션 환경변수 전량을 GitHub 러너에 내려받아야 한다**.
+#   DATABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY, QSTASH_TOKEN 이
+#   배포마다 러너 디스크에 떨어진다는 뜻이다. 학생 PII 를 다루는 서비스에서
+#   빌드 1~2분 아끼자고 감수할 거래가 아니다.
+#   빌드는 Vercel 에서 수행하고, 프로덕션 시크릿은 Vercel 밖으로 나가지 않는다.
+#   코드 자체의 빌드 가능 여부는 CI 의 `Build` job 이 더미 값으로 이미 검증한다.
 #
 # 필요한 설정:
-#   - secret  VERCEL_TOKEN       Vercel → Account Settings → Tokens 에서 발급
-#   - var     VERCEL_ORG_ID      팀 ID  (등록 완료)
-#   - var     VERCEL_PROJECT_ID  프로젝트 ID (등록 완료)
+#   - secret  VERCEL_TOKEN       Vercel → Settings → Tokens (스코프: Quest-On 팀)
+#   - var     VERCEL_ORG_ID      팀 ID
+#   - var     VERCEL_PROJECT_ID  프로젝트 ID
 
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
     branches: [main]
+  # 수동 재배포 / 롤백 후 재시도용
+  workflow_dispatch:
 
 # 배포는 겹치면 안 된다. 앞선 배포를 취소하지 않고 순서대로 흘린다.
 concurrency:
@@ -31,7 +39,7 @@ jobs:
     name: Deploy Production
     runs-on: ubuntu-latest
     # CI 가 초록일 때만 배포한다. main 에 들어왔다는 사실만으로는 배포하지 않는다.
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     environment:
       name: production
       url: https://quest-on.app
@@ -44,23 +52,23 @@ jobs:
         with:
           # workflow_run 은 기본적으로 기본 브랜치 최신을 체크아웃한다.
           # CI 가 검증한 바로 그 커밋을 배포해야 한다.
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
       - uses: actions/setup-node@v4
         with:
-          # Vercel 프로젝트 설정(Node.js 22.x)과 맞춘다. 다르면 CI 빌드 산출물이
-          # 실제 런타임과 다른 Node 로 만들어진다.
           node-version: 22
-          cache: npm
       - name: Install Vercel CLI
         run: npm install -g vercel@57.0.0 # 핀 고정(재현성; DEPENDENCY_POLICY 준수)
-      - name: Pull Vercel project settings
-        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-      - name: Build
-        run: vercel build --prod --token="$VERCEL_TOKEN"
-      - name: Deploy prebuilt output
+      - name: Verify token identity
+        # 배포가 실패했을 때 "토큰 문제인지 코드 문제인지"를 로그만 보고 가리기 위한 단계.
+        # 계정/팀 이름만 찍히고 토큰 값은 노출되지 않는다.
+        run: |
+          echo "인증 주체: $(vercel whoami --token="$VERCEL_TOKEN")"
+          echo "접근 가능한 팀:"
+          vercel teams ls --token="$VERCEL_TOKEN"
+      - name: Deploy
         id: deploy
         run: |
-          url=$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          url=$(vercel deploy --prod --yes --token="$VERCEL_TOKEN")
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "배포 완료: $url"
       - name: Summary
@@ -68,7 +76,7 @@ jobs:
           {
             echo "### 프로덕션 배포 완료"
             echo ""
-            echo "- 커밋: \`${{ github.event.workflow_run.head_sha }}\`"
+            echo "- 커밋: \`${{ github.event.workflow_run.head_sha || github.sha }}\`"
             echo "- 배포 URL: ${{ steps.deploy.outputs.url }}"
             echo "- 도메인: https://quest-on.app"
           } >> "$GITHUB_STEP_SUMMARY"
