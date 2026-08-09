@@ -22,6 +22,10 @@ concurrency:
 jobs:
   impact-review:
     runs-on: ubuntu-latest
+    # 외부 AI 제공자(GLM Coding Plan)를 호출하는 단계가 있어 응답이 늘어질 수 있다.
+    # GitHub 기본 job 타임아웃은 6시간이라 상한이 없으면 한 번 멈출 때 그만큼 머지가 막힌다.
+    # 관측된 정상 범위는 4~9분이므로 여유를 두고 15분에서 끊는다.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
