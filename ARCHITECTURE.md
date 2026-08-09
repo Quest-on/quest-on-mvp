@@ -8,7 +8,9 @@ Quest-On is an AI-powered exam and assignment platform where instructors create 
 
 **Core Flow:** Instructor creates exam → uploads materials → AI generates questions → Students join via code → AI tutors during exam → Students submit → MCQ/OX auto-graded → Instructor grades case questions via AI chat → adjusts scores
 
-**Stack:** Next.js 16 (App Router) | React 19 | TypeScript 5 | Tailwind 4 | Prisma ORM | Supabase PostgreSQL + pgvector | Clerk Auth | OpenAI API | Upstash Redis | Vercel (iad1)
+**Stack:** Next.js 16 (App Router) | React 19 | TypeScript 5 | Tailwind 4 | Supabase Auth | Supabase PostgreSQL + pgvector | OpenAI API | Upstash Redis | Vercel (iad1)
+
+> 런타임 DB 접근은 `getSupabaseServer()` 하나뿐이다. **Prisma 는 런타임에 쓰지 않는다** — `prisma/schema.prisma` 는 introspection 결과이고, DDL 의 원천은 `database/[NNN]_*.sql` 이다.
 
 ---
 
@@ -24,17 +26,17 @@ Quest-On is an AI-powered exam and assignment platform where instructors create 
 ┌─────────────────────────────────────────────────────────────┐
 │                    NEXT.JS APP ROUTER                        │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────┐  │
-│  │ 29 Pages │  │ 44 API   │  │ Server   │  │ Middleware  │  │
-│  │ (SSR/CSR)│  │ Routes   │  │ Actions  │  │ (Clerk)    │  │
+│  │ 32 Pages │  │ 69 API   │  │ Server   │  │ 인증은 라우트│  │
+│  │ (SSR/CSR)│  │ Routes   │  │ Actions  │  │ 핸들러에서  │  │
 │  └──────────┘  └──────────┘  └──────────┘  └────────────┘  │
 └───┬──────────────┬──────────────┬──────────────┬────────────┘
     │              │              │              │
     ▼              ▼              ▼              ▼
 ┌────────┐  ┌──────────┐  ┌──────────┐  ┌────────────────┐
-│ Clerk  │  │ Supabase │  │ OpenAI   │  │ Upstash Redis  │
+│Supabase│  │ Supabase │  │ OpenAI   │  │ Upstash Redis  │
 │ Auth   │  │ Postgres │  │ API      │  │ Rate Limiting  │
-│        │  │ + Storage│  │ gpt-5.3  │  │                │
-│        │  │ + Vector │  │ gpt-5.4  │  │                │
+│        │  │ + Storage│  │ gpt-5.6  │  │                │
+│        │  │ + Vector │  │ 계열     │  │                │
 └────────┘  └──────────┘  └──────────┘  └────────────────┘
 ```
 
@@ -44,7 +46,7 @@ Quest-On is an AI-powered exam and assignment platform where instructors create 
 
 | Service | Purpose | Auth Mechanism | Env Vars |
 |---------|---------|---------------|----------|
-| **Clerk** | User auth (OAuth/passwordless), role management | Publishable + Secret key | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` |
+| **Supabase Auth** | User auth (OAuth/email), session cookies, role metadata | Anon key (client) + Service role key (server) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` |
 | **Supabase** | PostgreSQL database, file storage, realtime subscriptions, pgvector | Anon key (client) + Service role key (server) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL` |
 | **OpenAI** | Chat tutoring, objective auto-grading, case grading chat, question generation, summarization | API key | `OPENAI_API_KEY` |
 | **Upstash Redis** | Distributed rate limiting across serverless instances | REST URL + Token | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` |
@@ -54,7 +56,7 @@ Quest-On is an AI-powered exam and assignment platform where instructors create 
 
 ## 4. Authentication & Authorization
 
-**Provider:** Clerk (OAuth, passwordless, social login)
+**Provider:** Supabase Auth (OAuth + email). Clerk 은 제거됐다 — `@clerk/*` 의존성은 `package.json` 에 없다. 마이그레이션 흔적은 `scripts/migrate-clerk-users.ts` 뿐이다.
 
 **Roles:**
 - **Student** — take exams, chat with AI tutor, view reports
@@ -62,9 +64,9 @@ Quest-On is an AI-powered exam and assignment platform where instructors create 
 - **Admin** — separate JWT-based auth (`lib/admin-auth.ts`), system logs, AI usage analytics
 
 **Auth Flow:**
-1. Clerk handles sign-in/sign-up at `/(auth)/sign-in`, `/(auth)/sign-up`
-2. New users → `/onboarding` to select role (stored in `user.unsafeMetadata.role`)
-3. Role-based redirects via `lib/get-current-user.ts`
+1. Supabase Auth 가 `/(auth)/sign-in`, `/(auth)/sign-up` 에서 로그인/가입을 처리하고, OAuth 는 `/auth/callback` 으로 돌아온다
+2. 신규 사용자 → `/onboarding` 에서 역할 선택. **라우팅 권위는 `profiles.role`** 이다 (`lib/supabase-auth.ts`). auth `user_metadata.role` 은 가입 시점 힌트이며 권위가 아니다 (`lib/onboarding-role.ts`)
+3. 역할 기반 리다이렉트는 `lib/get-current-user.ts` (→ `lib/supabase-auth.ts` 의 `currentUser()` 재수출)
 4. API routes call `currentUser()` → returns null if unauthenticated
 5. Instructor layout enforces role check in `app/(app)/instructor/layout.tsx`
 
@@ -88,14 +90,15 @@ Defined in `lib/rate-limit.ts`. Uses Upstash Redis (distributed) with in-memory 
 
 ---
 
-## 6. Page Routes (29)
+## 6. Page Routes (32)
 
 ### Public / Auth
 | Route | Purpose |
 |-------|---------|
 | `/` | Landing page / role-based redirect |
-| `/(auth)/sign-in` | Clerk sign-in |
-| `/(auth)/sign-up` | Clerk sign-up |
+| `/(auth)/sign-in` | 로그인 |
+| `/(auth)/sign-up` | 가입 |
+| `/auth/callback` | OAuth 콜백 |
 | `/legal/privacy` | Privacy policy |
 | `/legal/terms` | Terms of service |
 | `/legal/security` | Security policy |
@@ -141,7 +144,7 @@ Defined in `lib/rate-limit.ts`. Uses Upstash Redis (distributed) with in-memory 
 
 ---
 
-## 7. API Routes (44)
+## 7. API Routes (69)
 
 ### AI / Generation
 | Method | Route | Purpose | Timeout |
@@ -215,7 +218,7 @@ Defined in `lib/rate-limit.ts`. Uses Upstash Redis (distributed) with in-memory 
 | Method | Route | Purpose |
 |--------|-------|---------|
 | POST | `/api/supa` | Multi-handler (exam, drive, session, submission, assignment) |
-| POST | `/api/auth/revoke-other-sessions` | Revoke other Clerk sessions |
+| POST | `/api/auth/revoke-other-sessions` | 현재 세션을 제외한 나머지 Supabase 세션 폐기 |
 | POST | `/api/log/paste` | Paste detection logging |
 | GET | `/api/universities/search` | University search |
 | GET | `/api/health` | Health check |
@@ -240,7 +243,7 @@ exam_nodes ──┐
              │      │
              │      └──────────▶ ai_events (also links to exams)
              │
-student_profiles (linked via Clerk user ID)
+student_profiles (Supabase auth user id 로 연결)
 questions (legacy — data now in exams.questions JSON)
 ```
 
@@ -255,7 +258,7 @@ questions (legacy — data now in exams.questions JSON)
 | **grades** | id, session_id, q_idx, score, comment, grade_type (auto\|manual), stage_grading (JSON) | [session_id, q_idx] | Rubric-based stage grading |
 | **messages** | id, session_id, q_idx, role, content, response_id, message_type, tokens_used | — | OpenAI Responses API chaining |
 | **ai_events** | id, provider, model, feature, input/output/cached/reasoning tokens, estimated_cost_usd_micros, latency_ms | — | Full AI cost/performance tracking |
-| **student_profiles** | id, student_id, name, student_number, school | student_id | Linked to Clerk user ID |
+| **student_profiles** | id, student_id, name, student_number, school | student_id | Supabase auth user id 로 연결 |
 | **questions** | id, exam_id, idx, type, prompt, ai_context | — | Legacy — questions now stored as JSON in exams table |
 | **exam_material_chunks** | id, exam_id, file_url, content, embedding (vector 1536) | — | RAG: pgvector embeddings for material search |
 
@@ -301,7 +304,7 @@ User Input → Sanitize → Rate Limit Check → Auth Check → RAG Search (if e
 |---|---------|----------|--------|
 | M1 | **CORS fallback includes localhost** in production | `lib/cors.ts:14-20` | If `ALLOWED_ORIGINS` unset, localhost accepted in prod |
 | M2 | **No CSRF protection** on POST/PUT/PATCH/DELETE endpoints | All state-changing API routes | Relies solely on SameSite cookies; forms vulnerable |
-| M3 | **CSP allows `unsafe-inline`** for scripts | `next.config.ts` CSP header | Required by Clerk; XSS attack surface increased |
+| M3 | **CSP allows `unsafe-inline`** for scripts | `next.config.ts` CSP header | XSS attack surface increased. Clerk 제거 후에도 남아 있어 재검토 대상 |
 | M4 | **No Next.js middleware.ts** for edge-level auth | Project root | Auth checks happen in individual route handlers, not at the edge |
 
 ### LOW
