@@ -7,6 +7,7 @@
 - 인증은 Clerk 이 아니라 **Supabase Auth** 다. (`SETUP.md`, `ERROR_RESOLUTION_GUIDE.md`, `STORAGE_RLS_FIX_GUIDE.md`)
 - 페이지 경로가 `app/instructor/...` → `app/(app)/instructor/...` 로 옮겨졌다.
 - AI 모델은 gpt-5.6 계열이다.
+- `mermaid/` 는 Clerk 시절 as-is/to-be 마이그레이션 검토용 도식이다. 현재 구조 도식은 루트 `ARCHITECTURE.md` 안에 Mermaid 로 들어 있다.
 
 루트를 비운 이유는 사람이 아니라 **에이전트** 때문이다. Claude Code / Cursor / Codex 는 루트의 마크다운을 컨텍스트로 끌어간다. 틀린 문서가 루트에 있으면 모든 도구가 같이 틀린다.
 

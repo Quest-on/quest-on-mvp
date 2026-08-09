@@ -1,375 +1,440 @@
-# Quest-On System Architecture
+# Quest-On 아키텍처
 
-> Last audited: 2026-03-25
+AI 기반 시험/과제 플랫폼. 교수자가 출제 → 학생이 AI 대화로 응시 → AI 채점 → 교수자 검수.
 
-## 1. System Overview
+## 이 문서를 읽는 법
 
-Quest-On is an AI-powered exam and assignment platform where instructors create assessments, students take them with AI tutoring support, and instructors grade case questions with AI-assisted chat after submission.
+**코드가 SSOT다.** 이 문서와 코드가 어긋나면 코드가 맞다. 여기 있는 그림은 "어디를 읽어야 하는지" 를 가리키는 지도이지 계약이 아니다.
 
-**Core Flow:** Instructor creates exam → uploads materials → AI generates questions → Students join via code → AI tutors during exam → Students submit → MCQ/OX auto-graded → Instructor grades case questions via AI chat → adjusts scores
+구조는 [C4 model](https://c4model.com/) 을 따른다 — 시스템 컨텍스트 → 컨테이너 → 컴포넌트 순으로 줌인하고, 흐름은 별도의 동적 다이어그램으로 뺀다. 다이어그램은 Mermaid 로 쓴다. 코드 옆에 텍스트로 남아 diff 가 보이고 GitHub 이 그대로 렌더한다. 이미지 파일로 만들면 즉시 썩는다.
 
-**Stack:** Next.js 16 (App Router) | React 19 | TypeScript 5 | Tailwind 4 | Supabase Auth | Supabase PostgreSQL + pgvector | OpenAI API | Upstash Redis | Vercel (iad1)
+**산문보다 그림을 먼저 고친다.** 표를 늘려서 문서를 유지하려 하지 말 것. 라우트·모델을 일일이 나열하는 표는 반드시 썩으므로, 개수와 그룹만 적고 정확한 목록은 명령으로 뽑는다.
 
-> 런타임 DB 접근은 `getSupabaseServer()` 하나뿐이다. **Prisma 는 런타임에 쓰지 않는다** — `prisma/schema.prisma` 는 introspection 결과이고, DDL 의 원천은 `database/[NNN]_*.sql` 이다.
-
----
-
-## 2. Architecture Diagram
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        CLIENTS                               │
-│  Instructor Dashboard  │  Student Exam UI  │  Admin Panel    │
-└────────────┬────────────────────┬──────────────┬─────────────┘
-             │                    │              │
-             ▼                    ▼              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    NEXT.JS APP ROUTER                        │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────┐  │
-│  │ 32 Pages │  │ 69 API   │  │ Server   │  │ 인증은 라우트│  │
-│  │ (SSR/CSR)│  │ Routes   │  │ Actions  │  │ 핸들러에서  │  │
-│  └──────────┘  └──────────┘  └──────────┘  └────────────┘  │
-└───┬──────────────┬──────────────┬──────────────┬────────────┘
-    │              │              │              │
-    ▼              ▼              ▼              ▼
-┌────────┐  ┌──────────┐  ┌──────────┐  ┌────────────────┐
-│Supabase│  │ Supabase │  │ OpenAI   │  │ Upstash Redis  │
-│ Auth   │  │ Postgres │  │ API      │  │ Rate Limiting  │
-│        │  │ + Storage│  │ gpt-5.6  │  │                │
-│        │  │ + Vector │  │ 계열     │  │                │
-└────────┘  └──────────┘  └──────────┘  └────────────────┘
+```bash
+git ls-files 'app/api/**/route.ts' | sed 's|app/api/||;s|/route.ts||' | sort   # API 라우트
+git ls-files 'app/**/page.tsx'     | sed 's|app/||;s|/page.tsx||'   | sort   # 페이지
 ```
 
 ---
 
-## 3. Third-Party Integrations
+## L1 — 시스템 컨텍스트
 
-| Service | Purpose | Auth Mechanism | Env Vars |
-|---------|---------|---------------|----------|
-| **Supabase Auth** | User auth (OAuth/email), session cookies, role metadata | Anon key (client) + Service role key (server) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` |
-| **Supabase** | PostgreSQL database, file storage, realtime subscriptions, pgvector | Anon key (client) + Service role key (server) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL` |
-| **OpenAI** | Chat tutoring, objective auto-grading, case grading chat, question generation, summarization | API key | `OPENAI_API_KEY` |
-| **Upstash Redis** | Distributed rate limiting across serverless instances | REST URL + Token | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` |
-| **Vercel** | Hosting, serverless functions, analytics | Platform-managed | `VERCEL_URL` |
+누가 이 시스템을 쓰고, 시스템 밖에 무엇이 있는가.
 
----
+```mermaid
+flowchart TB
+    student["학생<br/>시험·과제 응시"]
+    instructor["교수자<br/>출제·검수"]
+    admin["운영자<br/>승인·비용 모니터링"]
 
-## 4. Authentication & Authorization
+    questOn{{"Quest-On<br/>Next.js 16 on Vercel"}}
 
-**Provider:** Supabase Auth (OAuth + email). Clerk 은 제거됐다 — `@clerk/*` 의존성은 `package.json` 에 없다. 마이그레이션 흔적은 `scripts/migrate-clerk-users.ts` 뿐이다.
+    supabase[("Supabase<br/>Postgres · Auth · Storage · pgvector")]
+    openai["OpenAI API<br/>gpt-5.6 계열"]
+    upstash["Upstash<br/>Redis 레이트리밋 · QStash 큐"]
 
-**Roles:**
-- **Student** — take exams, chat with AI tutor, view reports
-- **Instructor** — create/manage exams, upload materials, review grades
-- **Admin** — separate JWT-based auth (`lib/admin-auth.ts`), system logs, AI usage analytics
+    student --> questOn
+    instructor --> questOn
+    admin --> questOn
 
-**Auth Flow:**
-1. Supabase Auth 가 `/(auth)/sign-in`, `/(auth)/sign-up` 에서 로그인/가입을 처리하고, OAuth 는 `/auth/callback` 으로 돌아온다
-2. 신규 사용자 → `/onboarding` 에서 역할 선택. **라우팅 권위는 `profiles.role`** 이다 (`lib/supabase-auth.ts`). auth `user_metadata.role` 은 가입 시점 힌트이며 권위가 아니다 (`lib/onboarding-role.ts`)
-3. 역할 기반 리다이렉트는 `lib/get-current-user.ts` (→ `lib/supabase-auth.ts` 의 `currentUser()` 재수출)
-4. API routes call `currentUser()` → returns null if unauthenticated
-5. Instructor layout enforces role check in `app/(app)/instructor/layout.tsx`
+    questOn --> supabase
+    questOn --> openai
+    questOn --> upstash
 
-**Admin Auth:** Separate system at `/admin/login` using username/password → HMAC-SHA256 signed JWT → httpOnly cookie (24h expiry). Uses timing-safe comparison.
-
-**Test Bypass:** `lib/get-current-user.ts` allows header-based auth bypass when `TEST_BYPASS_SECRET` is set. Hard-blocked in production (`NODE_ENV === "production"` throws).
-
----
-
-## 5. Rate Limiting
-
-Defined in `lib/rate-limit.ts`. Uses Upstash Redis (distributed) with in-memory fallback.
-
-| Endpoint | Limit | Window |
-|----------|-------|--------|
-| Chat (`/api/chat`) | 30 req | 1 min |
-| Admin login (`/api/admin/auth`) | 5 req | 1 min |
-| AI endpoints (`/api/ai/*`) | 20 req | 1 min |
-| Upload (`/api/upload`) | 10 req | 1 min |
-| Submission | 30 req | 1 min |
-
----
-
-## 6. Page Routes (32)
-
-### Public / Auth
-| Route | Purpose |
-|-------|---------|
-| `/` | Landing page / role-based redirect |
-| `/(auth)/sign-in` | 로그인 |
-| `/(auth)/sign-up` | 가입 |
-| `/auth/callback` | OAuth 콜백 |
-| `/legal/privacy` | Privacy policy |
-| `/legal/terms` | Terms of service |
-| `/legal/security` | Security policy |
-| `/legal/cookies` | Cookie policy |
-
-### Student
-| Route | Purpose |
-|-------|---------|
-| `/student` | Student dashboard |
-| `/student/profile-setup` | Student onboarding |
-| `/student/report/[sessionId]` | Session feedback report |
-| `/exam/[code]` | Exam waiting room / join |
-| `/exam/[code]/answer` | Active exam — answer questions |
-| `/assignment/[code]` | Assignment submission |
-| `/profile` | Student profile |
-
-### Instructor
-| Route | Purpose |
-|-------|---------|
-| `/instructor` | Instructor dashboard |
-| `/instructor/new` | Create new exam |
-| `/instructor/[examId]` | Exam detail / monitoring |
-| `/instructor/[examId]/edit` | Edit exam |
-| `/instructor/[examId]/grade/[studentId]` | Grade student |
-| `/instructor/[examId]/grade/[studentId]/re` | Re-grade |
-| `/instructor/assignment/new` | Create assignment |
-| `/instructor/assignment/[assignmentId]` | Assignment detail |
-| `/instructor/assignment/[assignmentId]/grade/[sessionId]` | Grade assignment |
-
-### Admin
-| Route | Purpose |
-|-------|---------|
-| `/admin` | Admin dashboard |
-| `/admin/login` | Admin login |
-| `/admin/logs` | System logs |
-| `/admin/ai-usage` | AI cost/token analytics |
-
-### Other
-| Route | Purpose |
-|-------|---------|
-| `/onboarding` | Role selection (new users) |
-| `/join` | Join exam via code |
-
----
-
-## 7. API Routes (69)
-
-### AI / Generation
-| Method | Route | Purpose | Timeout |
-|--------|-------|---------|---------|
-| POST | `/api/ai/generate-questions` | Generate exam questions from materials | default |
-| POST | `/api/ai/generate-questions-stream` | Streaming question generation | default |
-| POST | `/api/ai/adjust-question` | Adjust question wording | default |
-
-### Chat / Feedback
-| Method | Route | Purpose | Timeout |
-|--------|-------|---------|---------|
-| POST | `/api/chat` | Student AI tutor chat during exam | 60s |
-| POST | `/api/feedback-chat` | Post-exam feedback chat | default |
-| POST | `/api/assignment-chat` | Assignment-specific AI chat | default |
-| POST | `/api/instructor/chat` | Instructor AI assistant | default |
-| POST | `/api/feedback` | Generate session feedback report | 300s |
-
-### Exam Management
-| Method | Route | Purpose | Timeout |
-|--------|-------|---------|---------|
-| POST | `/api/exam/[examId]/start` | Start exam (open for students) | default |
-| POST | `/api/exam/[examId]/end` | End exam | default |
-| POST | `/api/exam/[examId]/late-entry` | Allow late student entry | default |
-| GET | `/api/exam/[examId]/sessions` | Get all student sessions for exam | default |
-| GET | `/api/exam/[examId]/final-grades` | Final grades for exam | default |
-| GET | `/api/exam/[examId]/live-messages` | SSE stream of live messages | default |
-
-### Session / Submission
-| Method | Route | Purpose | Timeout |
-|--------|-------|---------|---------|
-| GET | `/api/session/[sessionId]` | Get session data | default |
-| POST | `/api/session/[sessionId]/preflight` | Preflight checks before exam start | default |
-| PUT | `/api/session/[sessionId]/grade` | Trigger/update grading | default |
-| GET | `/api/session/[sessionId]/live-messages` | Live message stream for session | default |
-
-### Student
-| Method | Route | Purpose |
-|--------|-------|---------|
-| GET | `/api/student/profile` | Get student profile |
-| GET | `/api/student/sessions` | Get student's sessions |
-| GET | `/api/student/sessions/stats` | Session statistics |
-| GET | `/api/student/session/[sessionId]/report` | Session report data |
-
-### File / Materials
-| Method | Route | Purpose | Timeout |
-|--------|-------|---------|---------|
-| POST | `/api/upload` | File upload | 60s |
-| POST | `/api/upload/signed-url` | Generate signed upload URL | 30s |
-| POST | `/api/extract-text` | Extract text from PDF/DOCX | 120s |
-| POST | `/api/embed` | Generate embeddings for materials | 30s |
-| POST | `/api/search-materials` | RAG search exam materials | default |
-| POST | `/api/internal/process-rag` | Full RAG pipeline processing | 300s |
-
-### Admin
-| Method | Route | Purpose |
-|--------|-------|---------|
-| POST | `/api/admin/auth` | Admin login |
-| GET | `/api/admin/logs` | System logs |
-| GET | `/api/admin/users` | List users |
-| PATCH | `/api/admin/users/[userId]` | Update user |
-| GET | `/api/admin/ai-usage/summary` | AI cost summary |
-| GET | `/api/admin/ai-usage/breakdown` | Token/cost breakdown |
-| GET | `/api/admin/ai-usage/events` | Paginated AI event logs |
-
-### Analytics
-| Method | Route | Purpose |
-|--------|-------|---------|
-| GET | `/api/analytics/exam/[examId]/overview` | Exam analytics overview |
-
-### Other
-| Method | Route | Purpose |
-|--------|-------|---------|
-| POST | `/api/supa` | Multi-handler (exam, drive, session, submission, assignment) |
-| POST | `/api/auth/revoke-other-sessions` | 현재 세션을 제외한 나머지 Supabase 세션 폐기 |
-| POST | `/api/log/paste` | Paste detection logging |
-| GET | `/api/universities/search` | University search |
-| GET | `/api/health` | Health check |
-
----
-
-## 8. Database Schema (10 Models)
-
-**Provider:** Supabase PostgreSQL via Prisma ORM | **Extensions:** pgvector (1536-dim embeddings)
-
-### Entity Relationship
-
-```
-exam_nodes ──┐
-             ├──▶ exams ◀── exam_material_chunks (RAG)
-             │      │
-             │      ▼
-             │   sessions ──┬──▶ submissions
-             │      │       ├──▶ grades
-             │      │       ├──▶ messages
-             │      │       └──▶ ai_events
-             │      │
-             │      └──────────▶ ai_events (also links to exams)
-             │
-student_profiles (Supabase auth user id 로 연결)
-questions (legacy — data now in exams.questions JSON)
+    classDef person fill:#e8f0fe,stroke:#4a6fa5,color:#1a2a3a
+    classDef ext fill:#f1f3f4,stroke:#9aa0a6,color:#202124
+    class student,instructor,admin person
+    class supabase,openai,upstash ext
 ```
 
-### Models
-
-| Model | Key Fields | Unique Constraints | Notes |
-|-------|-----------|-------------------|-------|
-| **exams** | id, title, code, status, instructor_id, questions (JSON), type (exam\|assignment), rag_status | code | Gate fields: open_at, close_at, started_at |
-| **exam_nodes** | id, instructor_id, parent_id, kind, name, sort_order, exam_id | — | Self-referential tree (folders/sections), RLS enabled |
-| **sessions** | id, exam_id, student_id, status, device_fingerprint, last_heartbeat_at | [exam_id, student_id] | Status: not_joined → joined → waiting → in_progress → submitted/auto_submitted/locked |
-| **submissions** | id, session_id, q_idx, answer, edit_count, answer_history (JSON) | [session_id, q_idx] | Compression support |
-| **grades** | id, session_id, q_idx, score, comment, grade_type (auto\|manual), stage_grading (JSON) | [session_id, q_idx] | Rubric-based stage grading |
-| **messages** | id, session_id, q_idx, role, content, response_id, message_type, tokens_used | — | OpenAI Responses API chaining |
-| **ai_events** | id, provider, model, feature, input/output/cached/reasoning tokens, estimated_cost_usd_micros, latency_ms | — | Full AI cost/performance tracking |
-| **student_profiles** | id, student_id, name, student_number, school | student_id | Supabase auth user id 로 연결 |
-| **questions** | id, exam_id, idx, type, prompt, ai_context | — | Legacy — questions now stored as JSON in exams table |
-| **exam_material_chunks** | id, exam_id, file_url, content, embedding (vector 1536) | — | RAG: pgvector embeddings for material search |
-
-### Indexes (40+)
-Key performance indexes on: `exams.code`, `exams.instructor_id`, `exams.status`, `sessions.exam_id`, `sessions.student_id`, `sessions.status`, `messages(session_id, q_idx, created_at)`, `ai_events.created_at`, `ai_events.feature`, `ai_events.model`
+| 외부 시스템 | 쓰는 이유 | 없으면 |
+|---|---|---|
+| Supabase | DB, 인증, 파일 스토리지, pgvector 임베딩 | 아무것도 안 됨 |
+| OpenAI | 문항 생성, 응시 중 튜터링, 객관식 자동 채점, 요약 | AI 기능 전부 정지, 응시 자체는 가능 |
+| Upstash Redis | 서버리스 인스턴스 간 공유 레이트리밋 | 인메모리 폴백 — 인스턴스별로 따로 세므로 실효 없음 |
+| Upstash QStash | 채점 잡 큐잉·재시도 | 프로덕션에서 채점 트리거가 `qstash_not_configured` 로 **소리 내며** 실패 (조용히 삼키지 않음) |
 
 ---
 
-## 9. Data Flow: Key Operations
+## L2 — 컨테이너
 
-### Exam Lifecycle
-1. **Create:** Instructor creates exam → `POST /api/supa` (exam handler) → inserts `exams` row
-2. **Upload Materials:** `POST /api/upload/signed-url` → client uploads to Supabase Storage → `POST /api/extract-text` → `POST /api/internal/process-rag` → chunks + embeddings stored in `exam_material_chunks`
-3. **Generate Questions:** `POST /api/ai/generate-questions-stream` → OpenAI → questions stored in `exams.questions` JSON
-4. **Start Exam:** `POST /api/exam/[examId]/start` → sets `started_at`, students transition from waiting → in_progress
-5. **Student Chat:** `POST /api/chat` → RAG search materials → OpenAI chat completion → message stored in `messages`
-6. **Submit:** Student submits → `POST /api/supa` (submission handler) → `submissions` row, session status → submitted
-7. **Auto-Grade (objective only):** Submit triggers QStash `grade_question` for MCQ/OX → deterministic `grades` rows (`grade_type: auto`)
-8. **Case grading:** Instructor opens grade UI → `POST /api/session/[sessionId]/case-grade/chat` → `POST .../case-grade/commit` → `grades` rows (`grade_type: manual`)
-9. **Review:** Instructor dashboard `GET /api/exam/[examId]/student-summaries` shows MCQ/OX/case progress per student
+배포 단위와 그 사이의 통신. 한 그림에 다 넣으면 아무것도 안 보이므로 **동기 요청 경로**와 **비동기 작업 경로**를 나눈다.
 
-### AI Pipeline
+### 동기 — 사용자 요청
+
+```mermaid
+flowchart LR
+    pages["브라우저<br/>App Router 페이지 32개<br/>RSC · TanStack Query"]
+
+    subgraph vercel["Vercel — Next.js 16"]
+        userApi["사용자 API<br/>currentUser 인증"]
+        adminApi["관리자 API<br/>requireAdmin · 별도 JWT"]
+    end
+
+    auth["Supabase Auth"]
+    redis[("Upstash Redis<br/>레이트리밋")]
+    db[("Supabase Postgres")]
+    storage[("Supabase Storage")]
+    oai["OpenAI"]
+
+    pages --> userApi
+    pages --> adminApi
+    pages -. 세션 쿠키 .-> auth
+
+    userApi --> redis
+    userApi --> db
+    userApi --> storage
+    userApi --> oai
+    adminApi --> db
+
+    classDef svc fill:#fff4e5,stroke:#d18b34,color:#3a2a12
+    classDef ext fill:#f1f3f4,stroke:#9aa0a6,color:#202124
+    class userApi,adminApi svc
+    class auth,redis,db,storage,oai ext
 ```
-User Input → Sanitize → Rate Limit Check → Auth Check → RAG Search (if exam)
-→ OpenAI API Call → Track in ai_events → Return Response
+
+### 비동기 — 채점·RAG 작업
+
+```mermaid
+flowchart LR
+    userApi["사용자 API<br/>제출 · 재채점 트리거"]
+    cron["Cron 3종<br/>CRON_SECRET"]
+    qstash["QStash"]
+    worker["QStash 워커<br/>서명 검증"]
+    internal["내부 API<br/>INTERNAL_API_SECRET"]
+    db[("Supabase Postgres")]
+    oai["OpenAI"]
+
+    userApi -- 채점 잡 발행 --> qstash
+    userApi -- RAG 처리 위임 --> internal
+    cron -- 낙오 세션 회수 --> db
+    cron -- 재발행 --> qstash
+    qstash -- 콜백 --> worker
+    worker --> db
+    worker --> oai
+    internal --> db
+    internal --> oai
+
+    classDef svc fill:#fff4e5,stroke:#d18b34,color:#3a2a12
+    classDef ext fill:#f1f3f4,stroke:#9aa0a6,color:#202124
+    class userApi,cron,worker,internal svc
+    class qstash,db,oai ext
 ```
 
----
+**핵심 규칙 — 컨테이너 경계에서 지켜야 하는 것**
 
-## 10. Security Audit Findings
-
-### CRITICAL
-
-| # | Finding | Location | Impact |
-|---|---------|----------|--------|
-| C1 | **`.mcp.json` tracked in git** — exposes Supabase project ref | `.mcp.json` (git-tracked) | Attacker can identify your Supabase instance |
-| C2 | **`ADMIN_SESSION_SECRET` not configured** — admin auth throws on every call | `lib/admin-auth.ts:9-16`, `.env.local` | Admin dashboard completely broken; `getAdminSecret()` throws |
-| C3 | **`INTERNAL_API_SECRET` not configured** — RAG processing rejects all internal calls | `app/api/internal/process-rag/route.ts:10-12` | Material processing pipeline silently fails |
-
-### MEDIUM
-
-| # | Finding | Location | Impact |
-|---|---------|----------|--------|
-| M1 | **CORS fallback includes localhost** in production | `lib/cors.ts:14-20` | If `ALLOWED_ORIGINS` unset, localhost accepted in prod |
-| M2 | **No CSRF protection** on POST/PUT/PATCH/DELETE endpoints | All state-changing API routes | Relies solely on SameSite cookies; forms vulnerable |
-| M3 | **CSP allows `unsafe-inline`** for scripts | `next.config.ts` CSP header | XSS attack surface increased. Clerk 제거 후에도 남아 있어 재검토 대상 |
-| M4 | **No Next.js middleware.ts** for edge-level auth | Project root | Auth checks happen in individual route handlers, not at the edge |
-
-### LOW
-
-| # | Finding | Location | Impact |
-|---|---------|----------|--------|
-| L1 | **Input sanitization inconsistent** — not applied to all endpoints | Various API routes vs `lib/sanitize.ts` | Most endpoints use Zod + sanitize, but some skip it |
-| L2 | **Rate limiting silent fallback** — no warning when Redis unavailable in prod | `lib/rate-limit.ts` | In-memory fallback doesn't work across Vercel instances |
-| L3 | **Single admin account** — no multi-admin or OAuth support | `app/api/admin/auth/route.ts` | Single point of failure for admin access |
-
-### PASSING
-
-| Category | Status | Details |
-|----------|--------|---------|
-| Secrets in git | PASS | `.env*` excluded by `.gitignore`, never committed |
-| API authentication | PASS | All endpoints call `currentUser()` or `requireAdmin()` |
-| Ownership verification | PASS | Session/exam ownership checked before data access |
-| Input validation | PASS | Zod schemas on most endpoints |
-| Security headers | PASS | HSTS (2yr), X-Frame-Options DENY, CSP, Permissions-Policy |
-| Timing-safe auth | PASS | `crypto.timingSafeEqual` in admin auth and test bypass |
-| Production guards | PASS | `TEST_BYPASS_SECRET` hard-blocked in production |
-| File upload validation | PASS | Extension whitelist + MIME type check + size limits |
-| AI cost tracking | PASS | Full token/cost/latency tracking in `ai_events` |
-| Error handling | PASS | Generic errors in prod, detailed only in development |
+- 런타임 DB 접근은 `getSupabaseServer()` (`lib/supabase-server.ts`) 하나뿐이다. 라우트에 raw SQL 을 넣지 않는다.
+- **Prisma 는 런타임에 쓰지 않는다.** `prisma/schema.prisma` 는 introspection 결과이고 DDL 의 원천은 `database/[NNN]_*.sql` 이다. 런타임 `@prisma/client` import 는 0건이며 그 상태를 유지한다.
+- `middleware.ts` 가 없다. **인증은 각 라우트 핸들러가 직접 한다.** 엣지에서 걸러진다고 가정하지 말 것.
+- 워커·크론 라우트는 `currentUser()` 를 쓰지 않는다. QStash 서명 / `CRON_SECRET` / `INTERNAL_API_SECRET` 로 검증한다. 예외 목록은 `docs/SECURITY.md`.
 
 ---
 
-## 11. Dependency Audit
+## L3 — 컴포넌트
 
-**76 production deps | 23 dev deps | Package manager: npm**
+### 3-1. 인증과 역할 라우팅
 
-### Issues
+```mermaid
+flowchart LR
+    signin["/(auth)/sign-in<br/>/(auth)/sign-up"] --> sbAuth["Supabase Auth"]
+    sbAuth -->|OAuth| callback["/auth/callback"]
+    callback --> currentUser
+    signin --> currentUser
 
-| Package | Issue | Severity |
-|---------|-------|----------|
-| `@base-ui-components/react@1.0.0-rc.0` | Pre-release (RC) — may have breaking changes on update | Medium |
-| `dompurify` + `isomorphic-dompurify` | Dual packages — intentional (SSR compatibility) but adds bundle weight | Low |
-| 5 WASM transitive deps (`@emnapi/*`, `@napi-rs/*`, `@tybys/*`) | Extraneous — can be pruned with `npm prune` | Low |
-| No Prettier config | Code formatting not enforced — inconsistency risk | Low |
+    currentUser["currentUser()<br/>lib/supabase-auth.ts"]
+    currentUser -->|"profiles.role · status 조회"| profiles[("profiles")]
 
-### Clean
+    currentUser --> route{"role?"}
+    route -->|없음| onboarding["/onboarding"]
+    route -->|student| studentHome["/student"]
+    route -->|instructor pending| pending["/instructor-pending"]
+    route -->|instructor approved| instructorHome["/instructor"]
 
-- No deprecated packages detected (no moment.js, request, etc.)
-- No overlapping functionality (e.g., no competing HTTP clients)
-- 76 deps is reasonable for project scope (LMS + AI + rich text + charts)
-- Lock file present and consistent
-- All major packages on latest versions (React 19, Next.js 16, Tailwind 4)
+    adminLogin["/admin/login"] --> adminAuth["requireAdmin()<br/>lib/admin-auth.ts<br/>HMAC-SHA256 JWT · httpOnly 24h"]
+    adminAuth --> adminHome["/admin"]
+```
+
+**권위는 `profiles.role` 이다.** 가입 시 `user_metadata.role` 에 힌트가 들어가지만 라우팅 판단은 하지 않는다 (`lib/onboarding-role.ts` 참고). 관리자 인증은 사용자 인증과 완전히 분리된 별도 계통이다.
+
+`TEST_BYPASS_SECRET` 헤더 바이패스는 로컬(`development`)과 CI(`test`)에만 존재한다. 프로덕션·스테이징에서는 `lib/supabase-auth.ts` 가 요청 처리 중 throw 한다.
+
+### 3-2. 응시 세션
+
+```mermaid
+stateDiagram-v2
+    [*] --> not_joined
+    not_joined --> joined: 코드로 입장
+    joined --> waiting: preflight 동의
+    waiting --> in_progress: 교수자가 시험 시작 · 과제는 즉시
+    not_joined --> late_pending: 지각 입장 요청
+    late_pending --> in_progress: 승인
+    late_pending --> denied: 거절
+    in_progress --> submitted: 학생 제출
+    in_progress --> auto_submitted: 시간 만료 · 마감 스위퍼
+    in_progress --> locked: 교수자 강제 종료
+    waiting --> closed: 시험 종료로 대기실 닫힘
+    submitted --> [*]
+    auto_submitted --> [*]
+```
+
+타이머 기준은 `attempt_timer_started_at` 이다. `started_at` 이 아니다. 지각 입장(`/api/exam/[examId]/late-entry`)은 원래 시험 시작 시각을 타이머 기준으로 넣어 남은 시간을 깎는다.
+
+### 3-3. 채점 파이프라인
+
+여기가 이 시스템에서 가장 깨지기 쉬운 부분이다. 손대기 전에 `docs/GRADING_PIPELINE_RUNBOOK.md` 를 읽는다.
+
+```mermaid
+flowchart TB
+    submit["제출<br/>POST /api/supa · submission"] --> trigger{"QStash 설정됨?"}
+    trigger -->|로컬 미설정| inline["인프로세스 인라인 실행"]
+    trigger -->|Vercel 미설정| loud["실패 · reason: qstash_not_configured<br/>조용히 삼키지 않는다"]
+    trigger -->|설정됨| q1["QStash: grade_question"]
+
+    q1 --> worker["/api/internal/grading-worker<br/>서명 검증"]
+    worker --> grade["객관식·OX 결정론적 채점<br/>grades · grade_type: auto"]
+    grade --> branch{"case 문항 수"}
+
+    branch -->|0개| done0["phase: objective_only_done<br/>세션 요약 없음"]
+    branch -->|1개| sess["QStash: session_summary<br/>sessions.ai_summary"]
+    branch -->|2개 이상| qsum["QStash: question_summary<br/>grades.ai_summary"] --> sess
+    sess --> done["phase: done"]
+
+    sweeper["cron/grading-sweep<br/>5분마다"] -.->|낙오 세션 회수| q1
+    inline --> grade
+
+    classDef bad fill:#fdecea,stroke:#c5221f,color:#3c1211
+    class loud bad
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> queued
+    queued --> running
+    running --> completed
+    running --> failed: 3회 시도 초과
+    failed --> running: PUT /api/session/[sessionId]/grade 수동 재시도
+    completed --> [*]
+```
+
+**에세이/케이스 점수는 제출 시 자동 채점되지 않는다.** 교수자가 `case-grade/chat` → `case-grade/commit` 으로 나중에 매긴다. commit 은 요약을 다시 생성하지 않는다.
+
+스위퍼 안전장치: 세션당 60분 쿨다운(`last_swept_at`), 3회 시도 상한(`sweep_attempts`), 실행당 10세션 상한, `ai_summary` 가 이미 완성된 세션은 자동 해소. 비상 스위치는 `GRADING_SWEEP_DISABLED=1`.
+
+QStash 중복 발행은 `gradingDedupId()` 의 `(session, phase, qIdx)` 결정론적 키가 막는다. 제출과 하트비트가 경합하거나 스위퍼가 아직 살아 있는 재시도와 겹쳐도 같은 잡이 두 번 돌지 않는다.
+
+### 3-4. 자료 업로드 → RAG
+
+```mermaid
+sequenceDiagram
+    participant I as 교수자
+    participant A as /api/upload/signed-url
+    participant S as Supabase Storage
+    participant X as /api/extract-text
+    participant R as /api/internal/process-rag
+    participant O as OpenAI
+    participant D as exam_material_chunks
+
+    I->>A: 서명 URL 요청
+    A-->>I: 서명 URL
+    I->>S: 직접 업로드
+    I->>X: 텍스트 추출 요청
+    X->>R: INTERNAL_API_SECRET 로 위임
+    R->>O: 청크 임베딩
+    O-->>R: vector(1536)
+    R->>D: 청크 + 임베딩 저장
+```
+
+응시 중 `/api/chat` 은 `search-materials` 로 이 청크를 pgvector 검색해 컨텍스트로 넣는다.
+
+### 3-5. 에이전트 런 (출제 보조)
+
+```mermaid
+stateDiagram-v2
+    [*] --> queued
+    queued --> running
+    running --> waiting_approval: draft 완성
+    waiting_approval --> completed: 교수자 승인 → 커밋
+    running --> failed
+    running --> cancelled: 교수자 중단
+    waiting_approval --> cancelled
+```
+
+`cron/agent-sweeper` 가 10분마다 낙오된 런을 정리한다. 스텝 타입은 `user_input / plan / data_fetch / analysis / tool_call / draft / approval / final` (`lib/agent/types.ts`).
 
 ---
 
-## 12. Recommended Remediation Priority
+## 데이터 모델
 
-### Immediate (Before Next Deploy)
-1. **Add `ADMIN_SESSION_SECRET`** to `.env.local` and Vercel env vars (generate with `openssl rand -hex 32`)
-2. **Add `INTERNAL_API_SECRET`** to `.env.local` and Vercel env vars (generate with `openssl rand -hex 32`)
-3. **Add `.mcp.json` to `.gitignore`** and remove from git tracking (`git rm --cached .mcp.json`)
+`prisma/schema.prisma` 에 17개 모델이 있고, **`profiles` 는 거기 없지만 실제로 존재한다** — introspection 이 최신이 아니다. 역할 권위 테이블이므로 특히 주의한다.
 
-### Short-Term (This Week)
-4. **Fix CORS fallback** — remove localhost origins from production default in `lib/cors.ts`
-5. **Add `ALLOWED_ORIGINS`** to Vercel env vars with production domains only
-6. **Add Redis fallback warning** — log a warning in `lib/rate-limit.ts` when falling back to in-memory in production
-7. **Set `ADMIN_SESSION_SECRET`** in CI/CD secrets (`.github/workflows/ci.yml`)
+```mermaid
+erDiagram
+    profiles ||--o{ exams : "instructor_id"
+    profiles ||--o| student_profiles : "student_id"
+    exam_nodes ||--o{ exam_nodes : "parent_id"
+    exam_nodes ||--o| exams : "exam_id"
+    exams ||--o{ sessions : ""
+    exams ||--o{ exam_material_chunks : ""
+    sessions ||--o{ submissions : ""
+    sessions ||--o{ grades : ""
+    sessions ||--o{ messages : ""
+    sessions ||--o{ session_quiz_attempts : ""
+    exams ||--o{ exam_grading_sessions : ""
+    exam_grading_sessions ||--o{ bulk_grading_messages : ""
 
-### Medium-Term (This Month)
-8. Add `middleware.ts` for edge-level auth checks (reduces load on individual route handlers)
-9. Apply `sanitizeUserInput()` consistently across all endpoints accepting user text
-10. Add Prettier config for consistent formatting
-11. Consider CSRF tokens for any form-based submissions
+    profiles {
+        uuid id PK
+        text role "라우팅 권위"
+        text status "approved 등"
+    }
+    exams {
+        uuid id PK
+        text code UK
+        text type "exam | assignment"
+        json questions "문항 원본"
+        text rag_status
+        timestamptz open_at
+        timestamptz close_at
+        timestamptz started_at
+    }
+    sessions {
+        uuid id PK
+        text status
+        json grading_progress "status · phase · 진행률"
+        timestamptz attempt_timer_started_at "타이머 기준"
+        text ai_summary
+    }
+    submissions {
+        int q_idx UK "session_id 와 복합"
+        text answer
+        int edit_count
+        json answer_history
+    }
+    grades {
+        int q_idx UK "session_id 와 복합"
+        numeric score
+        text grade_type "auto | manual | ai_summary"
+        json stage_grading
+    }
+    messages {
+        int q_idx
+        text role
+        text response_id "Responses API 체이닝"
+    }
+    ai_events {
+        text model
+        text feature
+        bigint estimated_cost_usd_micros
+        int latency_ms
+    }
+    exam_material_chunks {
+        vector embedding "1536차원"
+    }
+```
+
+- `questions` 테이블은 **레거시**다. 문항 원본은 `exams.questions` JSON 이다.
+- `exams.rubric` 컬럼은 남아 있지만 채점 파이프라인이 더 이상 읽지 않는다.
+- `submissions` / `grades` 는 `(session_id, q_idx)` 로 유일하다. **qIdx 정합성이 채점 불변식의 핵심**이며 규칙은 `.github/impact-review/rules.md` 에 있다.
+- 모든 AI 호출은 `lib/ai-tracking.ts` 를 거쳐 `ai_events` 에 토큰·지연·비용이 기록된다. 우회하면 관리자 대시보드가 비고 비용 추적이 끊긴다.
+
+---
+
+## 라우트 지도
+
+페이지 32개 / API 라우트 69개. 정확한 목록은 위의 `git ls-files` 명령으로 뽑는다.
+
+```mermaid
+flowchart LR
+    subgraph pub["공개"]
+        p1["/ · /legal/*"]
+        p2["/(auth)/* · /auth/callback"]
+        p3["/join"]
+    end
+    subgraph stu["학생"]
+        s1["/student · /student/profile-setup"]
+        s2["/exam/[code] · /student/session/[id]/quiz"]
+        s3["/assignment/[code] · /assignment/[code]/review"]
+        s4["/student/report/[sessionId]"]
+    end
+    subgraph ins["교수자"]
+        i1["/instructor · /instructor/new"]
+        i2["/instructor/[examId] · /edit"]
+        i3["/instructor/[examId]/grade/[studentId]"]
+        i4["/instructor/assignment/*"]
+        i5["/instructor-pending"]
+    end
+    subgraph adm["운영자"]
+        a1["/admin/login → /admin"]
+        a2["/admin/ai-usage"]
+    end
+```
+
+| API 그룹 | 접두사 | 인증 |
+|---|---|---|
+| 액션 멀티핸들러 | `/api/supa` | `currentUser()` |
+| 시험 운영 | `/api/exam/[examId]/*` | `currentUser()` + 소유권 |
+| 세션·응시 | `/api/session/*`, `/api/student/*` | `currentUser()` + 소유권 |
+| AI 생성·대화 | `/api/ai/*`, `/api/chat`, `/api/feedback*`, `/api/assignment-chat` | `currentUser()` + 레이트리밋 |
+| 에이전트 런 | `/api/agent/runs/*` | `currentUser()` |
+| 관리자 | `/api/admin/*` | `requireAdmin()` |
+| 내부 위임 | `/api/internal/*` | `INTERNAL_API_SECRET` |
+| QStash 워커 | `/api/internal/grading-worker`, `/api/internal/bulk-grade-worker` | QStash 서명 |
+| Cron | `/api/cron/*` | `CRON_SECRET` |
+
+`/api/supa` 하나가 exam · drive · session · submission · assignment 핸들러를 모두 받는 멀티핸들러다. 이 파일이 커지는 것이 이 저장소의 구조적 부채다.
+
+---
+
+## 배포
+
+```mermaid
+flowchart LR
+    dev["작업 브랜치"] -->|PR| staging["staging"]
+    staging -->|자동 배포| stagingApp["staging.quest-on.app<br/>Vercel 프로젝트 A"]
+    stagingApp -->|팀 QA| release["staging → main 승격 PR<br/>승인 1개 · 조직 관리자 우회 가능"]
+    release --> main["main"]
+    main -->|자동 배포| prod["quest-on.app<br/>Vercel 프로젝트 B"]
+
+    stagingApp -.-> sbStg[("Supabase 스테이징")]
+    prod -.-> sbProd[("Supabase 프로덕션")]
+```
+
+- 스테이징과 프로덕션은 **Supabase 프로젝트·Upstash·OpenAI 키를 공유하지 않는다.** 공유하면 QA 가 프로덕션 레이트리밋과 예산을 태운다.
+- 스테이징 런타임은 프로덕션 크리덴셜을 절대 갖지 않는다. 스테이징이 뚫려도 프로덕션이 열리지 않아야 한다.
+- `NEXT_PUBLIC_APP_ENV=staging` 이 없으면 스테이징이 자기를 프로덕션이라고 믿는다 (별도 Vercel 프로젝트도 `VERCEL_ENV=production` 이므로). 오타를 내면 `next.config.ts` 가 빌드를 깬다.
+- 리전은 `iad1`, `icn1`. Cron 은 `grading-sweep` 5분, `agent-sweeper` 10분, `assignment-deadline-sweep` 5분.
+- QStash 콜백 URL 우선순위: `QSTASH_WORKER_BASE_URL` > `NEXT_PUBLIC_APP_URL` > `VERCEL_URL`. 마지막은 배포마다 바뀌므로 경고를 남기며, 프로덕션에서 쓰면 안 된다.
+
+상세는 `docs/STAGING.md`.
+
+---
+
+## 알려진 구조적 부채
+
+여기 적는 것은 **지금 코드에서 확인되는 것만**이다. 고쳐지면 지운다. 일회성 감사 리포트를 여기에 쌓지 않는다.
+
+| 항목 | 위치 | 왜 문제인가 |
+|---|---|---|
+| `middleware.ts` 부재 | 프로젝트 루트 | 인증이 라우트마다 반복된다. 하나 빠뜨리면 그대로 구멍 |
+| CSP `unsafe-inline` | `next.config.ts` | Clerk 때문에 열어둔 것이었으나 Clerk 제거 후에도 남아 있다. XSS 표면 |
+| CSRF 토큰 없음 | 상태 변경 라우트 전반 | SameSite 쿠키에만 의존 |
+| `/api/supa` 멀티핸들러 비대화 | `app/api/supa/handlers/*` | 도메인 경계가 한 엔드포인트에 뭉쳐 있다 |
+| `prisma/schema.prisma` 와 실제 스키마 불일치 | `profiles` 누락 | introspection 이 최신이 아님. 스키마를 근거로 판단하면 틀린다 |
+| 레이트리밋 인메모리 폴백 | `lib/rate-limit.ts` | Redis 불가 시 인스턴스별로 따로 세므로 사실상 무제한 |
+| `questions` 테이블 · `exams.rubric` 잔존 | DB | 읽는 코드가 없는데 남아 있어 오해를 만든다 |
+
+보안 **규칙**(무엇을 지켜야 하는가)은 여기가 아니라 `docs/SECURITY.md` 에 있다. 이 문서는 구조만 다룬다.
+
+---
+
+## 더 볼 곳
+
+| 주제 | 문서 |
+|---|---|
+| 에이전트 작업 규칙 (단일 계약) | `AGENTS.md` |
+| 채점·QStash·스위퍼 운영 | `docs/GRADING_PIPELINE_RUNBOOK.md` |
+| 인증·CORS·레이트리밋·입력검증 규칙 | `docs/SECURITY.md` |
+| 스테이징 환경 구축·운영 | `docs/STAGING.md` |
+| 테스트 명령과 기대치 | `docs/TESTING.md` |
+| 거울 쌍·qIdx·채점 불변식 | `.github/impact-review/rules.md` |
+| 라우트 핸들러 계약 | `app/api/CLAUDE.md` |

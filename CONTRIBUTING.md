@@ -21,7 +21,8 @@ Quest-on/quest-on-mvp
       ⑤ staging → main 승격 PR  →  메인테이너 승인 1개  →  프로덕션 배포
 ```
 
-- **`main` 과 `staging` 에 직접 push 금지.** GitHub ruleset 이 막고, 로컬 git hook 도 막습니다.
+- **`main` 은 GitHub ruleset 이 막습니다.** PR + 승인 1개 + CI 초록이 필요합니다. (조직 관리자는 장애 대응을 위해 우회할 수 있지만, 평시에 쓰라고 있는 게 아닙니다.)
+- **`staging` 에는 서버 측 protection 이 없습니다.** 장애 시 손이 묶이지 않게 일부러 비워 뒀습니다. 그래도 **작업은 반드시 PR 로 올립니다** — 로컬 git hook 이 실수로 인한 직접 커밋을 막습니다.
 - **작업 1개 = 이슈 1개 = 브랜치 1개 = PR 1개.** 작게, 자주.
 - **force-push 는 내 작업 브랜치에서만.** 공용 브랜치엔 절대 금지.
 
@@ -114,7 +115,7 @@ git push -u origin feat/login-button
 ### 6) 리뷰 반영
 - 코멘트가 달리면 같은 브랜치에서 수정 후 다시 push 하면 PR 이 자동 갱신됩니다.
 - CI(Lint & Type Check, Build, Unit Tests, API Integration Tests, Browser E2E Tests, impact-review, pr-hygiene)가 **전부 초록**이어야 머지합니다.
-- `staging` 은 승인 없이 CI 초록이면 머지할 수 있고, `main` 승격 PR 은 **메인테이너 승인 1개**가 필요합니다.
+- `staging` PR 은 CI 초록이면 승인 없이 머지할 수 있습니다. `main` 승격 PR 은 **승인 1개**가 필요합니다.
 
 ### 7) QA
 `staging` 에 머지되면 자동으로 staging.quest-on.app 에 배포됩니다. 본인 변경이 실제로 동작하는지 여기서 확인하고, 이슈에 결과를 남깁니다.
