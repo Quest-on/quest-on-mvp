@@ -1,0 +1,74 @@
+name: Deploy
+
+# Vercel Git 연동 대신 CI 에서 배포한다.
+#
+# 왜 이렇게 하는가:
+#   1. Git 연동 배포는 "커밋한 사람의 Vercel 계정"에 배포 권한이 있어야 한다.
+#      팀원이 늘거나 바뀔 때마다 seat($20/월/인)를 사야 하고, 권한이 없는 사람이
+#      커밋하면 배포가 조용히 멈춘다. 실제로 그 상태였다.
+#   2. CI 가 이미 next build 를 돌린다. Vercel 이 또 빌드하면 커밋당 빌드가 2회다.
+#      `vercel build` + `vercel deploy --prebuilt` 로 빌드를 1회로 줄인다.
+#      https://vercel.com/kb/guide/how-can-i-use-github-actions-with-vercel
+#
+# 필요한 설정:
+#   - secret  VERCEL_TOKEN       Vercel → Account Settings → Tokens 에서 발급
+#   - var     VERCEL_ORG_ID      팀 ID  (등록 완료)
+#   - var     VERCEL_PROJECT_ID  프로젝트 ID (등록 완료)
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+# 배포는 겹치면 안 된다. 앞선 배포를 취소하지 않고 순서대로 흘린다.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    # CI 가 초록일 때만 배포한다. main 에 들어왔다는 사실만으로는 배포하지 않는다.
+    if: github.event.workflow_run.conclusion == 'success'
+    environment:
+      name: production
+      url: https://quest-on.app
+    env:
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # workflow_run 은 기본적으로 기본 브랜치 최신을 체크아웃한다.
+          # CI 가 검증한 바로 그 커밋을 배포해야 한다.
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-node@v4
+        with:
+          # Vercel 프로젝트 설정(Node.js 22.x)과 맞춘다. 다르면 CI 빌드 산출물이
+          # 실제 런타임과 다른 Node 로 만들어진다.
+          node-version: 22
+          cache: npm
+      - name: Install Vercel CLI
+        run: npm install -g vercel@57.0.0 # 핀 고정(재현성; DEPENDENCY_POLICY 준수)
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - name: Build
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+      - name: Deploy prebuilt output
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "배포 완료: $url"
+      - name: Summary
+        run: |
+          {
+            echo "### 프로덕션 배포 완료"
+            echo ""
+            echo "- 커밋: \`${{ github.event.workflow_run.head_sha }}\`"
+            echo "- 배포 URL: ${{ steps.deploy.outputs.url }}"
+            echo "- 도메인: https://quest-on.app"
+          } >> "$GITHUB_STEP_SUMMARY"
