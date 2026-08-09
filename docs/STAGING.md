@@ -47,9 +47,13 @@ feat/xxx  ──PR──▶  staging  ──자동배포──▶  staging.quest
 - `staging` → `main` 승격 PR 은 "이번 배포에 뭐가 들어가는지" 목록 역할을 한다.
 - 핫픽스도 같은 경로로 간다. `main` 직행은 git hook 이 막는다.
 - **배포는 Vercel Git 연동이 아니라 GitHub Actions 가 수행한다** (`.github/workflows/deploy.yml`).
-  `main` 에서 CI 가 초록이면 그 커밋을 `vercel build` + `vercel deploy --prebuilt` 로 올린다.
+  `main` 에서 CI 가 초록이면 그 커밋을 `vercel deploy --prod` 로 올린다.
   Git 연동 배포는 "커밋한 사람의 Vercel 계정에 배포 권한이 있을 것"을 요구해서, 팀원이 바뀔 때마다
   seat 를 사야 하고 권한 없는 사람이 커밋하면 배포가 조용히 멈춘다. 배포 주체를 사람에서 CI 로 옮겼다.
+- **빌드는 Vercel 에서 돈다.** CI 에서 `vercel build --prebuilt` 로 빌드하면 커밋당 빌드가 1회로
+  줄지만, 그러려면 `vercel pull` 로 프로덕션 환경변수 전량을 GitHub 러너에 내려받아야 한다.
+  `DATABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY`·`QSTASH_TOKEN` 이 배포마다 러너 디스크에 떨어진다.
+  원칙 4("프로덕션 크리덴셜은 밖으로 나가지 않는다")를 CI 에도 그대로 적용한다.
 
 ---
 
