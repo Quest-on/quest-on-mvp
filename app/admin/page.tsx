@@ -56,6 +56,16 @@ interface AiSummaryResponse {
   };
 }
 
+interface PublishingRow {
+  instructorId: string;
+  name: string | null;
+  school: string | null;
+  plan: string;
+  publishedCount: number;
+  demoCount: number;
+  lastPublishedAt: string | null;
+}
+
 type AdminUsersResponse =
   | { unauthorized: true }
   | {
@@ -143,6 +153,18 @@ export default function AdminDashboard() {
     },
   });
 
+  // 발행 현황 (#86 / AC-19). 승인이 한도로 바뀐 뒤 plan 승격 판단의 근거는
+  // 대기열이 아니라 "누가 얼마나 쓰고 있는가"다.
+  const { data: publishing, refetch: refetchPublishing } = useQuery({
+    queryKey: ["admin-instructor-publishing"],
+    queryFn: async (): Promise<PublishingRow[]> => {
+      const res = await fetch("/api/admin/instructors/publishing");
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.instructors || [];
+    },
+  });
+
   useEffect(() => {
     if (usersResponse?.unauthorized) {
       router.push("/admin/login");
@@ -178,6 +200,7 @@ export default function AdminDashboard() {
     if (res.ok) {
       refetchPending();
       refetch();
+      refetchPublishing();
     }
   };
 
@@ -340,6 +363,7 @@ export default function AdminDashboard() {
                 id: string;
                 name: string;
                 email: string;
+                school: string | null;
                 created_at: string;
               }) => (
                 <div
@@ -349,6 +373,10 @@ export default function AdminDashboard() {
                   <div>
                     <p className="font-medium">{instructor.name || t("dashboard.pending.noName")}</p>
                     <p className="text-sm text-muted-foreground">{instructor.email}</p>
+                    {/* AC-19: 소속이 승인 판단의 근거다. 없으면 판단할 게 없다. */}
+                    <p className="text-sm text-muted-foreground">
+                      {instructor.school || t("dashboard.pending.noSchool")}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {t("dashboard.pending.appliedAt", { date: formatDateTime(instructor.created_at, locale, { year: "numeric", month: "short", day: "numeric" }) })}
                     </p>
@@ -367,6 +395,64 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            {t("dashboard.publishing.title")}
+          </CardTitle>
+          <CardDescription>{t("dashboard.publishing.description")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!publishing || publishing.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {t("dashboard.publishing.empty")}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {publishing.map((row) => (
+                <div
+                  key={row.instructorId}
+                  className="flex items-center justify-between gap-4 rounded-lg border p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">
+                      {row.name || t("dashboard.pending.noName")}
+                    </p>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {row.school || t("dashboard.pending.noSchool")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {row.lastPublishedAt
+                        ? t("dashboard.publishing.lastPublishedAt", {
+                            date: formatDateTime(row.lastPublishedAt, locale, {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            }),
+                          })
+                        : t("dashboard.publishing.neverPublished")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <Badge variant="secondary">{row.plan}</Badge>
+                    <span className="text-sm">
+                      {t("dashboard.publishing.publishedCount", {
+                        count: row.publishedCount,
+                      })}
+                    </span>
+                    {/* 데모는 한도에 안 잡히지만 "써 보긴 했는가"의 신호다. */}
+                    <span className="text-xs text-muted-foreground">
+                      {t("dashboard.publishing.demoCount", { count: row.demoCount })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -400,6 +486,7 @@ export default function AdminDashboard() {
               onClick={() => {
                 refetch();
                 refetchAiSummary();
+                refetchPublishing();
               }}
               variant="outline"
             >

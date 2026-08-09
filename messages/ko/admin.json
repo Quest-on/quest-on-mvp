@@ -18,7 +18,8 @@
       "description": "강사 승인 요청이 있습니다. 검토 후 승인해주세요.",
       "noName": "이름 없음",
       "appliedAt": "신청일: {date}",
-      "approve": "승인"
+      "approve": "승인",
+      "noSchool": "소속 미기재"
     },
     "userManagement": {
       "title": "사용자 관리",
@@ -38,6 +39,15 @@
       "aiLoadFail": "AI 사용량 정보를 불러오는데 실패했습니다.",
       "roleChangeFail": "역할 변경에 실패했습니다.",
       "serverError": "서버 오류가 발생했습니다."
+    },
+    "publishing": {
+      "title": "교수자 발행 현황",
+      "description": "무료 한도(발행 3회·시험당 학생 5명)를 얼마나 쓰고 있는지 봅니다. 데모 시험은 한도에 포함되지 않습니다.",
+      "empty": "아직 교수자 계정이 없습니다.",
+      "publishedCount": "발행 {count}건",
+      "demoCount": "데모 {count}건",
+      "lastPublishedAt": "최근 발행: {date}",
+      "neverPublished": "아직 발행 없음"
     }
   },
   "login": {

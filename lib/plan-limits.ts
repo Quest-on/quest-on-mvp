@@ -108,3 +108,26 @@ export function canAdmitStudent(
   if (limits.maxStudents === null) return true;
   return distinctStudentCount < limits.maxStudents;
 }
+
+/**
+ * 교수자의 발행 횟수 (AC-11, AC-17).
+ *
+ * "발행"은 상태 전이가 아니라 `exams.first_published_at`(첫 학생 세션 생성 시
+ * COALESCE 기록)이다. 그래서 재발행은 카운트를 늘리지 않는다.
+ *
+ * 이 함수가 유일한 카운트 지점이어야 한다. 호출부마다 쿼리를 다시 쓰면 언젠가
+ * 한 곳이 `is_demo` 를 빠뜨리고, 데모를 만들어 본 교수자가 무료 한도를 한 칸
+ * 잃는다.
+ */
+export async function countPublishedExams(instructorId: string): Promise<number> {
+  const supabase = getSupabaseServer();
+  const { count, error } = await supabase
+    .from("exams")
+    .select("id", { count: "exact", head: true })
+    .eq("instructor_id", instructorId)
+    .eq("is_demo", false)
+    .not("first_published_at", "is", null);
+
+  if (error) throw error;
+  return count ?? 0;
+}
