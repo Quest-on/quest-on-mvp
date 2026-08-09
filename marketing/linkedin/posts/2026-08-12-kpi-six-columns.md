@@ -83,7 +83,9 @@ Quest-On = **예비멘토링 8팀 중 연번 5, 배치 트랙.**
 
 ---
 
-## 1. 영준 개인 계정 (오리지널, 본편)
+## 1. 영준 개인 계정 (오리지널, 본편) — v4
+
+> v3 대비: 설명 문장 6개 제거로 약 300자 감축, **CTA에 상호성 추가**(§7-0 실측 — 도달 천장이 낮으므로 읽은 사람당 전환율이 전부다), 프라이머 인용을 원문에 더 밀착.
 
 최종 선발 20팀 명단에 저희 이름은 없었습니다.
 
@@ -91,66 +93,66 @@ Quest-On = **예비멘토링 8팀 중 연번 5, 배치 트랙.**
 
 「예비멘토링 팀(8개 팀)」. 다섯 번째 줄에 Quest-On이 있었습니다.
 
-프라이머 16년 역사에서 지원이 가장 많았던 기수라고 합니다. 기존의 두 배가 넘게 들어와 1,000팀을 넘겼고, 그중 100팀이 3분 대면 발표에 불렸습니다. 저희는 그 3분을 준비하는 데 몇 주를 썼습니다.
+프라이머 16년 역사에서 지원이 가장 많았던 기수였다고 합니다. 기존의 두 배가 넘게 들어와 1,000팀을 넘겼고, 그중 100팀이 3분 발표에 불렸습니다. 그리고 20팀이 선발됐습니다.
 
-그리고 20팀이 선발됐습니다. 거기엔 없었습니다.
-
-두 번째 표 아래 각주에는 이렇게 적혀 있었습니다. "예비멘토링 팀은 최종선발 팀이 아니지만, 성장 가능성 및 잠재력을 갖추고 있다고 평가한 팀."
+두 번째 표 각주에는 이렇게 적혀 있었습니다. "최종선발 팀이 아니지만, 성장 가능성 및 잠재력을 갖추고 있다고 평가한 팀."
 
 그날은 기쁜 건지 아쉬운 건지 정리가 안 됐습니다.
 
-며칠 뒤에 엑셀 파일을 하나 받았습니다. 주간 KPI를 적는 양식이었습니다. 칸이 다섯 개였고, 맨 위에 한 줄이 있었습니다. "너무 많이 넣지 마세요."
+며칠 뒤 엑셀 파일을 하나 받았습니다. 주간 KPI 양식이었습니다. 칸이 다섯 개였고, 맨 위에 한 줄이 있었습니다.
 
-저는 이 시트가 반가웠습니다. 적을 게 있다고 생각했으니까요.
+"너무 많이 넣지 마세요."
 
-지난 반년을 저희 다섯이서 이렇게 보냈습니다. 대학 세 곳에 실제로 배포했고, 실제 시험과 과제 11개가 저희 위에서 치러졌고, 응시가 441회 쌓였고, 351명이 가입했습니다.
+반가웠습니다. 적을 게 있다고 생각했으니까요.
 
-그래서 총회원 칸에 351을 적으려다 멈췄습니다.
+지난 반년을 저희 다섯이서 이렇게 보냈습니다. 대학 세 곳에 배포했고, 실제 시험과 과제 11개가 저희 위에서 치러졌고, 응시가 441회 쌓였고, 351명이 가입했습니다.
 
-351명이 어떻게 생겼는지가 갑자기 걸렸습니다. 교수님이 강의에서 시험 코드를 불러 주시면, 그 수업 학생 전원이 그날 가입합니다. 학생들은 저희를 고른 적이 없습니다. 수업이 시켰습니다.
+총회원 칸에 351을 적으려다 멈췄습니다.
 
-그러니까 351은 저희가 만든 수요가 아니라, 저희를 써 주신 교수님 몇 분의 강의 정원을 더한 값이었습니다. 큰 수업 하나만 더 받으면 400도 되고 500도 됩니다. 제품은 하나도 안 좋아졌는데요.
+교수님이 강의에서 시험 코드를 불러 주시면 그 수업 학생 전원이 그날 가입합니다. 학생들은 저희를 고른 적이 없습니다. 수업이 시켰습니다.
 
-돈을 내는 쪽은 학생이 아니라 교수님입니다. 그래서 회원의 정의를 교수로 바꿨습니다.
+351은 저희가 만든 수요가 아니라, 저희를 써 주신 교수님 몇 분의 강의 정원을 더한 값이었습니다. 큰 수업 하나만 더 받으면 400도 되고 500도 됩니다. 제품은 그대로인데요.
+
+돈을 내는 쪽은 학생이 아니라 교수님입니다. 회원의 정의를 교수로 바꿨습니다.
 
 총회원 3.
 
 한참 봤습니다. 반년 치 자랑을 제 손으로 지우는 일이었으니까요.
 
-그런데 3 쪽이 훨씬 많은 걸 알려줬습니다. 그 세 분 중 다음 학기에도 돈을 내고 다시 시험을 여신 분이 한 분, 동료 교수님께 저희를 소개해 주신 분이 한 분입니다. 반년 동안 저희가 실제로 만들어낸 신호는 351이 아니라 그 두 건이었습니다.
+그런데 3 쪽이 훨씬 많은 걸 알려줬습니다. 그 세 분 중 다음 학기에도 돈을 내고 다시 시험을 여신 분이 한 분, 동료 교수님께 저희를 소개해 주신 분이 한 분입니다. 반년 동안 저희가 만든 진짜 신호는 351이 아니라 그 두 건이었습니다.
 
-시트를 보다가 한 달 전에 읽었던 글이 생각났습니다. 지원이 마감되던 날 프라이머 권도균 대표님이 올리신 글입니다. 저희 팀 이야기도 아니고 결과가 나오기 훨씬 전에 쓰인 글인데, 이 문장이 계속 남아 있었습니다.
+시트를 보다가 한 달 전에 읽은 글이 떠올랐습니다. 지원이 마감되던 날 프라이머 권도균 대표님이 올리신 글입니다. 저희 팀 이야기도 아니고 결과가 나오기 훨씬 전 글인데, 한 문장이 계속 남아 있었습니다.
 
 "이제 제품 만드는 것은 점점 쉬워져서, 개발자 도움 없이도 도메인 전문가들이 자신의 문제를 해결하는 것이 가능해졌다."
 
-저희가 반년 동안 자랑한 것은 전부 만드는 쪽의 성취였습니다. 배포한 대학 수, 치러진 시험 수, 쌓인 응시 수. 그리고 그게 시트에서 0, 0, 3, 0으로 나왔습니다.
+저희가 반년 동안 자랑한 건 전부 만드는 쪽의 숫자였습니다. 배포한 대학 수, 치러진 시험 수, 쌓인 응시 수. 그게 시트에서 0, 0, 3, 0으로 나왔습니다.
 
-회의록을 다시 읽어 봤습니다. 지난 반년 안건의 절반 이상이 이미 쓰고 계신 교수님들의 그날 문제를 막는 일이었습니다. 새로 만나서 들은 기록은 몇 줄 없었습니다. 만드느라 듣지 못한 겁니다.
+회의록을 다시 읽어 봤습니다. 지난 반년 안건의 절반 이상이 이미 쓰고 계신 교수님들의 그날 문제를 막는 일이었습니다. 새로 만나서 들은 기록은 몇 줄 없었습니다.
 
-시트에는 문제가 하나 더 있었습니다. 8월은 방학입니다. 앞으로 다섯 주간 매출도 신규도 활성도 전부 0입니다. 게을러서 0이 아니라 학기가 없어서 0입니다.
+8월은 방학입니다. 앞으로 다섯 주간 매출도 신규도 활성도 전부 0입니다. 게을러서가 아니라 학기가 없어서 0입니다. 다섯 주 내내 0을 내면서 "방학이라서요"라고 쓸 수는 없었습니다.
 
-다섯 주 내내 0을 제출하면서 "방학이라서요"라고 적는 건 아무 의미가 없다고 봤습니다. 그래서 칸을 하나 직접 붙였습니다.
+그래서 칸을 하나 직접 붙였습니다.
 
 그 주에 실제로 성사된 교수님과의 대화 수.
 
 결과 안내 메일에도 이런 문장이 있었습니다. "내일부터는 다시 눈앞의 고객 한 명을 만나는 일로 돌아가시길 바랍니다."
 
-왜 20팀에 못 들어갔는지는 여기서 진단하지 않겠습니다. 아직 진행 중이고, 저 혼자 결론 낼 몫도 아닙니다.
+왜 20팀에 못 들어갔는지는 여기서 진단하지 않겠습니다. 아직 진행 중이고, 저 혼자 결론 낼 몫도 아닙니다. 대신 6개월 뒤에는 슬라이드 말고 성장 그래프를 들고 가려고 합니다.
 
-대신 이번 여름에 저희가 할 일은 정해졌습니다. 잘 만드는 팀에서 잘 듣는 팀으로 넘어가는 겁니다. 6개월 뒤에는 슬라이드 말고 성장 그래프를 들고 가려고 합니다.
+이번 여름에 늘릴 숫자는 하나입니다. 대화.
 
-그래서 늘릴 숫자는 하나입니다. 대화.
+시험이나 과제를 채점하시면서 학기마다 똑같은 지점에서 막히는 게 있으시다면, 30분만 내주실 수 있을까요. 제품 설명은 안 합니다. 대신 저희가 세 학교에서 본 것들은 그대로 말씀드리겠습니다. 학생들이 시험 중에 AI와 실제로 어떤 대화를 하는지, 교수님들이 채점하다가 어디서 손을 대시는지요.
 
-시험이나 과제를 채점하시면서 학기마다 똑같은 지점에서 막히는 게 있으시다면, 30분만 내주실 수 있을까요. 제품 설명은 안 하겠습니다. 그 막히는 지점만 듣고 오겠습니다.
+댓글이나 메시지 주시면 제가 찾아뵙겠습니다.
 
 #에듀테크 #스타트업 #AI평가
 
-> 약 2,150자 — 참여율 최고 구간(1,301~2,500자) 안. 훅 약 30자 자기완결.
-> **기승전결:** 기(명단에 없음 → 표가 하나 더) · 승(우리가 만든 것 / 351을 적으려다 멈춤) · **전(351→3, 그리고 "제품 만들기는 쉬워졌다"가 우리 시트를 설명한다)** · 결(만드는 팀 → 듣는 팀 / 대화 / 성장 그래프).
+> 약 1,850자. **기승전결:** 기(명단에 없음 → 표가 하나 더) · 승(우리가 만든 것 → 351을 적으려다 멈춤) · 전(351→3, 그리고 "제품 만들기는 쉬워졌다"가 우리 시트를 설명한다) · 결(만드는 팀 → 듣는 팀 / 대화 / 성장 그래프).
+> **CTA 변경 근거:** §7-0에서 이 세그먼트 도달 천장이 100 반응 언저리로 실측됐다. 그러면 승부는 노출이 아니라 **읽은 사람당 전환**이다. 그래서 "30분 주세요"에서 끝내지 않고 **우리가 돌려줄 것(3개 대학에서 관측한 두 가지)** 을 명시했다. 요청만 있는 CTA보다 교환이 있는 CTA가 전환된다.
 
 ---
 
-## 2. 회사 페이지 (한국어)
+## 2. 회사 페이지 (한국어) — v4
 
 지난주 KPI 시트에 저희가 정직하게 적은 숫자는 0, 0, 3, 0이었습니다.
 
@@ -158,63 +160,67 @@ Quest-On = **예비멘토링 8팀 중 연번 5, 배치 트랙.**
 
 받은 양식은 다섯 칸이었습니다. 매출, 신규회원, 총회원, WAU, 재방문율. 조건은 한 줄이었습니다. "너무 많이 넣지 마세요."
 
-총회원 칸에 351을 적으면 시트가 예뻐집니다. 문제는 그 351이 만들어진 방식이었습니다. 교수님 한 분이 시험 코드를 공지하면 그날 그 수업 학생 전원이 가입합니다. 351은 수요의 크기가 아니라 강의 정원의 합계였습니다.
+351을 적으면 시트가 예뻐집니다. 문제는 그 351이 만들어진 방식이었습니다. 교수님 한 분이 시험 코드를 공지하면 그날 그 수업 학생 전원이 가입합니다. 351은 수요의 크기가 아니라 강의 정원의 합계였습니다.
 
-저희에게 돈을 내는 쪽은 학생이 아니라 교수님입니다. 그래서 회원의 정의를 교수로 바꿨습니다.
+저희에게 돈을 내는 쪽은 학생이 아니라 교수님입니다. 회원의 정의를 교수로 바꿨습니다.
 
 총회원은 3이 됐습니다.
 
 3은 작습니다. 대신 3은 진짜입니다. 그 세 분 중 다음 학기에도 돈을 내고 다시 시험을 여신 분이 한 분, 동료 교수님을 소개해 주신 분이 한 분입니다. 둘 다 광고가 만든 게 아닙니다.
 
-저희가 반년 동안 자랑한 숫자는 전부 만드는 쪽의 성취였습니다. 배포한 대학 수, 치러진 시험 수, 쌓인 응시 수. 지난 반년 회의 안건의 절반 이상도 이미 쓰고 계신 교수님들의 그날 문제를 처리하는 데 쓰였습니다. 만드느라 듣지 못했습니다.
+저희가 반년 동안 자랑한 숫자는 전부 만드는 쪽의 것이었습니다. 배포한 대학 수, 치러진 시험 수, 쌓인 응시 수. 지난 반년 회의 안건의 절반 이상도 이미 쓰고 계신 교수님들의 그날 문제를 처리하는 데 쓰였습니다. 만드느라 듣지 못했습니다.
 
-여기에 하나가 더 남았습니다. 8월은 방학입니다. 매출도 신규도 활성도 앞으로 5주간 구조적으로 0입니다. 시트가 다섯 주 내내 0으로 채워질 예정이었습니다.
+8월은 방학입니다. 매출도 신규도 활성도 앞으로 5주간 구조적으로 0입니다. 시트가 다섯 주 내내 0으로 채워질 예정이었습니다.
 
 그래서 여섯 번째 칸을 직접 추가했습니다. **그 주에 실제로 성사된 교수님과의 대화 수.**
 
-이번 학기 목표를 한 문장으로 바꿨습니다. 가을에 돈 내고 다시 시험을 연 교수님이 몇 분인가.
+이번 학기 목표도 한 문장으로 바꿨습니다. 가을에 돈 내고 다시 시험을 연 교수님이 몇 분인가.
 
-시험이나 과제 평가에서 학기마다 똑같이 반복되는 문제가 있으시다면, 30분만 내주실 수 있을까요. 제품 이야기는 묻지 않으셔도 됩니다. 저희가 듣고 싶은 건 그 반복되는 문제 쪽입니다.
+시험이나 과제 평가에서 학기마다 똑같이 반복되는 문제가 있으시다면, 30분만 내주실 수 있을까요. 제품 이야기는 안 합니다. 대신 저희가 세 학교에서 관측한 것 — 학생들이 시험 중 AI와 나눈 대화의 패턴, 교수님들이 채점을 수정하시는 지점 — 은 그대로 공유해 드리겠습니다.
 
-여러분 팀의 시트에서, 예쁘지만 사실은 아무것도 말해주지 않는 칸은 어떤 칸인가요?
+여러분 팀의 시트에서, 예쁘지만 아무것도 말해주지 않는 칸은 어떤 칸인가요?
 
 #에듀테크 #AI평가 #AssessmentTech
 
-> 약 1,100자. **회사 채널은 선발 결과를 다루지 않는다.** 개인 글이 서사를 지고, 회사 글은 이전 가능한 인사이트(지표 재정의)만 진다. 두 글이 서로 잡아먹지 않게 하는 분업.
+> 약 1,050자. 회사 채널은 선발 결과를 다루지 않는다 — 개인 글이 서사를 지고, 회사 글은 이전 가능한 인사이트(지표 재정의)만 진다.
 
 ---
 
-## 3. 회사 페이지 (영문)
+## 3. 회사 페이지 (영문) — v4, **번역이 아니라 독립 작성**
 
-Last week we filled in our investor KPI sheet honestly. The numbers were 0, 0, 3, 0.
+> §7-0에서 한국어 B2B에는 바이럴 층이 없다는 게 실측됐다. **반응 5,000+ 층이 실재하는 쪽은 영문이다.** 그래서 영문판은 한국어 본문의 번역을 버리고, 영어권 훅 관습(짧은 문장·역설적 첫 줄·숫자 선행)으로 다시 썼다.
 
-351 students have signed up for Quest-On. We started to write 351, and stopped.
+We have 351 users. Last week we deleted that number from our own investor report.
 
-The template had five columns: revenue, new members, total members, WAU, repeat rate. One instruction came with it: "Don't add too many."
+The number that replaced it was 3.
 
-Writing 351 would have made the sheet look good. The problem was how the 351 happened. One instructor announces an exam code and every student in that course signs up the same afternoon. That number is not the size of our demand. It is the sum of class rosters.
+Our investor sent a weekly KPI template. Five columns: revenue, new members, total members, WAU, repeat rate. One instruction sat above them — "don't add too many."
 
-Students use Quest-On. Instructors pay for it. So we changed the definition of "member" to instructors.
+351 would have looked good in the total members column. The problem was how the 351 happens. One instructor announces an exam code, and every student in that course signs up the same afternoon. That number is not demand. It is the sum of class rosters.
 
-Total members became 3.
+Students use Quest-On. Instructors pay for it. So we redefined "member" as instructors.
 
-Three is small. Three is also real. Of those three, one has paid to run Quest-On again in a following term, and one introduced a colleague to us. Neither came from advertising.
+Three.
 
-Every number we had been proud of was a building number: universities deployed to, exams delivered, attempts logged. More than half the agenda across our last six months of team meetings was same-day support for instructors already using us. We were building, not listening.
+Three is small. Three is also real. One of those three has paid to run us again in a following term. One introduced a colleague. Neither came from advertising.
 
-Then there was the rest of the sheet. August is the semester break here. Revenue, new signups, weekly active instructors — all structurally zero for the next five weeks. We were about to submit five consecutive rows of zeros.
+Then we looked at the rest of the sheet. August is the semester break here, so revenue, new signups and weekly active instructors are all structurally zero for five straight weeks. We were about to file five identical rows of nothing.
 
-So we added a sixth column ourselves: **conversations with instructors that actually happened that week.**
+Every number we had been proud of was a building number: universities deployed to, exams delivered, attempts logged. Meanwhile, more than half the agenda across six months of team meetings was same-day support for instructors already using us. We were building. We were not listening.
 
-The goal for this term is now one sentence: how many instructors pay to run an exam with us again in the fall.
+So we added a sixth column ourselves.
 
-If assessment or grading creates the same problem for you every single term, would you give us 30 minutes? You don't have to ask about the product. The repeating problem is the part we want to hear.
+**Conversations with instructors that actually happened that week.**
 
-Which column on your team's dashboard looks good and tells you nothing?
+It is the only number we can move this summer, and it is the one we neglected most.
+
+If grading or assessment breaks in the same place for you every single term, would you give us 30 minutes? We won't pitch. We'll trade: you tell us where it breaks, and we'll tell you what we saw across three universities — how students actually talk to an AI mid-exam, and where instructors reach in and override the score.
+
+Which column on your dashboard looks good and tells you nothing?
 
 #EdTech #AssessmentTech #StartupMetrics
 
-> 독립 발행 자산이다(플레이북 §-1.3 — LinkedIn은 AI 답변 인용 2위 도메인, 인용은 바이럴이 아니라 일관성·원본성에 붙는다). 첫 댓글용이면 절반으로 줄이고 링크는 넣지 않는다.
+> 독립 발행 자산이다(플레이북 §-1.3 — LinkedIn은 AI 답변 인용 2위 도메인이고, 인용은 바이럴이 아니라 일관성·원본성에 붙는다). 첫 댓글용이면 절반으로 줄이고 링크는 넣지 않는다.
 
 ---
 
@@ -257,6 +263,13 @@ Which column on your team's dashboard looks good and tells you nothing?
 10. 24시간 내 재게시 금지. 이후 주 3~4회 복구.
 
 **이 글의 KPI는 좋아요가 아니라 여섯 번째 칸이다.** 댓글·DM 대화 요청을 전부 그 주 시트 `디스커버리 콜`에 기입한다. 임프레션·좋아요는 KPI에서 명시적으로 제외돼 있다.
+
+**기대치를 실측에 맞춰 미리 박아둔다 (§7-0).** 이 세그먼트의 천장은 프라이머 대표 계정이 98, 링글 공동대표가 19다. **이 글이 반응 30~60이면 성공, 100을 넘으면 세그먼트 상위권이다.** 숫자가 두 자리라고 실패로 읽지 마라 — 그건 이 판의 정상 범위고, 우리 성공 기준은 애초에 반응이 아니다.
+
+**증폭 레버는 하나뿐이다 — 대형 계정의 반응.** 이 판에서 반응 100을 넘기는 유일한 현실적 경로다. 이 글은 프라이머 공개 결과 페이지와 파트너 공지를 정면 인용하므로 **프라이머 관계자가 읽을 개연성이 실재한다.** 그래서 다음 세 가지가 곧 증폭 전략이다.
+- 각주·인용문을 **원문 그대로** 쓴다. 한 글자도 유리하게 다듬지 않는다.
+- 선발 결과·심사에 대한 평가·서운함·역설적 자기변호를 **0으로 유지**한다. 한 문장이라도 섞이면 그쪽에서 반응할 수 없는 글이 된다.
+- 권도균 대표 글은 **출처와 시점(모집 마감일, 결과 발표 한 달 전)을 명시**해 인용한다. 우리 결과에 끌어다 붙인 것처럼 보이면 안 된다.
 
 **팀원 첫 댓글 방향(실제 경험 있을 때만):** 개발 = 학기 중 당일 대응하느라 밀린 일 하나 / 제품 = 교수와 학생 중 누구를 사용자로 볼지 헷갈렸던 순간 / 운영 = 콜드메일보다 소개 한 건이 빨랐던 경험.
 
