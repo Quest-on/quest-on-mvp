@@ -51,6 +51,8 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
+    # 빌드는 Vercel 에서 돌고 CLI 는 대기만 한다. 정상 범위는 2~3분이다.
+    timeout-minutes: 20
     # CI 가 초록일 때만 배포한다. 브랜치에 들어왔다는 사실만으로는 배포하지 않는다.
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     env:
