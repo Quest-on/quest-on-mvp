@@ -665,12 +665,16 @@ export async function getInstructorExams() {
       return errorJson("INSTRUCTOR_REQUIRED", "Instructor access required", 403);
     }
 
+    // is_demo 제외 (AC-17): 데모는 "플래그를 단 진짜 exam" 이라 필터를 빠뜨리면
+    // 교수자 목록에 그대로 튀어나온다. 목록·통계·발행 카운트가 감사 대상이고,
+    // __tests__/demo-exclusion.test.ts 가 새 목록 쿼리의 누락을 잡는다.
     const { data: exams, error } = await getSupabase()
       .from("exams")
       .select(
         "id, title, code, description, duration, questions, materials, status, instructor_id, created_at, updated_at, type, deadline"
       )
       .eq("instructor_id", user.id) // Clerk user ID
+      .eq("is_demo", false)
       .order("created_at", { ascending: false });
 
     if (error) throw error;

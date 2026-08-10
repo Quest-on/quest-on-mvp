@@ -18,7 +18,8 @@
       "description": "Instructor approval requests are waiting. Please review and approve.",
       "noName": "No name",
       "appliedAt": "Applied: {date}",
-      "approve": "Approve"
+      "approve": "Approve",
+      "noSchool": "No affiliation"
     },
     "userManagement": {
       "title": "User Management",
@@ -38,6 +39,15 @@
       "aiLoadFail": "Failed to load AI usage information.",
       "roleChangeFail": "Failed to change role.",
       "serverError": "A server error occurred."
+    },
+    "publishing": {
+      "title": "Instructor publishing",
+      "description": "How much of the free tier (3 publishes, 5 students per exam) each instructor uses. Demo exams do not count.",
+      "empty": "No instructor accounts yet.",
+      "publishedCount": "{count} published",
+      "lastPublishedAt": "Last published: {date}",
+      "neverPublished": "Never published",
+      "loadFailed": "Failed to load publishing data. This is a fetch error, not an empty result."
     }
   },
   "login": {
