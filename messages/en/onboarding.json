@@ -62,5 +62,19 @@
     "serverError": "A server error occurred.",
     "saving": "Saving...",
     "saveBtn": "Save profile"
+  },
+  "consent": {
+    "title": "Required consent",
+    "ageOver14": {
+      "label": "[Required] I am 14 years of age or older"
+    },
+    "terms": {
+      "label": "[Required] I agree to the Terms of Service",
+      "linkLabel": "View Terms of Service"
+    },
+    "required": "Please confirm all required consent items.",
+    "failed": "We could not record your consent. Please try again.",
+    "notActive": "The current consent policy is being activated. Please try again shortly.",
+    "prefillFailed": "We could not load your existing profile. Submission is disabled to protect your information."
   }
 }

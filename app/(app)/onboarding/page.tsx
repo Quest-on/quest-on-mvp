@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +45,7 @@ export default function OnboardingPage() {
   const t = useTranslations("onboarding.page");
   const locale = useLocale();
   const { user, profile, isLoaded } = useAppUser();
+  const tConsent = useTranslations("onboarding.consent");
   const router = useRouter();
 
   // Step: "role" | "profile" | "intake"
@@ -53,6 +55,9 @@ export default function OnboardingPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [ageOver14, setAgeOver14] = useState(false);
+  const [terms, setTerms] = useState(false);
+  const [prefillFailed, setPrefillFailed] = useState(false);
 
   // Profile fields (shared)
   const [name, setName] = useState("");
@@ -89,41 +94,41 @@ export default function OnboardingPage() {
     }
   }, [isLoaded, user, profile]);
 
-  // 기존 프로필 프리필. 삭제된 /student/profile-setup 은 마운트 시
-  // /api/student/profile 을 읽어 이름·학번·학교를 채웠다. 통합하면서 이걸
-  // 빠뜨리면 프로필을 고치러 온 학생이 빈 폼을 마주하고, 그대로 저장하면
-  // 기존 값이 지워진 것처럼 보인다.
-  //
-  // 학생 전용이다. /api/instructor/profile 에는 GET 이 없고(POST 전용),
-  // 삭제된 페이지도 학생 프로필만 다뤘다.
+  // Existing profiles must be loaded before editing so a failed lookup cannot overwrite
+  // stored information with an empty form.
   useEffect(() => {
-    if (!isLoaded || !user || step !== "profile" || role !== "student") return;
+    if (!isLoaded || !user || step !== "profile") return;
 
     let cancelled = false;
-    const endpoint = "/api/student/profile";
+    const endpoint = role === "student" ? "/api/student/profile" : "/api/instructor/profile";
+    setPrefillFailed(false);
 
     (async () => {
       try {
         const res = await fetch(endpoint);
-        if (!res.ok || cancelled) return;
+        if (!res.ok) throw new Error("Profile prefill failed");
         const data = await res.json();
         const p = data?.profile;
         if (!p || cancelled) return;
 
-        // 사용자가 이미 입력을 시작했으면 덮어쓰지 않는다.
         setName((prev) => prev || p.name || "");
         setSchool((prev) => prev || p.school || "");
         setSchoolSearchQuery((prev) => prev || p.school || "");
-        setStudentNumber((prev) => prev || p.student_number || "");
+        if (role === "student") {
+          setStudentNumber((prev) => prev || p.student_number || "");
+        }
       } catch {
-        // 프리필 실패가 온보딩을 막아서는 안 된다. 빈 폼으로 진행한다.
+        if (!cancelled && role === "instructor") {
+          setPrefillFailed(true);
+          setError(tConsent("prefillFailed"));
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, user, step, role]);
+  }, [isLoaded, user, step, role, tConsent]);
 
   useEffect(() => {
     if (isLoaded && !user) {
@@ -213,6 +218,11 @@ export default function OnboardingPage() {
       return;
     }
 
+    if (!ageOver14 || !terms) {
+      setError(tConsent("required"));
+      return;
+    }
+
     if (!user) return;
     setIsSubmitting(true);
 
@@ -283,7 +293,19 @@ export default function OnboardingPage() {
             });
       if (!roleProfileRes.ok) throw new Error("Role profile update failed");
 
-      // 4. 교수자는 JTBD 2문항으로 넘어간다 (AC-4).
+      // 4. Record the two required decisions after every profile write succeeds.
+      const consentRes = await fetch("/api/consents/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ageOver14: true, terms: true }),
+      });
+      if (!consentRes.ok) {
+        setError(consentRes.status === 503 ? tConsent("notActive") : tConsent("failed"));
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 5. 교수자는 JTBD 2문항으로 넘어간다 (AC-4).
       //
       // 응시 중 프로필을 채우러 온 경우(redirect 파라미터)는 예외다 — 그 사람은
       // 지금 시험을 보러 가는 중이고, 여기서 붙잡으면 온보딩이 방해가 된다.
@@ -619,6 +641,35 @@ export default function OnboardingPage() {
                 )}
               </div>
 
+              <fieldset className="space-y-3" aria-labelledby="consent-title">
+                <legend id="consent-title" className="font-medium">
+                  {tConsent("title")}
+                </legend>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="age-over-14"
+                    checked={ageOver14}
+                    onCheckedChange={(checked) => setAgeOver14(checked === true)}
+                  />
+                  <Label htmlFor="age-over-14" className="cursor-pointer">
+                    {tConsent("ageOver14.label")}
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="terms"
+                    checked={terms}
+                    onCheckedChange={(checked) => setTerms(checked === true)}
+                  />
+                  <Label htmlFor="terms" className="cursor-pointer">
+                    {tConsent("terms.label")}
+                  </Label>
+                  <a href="/legal/terms" className="text-sm text-primary underline">
+                    {tConsent("terms.linkLabel")}
+                  </a>
+                </div>
+              </fieldset>
+
               {error && <ErrorAlert message={error} />}
 
               <div className="flex gap-3">
@@ -636,6 +687,9 @@ export default function OnboardingPage() {
                   className="flex-1"
                   disabled={
                     isSubmitting ||
+                    prefillFailed ||
+                    !ageOver14 ||
+                    !terms ||
                     !name ||
                     !school ||
                     (role === "student" && !studentNumber)
