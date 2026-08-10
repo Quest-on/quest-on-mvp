@@ -81,10 +81,32 @@ describe("연속성 경로 — 세션 소유권", () => {
     const source = code(read(relative));
 
     // 끝난 시험 세션에 계속 쓸 수 있으면 연속성 예외가 영구 우회가 된다.
-    const restrictsStatus =
-      /in_progress/.test(source) ||
-      /\bstatus\b[^\n]*(?:submitted|completed|closed|expired)/.test(source) ||
-      /submitted_at/.test(source);
+    //
+    // 소유권 때와 같은 실수를 반복하지 않는다. 필드를 SELECT 만 하고
+    // 거부하지 않으면 통과시키면 안 된다. **비교와 거부 분기**를 요구한다.
+    //
+    // 인정하는 형태:
+    //   .eq("status", "in_progress") / .is("submitted_at", null)  ← 쿼리 필터
+    //   if (session.submitted_at) return ...
+    //   if (x.status !== "in_progress") return ...
+    const filtersInQuery =
+      /\.eq\(\s*["']status["']\s*,\s*["']in_progress["']\s*\)/.test(source) ||
+      /\.is\(\s*["']submitted_at["']\s*,\s*null\s*\)/.test(source);
+
+    const rejectsOnStatus = [
+      ...source.matchAll(
+        /if\s*\(([^)]*(?:submitted_at|status)[^)]*)\)\s*\{([\s\S]{0,400}?)\n\s*\}/g,
+      ),
+    ].some(([, condition, body]) => {
+      const comparesStatus =
+        /submitted_at/.test(condition) ||
+        /status\s*(?:!==|===|!=|==)/.test(condition) ||
+        /in_progress/.test(condition);
+      const rejects = /\breturn\b|\bthrow\b/.test(body);
+      return comparesStatus && rejects;
+    });
+
+    const restrictsStatus = filtersInQuery || rejectsOnStatus;
 
     expect(
       restrictsStatus,
