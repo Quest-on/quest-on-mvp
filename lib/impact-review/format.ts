@@ -18,6 +18,22 @@ function modelBadge(p: ProviderResult): string {
   return p.model.split("/").pop() ?? p.model;
 }
 
+/**
+ * 모델/에이전트 레인이 안 돌았으면 그 사실을 코멘트 본문에 박는다.
+ *
+ * 레인이 죽어도 job 은 초록으로 끝난다(결정적 검사만 통과시키는 설계). 그런데
+ * 그때 "차단할 이슈가 없어요" 만 보이면 읽는 쪽은 AI 리뷰를 통과했다고 믿는다.
+ * 초록의 의미가 조용히 바뀌는 것이 이 봇에서 가장 위험한 실패다.
+ */
+function degradedNotice(p: ProviderResult): string | null {
+  if (!p.skipped) return null;
+  return (
+    `> ⚠️ **AI 리뷰가 실행되지 않았습니다** — \`${p.skippedReason ?? "skipped"}\`\n` +
+    `> 아래는 결정적 검사 결과뿐이고 회귀·아키텍처 레인은 비어 있습니다. ` +
+    `이 코멘트가 초록이어도 AI 검토를 받은 것이 아닙니다.`
+  );
+}
+
 /** PR/커밋 코멘트용 Markdown(한국어). 결정적 섹션 먼저, 모델 섹션 다음. 간결 유지. */
 export function formatComment(result: ReviewResult, event: "pr" | "push"): string {
   const visible = visibleFindings(result.findings);
@@ -32,8 +48,16 @@ export function formatComment(result: ReviewResult, event: "pr" | "push"): strin
       `변경 파일 ${result.changedFiles.length}개_`
   );
 
+  const degraded = degradedNotice(result.provider);
+  if (degraded) lines.push("", degraded);
+
   if (visible.length === 0) {
-    lines.push("", "🌸 차단할 영향/회귀 이슈가 없어요!");
+    lines.push(
+      "",
+      degraded
+        ? "결정적 검사에서는 차단할 이슈가 없습니다. **AI 리뷰는 돌지 않았습니다.**"
+        : "🌸 차단할 영향/회귀 이슈가 없어요!"
+    );
     lines.push("", `<sub>🐥 ${BOT_NAME} — 변경 영향·거울 드리프트 자동 리뷰</sub>`);
     return lines.join("\n");
   }
