@@ -675,6 +675,41 @@ export async function initExamSession(data: {
         session = existing;
       } else {
         session = upsertedSession;
+
+        // 018 이전 DB는 is_demo 컬럼 조회가 실패한다. 세션 삽입 뒤에만 격리해
+        // 실패해도 학생 입장을 막지 않고, 발행 계측만 건너뛴다.
+        try {
+          const { data: publicationExam, error: demoQueryError } = await getSupabase()
+            .from("exams")
+            .select("is_demo")
+            .eq("id", exam.id)
+            .maybeSingle();
+
+          if (demoQueryError) {
+            logError("[initExamSession] Failed to check whether exam is a demo", demoQueryError, {
+              path: "/api/supa/session-handlers",
+              additionalData: { examId: exam.id },
+            });
+          } else if (!publicationExam?.is_demo) {
+            const { error: publicationError } = await getSupabase()
+              .from("exams")
+              .update({ first_published_at: now })
+              .eq("id", exam.id)
+              .is("first_published_at", null);
+
+            if (publicationError) {
+              logError("[initExamSession] Failed to record first publication", publicationError, {
+                path: "/api/supa/session-handlers",
+                additionalData: { examId: exam.id },
+              });
+            }
+          }
+        } catch (publicationError) {
+          logError("[initExamSession] Failed to record first publication", publicationError, {
+            path: "/api/supa/session-handlers",
+            additionalData: { examId: exam.id },
+          });
+        }
       }
     }
 
