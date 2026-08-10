@@ -73,6 +73,21 @@ export const ENV_MANIFEST: readonly EnvSpec[] = [
     levels: ALL_DEPLOYED,
   },
   {
+    name: "CONSENT_RETENTION_PURGE_DISABLED",
+    purpose: "동의 원장 파기 cron 킬 스위치. 최초 배포는 1로 비활성화한다.",
+    levels: ALL_DEPLOYED,
+  },
+  {
+    name: "CONSENT_RETENTION_PURGE_MODE",
+    purpose: "동의 원장 파기 모드(dry-run | delete). 최초 배포는 dry-run이며 delete는 staging 증적과 별도 운영 승인 receipt 후에만 활성화한다.",
+    levels: ALL_DEPLOYED,
+  },
+  {
+    name: "CONSENT_AUDIT_DATABASE_URL",
+    purpose: "권리요청 승인 operator 환경 전용 consent_auditor 연결 문자열. Vercel 런타임에는 넣지 않는다.",
+    levels: {},
+  },
+  {
     name: "CONSENT_SUBJECT_HMAC_KEY_V1",
     purpose:
       "동의 원장의 subject_ref 파생 키(base64 32바이트 이상). 원장은 user_id 대신 HMAC 값만 저장한다. " +

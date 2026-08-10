@@ -19,6 +19,8 @@ const DEPLOYED_BASE: Record<string, string> = {
   CRON_SECRET: "cron",
   CONSENT_SUBJECT_HMAC_KEY_V1: "consent-hmac",
   CONSENT_GATE_MODE: "enforce",
+  CONSENT_RETENTION_PURGE_DISABLED: "1",
+  CONSENT_RETENTION_PURGE_MODE: "dry-run",
 };
 
 describe("auditEnv", () => {
