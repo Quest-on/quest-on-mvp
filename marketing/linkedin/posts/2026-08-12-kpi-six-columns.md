@@ -111,7 +111,7 @@ Quest-On = **예비멘토링 8팀 중 연번 5, 배치 트랙.**
 
 총회원 3.
 
-3은 작습니다. 대신 세 분 다 한 번 쓰고 끝나지 않았습니다. 시험이든 과제든 다음 회차를 저희로 다시 여셨고, 그중 한 분은 동료 교수님께 저희를 소개해 주셨습니다. 광고가 만든 숫자가 아닙니다.
+3은 작습니다. 대신 한 번 쓰고 끝난 분이 한 분도 없습니다. 세 분 다 다음 시험이나 다음 과제에 저희를 다시 부르셨고, 그중 한 분은 동료 교수님께 저희를 소개해 주셨습니다. 광고가 만든 숫자가 아닙니다.
 
 지원이 마감되던 날 프라이머 권도균 대표님이 올리신 글에 이런 문장이 있었습니다. 결과가 나오기 한 달 전 글이고 저희 팀 이야기도 아니지만, 시트를 채우는 내내 이 문장이 남았습니다.
 
@@ -149,11 +149,11 @@ Students use Quest-On. Instructors pay for it. So we redefined "member" as instr
 
 Three.
 
-Three is small. Three is also real: all three came back for a second round, and one of them introduced a colleague. None of it came from ads.
+Three is small. But none of them used us once and stopped. All three came back for the next exam or assignment, and one introduced a colleague. None of it came from ads.
 
-Every number we were proud of was a building number — universities deployed to, exams delivered, attempts logged. Meanwhile half of our team meetings for six months was same-day support for existing users. We were building, not listening.
+Every number we were proud of was a building number: universities deployed to, exams delivered, attempts logged. Meanwhile half of our team meetings for six months was same-day support. We were building, not listening.
 
-August is our semester break, so the next five weeks are structurally zero. So we added a sixth column: conversations with instructors that actually happened that week.
+August is our semester break, so the next five weeks are structurally zero. So we added a sixth column: conversations with instructors that actually happened.
 
 If grading breaks in the same place for you every term, would you give us 30 minutes? We won't pitch. We'll trade — you tell us where it breaks, and we'll tell you what we saw across three universities.
 
@@ -373,19 +373,15 @@ If grading breaks in the same place for you every term, would you give us 30 min
 - LinkedIn 공개 포스트 3건 원문 페치 성공. 개인 프로필은 비로그인 HTTP 999.
 - **운영 DB 조회 0건.**
 
-### ⚠️ 미해소 정합성 — 「세 분 다 재사용」 vs KPI 시트
+### ✅ 정합성 종결 — 「세 분 전원 재도입」 (2026-08-10 영준 확정)
 
-2026-08-09 영준 지시로 본문을 **「세 분 다 한 번 쓰고 끝나지 않았습니다」**로 고쳤다. 그런데 vault 기록과 어긋난다.
+전날 열어둔 판정 항목이 닫혔다. **영준 확정: 유료 도입 교수 3명 전원 재도입.**
 
-| 소스 | 값 |
-|---|---|
-| 2026-08-05 KPI 재설계 결정문 | 학기 **재도입 교수 = 1명**(동국대 학부 중간→기말). 장진욱 교수 과제 2건은 같은 학기 안이라 **재도입이 아니라 확장**으로 분류 |
-| 같은 문서 | 「학기 내 재사용은 **1/3**」 |
-| 영준(2026-08-09) | **3명 전부 recurring** |
+| 소스 | 종전 | 확정 |
+|---|---|---|
+| 2026-08-05 KPI 재설계 결정문 | 재도입 baseline **1명**, 「학기 내 재사용 1/3」 | **3명 / 3명** |
+| 본문 카피 | 「세 분 다 한 번 쓰고 끝나지 않았습니다」(봉합 표현) | **「한 번 쓰고 끝난 분이 한 분도 없습니다」**(정면 표현) |
 
-본문 문구는 「재도입」이 아니라 **「한 번 쓰고 끝나지 않았다」**(= 반복 사용)로 써서 두 정의 사이에서 참이 되도록 잡았다. 그래도 **다음 둘 중 하나는 정리해야 한다.**
+→ 어제 적어 둔 두 갈래 중 **1번(영준 기준이 맞다 → vault를 고친다)** 으로 종결. vault 「2026-08-05 Quest-On KPI 재설계」 결정문에 정정 블록을 추가했다.
 
-1. 영준 기준이 맞다면 → KPI 시트의 재도입/재사용 집계와 vault baseline(1명)을 **같이 고쳐야 한다.** 안 그러면 공개 글은 「전부 재사용」인데 투자자 시트는 「재도입 1」로 남아 서로 어긋난다.
-2. vault 기준이 맞다면 → 본문에서 「세 분 다」를 빼야 한다.
-
-**발행 전에 영준이 판정한다.** 투자자가 같은 주에 두 숫자를 다 볼 수 있는 상황이라 방치하면 안 된다.
+⚠️ **남은 실무 하나 (글에는 영향 없음).** KPI 시트의 「재도입률」 칸이 아직 「가을 첫 측정」으로 비어 있다. 3/3이 **학기 간** 재도입이면 그 칸은 지금 채울 수 있고, **학기 내** 반복이면 「가을 첫 측정」이 맞다. 본문은 학기 경계를 특정하지 않는 표현(「다음 시험이나 다음 과제」)이라 어느 쪽이든 참이다. 시트 기입만 영준이 정하면 된다.
