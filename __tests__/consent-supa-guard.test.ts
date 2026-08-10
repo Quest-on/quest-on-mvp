@@ -5,7 +5,7 @@ const route = readFileSync("app/api/supa/route.ts", "utf8");
 
 describe("/api/supa consent guard integration", () => {
   it("authenticates once, then invokes the guard before rate limiting", () => {
-    expect((route.match(/currentUser\(\)/g) ?? []).toHaveLength(1);
+    expect(route.match(/currentUser\(\)/g) ?? []).toHaveLength(1);
     const auth = route.indexOf("authedUser = await currentUser()");
     const guard = route.indexOf("await assertConsentOrRespond(");
     const rateLimit = route.indexOf("// Rate limit sensitive actions");
