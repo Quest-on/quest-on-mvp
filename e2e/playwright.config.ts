@@ -1,9 +1,16 @@
 import { defineConfig } from "@playwright/test";
 import path from "path";
+import { assertLocalTestEnv } from "./helpers/assert-local-test-env";
 import dotenv from "dotenv";
 
-// Load test environment variables
-dotenv.config({ path: path.resolve(__dirname, "../.env.test") });
+// Load test environment variables.
+// override: true — 셸에 남아 있는 값이 .env.test 를 이기면 로컬 스택을
+// 띄워 놓고도 엉뚱한 URL·키로 붙는다.
+dotenv.config({ path: path.resolve(__dirname, "../.env.test"), override: true });
+
+// DB 안전 멈춤 규칙(AGENTS.md). config 로드 시점에 fail-closed 로 막는다.
+// global-setup 보다 먼저 평가되므로 여기가 첫 방어선이다.
+assertLocalTestEnv();
 
 const PORT = process.env.E2E_PORT ?? "3000";
 const BASE_URL = `http://localhost:${PORT}`;

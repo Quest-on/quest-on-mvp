@@ -11,7 +11,9 @@ import { assertLocalTestEnv } from "./helpers/assert-local-test-env";
 
 // Load test env vars.
 // .env.local 은 절대 읽지 않는다 — 그 파일은 실서비스 자격증명을 담는다.
-dotenv.config({ path: path.resolve(__dirname, "../.env.test") });
+// override: true — 셸에 남아 있는 값이 .env.test 를 덮어쓰면, 로컬 스택을
+// 띄워도 원격 URL 로 붙거나(preflight 가 막지만) 엉뚱한 키를 쓰게 된다.
+dotenv.config({ path: path.resolve(__dirname, "../.env.test"), override: true });
 
 // DB 안전 멈춤 규칙(AGENTS.md) 을 여기서 fail-closed 로 강제한다.
 // 이 호출이 없으면 .env.test 에 원격 URL 이 들어 있을 때 그대로 원격을 파괴한다.
