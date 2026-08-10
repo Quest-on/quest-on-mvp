@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { getDeviceFingerprint } from "@/lib/device-fingerprint";
 import { createSupabaseClient } from "@/lib/supabase-client";
+import { hasAiChatQuestions } from "@/lib/grading-helpers";
 
 interface Question {
   id: string;
@@ -226,25 +227,23 @@ export function useExamSession({
         initData.sessionStatus || initData.session.status || "not_joined";
       setSessionStatus(currentSessionStatus);
 
-      // Show preflight when preflight_accepted_at is null and the session is
-      // in a state that needs acceptance.
-      // - "joined" / "waiting": pre-start join or waiting room — always show
-      //   when preflight not yet accepted.
-      // - "in_progress" with null preflight_accepted_at: the API auto-promotes
-      //   "joined" → "in_progress" on already-running exams without setting
-      //   preflight_accepted_at, so the modal must still appear here. Seed
-      //   data that wants to skip the modal (e.g. tests that simulate an
-      //   already-accepted session) must seed preflight_accepted_at.
-      // Excluded states: submitted / auto_submitted / late_pending — these
-      // either have no UI need for preflight or use a different gating path.
+      // 세션 수락 여부와 사람 단위 고지 확인은 별개다. 전자만 보면 레거시
+      // 장기 세션과 지각 입장이 AI 고지를 건너뛴다.
       const needsPreflightStatuses = new Set([
         "joined",
         "waiting",
+        "late_pending",
         "in_progress",
       ]);
+      const completedSessionStatuses = new Set(["submitted", "auto_submitted"]);
+      const needsDisclosureAcknowledgement =
+        hasAiChatQuestions(initData.exam.questions) &&
+        !initData.disclosureAcknowledged;
       if (
-        !initData.session.preflight_accepted_at &&
-        needsPreflightStatuses.has(currentSessionStatus)
+        needsPreflightStatuses.has(currentSessionStatus) &&
+        !completedSessionStatuses.has(currentSessionStatus) &&
+        !initData.session.submitted_at &&
+        (!initData.session.preflight_accepted_at || needsDisclosureAcknowledgement)
       ) {
         setShowPreflight(true);
       }
