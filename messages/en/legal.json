@@ -5,7 +5,7 @@
     "security": "Data security",
     "cookies": "Cookie policy"
   },
-  "lastModified": "Last updated: January 1, 2025",
+  "lastModified": "2026-08-10",
   "cookies": {
     "title": "Cookie Policy",
     "section1": {
@@ -108,61 +108,103 @@
       "item5": "Service stability (error and security log analysis)"
     },
     "section3": {
-      "heading": "3. Retention periods",
-      "item1": "Retained for 30 days after account deletion, then permanently removed (or as required by law)",
+      "heading": "3. Retention and destruction",
       "item1Label": "Account information:",
-      "item2": "For 1 year after the institution's contract ends, or as configured by the instructor",
-      "item2Label": "Exam / answer / AI logs:",
-      "item3": "Retained for 90 days for security purposes",
+      "item1": "Destroyed without delay when you close your account.",
+      "item2Label": "Exams, answers and AI conversation logs:",
+      "item2": "Retained for the period your educator sets; if none is set, destroyed when service use ends.",
       "item3Label": "Access logs:",
-      "principle": "All data is retained for the minimum period necessary."
+      "item3": "Retained for 90 days for security purposes, then destroyed.",
+      "principle": "We follow the minimum necessary retention principle and destroy personal data without delay once its purpose is fulfilled.",
+      "pseudonymized": {
+        "heading": "Pseudonymized retention of consent records after account closure",
+        "purpose": "Purpose: to evidence that consent was obtained.",
+        "period": "Period: three years from the date of account closure.",
+        "nature": "The retained data is pseudonymized, not anonymized. We do not store your member identifier; we keep only a substitute identifier derived with a separately held key.",
+        "separation": "Safeguards: the link between the substitute identifier and your member identifier is deleted at closure, and the derivation key is held in a separate, access-restricted environment that ordinary service credentials cannot read.",
+        "destruction": "When the period elapses, an automated destruction routine deletes the records irrecoverably.",
+        "rights": "You may still submit access, correction or deletion requests during the retention period using the contact below."
+      },
+      "incompleteAccounts": {
+        "heading": "Destruction of accounts that never completed sign-up",
+        "scope": "Scope: accounts created after this policy first took effect that have not completed the confirmations required to finish sign-up.",
+        "retention": "Retention: seven days from account creation.",
+        "destruction": "Procedure: after seven days an automated destruction job deletes the account and related data irrecoverably."
+      }
     },
     "section4": {
-      "heading": "4. Third-party sharing and processors",
+      "heading": "4. Third-party provision and processors",
       "thirdParty": {
-        "heading": "Third-party sharing",
-        "body": "We do not share personal data with third parties except as described in this policy."
+        "heading": "Third-party provision",
+        "body": "We provide personal data to third parties as follows.",
+        "recipient": "Recipient: the educator who created the exam you took, and their affiliated institution",
+        "items": "Items provided: name, affiliation and student identifier, answers, grading results, and the full transcript of your conversation with the AI",
+        "purpose": "Purpose: conducting assessment, grading and review, and academic administration",
+        "period": "Retention: for the period set by the educator",
+        "basis": "Legal basis: Article 17(4) of the Personal Information Protection Act. We provide the data without separate consent within a scope reasonably related to the original purpose of collection.",
+        "criteriaHeading": "Reasonable relatedness assessment",
+        "criteria1": "Relatedness to the original purpose: taking an exam is itself an act of being assessed, so providing answers and conversation content to the educator is directly connected to the original purpose.",
+        "criteria2": "Foreseeability: before starting, examinees see a notice stating that the conversation with the AI is shown to the instructor as-is.",
+        "criteria3": "Absence of harm to your interests: provision is limited to what the assessment of that exam requires, and is never extended to other exams or unrelated educators.",
+        "criteria4": "Security measures: data is encrypted in transit and at rest, access is restricted to the educator responsible for that exam, and access is logged."
       },
       "processing": {
         "heading": "Data processors",
-        "body": "We engage the following service providers to operate the service:",
+        "body": "We engage the following processors to operate the service.",
         "table": {
-          "vendor": "Vendor",
-          "task": "Service",
+          "vendor": "Processor",
+          "task": "Entrusted work",
           "retention": "Retention"
         },
         "rows": {
           "cloud": {
-            "name": "Cloud hosting provider",
-            "task": "Data storage and server operations",
-            "retention": "Duration of service"
+            "name": "Supabase, Inc.",
+            "task": "Database and authentication infrastructure",
+            "retention": "Until the processing agreement ends"
           },
-          "email": {
-            "name": "Email delivery provider",
-            "task": "Email delivery",
-            "retention": "Until delivery is complete"
+          "hosting": {
+            "name": "Vercel Inc.",
+            "task": "Application hosting and deployment",
+            "retention": "Until the processing agreement ends"
           },
           "llm": {
-            "name": "LLM API provider",
-            "task": "AI feature processing",
-            "retention": "Until processing is complete"
+            "name": "OpenAI, L.L.C.",
+            "task": "AI authoring, conversation and grading",
+            "retention": "Until processing completes"
+          },
+          "cache": {
+            "name": "Upstash, Inc.",
+            "task": "Rate limiting and job queueing",
+            "retention": "Until processing completes"
           }
         }
       }
     },
     "section5": {
-      "heading": "5. International transfers",
-      "body": "If AI APIs or cloud services use overseas servers, your personal data may be transferred internationally.",
-      "country": "Destination country:",
+      "heading": "5. Cross-border transfer of personal data",
+      "body": "We transfer personal data outside the Republic of Korea as follows.",
+      "recipientLabel": "Name of the recipient:",
+      "recipientValue": "Supabase, Inc. / Vercel Inc. / OpenAI, L.L.C. / Upstash, Inc.",
+      "contactLabel": "Contact details of the recipient:",
+      "contactValue": "Supabase, Inc. privacy@supabase.io / Vercel Inc. privacy@vercel.com / OpenAI, L.L.C. privacy@openai.com / Upstash, Inc. support@upstash.com",
+      "countryLabel": "Country of transfer:",
       "countryValue": "United States",
-      "items": "Data transferred:",
-      "itemsValue": "Submitted answers, AI question/answer logs",
-      "purpose": "Purpose:",
-      "purposeValue": "AI feature processing",
-      "retention": "Retention:",
-      "retentionValue": "Until processing is complete",
-      "optOut": "How to opt out:",
-      "optOutValue": "Processing stops when you stop using the service"
+      "timingLabel": "Timing of transfer:",
+      "timingValue": "Transferred as needed at the moment the relevant processing occurs during service use.",
+      "methodLabel": "Method of transfer:",
+      "methodValue": "Transmission over an encrypted network connection",
+      "itemsLabel": "Items transferred:",
+      "itemsValue": "Account identifier, email address, answers, AI conversation content, and service usage records",
+      "purposeLabel": "Purpose of transfer:",
+      "purposeValue": "Database and authentication infrastructure, application hosting, AI processing, and rate limiting and job queueing",
+      "retentionLabel": "Recipient's retention period:",
+      "retentionValue": "Until the processing agreement ends or processing completes",
+      "basisLabel": "Legal basis:",
+      "basisValue": "Article 28-8(1)3 of the Personal Information Protection Act. The transfer constitutes entrusted processing and storage necessary to perform a contract, and the matters listed in Article 28-8(2) are disclosed in this policy in lieu of separate consent.",
+      "optOutLabel": "How to refuse the transfer:",
+      "optOutValue": "You may notify us of your refusal using the contact below, or close your account.",
+      "optOutEffectLabel": "Effect of refusal:",
+      "optOutEffectValue": "Processing by these recipients is essential to providing the service, so if you refuse the transfer you will not be able to use the service."
     },
     "section6": {
       "heading": "6. Your rights",
@@ -182,9 +224,10 @@
     },
     "section8": {
       "heading": "8. Contact",
-      "officer": "Data Protection Officer",
+      "officer": "Personal Information Protection Officer",
+      "department": "Department: Quest-On Data Protection Team",
       "email": "Email: questonkr@gmail.com",
-      "contact": "For inquiries, complaints, or dispute resolution regarding personal data, please contact us at the address above."
+      "contact": "Questions, complaints and dispute resolution regarding personal data can be submitted to the contact above."
     }
   },
   "security": {
