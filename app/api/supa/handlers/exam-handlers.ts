@@ -64,6 +64,18 @@ export async function createExam(data: {
   updated_at: string;
   parent_folder_id?: string | null;
   language?: "ko" | "en";
+  /** `exams.type`. 기본은 시험. 과제 계열은 마감 기반으로 동작한다. */
+  type?: string;
+  assignment_prompt?: string | null;
+  rubric?: string | null;
+  /**
+   * 온보딩 데모 (#82 / AC-5). 목록·통계·발행 카운트에서 제외되는 exam 이다.
+   *
+   * false 일 때 키를 아예 넣지 않는 이유: `is_demo` 는 018 마이그레이션이 추가한
+   * 컬럼이라, 아직 적용되지 않은 DB 에서 일반 시험 생성까지 같이 죽는다.
+   * 기본값은 DB 가 false 로 갖고 있다.
+   */
+  is_demo?: boolean;
 }) {
   try {
     // Get current user
@@ -151,7 +163,7 @@ export async function createExam(data: {
       });
     }
 
-    const examData = {
+    const examData: Record<string, unknown> = {
       title: data.title,
       code: examCode,
       description: null, // description 필드는 nullable이므로 null로 설정
@@ -165,6 +177,10 @@ export async function createExam(data: {
       instructor_id: user.id, // Clerk user ID (e.g., "user_31ihNg56wMaE27ft10H4eApjc1J")
       created_at: data.created_at,
       updated_at: data.updated_at,
+      ...(data.type ? { type: data.type } : {}),
+      ...(data.assignment_prompt ? { assignment_prompt: data.assignment_prompt } : {}),
+      ...(data.rubric ? { rubric: data.rubric } : {}),
+      ...(data.is_demo ? { is_demo: true } : {}),
     };
 
     const parentId = data.parent_folder_id || null;

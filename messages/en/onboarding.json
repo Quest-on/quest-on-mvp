@@ -30,7 +30,21 @@
     "confirmDescStudent": "Student (exam taker)",
     "confirmDescSuffix": "You will continue as {role}. You can change this later in your profile settings.",
     "reSelectBtn": "Choose again",
-    "confirmBtn": "Confirm"
+    "confirmBtn": "Confirm",
+    "intakeTitle": "Almost done",
+    "intakeDesc": "Answer two questions and we will set up a demo exam that fits your subject.",
+    "intakeAssessTargetLabel": "What do you assess?",
+    "intakeAssessTarget_exam": "Exams",
+    "intakeAssessTarget_assignment": "Assignments",
+    "intakeSubjectLabel": "What subject do you teach?",
+    "intakeSubject_humanities": "Humanities & Social Sciences",
+    "intakeSubject_business": "Business & Economics",
+    "intakeSubject_engineering": "Engineering & Sciences",
+    "intakeSubject_health": "Health & Medicine",
+    "intakeSubject_general": "Other",
+    "intakeSubmitBtn": "Create demo exam",
+    "intakeSkipBtn": "Skip",
+    "intakeCreating": "Creating..."
   },
   "profileSetup": {
     "cardTitle": "Profile setup",

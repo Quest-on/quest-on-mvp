@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import { useRouter } from "next/navigation";
 import {
@@ -42,11 +42,13 @@ interface University {
 
 export default function OnboardingPage() {
   const t = useTranslations("onboarding.page");
+  const locale = useLocale();
   const { user, profile, isLoaded } = useAppUser();
   const router = useRouter();
 
-  // Step: "role" | "profile"
-  const [step, setStep] = useState<"role" | "profile">("role");
+  // Step: "role" | "profile" | "intake"
+  // intake 는 교수자 전용 JTBD 2문항 단계다 (AC-4). 학생은 거치지 않는다.
+  const [step, setStep] = useState<"role" | "profile" | "intake">("role");
   const [role, setRole] = useState<"instructor" | "student">("student");
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,6 +66,13 @@ export default function OnboardingPage() {
 
   // Student-only fields
   const [studentNumber, setStudentNumber] = useState("");
+
+  // JTBD 2문항 (AC-4). 프로필 수집이 아니라 데모 템플릿 선택 입력이다 —
+  // 즉시 소비되지 않는 질문은 온보딩에 둘 이유가 없다.
+  const [assessTarget, setAssessTarget] = useState<"exam" | "assignment">("exam");
+  const [subject, setSubject] = useState<
+    "humanities" | "business" | "engineering" | "health" | "general"
+  >("general");
 
   // AC-1: 가입 시점의 역할 의도를 해석할 수 있으면 역할 단계를 건너뛴다.
   // 해석할 수 없으면(예: OAuth 쿠키 소실) 역할 단계를 그대로 보여준다 —
@@ -262,7 +271,10 @@ export default function OnboardingPage() {
             });
       if (!roleProfileRes.ok) throw new Error("Role profile update failed");
 
-      // 4. Redirect
+      // 4. 교수자는 JTBD 2문항으로 넘어간다 (AC-4).
+      //
+      // 응시 중 프로필을 채우러 온 경우(redirect 파라미터)는 예외다 — 그 사람은
+      // 지금 시험을 보러 가는 중이고, 여기서 붙잡으면 온보딩이 방해가 된다.
       //
       // redirect 는 URL 쿼리(= 사용자 입력)로 들어온다. `/student/profile-setup`
       // 이 쿼리를 그대로 넘겨주므로 이 지점이 유일한 소비 지점이자 검증 지점이다.
@@ -278,7 +290,8 @@ export default function OnboardingPage() {
       if (redirectTarget) {
         window.location.href = redirectTarget;
       } else if (role === "instructor") {
-        window.location.href = "/instructor-pending";
+        setStep("intake");
+        setIsSubmitting(false);
       } else {
         sessionStorage.setItem("profile-setup-complete", "true");
         window.location.href = "/student";
@@ -287,6 +300,44 @@ export default function OnboardingPage() {
       setError(t("saveFailed"));
       setIsSubmitting(false);
     }
+  };
+
+  /**
+   * 데모 생성 (AC-5, AC-6).
+   *
+   * 건너뛰어도 데모는 만든다. 빈 대시보드로 보내는 것보다 기본 템플릿이라도
+   * 만져볼 게 있는 편이 낫다 — 건너뛴 사실은 서버가 마일스톤에 남겨서 발행
+   * 직전에 같은 질문을 다시 물을 근거로 쓴다.
+   *
+   * 생성이 실패해도 교수자를 온보딩에 가둬 두지 않는다. 데모는 도움이지
+   * 관문이 아니다. 그래서 성공 여부와 무관하게 다음 화면으로 보낸다.
+   */
+  const createDemo = async (skipped: boolean) => {
+    setIsSubmitting(true);
+    setError("");
+    let examId: string | null = null;
+    try {
+      const res = await fetch("/api/onboarding/demo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(skipped ? {} : { assessTarget, subject }),
+          skipped,
+          language: locale === "en" ? "en" : "ko",
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        examId = typeof data?.examId === "string" ? data.examId : null;
+      }
+    } catch {
+      // 무시하고 진행한다 — 아래 이동은 항상 일어난다.
+    }
+    // 데모 상세로 직접 보낸다. 드라이브 목록을 거쳐 찾게 하면 AC-17(데모는
+    // 목록·통계·발행 카운트 어디에도 나타나지 않는다)과 정면으로 부딪힌다 —
+    // 목록에서 숨기는 순간 데모가 도달 불가능해지기 때문이다. 링크로 보내면
+    // 둘 다 성립한다.
+    window.location.href = examId ? `/instructor/${examId}` : "/instructor";
   };
 
   if (!isLoaded || !user) {
@@ -349,6 +400,114 @@ export default function OnboardingPage() {
             >
               {t("continueBtn")}
             </Button>
+          </CardContent>
+        </Card>
+      ) : step === "intake" ? (
+        /* ── Step 3: JTBD 2문항 (교수자 전용, AC-4) ── */
+        <Card className="w-full shadow-xl border-0">
+          <CardHeader className="text-center space-y-4">
+            <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto">
+              <GraduationCap className="w-8 h-8 text-primary-foreground" />
+            </div>
+            <CardTitle className="text-2xl font-bold">{t("intakeTitle")}</CardTitle>
+            <CardDescription className="text-base">
+              {t("intakeDesc")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {error && <ErrorAlert message={error} />}
+
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">
+                {t("intakeAssessTargetLabel")}
+              </Label>
+              <RadioGroup
+                value={assessTarget}
+                onValueChange={(value) =>
+                  setAssessTarget(value as "exam" | "assignment")
+                }
+                className="grid grid-cols-2 gap-3"
+              >
+                {(["exam", "assignment"] as const).map((value) => (
+                  <Label
+                    key={value}
+                    htmlFor={`assess-${value}`}
+                    className="flex items-center gap-2 rounded-lg border-2 p-4 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                  >
+                    <RadioGroupItem value={value} id={`assess-${value}`} />
+                    <span className="text-sm font-medium">
+                      {t(`intakeAssessTarget_${value}`)}
+                    </span>
+                  </Label>
+                ))}
+              </RadioGroup>
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">
+                {t("intakeSubjectLabel")}
+              </Label>
+              <RadioGroup
+                value={subject}
+                onValueChange={(value) =>
+                  setSubject(
+                    value as
+                      | "humanities"
+                      | "business"
+                      | "engineering"
+                      | "health"
+                      | "general"
+                  )
+                }
+                className="grid grid-cols-2 gap-3"
+              >
+                {(
+                  [
+                    "humanities",
+                    "business",
+                    "engineering",
+                    "health",
+                    "general",
+                  ] as const
+                ).map((value) => (
+                  <Label
+                    key={value}
+                    htmlFor={`subject-${value}`}
+                    className="flex items-center gap-2 rounded-lg border-2 p-3 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                  >
+                    <RadioGroupItem value={value} id={`subject-${value}`} />
+                    <span className="text-sm">{t(`intakeSubject_${value}`)}</span>
+                  </Label>
+                ))}
+              </RadioGroup>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 min-h-[48px]"
+                disabled={isSubmitting}
+                onClick={() => createDemo(true)}
+              >
+                {t("intakeSkipBtn")}
+              </Button>
+              <Button
+                type="button"
+                className="flex-1 min-h-[48px]"
+                disabled={isSubmitting}
+                onClick={() => createDemo(false)}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {t("intakeCreating")}
+                  </>
+                ) : (
+                  t("intakeSubmitBtn")
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
