@@ -9,7 +9,9 @@ import {
   type AuthAccountCandidate,
 } from "@/lib/incomplete-account-purge";
 
-const cutoff = "2026-08-10T00:00:00.000Z";
+// cutoff 은 "지금"이 아니라 "지금 - 7일" 이다. now = 2026-08-10 기준으로 2026-08-03.
+// 이 둘을 헷갈리면 7일 미만 계정이 후보로 잡혀 살아 있는 계정이 지워진다.
+const cutoff = "2026-08-03T00:00:00.000Z";
 const firstRelease = "2026-08-01T00:00:00.000Z";
 const incomplete = vi.fn().mockResolvedValue({ complete: false });
 const complete = vi.fn().mockResolvedValue({ complete: true });
