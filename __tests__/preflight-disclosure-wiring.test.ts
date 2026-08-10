@@ -31,8 +31,14 @@ function isGated(
   return gateEnd > idx - lastGate && text.slice(lastGate, lastGate + gateEnd).includes(translationKey);
 }
 
-/** AI 고지 3줄은 사람 단위 1회 게이트까지 함께 걸려야 한다 (AC-15). */
-const DISCLOSURE_GATE = "{examHasEssay && showAiDisclosure && (";
+/**
+ * AI 최초 확인 묶음은 **하나의 게이트**여야 한다 (AC-14 / AC-15).
+ *
+ * 3줄만 숨기고 동의 체크박스를 남기면 "확인을 다시 받는" 것이라 재노출 금지가
+ * 반쪽이 된다. 반대로 시험 규칙·시간 정책까지 숨기면 시험마다 다른 정보를
+ * 못 보게 된다. 그래서 게이트 이름 하나로 묶어 두고 그 사용처를 고정한다.
+ */
+const DISCLOSURE_GATE = "{showFirstRunAiConsent && (";
 
 describe("PreflightModal AI 고지 게이팅", () => {
   it("examHasEssay 를 prop 으로 받는다", () => {
@@ -75,11 +81,11 @@ describe("PreflightModal AI 고지 게이팅", () => {
 
   it("AI 로그 동의 체크박스와 수락 조건도 함께 게이팅된다", () => {
     // 체크박스만 숨기고 조건을 안 고치면 객관식 시험에서 시작 버튼이 영원히 비활성이 된다.
-    expect(source).toMatch(/const canAccept = examHasEssay/);
+    expect(source).toMatch(/const canAccept = showFirstRunAiConsent/);
     expect(source).toMatch(
-      /disabled=\{examHasEssay \? \(!rulesAccepted \|\| !aiLogAccepted\) : !rulesAccepted\}/
+      /disabled=\{showFirstRunAiConsent \? \(!rulesAccepted \|\| !aiLogAccepted\) : !rulesAccepted\}/
     );
-    expect(isGated("ai-log")).toBe(true);
+    expect(isGated("ai-log", source, DISCLOSURE_GATE)).toBe(true);
   });
 
   it("고지 블록이 무조건 렌더되는 형태로 되돌아가지 않는다", () => {

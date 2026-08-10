@@ -46,8 +46,23 @@ export function PreflightModal({
   const [rulesAccepted, setRulesAccepted] = useState(false);
   const [aiLogAccepted, setAiLogAccepted] = useState(false);
 
+  /**
+   * AI 최초 고지 묶음을 이번 응시에 보여줄 것인가 (AC-14 / AC-15).
+   *
+   * `examHasEssay` — 채팅이 아예 없는 MCQ/OX 전용 시험에서 "AI에게 질문하세요"를
+   * 안내하면 고지가 거짓이 된다.
+   * `showAiDisclosure` — 이미 확인한 학생에게 매 시험 같은 걸 다시 읽히면 그때부터
+   * 안 읽는다. AC-15 가 재노출을 금지하는 이유다.
+   *
+   * 3줄 블록만 숨기고 동의 체크박스를 남기면 "확인을 다시 받는" 것이라 재노출
+   * 금지가 반쪽이 된다. 최초 확인 묶음(3줄 + 로그 공지 + 동의 체크박스 + 수락
+   * 조건)을 하나의 게이트로 묶는다. 시험 규칙·시간 정책은 시험마다 다르므로
+   * 이 게이트 밖에 그대로 둔다.
+   */
+  const showFirstRunAiConsent = examHasEssay && showAiDisclosure;
+
   const handleAccept = () => {
-    const canAccept = examHasEssay
+    const canAccept = showFirstRunAiConsent
       ? rulesAccepted && aiLogAccepted
       : rulesAccepted;
     if (canAccept) {
@@ -105,7 +120,7 @@ export function PreflightModal({
               showAiDisclosure 는 사람 단위 최초 1회 게이팅이다 (AC-15). 이미 확인한
               학생에게 매 시험 같은 3줄을 다시 읽히면 그때부터는 안 읽는다. 확인
               사실은 onboarding_events(student_disclosure_ack)에 남는다. */}
-          {examHasEssay && showAiDisclosure && (
+          {showFirstRunAiConsent && (
             <div className="border rounded-lg p-4 bg-muted/30">
               <h3 className="font-semibold mb-2 flex items-center gap-2">
                 <Shield className="h-4 w-4 text-primary" />
@@ -261,7 +276,7 @@ export function PreflightModal({
           </Collapsible>
 
           {/* AI 로그 공지 */}
-          {examHasEssay && (
+          {showFirstRunAiConsent && (
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
@@ -294,7 +309,7 @@ export function PreflightModal({
                 {t("preflight.rulesCheckLabel")}
               </label>
             </div>
-            {examHasEssay && (
+            {showFirstRunAiConsent && (
               <div className="flex items-start gap-3">
                 <Checkbox
                   id="ai-log"
@@ -322,7 +337,7 @@ export function PreflightModal({
           </Button>
           <Button
             onClick={handleAccept}
-            disabled={examHasEssay ? (!rulesAccepted || !aiLogAccepted) : !rulesAccepted}
+            disabled={showFirstRunAiConsent ? (!rulesAccepted || !aiLogAccepted) : !rulesAccepted}
             data-testid="preflight-accept-btn"
           >
             {t("preflight.acceptButton")}
