@@ -7,9 +7,16 @@ import {
   createTestSupabaseClient,
   waitForTestSupabaseReady,
 } from "./helpers/supabase-test-client";
+import { assertLocalTestEnv } from "./helpers/assert-local-test-env";
 
-// Load test env vars
+// Load test env vars.
+// .env.local 은 절대 읽지 않는다 — 그 파일은 실서비스 자격증명을 담는다.
 dotenv.config({ path: path.resolve(__dirname, "../.env.test") });
+
+// DB 안전 멈춤 규칙(AGENTS.md) 을 여기서 fail-closed 로 강제한다.
+// 이 호출이 없으면 .env.test 에 원격 URL 이 들어 있을 때 그대로 원격을 파괴한다.
+// 마이그레이션·seed·cleanup 어느 것보다 먼저 실행되어야 한다.
+assertLocalTestEnv();
 
 let mockServer: ChildProcess | null = null;
 
