@@ -70,7 +70,10 @@ test.describe("POST /api/exam/[examId]/late-entry", () => {
 
     const updated = await getSession(session.id);
     expect(updated.status).toBe("in_progress");
-    expect(updated.preflight_accepted_at).toBe(acceptedAt);
+    // Postgres 는 +00:00 로, JS 는 Z 로 직렬화한다. 문자열이 아니라 시각을 비교한다.
+    expect(new Date(updated.preflight_accepted_at).getTime()).toBe(
+      new Date(acceptedAt).getTime()
+    );
   });
 
   test("instructor denies late_pending session → 200, session becomes denied", async ({
