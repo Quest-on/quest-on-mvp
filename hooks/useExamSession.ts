@@ -81,6 +81,9 @@ export function useExamSession({
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [examInitialized, setExamInitialized] = useState(false);
   const [showPreflight, setShowPreflight] = useState(false);
+  // AI 사용 고지를 이미 확인한 학생인지 (AC-15). 서버가 onboarding_events 로
+  // 판정한 값이라 클라이언트가 뒤집지 않는다.
+  const [disclosureAcknowledged, setDisclosureAcknowledged] = useState(false);
   const [isInWaitingRoom, setIsInWaitingRoom] = useState(false);
   const [isLateEntry, setIsLateEntry] = useState(false);
   const [sessionError, setSessionError] = useState(false);
@@ -211,6 +214,8 @@ export function useExamSession({
         return { questionId: q.id, text: submission?.answer || "" };
       })
     );
+
+    setDisclosureAcknowledged(initData.disclosureAcknowledged === true);
 
     if (initData.session) {
       setSessionId(initData.session.id);
@@ -462,6 +467,7 @@ export function useExamSession({
     isSubmitted,
     setIsSubmitted,
     showPreflight,
+    disclosureAcknowledged,
     setShowPreflight,
     isInWaitingRoom,
     setIsInWaitingRoom,

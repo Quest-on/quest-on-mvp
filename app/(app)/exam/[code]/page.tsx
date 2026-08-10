@@ -451,6 +451,8 @@ export default function ExamPage() {
   if (session.showPreflight) {
     return (
       <>
+        {/* AC-15: AI 사용 고지는 사람 단위 최초 1회만 노출한다. 시험 규칙·시간
+            정책 안내는 매 응시 유지한다 — 그건 시험마다 다르기 때문이다. */}
         <PreflightModal
           open={session.showPreflight && !submission.showPreflightCancelConfirm}
           onAccept={handlePreflightAccept}
@@ -459,6 +461,7 @@ export default function ExamPage() {
           examDuration={exam.duration}
           examDescription={exam.description}
           examHasEssay={examHasEssay}
+          showAiDisclosure={!session.disclosureAcknowledged}
         />
         <AlertDialog open={submission.showPreflightCancelConfirm} onOpenChange={submission.setShowPreflightCancelConfirm}>
           <AlertDialogContent>

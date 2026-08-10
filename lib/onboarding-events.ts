@@ -88,3 +88,42 @@ export async function recordOnboardingEvent({
     return false;
   }
 }
+
+/**
+ * 마일스톤에 이미 도달했는지 본다 (AC-15).
+ *
+ * 계측용 테이블을 **게이팅 근거로도** 쓴다. 학생 AI 고지는 "최초 1회만 보여준다"가
+ * 인수 조건이고 그 최초 1회의 정의가 곧 이 마일스톤이라, 별도 컬럼을 두면 같은
+ * 사실이 두 곳에 생기고 언젠가 어긋난다.
+ *
+ * 실패하면 `false` 다. 즉 조회 장애 시 고지를 **다시 보여주는** 쪽으로 실패한다.
+ * 반대로 실패하면 고지를 못 받은 학생이 응시하게 된다.
+ */
+export async function hasOnboardingEvent(
+  userId: string,
+  event: OnboardingEventName
+): Promise<boolean> {
+  try {
+    const supabase = getSupabaseServer();
+    const { data, error } = await supabase
+      .from("onboarding_events")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("event", event)
+      .maybeSingle();
+
+    if (error) {
+      logError("[onboarding-events] Failed to read milestone", error, {
+        path: "lib/onboarding-events",
+      });
+      return false;
+    }
+
+    return !!data;
+  } catch (err) {
+    logError("[onboarding-events] Unhandled error", err, {
+      path: "lib/onboarding-events",
+    });
+    return false;
+  }
+}

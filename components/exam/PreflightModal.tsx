@@ -28,6 +28,8 @@ interface PreflightModalProps {
   examDuration?: number;
   examDescription?: string;
   examHasEssay: boolean;
+  /** 이 학생이 아직 AI 사용 고지를 확인하지 않았는가 (AC-15) */
+  showAiDisclosure?: boolean;
 }
 
 export function PreflightModal({
@@ -38,6 +40,7 @@ export function PreflightModal({
   examDuration,
   examDescription,
   examHasEssay,
+  showAiDisclosure = true,
 }: PreflightModalProps) {
   const t = useTranslations("exam");
   const [rulesAccepted, setRulesAccepted] = useState(false);
@@ -97,8 +100,12 @@ export function PreflightModal({
               단 examHasEssay 로 게이팅한다. MCQ/OX 전용 시험은
               exam/[code]/page.tsx 가 !isCurrentObjective 일 때만 ExamChatSidebar 를
               렌더하므로 채팅 자체가 없다. 없는 기능을 쓰라고 안내하면 고지가
-              거짓이 되고, 신뢰를 얻으려던 문구가 반대로 신뢰를 깎는다. */}
-          {examHasEssay && (
+              거짓이 되고, 신뢰를 얻으려던 문구가 반대로 신뢰를 깎는다.
+
+              showAiDisclosure 는 사람 단위 최초 1회 게이팅이다 (AC-15). 이미 확인한
+              학생에게 매 시험 같은 3줄을 다시 읽히면 그때부터는 안 읽는다. 확인
+              사실은 onboarding_events(student_disclosure_ack)에 남는다. */}
+          {examHasEssay && showAiDisclosure && (
             <div className="border rounded-lg p-4 bg-muted/30">
               <h3 className="font-semibold mb-2 flex items-center gap-2">
                 <Shield className="h-4 w-4 text-primary" />
