@@ -2,18 +2,17 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
+// Windows 체크아웃(core.autocrlf=true)에서는 파일이 CRLF 로 내려온다. 아래 단언들은
+// 줄바꿈을 \n 으로 고정한 정규식이라, 정규화하지 않으면 CI(리눅스)만 통과하고
+// 개발자 로컬에서는 항상 실패한다 — 신호가 아니라 소음이 된다.
 const root = path.resolve(__dirname, "..");
+const readText = (relative: string) =>
+  readFileSync(path.join(root, relative), "utf8").replace(/\r\n/g, "\n");
 
 describe("onboarding activation migration safety", () => {
   it("applies 018 atomically and stops psql on errors", () => {
-    const migration = readFileSync(
-      path.join(root, "database/018_onboarding_activation.sql"),
-      "utf8"
-    );
-    const testSetup = readFileSync(
-      path.join(root, ".github/actions/test-setup/action.yml"),
-      "utf8"
-    );
+    const migration = readText("database/018_onboarding_activation.sql");
+    const testSetup = readText(".github/actions/test-setup/action.yml");
 
     expect(migration).toMatch(/^BEGIN;$/m);
     expect(migration).toMatch(/^COMMIT;$/m);
@@ -23,10 +22,7 @@ describe("onboarding activation migration safety", () => {
   });
 
   it("passes the non-Prisma table SQL as one psql argument", () => {
-    const testSetup = readFileSync(
-      path.join(root, ".github/actions/test-setup/action.yml"),
-      "utf8"
-    );
+    const testSetup = readText(".github/actions/test-setup/action.yml");
     const action = testSetup.match(
       /    - name: Create non-Prisma tables\n([\s\S]*?)\n    - name: Apply SQL functions/
     )?.[1];
@@ -36,7 +32,7 @@ describe("onboarding activation migration safety", () => {
   });
 
   it("keeps the onboarding event exam foreign key in Prisma", () => {
-    const schema = readFileSync(path.join(root, "prisma/schema.prisma"), "utf8");
+    const schema = readText("prisma/schema.prisma");
     const onboardingEvents = schema.match(/model onboarding_events \{([\s\S]*?)\n\}/)?.[1] ?? "";
     const exams = schema.match(/model exams \{([\s\S]*?)\n\}/)?.[1] ?? "";
 
