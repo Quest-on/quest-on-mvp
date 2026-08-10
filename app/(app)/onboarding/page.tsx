@@ -74,11 +74,6 @@ export default function OnboardingPage() {
       // 이미 역할이 확정된 기존 사용자(프로필 수정 진입)는 profiles.role 이 권위다.
       metadataRole: profile?.role ?? user?.user_metadata?.role,
       cookieString: typeof document === "undefined" ? null : document.cookie,
-      // #87 이 쿠키 라이터를 넣기 전까지 OAuth 가입자의 역할은 여기에만 있다.
-      localStorageRole:
-        typeof window === "undefined"
-          ? null
-          : window.localStorage.getItem("selectedRole"),
     });
     if (resolved) {
       setRole(resolved);
@@ -214,13 +209,28 @@ export default function OnboardingPage() {
     setIsSubmitting(true);
 
     try {
-      // profiles 테이블에 모든 정보 한 번에 업데이트
+      // 1. 역할 클레임 (#87). 인가 사실이라 프로필 편집과 라우트가 다르다.
+      //    이미 역할이 있는 사용자(프로필 수정 진입)는 부르지 않는다 — 서버가
+      //    409 로 거부하는 게 정상이고, 그걸 오류로 띄우면 수정이 막힌다.
+      if (!profile?.role) {
+        const roleRes = await fetch("/api/user/role", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role }),
+        });
+        // 409(ROLE_ALREADY_SET)는 다른 탭·재시도로 이미 정해진 경우다. 역할은
+        // 어차피 바꿀 수 없으니 프로필 저장은 계속 진행한다.
+        if (!roleRes.ok && roleRes.status !== 409) {
+          throw new Error("Role claim failed");
+        }
+      }
+
+      // 2. profiles 테이블에 프로필 정보 업데이트.
+      //    role·status 는 여기서 보내지 않는다 — 서버가 거부한다 (AC-20).
       const profileRes = await fetch("/api/user/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          role,
-          status: role === "instructor" ? "pending" : "approved",
           display_name: name.trim(),
           school: school.trim(),
           ...(role === "student" ? { student_id: studentNumber.trim() } : {}),
@@ -228,7 +238,7 @@ export default function OnboardingPage() {
       });
       if (!profileRes.ok) throw new Error("Profile update failed");
 
-      // role별 추가 프로필 테이블에도 저장 (기존 API들이 여기서 읽음).
+      // 3. role별 추가 프로필 테이블에도 저장 (기존 API들이 여기서 읽음).
       // AC-2: 이 호출의 실패를 삼키면 프로필이 반쪽만 저장된 유저가 생긴다.
       const roleProfileRes =
         role === "student"
@@ -251,9 +261,6 @@ export default function OnboardingPage() {
               }),
             });
       if (!roleProfileRes.ok) throw new Error("Role profile update failed");
-
-      // Clear localStorage
-      localStorage.removeItem("selectedRole");
 
       // 4. Redirect
       //

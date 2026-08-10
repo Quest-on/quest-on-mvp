@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { createSupabaseClient } from "@/lib/supabase-client";
+import { buildRoleCookie } from "@/lib/onboarding-role";
 import { useTranslations } from "next-intl";
 
 type Step = "start" | "verify";
@@ -26,15 +27,23 @@ export function CustomSignUp() {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 
+  // 역할 의도는 쿠키로 남긴다 (#87). localStorage 는 서버가 못 읽어서, OAuth
+  // 리다이렉트로 돌아온 뒤 서버가 역할을 클레임할 방법이 없었다.
+  const rememberRole = (value: "instructor" | "student") => {
+    document.cookie = buildRoleCookie(value, {
+      secure: window.location.protocol === "https:",
+    });
+  };
+
   const handleRoleChange = (value: "instructor" | "student") => {
     setRole(value);
-    localStorage.setItem("selectedRole", value);
+    rememberRole(value);
   };
 
   const handleOAuth = async (provider: "google" | "azure") => {
     if (oauthLoading) return;
     setOauthLoading(provider);
-    localStorage.setItem("selectedRole", role);
+    rememberRole(role);
 
     const supabase = createSupabaseClient();
     await supabase.auth.signInWithOAuth({
