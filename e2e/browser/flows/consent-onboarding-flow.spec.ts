@@ -84,3 +84,91 @@ test.describe("온보딩 동의 흐름", () => {
     await expect(fieldset.locator('a[href="/legal/terms"]')).toHaveCount(1);
   });
 });
+
+test.describe("온보딩 동의 흐름 — 조합과 복귀", () => {
+  /** 체크박스 두 개를 원하는 조합으로 맞춘다. */
+  async function setBoxes(
+    page: import("@playwright/test").Page,
+    age: boolean,
+    terms: boolean,
+  ) {
+    const fieldset = page.locator('fieldset[aria-labelledby="consent-title"]');
+    const boxes = fieldset.locator('[role="checkbox"], input[type="checkbox"]');
+    for (const [index, want] of [age, terms].entries()) {
+      const box = boxes.nth(index);
+      const state = await box.getAttribute("data-state");
+      const checked = state === "checked" || (await box.isChecked().catch(() => false));
+      if (checked !== want) await box.click();
+    }
+  }
+
+  test("한 쪽만 체크하면 제출이 열리지 않는다", async ({ freshUserPage }) => {
+    const page = freshUserPage;
+    await page.goto("/onboarding", { waitUntil: "networkidle" });
+
+    const fieldset = page.locator('fieldset[aria-labelledby="consent-title"]');
+    if ((await fieldset.count()) === 0) return;
+
+    const submit = page.locator('button[type="submit"]').first();
+
+    // 두 조합 모두 막혀야 한다. 하나로 묶어 받으면 법 제22조① 위반이다.
+    await setBoxes(page, true, false);
+    await expect(submit).toBeDisabled();
+
+    await setBoxes(page, false, true);
+    await expect(submit).toBeDisabled();
+  });
+
+  test("동의 기록이 실패하면 이동하지 않는다", async ({ freshUserPage }) => {
+    const page = freshUserPage;
+
+    // 실패를 성공처럼 넘기면 게이트가 영원히 막힌다.
+    await page.route("**/api/consents/onboarding", async (route) => {
+      if (route.request().method() === "POST") {
+        await route.fulfill({
+          status: 500,
+          body: JSON.stringify({ error: "CONSENT_RECORD_FAILED" }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.goto("/onboarding", { waitUntil: "networkidle" });
+    const fieldset = page.locator('fieldset[aria-labelledby="consent-title"]');
+    if ((await fieldset.count()) === 0) return;
+
+    await setBoxes(page, true, true);
+    const submit = page.locator('button[type="submit"]').first();
+    if (await submit.isDisabled()) return; // 프로필 필드가 비어 있으면 여기까지다
+
+    await submit.click();
+    await page.waitForTimeout(500);
+
+    expect(page.url()).toContain("/onboarding");
+  });
+
+  test("redirect 파라미터는 안전한 내부 경로만 보존한다", async ({ freshUserPage }) => {
+    const page = freshUserPage;
+
+    // 프로토콜 상대 URL 이 통과하면 로그인 직후 외부로 튕긴다.
+    await page.goto("/onboarding?redirect=//evil.com", { waitUntil: "networkidle" });
+    expect(new URL(page.url()).host).not.toContain("evil.com");
+  });
+});
+
+test.describe("온보딩 동의 흐름 — 실제 auth 경로", () => {
+  test("이메일 확인 링크로 세션을 만들면 온보딩으로 온다", async ({
+    page,
+    signInViaEmailLink,
+  }) => {
+    await signInViaEmailLink(page);
+    // 콜백은 항상 온보딩을 거친다. 바로 보호 화면으로 들어가면 안 된다.
+    expect(page.url()).toMatch(/\/onboarding|\/sign-in/);
+  });
+
+  test("callback code 경로도 온보딩으로 온다", async ({ page, signInViaCallbackCode }) => {
+    await signInViaCallbackCode(page);
+    expect(page.url()).toMatch(/\/onboarding|\/sign-in/);
+  });
+});

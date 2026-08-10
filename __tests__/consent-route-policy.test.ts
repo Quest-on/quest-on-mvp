@@ -11,10 +11,13 @@ describe("proxy — 보호 API 게이트 배선", () => {
     expect(proxySource).toMatch(/if \(!modeBlocksApis\(apiMode\)\) return response;/);
   });
 
-  it("protected 분류에만 적용한다", () => {
+  it("public 과 onboarding_support 만 무조건 통과한다", () => {
+    // 예전엔 `!== "protected"` 로 걸러서 exam_continuity 까지
+    // 소유권 검사 없이 통과했다. 그게 우회였다.
     expect(proxySource).toMatch(
-      /classifyRoute\(pathname, request\.method\) !== "protected"\) return response;/,
+      /apiRouteClass === "public" \|\| apiRouteClass === "onboarding_support"/,
     );
+    expect(proxySource).not.toMatch(/classifyRoute\([^)]*\) !== "protected"\) return response;/);
   });
 
   it("/api/supa 는 route 가 판정하므로 proxy 가 건너뛴다", () => {
@@ -22,8 +25,18 @@ describe("proxy — 보호 API 게이트 배선", () => {
     expect(proxySource).toMatch(/pathname === "\/api\/supa"\) return response;/);
   });
 
-  it("소유한 in_progress 세션은 통과시킨다", () => {
-    expect(proxySource).toMatch(/ownsInProgressSession\(apiUser\.id, pathname\)/);
+  it("연속성 예외는 continuity 분류에만, 소유권과 함께 준다", () => {
+    // protected 가 세션 하나로 우회되면 게이트가 무력해진다.
+    expect(proxySource).toMatch(
+      /apiRouteClass === "exam_continuity" &&\s*\(await ownsInProgressSession\(apiUser\.id, pathname\)\)/,
+    );
+  });
+
+  it("연속성 예외는 동의 완료 판정 뒤에 온다", () => {
+    const gateAt = proxySource.indexOf("const apiGate = await evaluateConsentGate");
+    const continuityAt = proxySource.indexOf('apiRouteClass === "exam_continuity" &&');
+    expect(gateAt).toBeGreaterThan(-1);
+    expect(continuityAt).toBeGreaterThan(gateAt);
   });
 
   it("미인증은 가로채지 않고 route 의 401 에 맡긴다", () => {

@@ -102,3 +102,96 @@ test.describe("탈퇴와 보존", () => {
     );
   });
 });
+
+test.describe("보존 만료 경계와 재실행", () => {
+  const EXPIRED_SUBJECT = "v1:" + "2".repeat(64);
+  const EXPIRED_USER = "consent-e2e-expired-user";
+
+  test.beforeAll(async () => {
+    // 이미 3년이 지난 주체를 직접 만든다. CHECK 제약을 지키려면
+    // deleted_at 과 destroy_after 가 정확히 3년 차이여야 한다.
+    const deletedAt = new Date();
+    deletedAt.setUTCFullYear(deletedAt.getUTCFullYear() - 4);
+    const destroyAfter = new Date(deletedAt);
+    destroyAfter.setUTCFullYear(destroyAfter.getUTCFullYear() + 3);
+
+    await supabase.rpc("register_consent_subject", {
+      p_user_id: EXPIRED_USER,
+      p_subject_ref: EXPIRED_SUBJECT,
+    });
+    await supabase.from("consent_records").insert({
+      subject_ref: EXPIRED_SUBJECT,
+      consent_key: "terms",
+      granted: true,
+      policy_version: RELEASE,
+    });
+    await supabase.from("consent_retention_index").insert({
+      subject_ref: EXPIRED_SUBJECT,
+      deleted_at: deletedAt.toISOString(),
+      destroy_after: destroyAfter.toISOString(),
+    });
+  });
+
+  test("dry-run 은 후보를 세되 삭제하지 않는다", async () => {
+    const { data } = await supabase.rpc("purge_expired_consent_records", {
+      p_dry_run: true,
+      p_limit: 100,
+    });
+    const row = Array.isArray(data) ? data[0] : data;
+
+    expect(row?.candidate_count ?? 0).toBeGreaterThan(0);
+    expect(row?.deleted_count ?? 0).toBe(0);
+
+    // 원장이 그대로여야 한다.
+    const { data: rows } = await supabase
+      .from("consent_records")
+      .select("id")
+      .eq("subject_ref", EXPIRED_SUBJECT);
+    expect((rows ?? []).length).toBeGreaterThan(0);
+  });
+
+  test("경계가 지난 주체는 삭제되고 재실행은 0건이다", async () => {
+    const { data: first } = await supabase.rpc("purge_expired_consent_records", {
+      p_dry_run: false,
+      p_limit: 100,
+    });
+    const firstRow = Array.isArray(first) ? first[0] : first;
+    expect(firstRow?.deleted_count ?? 0).toBeGreaterThan(0);
+
+    const { data: rows } = await supabase
+      .from("consent_records")
+      .select("id")
+      .eq("subject_ref", EXPIRED_SUBJECT);
+    expect(rows ?? []).toHaveLength(0);
+
+    // 멱등성 — 바로 다시 돌려도 지울 게 없어야 한다.
+    const { data: second } = await supabase.rpc("purge_expired_consent_records", {
+      p_dry_run: false,
+      p_limit: 100,
+    });
+    const secondRow = Array.isArray(second) ? second[0] : second;
+    expect(secondRow?.deleted_count ?? 0).toBe(0);
+  });
+});
+
+test.describe("접근 분리", () => {
+  test("일반 service 권한으로는 매핑을 직접 읽지 못한다", async () => {
+    // 019 가 service_role 의 매핑 직접 권한을 회수했다. 읽히면
+    // 탈퇴자 재식별 경로가 앱에 열려 있다는 뜻이다.
+    const { error } = await supabase
+      .from("consent_subject_map")
+      .select("user_id")
+      .limit(1);
+
+    expect(error).not.toBeNull();
+  });
+
+  test("보존 인덱스도 일반 service 권한으로 읽히지 않는다", async () => {
+    const { error } = await supabase
+      .from("consent_retention_index")
+      .select("subject_ref")
+      .limit(1);
+
+    expect(error).not.toBeNull();
+  });
+});
