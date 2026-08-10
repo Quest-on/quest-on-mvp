@@ -17,6 +17,7 @@ const DEPLOYED_BASE: Record<string, string> = {
   ADMIN_SESSION_SECRET: "secret",
   INTERNAL_API_SECRET: "internal",
   CRON_SECRET: "cron",
+  CONSENT_SUBJECT_HMAC_KEY_V1: "consent-hmac",
 };
 
 describe("auditEnv", () => {

@@ -68,6 +68,14 @@ export const ENV_MANIFEST: readonly EnvSpec[] = [
     levels: { production: "required", staging: "required", development: "recommended" },
   },
   {
+    name: "CONSENT_SUBJECT_HMAC_KEY_V1",
+    purpose:
+      "동의 원장의 subject_ref 파생 키(base64 32바이트 이상). 원장은 user_id 대신 HMAC 값만 저장한다. " +
+      "분실하면 기존 원장의 재식별 경로가 영구 소실되므로 환경별 escrow 와 복구 리허설이 필요하다. " +
+      "기존 원장 만료 전 회전 금지. repo/DB/로그에 절대 남기지 않는다.",
+    levels: { production: "required", staging: "required", development: "required" },
+  },
+  {
     name: "ADMIN_USERNAME",
     purpose: "관리자 로그인 ID.",
     levels: ALL_DEPLOYED,
