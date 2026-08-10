@@ -1,0 +1,230 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const SESSION_ID = "3f1d4b2a-1111-4111-8111-111111111111";
+const EXAM_ID = "2f1d4b2a-1111-4111-8111-111111111111";
+const INSTRUCTOR_ID = "instructor-1";
+
+let sessionUser: { id: string; role: string } | null = {
+  id: INSTRUCTOR_ID,
+  role: "instructor",
+};
+let isDemo = true;
+let isDemoLookupError: Error | null = null;
+let gradeRows: Array<Record<string, unknown>> = [{ id: "grade-1", q_idx: 0, score: 90 }];
+
+const recordOnboardingEvent = vi.fn(async () => true);
+const hasOnboardingEvent = vi.fn(async () => false);
+const recordDemoGradedViewed = vi.fn(async () => undefined);
+const isDemoCompleted = vi.fn(async () => false);
+const isAiDemoRegenerationUnlocked = vi.fn(async () => false);
+
+vi.mock("@/lib/get-current-user", () => ({
+  currentUser: async () => sessionUser,
+}));
+vi.mock("@/lib/onboarding-events", () => ({
+  ONBOARDING_EVENTS: { DEMO_GRADED_VIEWED: "demo_graded_viewed" },
+  recordOnboardingEvent,
+  hasOnboardingEvent,
+}));
+vi.mock("@/lib/demo-completion", () => ({
+  recordDemoGradedViewed,
+  isDemoCompleted,
+  isAiDemoRegenerationUnlocked,
+}));
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimitAsync: async () => ({ allowed: true }),
+  RATE_LIMITS: { sessionRead: { limit: 30, windowSec: 60 } },
+}));
+vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
+vi.mock("@/lib/app-users", () => ({
+  batchGetUserInfo: async () => new Map(),
+}));
+
+const session = {
+  id: SESSION_ID,
+  exam_id: EXAM_ID,
+  student_id: "student-1",
+  submitted_at: "2026-08-10T00:00:00Z",
+  used_clarifications: 0,
+  created_at: "2026-08-10T00:00:00Z",
+  compressed_session_data: null,
+  compression_metadata: null,
+  ai_summary: null,
+  auto_submitted: false,
+  grading_progress: null,
+  final_answer: null,
+  final_answer_updated_at: null,
+};
+const exam = {
+  id: EXAM_ID,
+  instructor_id: INSTRUCTOR_ID,
+  questions: [{ idx: 0, type: "essay", prompt: "답변" }],
+  status: "closed",
+  score_weights: null,
+};
+
+function resultFor(table: string, selectFields: string) {
+  if (table === "grades") return { data: gradeRows, error: null };
+  if (table === "submissions" || table === "messages" || table === "paste_logs") {
+    return { data: [], error: null };
+  }
+  if (table === "session_quiz_attempts") return { data: null, error: null };
+  if (table === "exams" && selectFields === "is_demo") {
+    return { data: isDemo ? { is_demo: true } : { is_demo: false }, error: isDemoLookupError };
+  }
+  return { data: null, error: null };
+}
+
+vi.mock("@/lib/supabase-server", () => ({
+  getSupabaseServer: () => ({
+    from: (table: string) => {
+      let selectFields = "";
+      const query = {
+        select: (fields: string) => {
+          selectFields = fields;
+          return query;
+        },
+        eq: () => query,
+        order: () => query,
+        single: async () => {
+          if (table === "sessions") return { data: session, error: null };
+          if (table === "exams") return { data: exam, error: null };
+          return resultFor(table, selectFields);
+        },
+        maybeSingle: async () => resultFor(table, selectFields),
+        then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
+          Promise.resolve(resultFor(table, selectFields)).then(resolve, reject),
+      };
+      return query;
+    },
+  }),
+}));
+
+async function actualDemoCompletion() {
+  return vi.importActual<typeof import("@/lib/demo-completion")>("@/lib/demo-completion");
+}
+
+async function callGrade() {
+  const { GET } = await import("../app/api/session/[sessionId]/grade/route");
+  const response = await GET(new Request("https://quest-on.app") as never, {
+    params: Promise.resolve({ sessionId: SESSION_ID }),
+  });
+  return { status: response.status, body: await response.json() };
+}
+
+async function callStatus() {
+  const { GET } = await import("../app/api/onboarding/demo/status/route");
+  const response = await GET();
+  return { status: response.status, body: await response.json() };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  sessionUser = { id: INSTRUCTOR_ID, role: "instructor" };
+  isDemo = true;
+  isDemoLookupError = null;
+  gradeRows = [{ id: "grade-1", q_idx: 0, score: 90 }];
+  recordDemoGradedViewed.mockResolvedValue(undefined);
+  isDemoCompleted.mockResolvedValue(false);
+  isAiDemoRegenerationUnlocked.mockResolvedValue(false);
+});
+
+describe("데모 완주 판정 (AC-7)", () => {
+  it("채점 결과가 있는 데모 조회는 demo_graded_viewed를 기록한다", async () => {
+    const { recordDemoGradedViewed: record } = await actualDemoCompletion();
+
+    await record({ userId: INSTRUCTOR_ID, examId: EXAM_ID, hasGrades: true });
+
+    expect(recordOnboardingEvent).toHaveBeenCalledWith({
+      userId: INSTRUCTOR_ID,
+      role: "instructor",
+      event: "demo_graded_viewed",
+      examId: EXAM_ID,
+    });
+  });
+
+  it("채점 결과가 없는 데모 조회는 기록하지 않는다", async () => {
+    const { recordDemoGradedViewed: record } = await actualDemoCompletion();
+
+    await record({ userId: INSTRUCTOR_ID, examId: EXAM_ID, hasGrades: false });
+
+    expect(recordOnboardingEvent).not.toHaveBeenCalled();
+  });
+
+  it("데모가 아닌 시험 조회는 기록하지 않는다", async () => {
+    isDemo = false;
+    const { recordDemoGradedViewed: record } = await actualDemoCompletion();
+
+    await record({ userId: INSTRUCTOR_ID, examId: EXAM_ID, hasGrades: true });
+
+    expect(recordOnboardingEvent).not.toHaveBeenCalled();
+  });
+
+  it("018 미적용으로 is_demo 조회가 실패해도 기록하지 않고 예외를 내지 않는다", async () => {
+    isDemoLookupError = new Error("column exams.is_demo does not exist");
+    const { recordDemoGradedViewed: record } = await actualDemoCompletion();
+
+    await expect(record({ userId: INSTRUCTOR_ID, examId: EXAM_ID, hasGrades: true })).resolves.toBeUndefined();
+    expect(recordOnboardingEvent).not.toHaveBeenCalled();
+  });
+
+  it("채점 결과 열람은 시험 소유자와 실제 grade 존재 여부로 계측한다", async () => {
+    const result = await callGrade();
+
+    expect(result.status).toBe(200);
+    expect(recordDemoGradedViewed).toHaveBeenCalledWith({
+      userId: INSTRUCTOR_ID,
+      examId: EXAM_ID,
+      hasGrades: true,
+    });
+  }, 10_000);
+
+  it("채점 결과가 없으면 grade 조회 훅도 완주로 기록하지 않는다", async () => {
+    gradeRows = [];
+
+    const result = await callGrade();
+
+    expect(result.status).toBe(200);
+    expect(recordDemoGradedViewed).toHaveBeenCalledWith({
+      userId: INSTRUCTOR_ID,
+      examId: EXAM_ID,
+      hasGrades: false,
+    });
+  });
+
+  it("계측이 실패해도 채점 결과 조회 응답은 성공한다", async () => {
+    recordDemoGradedViewed.mockRejectedValueOnce(new Error("metrics down"));
+
+    const result = await callGrade();
+
+    expect(result.status).toBe(200);
+    expect(result.body.success).toBe(true);
+  });
+});
+
+describe("데모 재생성 개방 상태 (AC-8)", () => {
+  it("완주 여부에 따라 AI 재생성 개방 상태를 돌려준다", async () => {
+    isDemoCompleted.mockResolvedValue(true);
+    isAiDemoRegenerationUnlocked.mockResolvedValue(true);
+
+    const result = await callStatus();
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ completed: true, aiRegenerationUnlocked: true });
+  });
+
+  it("미완주면 AI 재생성을 개방하지 않는다", async () => {
+    const result = await callStatus();
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ completed: false, aiRegenerationUnlocked: false });
+  });
+
+  it("비로그인과 비교수자를 거부한다", async () => {
+    sessionUser = null;
+    await expect(callStatus()).resolves.toMatchObject({ status: 401 });
+
+    sessionUser = { id: "student-1", role: "student" };
+    await expect(callStatus()).resolves.toMatchObject({ status: 403 });
+  });
+});
