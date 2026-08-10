@@ -1,10 +1,16 @@
 import { describe, beforeEach, expect, it, vi } from "vitest";
 
-const currentUser = vi.fn();
-const deleteUser = vi.fn();
-const retireConsentSubject = vi.fn();
-const logError = vi.fn();
-const from = vi.fn();
+// vi.mock 은 파일 최상단으로 호이스팅되므로 팩토리가 일반 const 를 볼 수 없다.
+// vi.hoisted 로 함께 끌어올려야 참조가 성립한다.
+const { currentUser, deleteUser, retireConsentSubject, logError, from } = vi.hoisted(
+  () => ({
+    currentUser: vi.fn(),
+    deleteUser: vi.fn(),
+    retireConsentSubject: vi.fn(),
+    logError: vi.fn(),
+    from: vi.fn(),
+  }),
+);
 vi.mock("@/lib/get-current-user", () => ({ currentUser }));
 vi.mock("@/lib/supabase-server", () => ({
   getSupabaseServer: () => ({ auth: { admin: { deleteUser } }, from }),

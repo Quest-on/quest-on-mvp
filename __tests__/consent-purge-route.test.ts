@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const purgeExpiredConsentRecords = vi.fn();
-const recordPurgeRun = vi.fn();
-const logError = vi.fn();
+// vi.mock 은 파일 최상단으로 호이스팅되므로 팩토리가 일반 const 를 볼 수 없다.
+// vi.hoisted 로 함께 끌어올려야 참조가 성립한다.
+const { purgeExpiredConsentRecords, recordPurgeRun, logError } = vi.hoisted(() => ({
+  purgeExpiredConsentRecords: vi.fn(),
+  recordPurgeRun: vi.fn(),
+  logError: vi.fn(),
+}));
+
 vi.mock("@/lib/consent-retention", () => ({
   purgeExpiredConsentRecords,
   recordPurgeRun,
