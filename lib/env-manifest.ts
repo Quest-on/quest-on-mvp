@@ -68,6 +68,11 @@ export const ENV_MANIFEST: readonly EnvSpec[] = [
     levels: { production: "required", staging: "required", development: "recommended" },
   },
   {
+    name: "CONSENT_GATE_MODE",
+    purpose: "동의 게이트 동작 모드(off | shadow | prompt | enforce). 배포 환경에서는 명시해야 한다.",
+    levels: ALL_DEPLOYED,
+  },
+  {
     name: "CONSENT_SUBJECT_HMAC_KEY_V1",
     purpose:
       "동의 원장의 subject_ref 파생 키(base64 32바이트 이상). 원장은 user_id 대신 HMAC 값만 저장한다. " +

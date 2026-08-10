@@ -1,6 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isAuthBypassAllowedEnv } from "@/lib/app-env";
+import { evaluateConsentGate } from "@/lib/consent-gate";
+import { getConsentGateMode, modeBlocksPages, modeLogsOnly } from "@/lib/consent-gate-mode";
+import { classifyRoute, ownsInProgressSession } from "@/lib/consent-route-policy";
+import { logInfo } from "@/lib/logger";
+import { safeInternalPath } from "@/lib/safe-redirect";
 
 const isPublicRoute = (pathname: string) =>
   [
@@ -9,6 +14,8 @@ const isPublicRoute = (pathname: string) =>
     "/sign-in",
     "/sign-up",
     "/onboarding",
+    "/legal",
+    "/student/profile-setup",
     "/auth/callback",
   ].some((r) => pathname === r || pathname.startsWith(r + "/"));
 
@@ -37,7 +44,7 @@ export async function proxy(request: NextRequest) {
     const bypassCookie = request.cookies.get("__test_bypass")?.value;
     if (bypassCookie === bypassSecret) {
       const role = request.cookies.get("__test_user_role")?.value || null;
-      return applyRouteGuards(request, response, pathname, role);
+      return applyRouteGuards(request, response, pathname, role, "test-bypass");
     }
   }
 
@@ -80,25 +87,24 @@ export async function proxy(request: NextRequest) {
 
   const role = profile?.role ?? null;
 
-  return applyRouteGuards(request, response, pathname, role);
+  return applyRouteGuards(request, response, pathname, role, user.id);
 }
 
-function applyRouteGuards(
+async function applyRouteGuards(
   request: NextRequest,
   response: NextResponse,
   pathname: string,
   role: string | null,
-): NextResponse {
+  userId: string
+): Promise<NextResponse> {
   // 로그인된 유저가 공개 라우트(홈, 로그인 등)에 접근 → role에 맞는 대시보드로 리다이렉트
-  // /onboarding은 제외: role이 없으면 여기서 설정해야 하므로 통과, role이 있어도 접근 허용 (페이지가 자체 처리)
-  if (isPublicRoute(pathname) && pathname !== "/auth/callback" && pathname !== "/join" && pathname !== "/onboarding") {
-    if (!role) {
-      return NextResponse.redirect(new URL("/onboarding", request.url));
-    }
+  // /onboarding과 legal 문서는 설정/정책 확인에 필요하므로 통과한다.
+  if (isPublicRoute(pathname) && !["/auth/callback", "/join", "/onboarding", "/legal"].some((route) => pathname === route || pathname.startsWith(route + "/"))) {
+    if (!role) return NextResponse.redirect(new URL("/onboarding", request.url));
     if (role === "instructor") {
+
       return NextResponse.redirect(new URL("/instructor", request.url));
     }
-    // student
     return NextResponse.redirect(new URL("/student", request.url));
   }
 
@@ -107,16 +113,30 @@ function applyRouteGuards(
       return NextResponse.redirect(new URL("/student", request.url));
     }
   }
-
   if (isStudentRoute(pathname)) {
-    if (role === "instructor") {
-      return NextResponse.redirect(new URL("/instructor", request.url));
-    }
-    if (!role) {
-      return NextResponse.redirect(new URL("/onboarding", request.url));
-    }
+    if (role === "instructor") return NextResponse.redirect(new URL("/instructor", request.url));
+    if (!role) return NextResponse.redirect(new URL("/onboarding", request.url));
   }
 
+  const routeClass = classifyRoute(pathname, request.method);
+  const mode = getConsentGateMode();
+  if (mode === "off" || routeClass === "public" || routeClass === "onboarding_support") return response;
+
+  const gate = await evaluateConsentGate(userId);
+  let decision = "allow";
+  if (!gate.complete) {
+    const continuityAllowed = routeClass === "exam_continuity" && await ownsInProgressSession(userId, pathname);
+    if (!continuityAllowed && modeBlocksPages(mode)) decision = "redirect";
+  }
+  if (modeLogsOnly(mode) || !gate.complete) {
+    void logInfo("consent_gate", { payload: { mode, route_class: routeClass, method: request.method, decision, reason: gate.complete ? "complete" : gate.reason } });
+  }
+  if (decision === "redirect") {
+    const target = safeInternalPath(`${pathname}${request.nextUrl.search}`) ?? "/";
+    const onboarding = new URL("/onboarding", request.url);
+    onboarding.searchParams.set("redirect", target);
+    return NextResponse.redirect(onboarding);
+  }
   return response;
 }
 
