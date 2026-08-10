@@ -131,6 +131,11 @@ runs:
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -v ON_ERROR_STOP=1 \
           -f database/018_onboarding_activation.sql
+        # 019 도 raw profiles 테이블의 RLS와 권한을 고정한다. 적용하지 않으면 아래
+        # blanket GRANT가 CI에서만 직접 PATCH를 다시 열어 운영 보안 검증이 무력화된다.
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
+          -f database/019_profiles_rls.sql
         # Reload PostgREST schema cache so new functions are immediately callable
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -c "NOTIFY pgrst, 'reload schema';"
@@ -149,12 +154,13 @@ runs:
           GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
           GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
           GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
-          -- 이 blanket GRANT 는 018 이 건 REVOKE 를 되돌린다. 두 테이블은
-          -- service_role 전용이므로 다시 회수해 CI 를 운영과 같은 자세로 맞춘다.
-          -- (RLS 가 실질 방어선이라 이게 없어도 데이터는 안 뚫리지만, CI 와 운영이
-          --  다른 권한 상태로 갈라지면 나중에 판단을 그르친다.)
+          -- 이 blanket GRANT 는 018·019 가 건 REVOKE 를 되돌린다. plan_limits와
+          -- onboarding_events는 service_role 전용이고, profiles는 자기 행 SELECT만
+          -- 허용한다. 다시 회수하지 않으면 CI에서만 직접 PATCH가 열려 판단을 그르친다.
           REVOKE ALL ON public.plan_limits FROM anon, authenticated;
           REVOKE ALL ON public.onboarding_events FROM anon, authenticated;
+          REVOKE ALL ON public.profiles FROM anon, authenticated;
+          GRANT SELECT ON public.profiles TO anon, authenticated;
           NOTIFY pgrst, 'reload schema';
         "
       shell: bash
