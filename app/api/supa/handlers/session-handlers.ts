@@ -307,13 +307,23 @@ export async function initExamSession(data: {
     // 1. Fetch Exam by Code
     const { data: exam, error: examError } = await getSupabase()
       .from("exams")
-      .select("id, title, code, description, duration, questions, rubric, rubric_public, chat_weight, status, instructor_id, materials, materials_text, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, student_count, type, deadline")
+      .select("id, title, code, description, duration, questions, rubric, rubric_public, chat_weight, status, instructor_id, is_demo, materials, materials_text, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, student_count, type, deadline")
       .eq("code", data.examCode)
       .single();
 
     if (examError || !exam) {
       return errorJson("EXAM_NOT_FOUND", "Exam not found", 404);
     }
+
+    // 데모 미리보기 (AC-7): 교수자가 자기 데모를 학생 시점으로 겪는 경로다.
+    //
+    // 온볼딩의 목표가 "가입 직후 자기 과목 데모를 학생 시점으로 끝까지 겪는 것"인데,
+    // 이 검사 없이는 교수자가 자기 시험 코드로 들어와도 학생 프로필 게이트에서
+    // 403/리다이렉트로 막혀 완주에 도달할 수 없었다.
+    //
+    // 범위를 is_demo=true + 소유자로 좁힌다. 이걸 일반 시험까지 열으면 교수자가
+    // 자기 시험에 세션을 만들어 통계·발행 카운트를 오염시킬 수 있다.
+    const isDemoPreview = exam.is_demo === true && exam.instructor_id === user.id;
 
     // ✅ Gate 방식: 시험 상태 및 입장 가능 여부 확인
     const now = new Date().toISOString();
@@ -753,6 +763,8 @@ export async function initExamSession(data: {
       gateStarted: gateState.gateStarted,
       sessionReactivated, // 세션 복원 여부 (브라우저 닫기 후 재진입 시)
       disclosureAcknowledged,
+      // 클라이언트 프로필 게이트가 이걸 보고 데모 소유자를 우회시킨다 (AC-7).
+      demoPreview: isDemoPreview,
     });
   } catch (error) {
     logError("[initExamSession] Failed to initialize exam session", error, { path: "/api/supa/session-handlers" });
