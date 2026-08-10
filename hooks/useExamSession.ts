@@ -101,6 +101,11 @@ export function useExamSession({
   const autoSubmitHandledRef = useRef(false);
 
   // Profile gate
+  //
+  // 교수자가 자기 데모를 학생 시점으로 겪는 경우(AC-7)는 우회한다.
+  // 데모 미리보기 여부는 서버가 init 응답의 demoPreview 로 남긴다 — 클라이언트가
+  // is_demo 를 스스로 판정하면 남의 데모나 일반 시험까지 우회될 수 있다.
+  // 그래서 게이트는 init 결과를 기다렸다가 demoPreview 가 아닐 때만 리다이렉트한다.
   const [profileGateChecked, setProfileGateChecked] = useState(false);
   const { data: profileGateData } = useQuery({
     queryKey: ["student-profile-gate", user?.id],
@@ -115,16 +120,7 @@ export function useExamSession({
     staleTime: 30_000,
   });
 
-  useEffect(() => {
-    if (!profileGateData || profileGateChecked) return;
-    if (!profileGateData.hasProfile) {
-      router.replace(`/student/profile-setup?redirect=${encodeURIComponent(`/exam/${examCode}`)}`);
-      return;
-    }
-    setProfileGateChecked(true);
-  }, [profileGateData, profileGateChecked, router, examCode]);
-
-  // Session init query
+  // Session init query (게이트보다 먼저 선언 — 데모 미리보기 판정을 써야 한다)
   const { data: initData, isLoading: initLoading } = useQuery({
     queryKey: ["exam-session-init", examCode, user?.id],
     queryFn: async () => {
@@ -147,11 +143,31 @@ export function useExamSession({
         return { ok: false as const, errorData: { error: "NETWORK_ERROR" } };
       }
     },
-    enabled: !!examCode && isLoaded && !!user && profileGateChecked,
+    // 데모 미리보기는 서버가 init 에서 판정한다. 그래서 init 은 프로필 게이트를
+    // 기다리지 않고 돌린다 — 학생이면 게이트가 어차피 통과하고, 데모 소유자면
+    // demoPreview 가 와서 게이트를 우회한다.
+    enabled: !!examCode && isLoaded && !!user,
     retry: 2,
     staleTime: Infinity,
     gcTime: 10 * 60 * 1000,
   });
+
+  useEffect(() => {
+    // init 결과가 올 때까지 기다린다. 그 전에 리다이렉트하면 데모 미리보기도
+    // 프로필 게이트에 걸려 튕긴다.
+    if (!profileGateData || profileGateChecked) return;
+    if (initData === undefined) return; // init 이 아직 안 끝났다
+    if (initData.ok && initData.demoPreview) {
+      // 데모 소유자는 학생 프로필이 없어도 겪게 한다.
+      setProfileGateChecked(true);
+      return;
+    }
+    if (!profileGateData.hasProfile) {
+      router.replace(`/student/profile-setup?redirect=${encodeURIComponent(`/exam/${examCode}`)}`);
+      return;
+    }
+    setProfileGateChecked(true);
+  }, [profileGateData, profileGateChecked, initData, router, examCode]);
 
   const examLoading = initLoading || (!examInitialized && !initData);
 

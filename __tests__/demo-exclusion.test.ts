@@ -61,6 +61,10 @@ const REGISTRY: Record<string, { kind: Classification; why: string }> = {
   "app/api/feedback-chat/route.ts": { kind: "single-exam", why: "code 로 단건 조회" },
   "app/api/feedback/route.ts": { kind: "single-exam", why: "code 로 단건 조회" },
   "app/api/instructor/generate-summary/route.ts": { kind: "single-exam", why: "세션의 exam 로드" },
+  "app/api/onboarding/demo/route.ts": {
+    kind: "single-exam",
+    why: "데모 생성 라우트. is_demo=true 로 만드는 곳이고 기존 데모는 is_demo 로 좁혀 조회한다",
+  },
   "app/api/internal/bulk-grade-worker/route.ts": { kind: "single-exam", why: "단건 채점 워커" },
   "app/api/session/[sessionId]/grade/route.ts": { kind: "single-exam", why: "세션의 exam 로드" },
   "app/api/session/[sessionId]/live-messages/route.ts": { kind: "single-exam", why: "세션의 exam 로드" },
@@ -83,6 +87,10 @@ const REGISTRY: Record<string, { kind: Classification; why: string }> = {
   "app/api/health/route.ts": { kind: "demo-neutral", why: "DB 헬스 프로브. 사용자 데이터를 안 돌려준다" },
   "app/api/internal/process-rag/route.ts": { kind: "demo-neutral", why: "rag_status 갱신만" },
   "lib/assignment-deadline-sweep.ts": { kind: "demo-neutral", why: "마감 스윕. 데모 과제도 마감돼야 정상이다" },
+  "lib/demo-completion.ts": {
+    kind: "demo-neutral",
+    why: "데모 완주 계측 판정. exams 를 목록으로 읽지 않고 is_demo 단건 조회만 쓴다",
+  },
 
   // ── 아직 결론 나지 않은 지점 (후속) ───────────────────────────
   // 학생 응시 이력·통계와 AI 비용 집계는 AC-17 의 "교수자 목록·통계"에 직접
