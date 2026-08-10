@@ -15,11 +15,14 @@ REVOKE ALL ON public.profiles FROM anon, authenticated;
 GRANT SELECT ON public.profiles TO anon, authenticated;
 
 DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
--- profiles.id 는 uuid 다. auth.uid() 도 uuid 이므로 캐스트 없이 비교한다.
--- ::text 로 감기면 text = uuid 가 되어 적용이 실패한다 (스테이징에서 확인됨).
+-- profiles.id 의 타입이 저장소의 두 정의에서 갈라진다:
+--   - 스테이징/운영 Supabase: uuid (Supabase Auth 와 맞춘 기본)
+--   - CI test-setup 의 raw CREATE TABLE: TEXT
+-- 한쪽으로 고정하면 다른 쪽이 `operator does not exist: text = uuid` 또는
+-- `uuid = text` 로 적용이 거절된다. 양쪽 다 되게 id 쪽을 text 로 맞춘다.
 CREATE POLICY "profiles_select_own" ON public.profiles
   FOR SELECT TO authenticated
-  USING ((select auth.uid()) = id);
+  USING ((select auth.uid())::text = id::text);
 
 DROP POLICY IF EXISTS "service_role_all" ON public.profiles;
 CREATE POLICY "service_role_all" ON public.profiles

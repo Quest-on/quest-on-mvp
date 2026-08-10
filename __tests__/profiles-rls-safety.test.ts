@@ -23,13 +23,15 @@ describe("profiles RLS migration safety", () => {
       "GRANT SELECT ON public.profiles TO anon, authenticated;"
     );
     expect(migration).toMatch(
-      /CREATE POLICY "profiles_select_own" ON public\.profiles\n  FOR SELECT TO authenticated\n  USING \(\(select auth\.uid\(\)\) = id\);/
+      /CREATE POLICY "profiles_select_own" ON public\.profiles\n  FOR SELECT TO authenticated\n  USING \(\(select auth\.uid\(\)\)::text = id::text\);/
     );
 
-    // 019 가 스테이징에서 실패한 실제 버그다. profiles.id 는 uuid 라서
-    // auth.uid()(uuid)에 ::text 를 걸면 text = uuid 비교가 되어 적용이 거절된다.
-    // 정책 문자열을 고정하는 것만으로는 못 잡는다 — 타입 캐스트 자체를 금지한다.
-    expect(migration).not.toMatch(/auth\.uid\(\)\)\)::text/);
+    // profiles.id 의 타입이 저장소의 두 정의에서 갈라진다(운영 uuid / CI TEXT).
+    // 한쪽으로만 캐스트하면 다른 쪽이 `operator does not exist` 로 거절된다.
+    // 양쪽 다 text 로 맞춰야 하므로, auth.uid() 만 혼자 캐스트되거나 캐스트가
+    // 아예 없으면 안 된다.
+    expect(migration).not.toMatch(/auth\.uid\(\)\)\)::text = id\)/);
+    expect(migration).not.toMatch(/auth\.uid\(\)\) = id\)/);
     expect(migration).not.toMatch(/CREATE POLICY[\s\S]*?FOR UPDATE/);
     expect(migration).toMatch(
       /CREATE POLICY "service_role_all" ON public\.profiles\n  FOR ALL TO service_role USING \(true\) WITH CHECK \(true\);/
