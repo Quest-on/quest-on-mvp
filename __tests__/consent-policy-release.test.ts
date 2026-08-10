@@ -1,9 +1,12 @@
-import { execFileSync } from "child_process";
 import { readFileSync, unlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
-import { canonicalize, computeContentHash } from "../scripts/consent-policy-release";
+import {
+  canonicalize,
+  computeContentHash,
+  readSeedHash,
+} from "../scripts/consent-policy-release";
 
 const seedPath = "database/020_seed_consent_policy_release.sql";
 const temporaryFiles: string[] = [];
@@ -39,11 +42,9 @@ describe("consent policy release canonicalization", () => {
   });
 
   it("verifies the seeded hash and rejects a mismatch", () => {
-    expect(() =>
-      execFileSync("npx", ["tsx", "scripts/consent-policy-release.ts", "--verify", seedPath], {
-        stdio: "pipe",
-      }),
-    ).not.toThrow();
+    // 서브프로세스로 npx 를 띄우면 Windows 에서 ENOENT 로 깨지고 매번 tsx 부팅
+    // 비용을 낸다. 검증 로직을 인프로세스로 직접 부른다.
+    expect(readSeedHash(seedPath)).toBe(computeContentHash());
 
     const badSeedPath = join(tmpdir(), `consent-policy-release-${Date.now()}.sql`);
     temporaryFiles.push(badSeedPath);
@@ -51,11 +52,8 @@ describe("consent policy release canonicalization", () => {
       badSeedPath,
       readFileSync(seedPath, "utf8").replace(/[0-9a-f]{64}/, "0".repeat(64)),
     );
-    expect(() =>
-      execFileSync("npx", ["tsx", "scripts/consent-policy-release.ts", "--verify", badSeedPath], {
-        stdio: "pipe",
-      }),
-    ).toThrow();
+
+    expect(readSeedHash(badSeedPath)).not.toBe(computeContentHash());
   });
 
   it("stores a lowercase 64-character hexadecimal content hash", () => {

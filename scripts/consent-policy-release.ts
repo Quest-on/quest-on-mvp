@@ -72,7 +72,7 @@ export function computeContentHash(input: JsonValue = buildCanonicalInput()): st
   return createHash("sha256").update(canonicalize(input), "utf8").digest("hex");
 }
 
-function readSeedHash(sqlPath: string): string | null {
+export function readSeedHash(sqlPath: string): string | null {
   const sql = readFileSync(sqlPath, "utf8");
   return sql.match(/VALUES\s*\(\s*'[^']+'\s*,\s*'([0-9a-f]{64})'/is)?.[1] ?? null;
 }
