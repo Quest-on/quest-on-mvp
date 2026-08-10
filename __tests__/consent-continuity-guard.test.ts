@@ -49,19 +49,46 @@ describe("연속성 경로 — 인증", () => {
 });
 
 describe("연속성 경로 — 세션 소유권", () => {
-  it.each(CONTINUITY_ROUTES)("%s 가 세션 소유자를 대조한다", (relative) => {
+  it.each(CONTINUITY_ROUTES)("%s 가 인증 사용자와 실제로 대조한다", (relative) => {
     const source = code(read(relative));
 
-    // 소유권 확인은 "세션의 student_id 가 현재 사용자인가" 로 귀결된다.
-    // 어떤 형태로든 그 대조가 코드에 있어야 한다.
-    const comparesOwner =
-      /student_id/.test(source) ||
-      /\.eq\(\s*["']student_id["']/.test(source) ||
-      /session\.student_id/.test(source);
+    // 느슨한 검사(`student_id` 문자열 존재)는 "조회만 하고 대조 안 함" 도
+    // 통과시킨다. 인증 사용자 id 와의 **비교**가 있어야 한다.
+    // 인증에서 파생된 사용자 식별자의 통상적인 이름들.
+    // `verifiedStudentId` 처럼 검증을 거쳤음을 이름에 담는 관습도 포함한다.
+    const AUTHED = String.raw`(?:user|authedUser|userId|currentUserId|verified[A-Za-z]*Id)`;
+
+    const comparesToAuthedUser =
+      // .eq("student_id", <authed>)
+      new RegExp(
+        String.raw`\.eq\(\s*["']student_id["']\s*,\s*${AUTHED}\b[^)]*\)`,
+      ).test(source) ||
+      // session.student_id !== <authed>
+      new RegExp(String.raw`student_id\s*(?:!==|===|!=|==)\s*${AUTHED}\b`).test(source) ||
+      // <authed>.id !== session.student_id
+      new RegExp(
+        String.raw`${AUTHED}(?:\.id)?\s*(?:!==|===|!=|==)\s*[A-Za-z_$][\w$]*\.student_id`,
+      ).test(source);
 
     expect(
-      comparesOwner,
-      `${relative} 에 세션 소유자 대조가 없다 — proxy 가 위임했는데 route 도 안 보면 아무도 안 본다`,
+      comparesToAuthedUser,
+      `${relative} 가 student_id 를 인증 사용자와 대조하지 않는다 — ` +
+        `proxy 가 위임했는데 route 도 안 보면 아무도 안 본다`,
+    ).toBe(true);
+  });
+
+  it.each(CONTINUITY_ROUTES)("%s 가 진행 상태를 제한한다", (relative) => {
+    const source = code(read(relative));
+
+    // 끝난 시험 세션에 계속 쓸 수 있으면 연속성 예외가 영구 우회가 된다.
+    const restrictsStatus =
+      /in_progress/.test(source) ||
+      /\bstatus\b[^\n]*(?:submitted|completed|closed|expired)/.test(source) ||
+      /submitted_at/.test(source);
+
+    expect(
+      restrictsStatus,
+      `${relative} 가 세션 진행 상태를 제한하지 않는다 — 종료된 세션으로도 통과한다`,
     ).toBe(true);
   });
 });
