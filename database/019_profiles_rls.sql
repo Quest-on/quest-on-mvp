@@ -15,9 +15,11 @@ REVOKE ALL ON public.profiles FROM anon, authenticated;
 GRANT SELECT ON public.profiles TO anon, authenticated;
 
 DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
+-- profiles.id 는 uuid 다. auth.uid() 도 uuid 이므로 캐스트 없이 비교한다.
+-- ::text 로 감기면 text = uuid 가 되어 적용이 실패한다 (스테이징에서 확인됨).
 CREATE POLICY "profiles_select_own" ON public.profiles
   FOR SELECT TO authenticated
-  USING ((select auth.uid())::text = id);
+  USING ((select auth.uid()) = id);
 
 DROP POLICY IF EXISTS "service_role_all" ON public.profiles;
 CREATE POLICY "service_role_all" ON public.profiles
