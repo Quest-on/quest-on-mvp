@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  *   · 기록 실패를 2xx 로 감추는 것
  */
 
+let gateModeMock = vi.fn(() => "prompt");
 let currentUserMock = vi.fn();
 let recordMock = vi.fn();
 let releaseMock = vi.fn();
@@ -28,6 +29,11 @@ async function loadRoute() {
   vi.doMock("@/lib/consent-gate", () => ({
     getCurrentPolicyRelease: releaseMock,
     evaluateConsentGate: gateMock,
+  }));
+  // 기본은 수집 활성(prompt). off/shadow 동작은 별도 케이스에서 검증한다.
+  vi.doMock("@/lib/consent-gate-mode", () => ({
+    getConsentGateMode: () => gateModeMock(),
+    modeCollectsConsent: (mode: string) => mode === "prompt" || mode === "enforce",
   }));
 
   return await import("@/app/api/consents/onboarding/route");
@@ -50,12 +56,55 @@ describe("POST /api/consents/onboarding", () => {
       requiresReconsent: true,
     }));
     gateMock = vi.fn();
+    gateModeMock = vi.fn(() => "prompt");
   });
 
   afterEach(() => {
     vi.doUnmock("@/lib/supabase-auth");
     vi.doUnmock("@/lib/consent-records");
     vi.doUnmock("@/lib/consent-gate");
+    vi.doUnmock("@/lib/consent-gate-mode");
+  });
+
+  it("off 모드에서는 503 이고 기록하지 않는다", async () => {
+    // 기능이 배포됐지만 아직 켜지지 않은 단계다. 여기서 수집하면
+    // 롤아웃을 되돌려도 이미 받은 행이 남는다.
+    gateModeMock = vi.fn(() => "off");
+    const { POST } = await loadRoute();
+
+    const res = await POST(jsonRequest({ ageOver14: true, terms: true }));
+
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe("CONSENT_NOT_ACTIVE");
+    expect(recordMock).not.toHaveBeenCalled();
+  });
+
+  it("shadow 모드에서도 503 이고 기록하지 않는다", async () => {
+    gateModeMock = vi.fn(() => "shadow");
+    const { POST } = await loadRoute();
+
+    const res = await POST(jsonRequest({ ageOver14: true, terms: true }));
+
+    expect(res.status).toBe(503);
+    expect(recordMock).not.toHaveBeenCalled();
+  });
+
+  it("enforce 모드에서는 정상 기록한다", async () => {
+    gateModeMock = vi.fn(() => "enforce");
+    const { POST } = await loadRoute();
+
+    const res = await POST(jsonRequest({ ageOver14: true, terms: true }));
+
+    expect(res.status).toBe(200);
+    expect(recordMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("수집 차단은 인증 확인 뒤에 일어난다 (미인증이 우선)", async () => {
+    gateModeMock = vi.fn(() => "off");
+    currentUserMock = vi.fn(async () => null);
+    const { POST } = await loadRoute();
+
+    expect((await POST(jsonRequest({ ageOver14: true, terms: true }))).status).toBe(401);
   });
 
   it("AC-U2 — 미인증은 401 이고 기록을 시도하지 않는다", async () => {
@@ -208,6 +257,19 @@ describe("GET /api/consents/onboarding", () => {
     vi.doUnmock("@/lib/supabase-auth");
     vi.doUnmock("@/lib/consent-records");
     vi.doUnmock("@/lib/consent-gate");
+    vi.doUnmock("@/lib/consent-gate-mode");
+  });
+
+  it("GET 이 수집 활성 여부를 함께 돌려준다", async () => {
+    gateModeMock = vi.fn(() => "off");
+    const { GET } = await loadRoute();
+
+    expect((await (await GET()).json()).collecting).toBe(false);
+
+    gateModeMock = vi.fn(() => "prompt");
+    const { GET: GET2 } = await loadRoute();
+
+    expect((await (await GET2()).json()).collecting).toBe(true);
   });
 
   it("미인증은 401 이고 게이트를 평가하지 않는다", async () => {

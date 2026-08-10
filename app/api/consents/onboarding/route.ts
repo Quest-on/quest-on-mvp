@@ -7,6 +7,7 @@ import {
   type ConsentDecisionInput,
 } from "@/lib/consent-records";
 import { evaluateConsentGate, getCurrentPolicyRelease } from "@/lib/consent-gate";
+import { getConsentGateMode, modeCollectsConsent } from "@/lib/consent-gate-mode";
 
 /**
  * 온보딩 필수 동의 기록·조회.
@@ -40,6 +41,15 @@ export async function POST(request: NextRequest) {
   const user = await currentUser();
   if (!user) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+
+  // 2. 수집 모드가 아니면 여기서 끝난다.
+  //
+  // off/shadow 는 "기능이 배포됐지만 아직 켜지지 않은" 상태다. 이때 동의를
+  // 받아버리면 legal 문서가 production 에 나가기 전에 수집이 시작되고,
+  // 롤아웃을 되돌려도 이미 받은 행이 남는다. 서버가 권위를 갖고 막는다.
+  if (!modeCollectsConsent(getConsentGateMode())) {
+    return NextResponse.json({ error: "CONSENT_NOT_ACTIVE" }, { status: 503 });
   }
 
   // 2. 입력 검증. 파싱 실패도 DB 접근 없이 끝난다.
@@ -95,23 +105,32 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ recorded: decisions.length, policyVersion: release.releaseId });
 }
 
-/** 현재 사용자의 필수 동의 완료 여부. 온보딩 UI 와 게이트가 함께 쓴다. */
+/**
+ * 현재 사용자의 필수 동의 완료 여부와 수집 활성 여부.
+ *
+ * UI 는 `collecting` 을 보고 체크박스를 그릴지 정한다. 클라이언트가 이 값을
+ * 못 읽으면(로딩·오류) 체크박스를 그리지 않고 제출도 막아야 한다 — 어차피
+ * 서버가 POST 를 503 으로 막으므로, UI 가 앞서 나가면 사용자만 헛수고한다.
+ */
 export async function GET() {
   const user = await currentUser();
   if (!user) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
+  const collecting = modeCollectsConsent(getConsentGateMode());
   const result = await evaluateConsentGate(user.id);
 
   if (result.complete) {
     return NextResponse.json({
+      collecting,
       complete: true,
       policyVersion: result.currentRelease.releaseId,
     });
   }
 
   return NextResponse.json({
+    collecting,
     complete: false,
     reason: result.reason,
     missingKeys: result.missingKeys,
