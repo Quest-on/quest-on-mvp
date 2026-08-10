@@ -83,6 +83,16 @@ export const ENV_MANIFEST: readonly EnvSpec[] = [
     levels: ALL_DEPLOYED,
   },
   {
+    name: "INCOMPLETE_ACCOUNT_PURGE_DISABLED",
+    purpose: "온보딩 미완료 auth 계정 파기 cron 킬 스위치. 최초 배포는 1로 비활성화한다.",
+    levels: ALL_DEPLOYED,
+  },
+  {
+    name: "INCOMPLETE_ACCOUNT_PURGE_MODE",
+    purpose: "온보딩 미완료 auth 계정 파기 모드(dry-run | delete). 최초 배포는 dry-run이다.",
+    levels: ALL_DEPLOYED,
+  },
+  {
     name: "CONSENT_AUDIT_DATABASE_URL",
     purpose: "권리요청 승인 operator 환경 전용 consent_auditor 연결 문자열. Vercel 런타임에는 넣지 않는다.",
     levels: {},
