@@ -24,8 +24,13 @@ jobs:
     runs-on: ubuntu-latest
     # 외부 AI 제공자(GLM Coding Plan)를 호출하는 단계가 있어 응답이 늘어질 수 있다.
     # GitHub 기본 job 타임아웃은 6시간이라 상한이 없으면 한 번 멈출 때 그만큼 머지가 막힌다.
-    # 관측된 정상 범위는 4~9분이므로 여유를 두고 15분에서 끊는다.
-    timeout-minutes: 15
+    #
+    # 상한은 아래 단계 예산의 합보다 커야 한다. 작으면 리뷰가 끝나기 전에 job 이 죽고,
+    # GitHub 은 그걸 cancelled 로 보고한다 — 실패로 안 보여서 원인을 찾기 어렵다.
+    #   레인 2개(regression, architecture) 순차 × IMPACT_REVIEW_AGENT_TIMEOUT_MS(15분) = 30분
+    #   + checkout/npm ci/opencode 설치 등 셋업 약 3~5분
+    # 관측된 완주 시간은 9~31분이므로 45분에서 끊는다. 6시간 대비 충분히 짧다.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
