@@ -41,6 +41,17 @@ export default async function PrivacyPage() {
               <li>{t("privacy.section1.optional.item1")}</li>
             </ul>
           </div>
+
+          <div>
+            <h3 className="text-xl font-medium mb-2">
+              {t("privacy.section1.legalBasis.heading")}
+            </h3>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>{t("privacy.section1.legalBasis.contract")}</li>
+              <li>{t("privacy.section1.legalBasis.consent")}</li>
+              <li>{t("privacy.section1.legalBasis.minimal")}</li>
+            </ul>
+          </div>
         </div>
       </section>
 

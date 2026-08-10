@@ -170,6 +170,21 @@ describe("legal messages — 국외이전 공개항목 (제28조의8②)", () =>
   });
 });
 
+describe("legal messages — 수집·이용 근거 (제15조①4호)", () => {
+  it("법적 근거를 명시하고 최소수집 입증책임을 밝힌다", () => {
+    // 수집 항목만 나열하고 근거를 안 적으면 어떤 자격으로 처리하는지가 빠진다.
+    expect(ko.privacy.section1.legalBasis.contract).toContain("제15조제1항제4호");
+    expect(en.privacy.section1.legalBasis.contract).toContain("15(1)4");
+    expect(ko.privacy.section1.legalBasis.minimal).toContain("제16조제1항");
+  });
+
+  it("선택 항목은 동의 기반이며 거부해도 이용에 제한이 없음을 밝힌다", () => {
+    for (const doc of [ko, en]) {
+      expect(doc.privacy.section1.legalBasis.consent.trim()).not.toBe("");
+    }
+  });
+});
+
 describe("legal messages — 제3자 제공 (제17조④)", () => {
   it("시행령 제14조의2 네 판단기준이 별개 값으로 존재한다", () => {
     for (const [locale, doc] of [

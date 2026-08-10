@@ -97,6 +97,12 @@
       "optional": {
         "heading": "Optional",
         "item1": "Support inquiry content and attachments"
+      },
+      "legalBasis": {
+        "heading": "Legal basis for processing",
+        "contract": "The required items above are processed under Article 15(1)4 of the Personal Information Protection Act to perform the service agreement concluded with you. Authoring, taking, grading and reviewing exams are essential to that agreement, so they are processed without separate consent and disclosed here instead.",
+        "consent": "Confirmation that you are 14 or older, and agreement to the Terms of Service, are collected separately at sign-up. Optional items are processed only with your consent, and declining them does not restrict your use of the service.",
+        "minimal": "Under Article 16(1) of the same Act we collect only the minimum items necessary to achieve the purpose, and the burden of proving that minimality rests with us."
       }
     },
     "section2": {
