@@ -11,6 +11,10 @@ import {
   promoteSessionToInProgress,
 } from "@/app/api/supa/handlers/session-handlers";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
+import {
+  ONBOARDING_EVENTS,
+  recordOnboardingEvent,
+} from "@/lib/onboarding-events";
 
 /**
  * POST /api/session/[sessionId]/preflight
@@ -134,6 +138,19 @@ export async function POST(
 
       reconciledSession = updatedSession;
     }
+
+    // AI 사용 고지 확인 기록 (AC-15). `preflight_accepted_at` 은 세션 단위라
+    // "이 응시에서 수락했다"까지만 말한다. 학생이 처음으로 고지를 확인한
+    // 시점은 세션이 아니라 사람 단위이므로 마일스톤으로 남긴다.
+    //
+    // await 하되 실패해도 무시한다 — 이 함수는 throw 하지 않고 boolean 만
+    // 돌려준다. 계측 때문에 응시 시작이 막히면 그게 더 큰 사고다.
+    await recordOnboardingEvent({
+      userId: user.id,
+      role: "student",
+      event: ONBOARDING_EVENTS.STUDENT_DISCLOSURE_ACK,
+      examId: session.exam_id,
+    });
 
     const gateState = buildGateStatePayload(reconciledSession, exam, nowTime);
 

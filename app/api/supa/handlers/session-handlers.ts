@@ -7,6 +7,10 @@ import { logError } from "@/lib/logger";
 import { triggerGradingIfNeeded } from "@/lib/grading-trigger";
 import { sanitizeUserInput } from "@/lib/sanitize";
 import { stripSensitiveQuestionFields } from "@/lib/sanitize-exam-questions";
+import {
+  ONBOARDING_EVENTS,
+  hasOnboardingEvent,
+} from "@/lib/onboarding-events";
 
 /** 5-second grace period for network latency (shared across heartbeat/initExamSession/feedback) */
 const GRACE_PERIOD_MS = 5_000;
@@ -695,6 +699,14 @@ export async function initExamSession(data: {
       nowTime
     );
 
+    // 고지를 이미 확인한 학생인가 (AC-15). preflight 자체는 시험마다 뜨지만
+    // AI 사용 3줄 고지는 사람 단위로 최초 1회다. 조회가 실패하면 false 라
+    // 고지를 한 번 더 보여주는 쪽으로 실패한다.
+    const disclosureAcknowledged = await hasOnboardingEvent(
+      data.studentId,
+      ONBOARDING_EVENTS.STUDENT_DISCLOSURE_ACK
+    );
+
     return successJson({
       exam,
       session,
@@ -705,6 +717,7 @@ export async function initExamSession(data: {
       sessionStatus: gateState.status,
       gateStarted: gateState.gateStarted,
       sessionReactivated, // 세션 복원 여부 (브라우저 닫기 후 재진입 시)
+      disclosureAcknowledged,
     });
   } catch (error) {
     logError("[initExamSession] Failed to initialize exam session", error, { path: "/api/supa/session-handlers" });

@@ -15,31 +15,48 @@ import { readFileSync } from "fs";
 
 const source = readFileSync("components/exam/PreflightModal.tsx", "utf8");
 
-/** `{examHasEssay && (` 로 열리는 블록 안에 특정 키가 있는지. */
-function isGated(translationKey: string, text = source): boolean {
+/** 지정한 게이트 블록 안에 특정 키가 있는지. */
+function isGated(
+  translationKey: string,
+  text = source,
+  gate = "{examHasEssay && ("
+): boolean {
   const idx = text.indexOf(translationKey);
   if (idx === -1) return false;
   const before = text.slice(0, idx);
-  const lastGate = before.lastIndexOf("{examHasEssay && (");
+  const lastGate = before.lastIndexOf(gate);
   if (lastGate === -1) return false;
   const gateIndent = text.slice(text.lastIndexOf("\n", lastGate) + 1, lastGate);
   const gateEnd = text.slice(lastGate).search(new RegExp(`\\n${gateIndent}\\)\\}`));
   return gateEnd > idx - lastGate && text.slice(lastGate, lastGate + gateEnd).includes(translationKey);
 }
 
+/** AI 고지 3줄은 사람 단위 1회 게이트까지 함께 걸려야 한다 (AC-15). */
+const DISCLOSURE_GATE = "{examHasEssay && showAiDisclosure && (";
+
 describe("PreflightModal AI 고지 게이팅", () => {
   it("examHasEssay 를 prop 으로 받는다", () => {
     expect(source).toMatch(/examHasEssay:\s*boolean/);
   });
 
-  it("AI 고지 3줄이 examHasEssay 게이트 안에 있다", () => {
+  it("AI 고지 3줄이 examHasEssay + showAiDisclosure 게이트 안에 있다", () => {
     for (const key of [
       "preflight.aiDisclosureAllowed",
       "preflight.aiDisclosureGraded",
       "preflight.aiDisclosureVisible",
     ]) {
-      expect(isGated(key), `${key} 가 게이팅되지 않았다`).toBe(true);
+      expect(
+        isGated(key, source, DISCLOSURE_GATE),
+        `${key} 가 게이팅되지 않았다`
+      ).toBe(true);
     }
+  });
+
+  it("showAiDisclosure 는 옵셔널이고 기본값이 '노출'이다 (AC-15)", () => {
+    // 기본값을 false 로 두면 prop 을 안 넘긴 호출부에서 고지가 조용히 사라진다.
+    // 중복 노출은 눈에 보이지만 누락은 아무도 못 알아챈다 — 안전한 쪽 기본값.
+    expect(source).toMatch(/showAiDisclosure\?:\s*boolean/);
+    expect(source).toMatch(/showAiDisclosure = true/);
   });
 
   it("multiline 번역 식이 바깥 게이트를 닫지 않는다", () => {
@@ -69,6 +86,6 @@ describe("PreflightModal AI 고지 게이팅", () => {
     // 회귀 형태: 게이트 없이 aiDisclosureTitle 을 바로 렌더
     const titleIdx = source.indexOf("preflight.aiDisclosureTitle");
     expect(titleIdx).toBeGreaterThan(-1);
-    expect(isGated("preflight.aiDisclosureTitle")).toBe(true);
+    expect(isGated("preflight.aiDisclosureTitle", source, DISCLOSURE_GATE)).toBe(true);
   });
 });
