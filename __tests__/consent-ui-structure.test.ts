@@ -40,6 +40,19 @@ describe("consent onboarding UI structure", () => {
     expect(onboardingSource).toContain("consentCollecting === null ||");
   });
 
+  it("off/shadow 에서 프로필만으로 온보딩을 끝낼 수 있다", () => {
+    // disabled prop 만 고치고 submit 핸들러의 검사를 그대로 두면,
+    // 체크박스가 렌더되지도 않는 off/shadow 에서 아무도 온보딩을
+    // 끝내지 못한다. 핸들러도 collecting 을 봐야 한다.
+    expect(onboardingSource).toMatch(
+      /if \(consentCollecting && \(!ageOver14 \|\| !terms\)\) \{/,
+    );
+    // 수집 여부를 모르는 동안에는 판단을 미룬다.
+    expect(onboardingSource).toMatch(/if \(consentCollecting === null\) \{/);
+    // 무조건 거부하는 옛 검사가 남아 있으면 안 된다.
+    expect(onboardingSource).not.toMatch(/^\s*if \(!ageOver14 \|\| !terms\) \{/m);
+  });
+
   it("has no user-visible hardcoded Korean text", () => {
     expect(sourceWithoutComments).not.toMatch(/[\uac00-\ud7a3]/);
   });

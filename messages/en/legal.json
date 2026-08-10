@@ -103,6 +103,32 @@
         "contract": "The required items above are processed under Article 15(1)4 of the Personal Information Protection Act to perform the service agreement concluded with you. Authoring, taking, grading and reviewing exams are essential to that agreement, so they are processed without separate consent and disclosed here instead.",
         "consent": "Confirmation that you are 14 or older, and agreement to the Terms of Service, are collected separately at sign-up. Optional items are processed only with your consent, and declining them does not restrict your use of the service.",
         "minimal": "Under Article 16(1) of the same Act we collect only the minimum items necessary to achieve the purpose, and the burden of proving that minimality rests with us."
+      },
+      "mapping": {
+        "heading": "Purpose and retention by item",
+        "note": "Retention periods below match the destruction procedures in Section 3.",
+        "rows": {
+          "account": {
+            "items": "Name, email, institution, role, login identifier",
+            "purpose": "Account identification and authentication, role-based access",
+            "retention": "Destroyed without delay when the account is closed"
+          },
+          "exam": {
+            "items": "Exam code, sitting time, submitted answers, rubric scores, feedback logs",
+            "purpose": "Running exams, grading and reviewing results",
+            "retention": "Until the period set by the educator; if none is set, destroyed when service use ends"
+          },
+          "ai": {
+            "items": "AI question and response logs, reflection Q&A logs",
+            "purpose": "Providing AI features and evidencing assessment",
+            "retention": "Same as exam data"
+          },
+          "access": {
+            "items": "IP address, browser and OS, access timestamps, error logs",
+            "purpose": "Security incident response and error analysis",
+            "retention": "Retained for 90 days, then destroyed"
+          }
+        }
       }
     },
     "section2": {

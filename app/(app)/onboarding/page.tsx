@@ -245,7 +245,15 @@ export default function OnboardingPage() {
       return;
     }
 
-    if (!ageOver14 || !terms) {
+    // 수집이 켜졌을 때만 두 항목을 요구한다.
+    //
+    // off/shadow 에서는 체크박스가 아예 렌더되지 않으므로 여기서 무조건
+    // 막으면 아무도 온보딩을 끝낼 수 없다. 프로필만으로 통과해야 한다.
+    // 아직 모르는 상태(null)면 판단을 미루고 제출을 보류한다.
+    if (consentCollecting === null) {
+      return;
+    }
+    if (consentCollecting && (!ageOver14 || !terms)) {
       setError(tConsent("required"));
       return;
     }

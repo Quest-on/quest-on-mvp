@@ -183,6 +183,26 @@ describe("legal messages — 수집·이용 근거 (제15조①4호)", () => {
       expect(doc.privacy.section1.legalBasis.consent.trim()).not.toBe("");
     }
   });
+
+  it("항목별 목적·보유기간 매핑이 네 범주 모두 있다", () => {
+    // 법적 근거만 적고 매핑을 빼면 "무엇을 왜 얼마나" 가 남지 않는다.
+    for (const [locale, doc] of [
+      ["ko", ko],
+      ["en", en],
+    ] as const) {
+      const rows = doc.privacy.section1.mapping.rows;
+      for (const key of ["account", "exam", "ai", "access"] as const) {
+        for (const field of ["items", "purpose", "retention"] as const) {
+          const value = rows[key]?.[field];
+          expect(
+            typeof value,
+            `${locale}.section1.mapping.rows.${key}.${field} 가 없다`,
+          ).toBe("string");
+          expect((value as string).trim()).not.toBe("");
+        }
+      }
+    }
+  });
 });
 
 describe("legal messages — 제3자 제공 (제17조④)", () => {

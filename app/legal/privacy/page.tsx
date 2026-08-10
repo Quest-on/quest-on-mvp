@@ -52,6 +52,34 @@ export default async function PrivacyPage() {
               <li>{t("privacy.section1.legalBasis.minimal")}</li>
             </ul>
           </div>
+
+          <div>
+            <h3 className="text-xl font-medium mb-2">
+              {t("privacy.section1.mapping.heading")}
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full border border-border">
+                <tbody>
+                  {(["account", "exam", "ai", "access"] as const).map((row) => (
+                    <tr key={row}>
+                      <td className="px-4 py-2 border border-border">
+                        {t(`privacy.section1.mapping.rows.${row}.items`)}
+                      </td>
+                      <td className="px-4 py-2 border border-border">
+                        {t(`privacy.section1.mapping.rows.${row}.purpose`)}
+                      </td>
+                      <td className="px-4 py-2 border border-border">
+                        {t(`privacy.section1.mapping.rows.${row}.retention`)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t("privacy.section1.mapping.note")}
+            </p>
+          </div>
         </div>
       </section>
 
