@@ -67,7 +67,6 @@ client_id = "local-google-stub"
 secret = "local-google-stub-secret"
 url = "http://host.docker.internal:4010/oauth/keycloak"
 redirect_uri = ""
-
 [auth.sms]
 enable_signup = false
 enable_confirmations = false

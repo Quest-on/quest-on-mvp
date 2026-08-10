@@ -15,6 +15,9 @@ runs:
       with:
         version: 2.113.0
 
+    # supabase/config.toml 이 없으면 `supabase start` 가 프로젝트를 인식하지
+    # 못하고, 실패 사유가 불명확한 채로 뒤 step 들이 줄줄이 깨진다.
+    # 여기서 먼저 확인해 원인을 분명히 남긴다.
     - name: Verify local Supabase project config
       run: |
         if [ ! -f supabase/config.toml ]; then

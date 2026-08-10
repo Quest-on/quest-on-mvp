@@ -141,4 +141,43 @@ describe("e2e 부트스트랩 배선", () => {
       expect(code, `${file} 이 .env.local 을 읽는다`).not.toContain(".env.local");
     }
   });
+
+  it("로컬 Supabase 프로젝트 설정이 저장소에 있다", () => {
+    // 이게 없으면 `supabase start` 가 프로젝트를 인식하지 못해
+    // 로컬에서도 CI 에서도 스택을 재현할 수 없다. 그러면 E2E 는
+    // "환경이 없어서" 가 아니라 "배선이 없어서" 안 도는 것이다.
+    const configPath = path.join(REPO_ROOT, "supabase", "config.toml");
+    expect(fs.existsSync(configPath)).toBe(true);
+
+    const config = fs.readFileSync(configPath, "utf8");
+    // preflight 와 test-setup 이 쓰는 포트와 어긋나면 붙지 못한다.
+    expect(config).toMatch(/^port = 54321$/m); // api
+    expect(config).toMatch(/^port = 54322$/m); // db
+    expect(config).toMatch(/^port = 54324$/m); // inbucket — 이메일 확인 fixture
+  });
+
+  it("CI 가 supabase start 전에 설정 존재를 확인한다", () => {
+    const action = fs.readFileSync(
+      path.join(REPO_ROOT, ".github", "actions", "test-setup", "action.yml"),
+      "utf8",
+    );
+
+    const verifyAt = action.indexOf("supabase/config.toml");
+    const startAt = action.indexOf("supabase start");
+    expect(verifyAt).toBeGreaterThan(-1);
+    // 확인이 start 보다 앞서야 실패 원인이 분명해진다.
+    expect(verifyAt).toBeLessThan(startAt);
+  });
+
+  it("CI 가 preflight 3조건을 갖춰준다", () => {
+    const action = fs.readFileSync(
+      path.join(REPO_ROOT, ".github", "actions", "test-setup", "action.yml"),
+      "utf8",
+    );
+
+    // 없으면 내가 넣은 preflight 가 CI 의 모든 E2E 를 멈춘다.
+    expect(action).toContain(".env.test");
+    expect(action).toContain("DISPOSABLE_LOCAL_DB_CONFIRMED=1");
+    expect(action).toMatch(/127\.0\.0\.1:54321/);
+  });
 });
