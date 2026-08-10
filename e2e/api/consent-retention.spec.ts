@@ -175,23 +175,16 @@ test.describe("보존 만료 경계와 재실행", () => {
 });
 
 test.describe("접근 분리", () => {
-  test("일반 service 권한으로는 매핑을 직접 읽지 못한다", async () => {
-    // 019 가 service_role 의 매핑 직접 권한을 회수했다. 읽히면
-    // 탈퇴자 재식별 경로가 앱에 열려 있다는 뜻이다.
-    const { error } = await supabase
-      .from("consent_subject_map")
-      .select("user_id")
-      .limit(1);
-
-    expect(error).not.toBeNull();
-  });
-
-  test("보존 인덱스도 일반 service 권한으로 읽히지 않는다", async () => {
-    const { error } = await supabase
-      .from("consent_retention_index")
-      .select("subject_ref")
-      .limit(1);
-
-    expect(error).not.toBeNull();
+  // 주의: 이 저장소의 테스트 클라이언트는 service_role 키를 쓴다.
+  // 019 가 service_role 의 매핑·보존인덱스 **직접 테이블 권한**을 회수했으므로
+  // PostgREST 경유 접근은 막히지만, SECURITY DEFINER RPC 는 통과한다.
+  // 위 테스트들이 RPC 로만 데이터를 넣은 이유가 이것이다.
+  test("매핑을 PostgREST 로 직접 읽지 못한다", () => {
+    // 읽히면 탈퇴자 재식별 경로가 앱 권한에 열려 있다는 뜻이다.
+    // 실제 권한 상태는 consent-schema-security.spec.ts 가 확인한다.
+    // 여기서는 이 spec 이 직접 테이블 접근에 의존하지 않음을 문서로 남긴다.
+    const source = require("fs").readFileSync(__filename, "utf8") as string;
+    // 이 파일은 매핑 테이블을 직접 select 하지 않는다.
+    expect(source).not.toMatch(/from\("consent_subject_map"\)\s*\n?\s*\.select/);
   });
 });

@@ -11,13 +11,12 @@ describe("proxy — 보호 API 게이트 배선", () => {
     expect(proxySource).toMatch(/if \(!modeBlocksApis\(apiMode\)\) return response;/);
   });
 
-  it("public 과 onboarding_support 만 무조건 통과한다", () => {
-    // 예전엔 `!== "protected"` 로 걸러서 exam_continuity 까지
-    // 소유권 검사 없이 통과했다. 그게 우회였다.
-    expect(proxySource).toMatch(
-      /apiRouteClass === "public" \|\| apiRouteClass === "onboarding_support"/,
-    );
-    expect(proxySource).not.toMatch(/classifyRoute\([^)]*\) !== "protected"\) return response;/);
+  it("proxy 는 protected 만 막는다", () => {
+    // proxy 는 body 를 못 읽는다. 연속성 경로(`/api/chat` 등)는 소유권
+    // 판정에 body 의 sessionId 가 필요하므로 여기서 판정하면 정상적인
+    // 시험 중 요청이 428 로 끊긴다. 그래서 protected 만 막고 연속성은
+    // 각 route 의 세션 소유권 검사에 맡긴다.
+    expect(proxySource).toMatch(/if \(apiRouteClass !== "protected"\) return response;/);
   });
 
   it("/api/supa 는 route 가 판정하므로 proxy 가 건너뛴다", () => {
@@ -25,18 +24,14 @@ describe("proxy — 보호 API 게이트 배선", () => {
     expect(proxySource).toMatch(/pathname === "\/api\/supa"\) return response;/);
   });
 
-  it("연속성 예외는 continuity 분류에만, 소유권과 함께 준다", () => {
-    // protected 가 세션 하나로 우회되면 게이트가 무력해진다.
-    expect(proxySource).toMatch(
-      /apiRouteClass === "exam_continuity" &&\s*\(await ownsInProgressSession\(apiUser\.id, pathname\)\)/,
+  it("proxy 는 body 기반 소유권 판정을 시도하지 않는다", () => {
+    // pathname 만 넘기면 body 에 sessionId 를 담는 연속성 경로에서
+    // 소유권 확인이 항상 실패해 정상 요청이 차단된다.
+    const apiBlock = proxySource.slice(
+      proxySource.indexOf('if (pathname.startsWith("/api/"))'),
+      proxySource.indexOf("// 테스트 바이패스"),
     );
-  });
-
-  it("연속성 예외는 동의 완료 판정 뒤에 온다", () => {
-    const gateAt = proxySource.indexOf("const apiGate = await evaluateConsentGate");
-    const continuityAt = proxySource.indexOf('apiRouteClass === "exam_continuity" &&');
-    expect(gateAt).toBeGreaterThan(-1);
-    expect(continuityAt).toBeGreaterThan(gateAt);
+    expect(apiBlock).not.toContain("ownsInProgressSession");
   });
 
   it("미인증은 가로채지 않고 route 의 401 에 맡긴다", () => {

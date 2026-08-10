@@ -26,7 +26,10 @@ runs:
     - run: supabase start
       shell: bash
 
-    # DB 안전 멈춤 규칙의 preflight가 요구하는 폐기 로컬 DB 증거를 러너에만 만든다.
+    # DB 안전 멈춤 규칙(AGENTS.md)의 preflight 가 세 조건을 요구한다.
+    # `.env.test` 존재, DISPOSABLE_LOCAL_DB_CONFIRMED=1, 두 URL 이 localhost.
+    # CI 는 방금 띄운 로컬 Supabase 만 쓰므로 여기서 임시로 만들어 준다.
+    # 이 파일은 러너에서만 생기고 저장소에 커밋되지 않는다.
     - name: Create disposable local .env.test
       run: |
         ANON_KEY="$(supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2- | tr -d '"')"

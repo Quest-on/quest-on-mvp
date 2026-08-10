@@ -58,14 +58,15 @@ export async function proxy(request: NextRequest) {
       return NextResponse.json({ error: "CONSENT_GATE_MISCONFIGURED" }, { status: 500 });
     }
     if (!modeBlocksApis(apiMode)) return response;
-    // 분류별로 판정이 다르다. 순서를 뒤집으면 우회가 생긴다.
-    //   public / onboarding_support → 무조건 통과 (게이트 대상이 아니다)
-    //   exam_continuity            → 소유한 진행 중 세션이 있을 때만 통과
-    //   protected                  → 동의 미완료면 차단. 연속성 예외 없음
+    // proxy 는 body 를 읽을 수 없다. 그런데 `/api/chat` 같은 연속성 경로는
+    // 소유권 판정에 body 의 sessionId 가 필요하다. 여기서 판정하면 정상적인
+    // 시험 중 요청이 428 로 끊긴다 — 그건 이 설계가 가장 피해야 할 사고다.
+    //
+    // 그래서 proxy 는 `protected` 만 막는다. 연속성 경로는 각 route 가
+    // 이미 세션 소유권을 확인하므로, 동의 미완료 사용자가 소유하지 않은
+    // 세션에 접근하는 건 그 검사에서 걸린다.
     const apiRouteClass = classifyRoute(pathname, request.method);
-    if (apiRouteClass === "public" || apiRouteClass === "onboarding_support") {
-      return response;
-    }
+    if (apiRouteClass !== "protected") return response;
 
     const apiSupabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -89,19 +90,6 @@ export async function proxy(request: NextRequest) {
 
     const apiGate = await evaluateConsentGate(apiUser.id);
     if (apiGate.complete) return response;
-
-    // 연속성 예외는 continuity 분류에만, 그것도 소유권이 확인될 때만 준다.
-    // protected 는 세션을 들고 있어도 예외가 아니다 — 그러면 시험 하나
-    // 열어둔 사람이 무관한 API 를 전부 우회한다.
-    //
-    // proxy 는 body 를 소비하면 안 되므로 path 로만 판단한다. body 까지
-    // 봐야 하는 `/api/supa` 는 위에서 이미 route 로 넘겼다.
-    if (
-      apiRouteClass === "exam_continuity" &&
-      (await ownsInProgressSession(apiUser.id, pathname))
-    ) {
-      return response;
-    }
 
     void logInfo("consent_gate", {
       payload: {
