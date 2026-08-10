@@ -129,6 +129,11 @@
             "retention": "Retained for 90 days, then destroyed"
           }
         }
+      },
+      "contract": {
+        "items": "Name, email, institution, role, login identifier / Exam code, sitting time, submitted answers, rubric scores, feedback logs / AI question and response logs, reflection Q&A logs / IP address, browser and OS, access timestamps, error logs",
+        "purpose": "Account identification and authentication, role-based access / Running exams, grading and reviewing results / Providing AI features and evidencing assessment / Security incident response and error analysis",
+        "retention": "Destroyed without delay when the account is closed / Until the period set by the educator; if none is set, destroyed when service use ends / Same as exam data / Retained for 90 days, then destroyed"
       }
     },
     "section2": {
@@ -162,6 +167,14 @@
         "scope": "Scope: accounts created after this policy first took effect that have not completed the confirmations required to finish sign-up.",
         "retention": "Retention: seven days from account creation.",
         "destruction": "Procedure: after seven days an automated destruction job deletes the account and related data irrecoverably."
+      },
+      "consentRecords": {
+        "purpose": "Purpose: to evidence that consent was obtained.",
+        "retention": "Period: three years from the date of account closure.",
+        "form": "The retained data is pseudonymized, not anonymized. We do not store your member identifier; we keep only a substitute identifier derived with a separately held key.",
+        "separation": "Safeguards: the link between the substitute identifier and your member identifier is deleted at closure, and the derivation key is held in a separate, access-restricted environment that ordinary service credentials cannot read.",
+        "destruction": "When the period elapses, an automated destruction routine deletes the records irrecoverably.",
+        "rights": "You may still submit access, correction or deletion requests during the retention period using the contact below."
       }
     },
     "section4": {
@@ -178,7 +191,15 @@
         "criteria1": "Relatedness to the original purpose: taking an exam is itself an act of being assessed, so providing answers and conversation content to the educator is directly connected to the original purpose.",
         "criteria2": "Foreseeability: before starting, examinees see a notice stating that the conversation with the AI is shown to the instructor as-is.",
         "criteria3": "Absence of harm to your interests: provision is limited to what the assessment of that exam requires, and is never extended to other exams or unrelated educators.",
-        "criteria4": "Security measures: data is encrypted in transit and at rest, access is restricted to the educator responsible for that exam, and access is logged."
+        "criteria4": "Security measures: data is encrypted in transit and at rest, access is restricted to the educator responsible for that exam, and access is logged.",
+        "legalBasis": "Legal basis: Article 17(4) of the Personal Information Protection Act. We provide the data without separate consent within a scope reasonably related to the original purpose of collection.",
+        "reasonableRelation": {
+          "originalPurpose": "Relatedness to the original purpose: taking an exam is itself an act of being assessed, so providing answers and conversation content to the educator is directly connected to the original purpose.",
+          "predictability": "Foreseeability: before starting, examinees see a notice stating that the conversation with the AI is shown to the instructor as-is.",
+          "dataSubjectImpact": "Absence of harm to your interests: provision is limited to what the assessment of that exam requires, and is never extended to other exams or unrelated educators.",
+          "safeguards": "Security measures: data is encrypted in transit and at rest, access is restricted to the educator responsible for that exam, and access is logged."
+        },
+        "retention": "Retention: for the period set by the educator"
       },
       "processing": {
         "heading": "Data processors",
@@ -236,7 +257,14 @@
       "optOutLabel": "How to refuse the transfer:",
       "optOutValue": "You may notify us of your refusal using the contact below, or close your account.",
       "optOutEffectLabel": "Effect of refusal:",
-      "optOutEffectValue": "Processing by these recipients is essential to providing the service, so if you refuse the transfer you will not be able to use the service."
+      "optOutEffectValue": "Processing by these recipients is essential to providing the service, so if you refuse the transfer you will not be able to use the service.",
+      "recipientName": "Supabase, Inc. / Vercel Inc. / OpenAI, L.L.C. / Upstash, Inc.",
+      "recipientContact": "Supabase, Inc. privacy@supabase.io / Vercel Inc. privacy@vercel.com / OpenAI, L.L.C. privacy@openai.com / Upstash, Inc. support@upstash.com",
+      "timing": "Transferred as needed at the moment the relevant processing occurs during service use.",
+      "method": "Transmission over an encrypted network connection",
+      "legalBasis": "Article 28-8(1)3 of the Personal Information Protection Act. The transfer constitutes entrusted processing and storage necessary to perform a contract, and the matters listed in Article 28-8(2) are disclosed in this policy in lieu of separate consent.",
+      "optOutMethod": "You may notify us of your refusal using the contact below, or close your account.",
+      "optOutEffect": "Processing by these recipients is essential to providing the service, so if you refuse the transfer you will not be able to use the service."
     },
     "section6": {
       "heading": "6. Your rights",
@@ -259,7 +287,8 @@
       "officer": "Personal Information Protection Officer",
       "department": "Department: Quest-On Data Protection Team",
       "email": "Email: questonkr@gmail.com",
-      "contact": "Questions, complaints and dispute resolution regarding personal data can be submitted to the contact above."
+      "contact": "Questions, complaints and dispute resolution regarding personal data can be submitted to the contact above.",
+      "officerNameOrDepartment": "Personal Information Protection Officer: Quest-On Data Protection Team"
     }
   },
   "security": {
