@@ -45,7 +45,7 @@ function get(root: unknown, dotted: string): unknown {
 describe("legal messages — AC-D1 leaf 계약 (명세 원문)", () => {
   // 명세가 leaf 이름을 정확히 못박고 있다. 별칭으로 대체하면 계약 위반이다.
   const REQUIRED_LEAVES = [
-    "privacy.section1.legalBasis.contract",
+    "privacy.section1.legalBasis",
     "privacy.section1.contract.items",
     "privacy.section1.contract.purpose",
     "privacy.section1.contract.retention",
@@ -263,14 +263,14 @@ describe("legal messages — 국외이전 공개항목 (제28조의8②)", () =>
 describe("legal messages — 수집·이용 근거 (제15조①4호)", () => {
   it("법적 근거를 명시하고 최소수집 입증책임을 밝힌다", () => {
     // 수집 항목만 나열하고 근거를 안 적으면 어떤 자격으로 처리하는지가 빠진다.
-    expect(ko.privacy.section1.legalBasis.contract).toContain("제15조제1항제4호");
-    expect(en.privacy.section1.legalBasis.contract).toContain("15(1)4");
-    expect(ko.privacy.section1.legalBasis.minimal).toContain("제16조제1항");
+    expect(ko.privacy.section1.legalBasis).toContain("제15조제1항제4호");
+    expect(en.privacy.section1.legalBasis).toContain("15(1)4");
+    expect(ko.privacy.section1.legalBasisDetail.minimal).toContain("제16조제1항");
   });
 
   it("선택 항목은 동의 기반이며 거부해도 이용에 제한이 없음을 밝힌다", () => {
     for (const doc of [ko, en]) {
-      expect(doc.privacy.section1.legalBasis.consent.trim()).not.toBe("");
+      expect(doc.privacy.section1.legalBasisDetail.consent.trim()).not.toBe("");
     }
   });
 

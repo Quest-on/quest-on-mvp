@@ -44,12 +44,12 @@ export default async function PrivacyPage() {
 
           <div>
             <h3 className="text-xl font-medium mb-2">
-              {t("privacy.section1.legalBasis.heading")}
+              {t("privacy.section1.legalBasisDetail.heading")}
             </h3>
             <ul className="list-disc pl-6 space-y-2">
-              <li>{t("privacy.section1.legalBasis.contract")}</li>
-              <li>{t("privacy.section1.legalBasis.consent")}</li>
-              <li>{t("privacy.section1.legalBasis.minimal")}</li>
+              <li>{t("privacy.section1.legalBasis")}</li>
+              <li>{t("privacy.section1.legalBasisDetail.consent")}</li>
+              <li>{t("privacy.section1.legalBasisDetail.minimal")}</li>
             </ul>
           </div>
 

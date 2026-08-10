@@ -54,6 +54,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 세션 소유권 검증
+    //
+    // sessionId 는 body 로 들어온다. 인증만 하고 소유자를 대조하지 않으면
+    // 로그인한 아무나 남의 sessionId 로 messages 에 행을 삽입할 수 있다.
+    // 동의 게이트도 이 경로를 route 에 위임하므로 여기서 막지 않으면
+    // 아무도 안 보는 셈이 된다.
+    const { data: ownedSession } = await getSupabase()
+      .from("sessions")
+      .select("id, student_id, exam_id")
+      .eq("id", sessionId)
+      .eq("student_id", user.id)
+      .maybeSingle();
+
+    if (!ownedSession || ownedSession.exam_id !== examId) {
+      return new Response(
+        JSON.stringify({ error: "FORBIDDEN", message: "Session not accessible" }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
     // Fetch exam info for context
     const { data: exam } = await getSupabase()
       .from("exams")
