@@ -45,9 +45,9 @@
       "description": "무료 한도(발행 3회·시험당 학생 5명)를 얼마나 쓰고 있는지 봅니다. 데모 시험은 한도에 포함되지 않습니다.",
       "empty": "아직 교수자 계정이 없습니다.",
       "publishedCount": "발행 {count}건",
-      "demoCount": "데모 {count}건",
       "lastPublishedAt": "최근 발행: {date}",
-      "neverPublished": "아직 발행 없음"
+      "neverPublished": "아직 발행 없음",
+      "loadFailed": "발행 현황을 불러오지 못했습니다. 데이터가 없는 것이 아니라 조회가 실패한 것입니다."
     }
   },
   "login": {

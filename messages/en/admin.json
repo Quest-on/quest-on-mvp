@@ -45,9 +45,9 @@
       "description": "How much of the free tier (3 publishes, 5 students per exam) each instructor uses. Demo exams do not count.",
       "empty": "No instructor accounts yet.",
       "publishedCount": "{count} published",
-      "demoCount": "{count} demo",
       "lastPublishedAt": "Last published: {date}",
-      "neverPublished": "Never published"
+      "neverPublished": "Never published",
+      "loadFailed": "Failed to load publishing data. This is a fetch error, not an empty result."
     }
   },
   "login": {

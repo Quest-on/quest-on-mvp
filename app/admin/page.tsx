@@ -62,7 +62,6 @@ interface PublishingRow {
   school: string | null;
   plan: string;
   publishedCount: number;
-  demoCount: number;
   lastPublishedAt: string | null;
 }
 
@@ -155,11 +154,18 @@ export default function AdminDashboard() {
 
   // 발행 현황 (#86 / AC-19). 승인이 한도로 바뀐 뒤 plan 승격 판단의 근거는
   // 대기열이 아니라 "누가 얼마나 쓰고 있는가"다.
-  const { data: publishing, refetch: refetchPublishing } = useQuery({
+  const {
+    data: publishing,
+    refetch: refetchPublishing,
+    isError: publishingError,
+  } = useQuery({
     queryKey: ["admin-instructor-publishing"],
     queryFn: async (): Promise<PublishingRow[]> => {
       const res = await fetch("/api/admin/instructors/publishing");
-      if (!res.ok) return [];
+      // 장애를 빈 목록으로 위장하지 않는다. 018 미적용이나 DB 오류로 500 이
+      // 나도 `[]` 를 돌려주면 관리자는 "발행한 교수자가 없다"로 읽는다.
+      // 아무도 안 쓰는 것과 화면이 고장 난 것은 완전히 다른 판단을 부른다.
+      if (!res.ok) throw new Error("PUBLISHING_FETCH_FAILED");
       const data = await res.json();
       return data.instructors || [];
     },
@@ -405,7 +411,9 @@ export default function AdminDashboard() {
           <CardDescription>{t("dashboard.publishing.description")}</CardDescription>
         </CardHeader>
         <CardContent>
-          {!publishing || publishing.length === 0 ? (
+          {publishingError ? (
+            <ErrorAlert message={t("dashboard.publishing.loadFailed")} />
+          ) : !publishing || publishing.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {t("dashboard.publishing.empty")}
             </p>
@@ -441,10 +449,6 @@ export default function AdminDashboard() {
                       {t("dashboard.publishing.publishedCount", {
                         count: row.publishedCount,
                       })}
-                    </span>
-                    {/* 데모는 한도에 안 잡히지만 "써 보긴 했는가"의 신호다. */}
-                    <span className="text-xs text-muted-foreground">
-                      {t("dashboard.publishing.demoCount", { count: row.demoCount })}
                     </span>
                   </div>
                 </div>

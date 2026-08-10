@@ -84,17 +84,16 @@ describe("GET /api/admin/instructors/pending", () => {
 });
 
 describe("GET /api/admin/instructors/publishing", () => {
-  it("데모는 발행 카운트에서 빼고 별도로 센다 — AC-17/AC-19", async () => {
+  it("데모와 미발행은 DB 조회에서 걸러진다 — 앱이 세지 않는다 (AC-17)", async () => {
     profileRows = [
       { id: "i1", display_name: "김교수", school: "동국대", plan: "free", status: "pending" },
     ];
+    // 라우트가 `.eq("is_demo", false)` + `.not("first_published_at","is",null)` 로
+    // 좁히므로 스텁이 돌려주는 행은 이미 "데모 아님 · 발행됨"뿐이다. 여기서
+    // 데모 행을 섞으면 실제 쿼리가 아니라 스텁의 후처리를 검증하게 된다.
     examRows = [
-      { instructor_id: "i1", is_demo: false, first_published_at: "2026-08-01T00:00:00Z" },
-      { instructor_id: "i1", is_demo: false, first_published_at: "2026-08-05T00:00:00Z" },
-      // 데모는 발행됐어도 카운트에 들어가면 안 된다.
-      { instructor_id: "i1", is_demo: true, first_published_at: "2026-08-09T00:00:00Z" },
-      // 한 번도 발행 안 된 초안은 세지 않는다.
-      { instructor_id: "i1", is_demo: false, first_published_at: null },
+      { instructor_id: "i1", first_published_at: "2026-08-01T00:00:00Z" },
+      { instructor_id: "i1", first_published_at: "2026-08-05T00:00:00Z" },
     ];
 
     const { GET } = await import("../app/api/admin/instructors/publishing/route");
@@ -102,11 +101,23 @@ describe("GET /api/admin/instructors/publishing", () => {
     const row = body.instructors[0];
 
     expect(row.publishedCount).toBe(2);
-    expect(row.demoCount).toBe(1);
-    // 최근 발행일도 데모를 따라가면 안 된다.
     expect(row.lastPublishedAt).toBe("2026-08-05T00:00:00Z");
     expect(row.school).toBe("동국대");
     expect(row.plan).toBe("free");
+    // AC-17: 데모의 존재 자체가 관리자 화면에 드러나면 안 된다.
+    expect(row).not.toHaveProperty("demoCount");
+  });
+
+  it("데모 제외와 발행 여부를 쿼리에서 건다 — 앱 필터로 대체하지 않는다", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(
+      "app/api/admin/instructors/publishing/route.ts",
+      "utf8"
+    );
+
+    expect(source).toMatch(/\.eq\("is_demo", false\)/);
+    expect(source).toMatch(/\.not\("first_published_at", "is", null\)/);
+    expect(source).not.toContain("demoCount");
   });
 
   it("한 번도 발행하지 않은 교수자도 0 으로 보인다 — 안 보이면 방치된다", async () => {

@@ -24,7 +24,6 @@ type PublishingRow = {
   plan: string;
   status: string | null;
   publishedCount: number;
-  demoCount: number;
   lastPublishedAt: string | null;
 };
 
@@ -39,8 +38,13 @@ export async function GET() {
       await Promise.all([
         supabase
           .from("exams")
-          .select("instructor_id, is_demo, first_published_at")
-          .not("instructor_id", "is", null),
+          .select("instructor_id, first_published_at")
+          // 데모는 DB 에서 걸러 내보내지 않는다 (AC-17: "어디에도 나타나지 않는다").
+          // 앱에서 세어 별도 칸으로 보여주면, 숫자가 정확하더라도 관리자 화면에
+          // 데모의 존재 자체가 드러난다.
+          .eq("is_demo", false)
+          .not("instructor_id", "is", null)
+          .not("first_published_at", "is", null),
         supabase
           .from("profiles")
           .select("id, display_name, school, plan, status")
@@ -51,19 +55,14 @@ export async function GET() {
     if (profilesError) throw profilesError;
 
     const published = new Map<string, number>();
-    const demos = new Map<string, number>();
     const lastPublished = new Map<string, string>();
 
+    // 쿼리가 이미 데모와 미발행을 걸러냈다. 여기서는 세기만 한다.
     for (const exam of exams ?? []) {
       const id = exam.instructor_id as string;
-      if (exam.is_demo) {
-        demos.set(id, (demos.get(id) ?? 0) + 1);
-        continue;
-      }
-      if (!exam.first_published_at) continue;
+      const at = exam.first_published_at as string;
 
       published.set(id, (published.get(id) ?? 0) + 1);
-      const at = exam.first_published_at as string;
       const seen = lastPublished.get(id);
       if (!seen || at > seen) lastPublished.set(id, at);
     }
@@ -78,7 +77,6 @@ export async function GET() {
       plan: (p.plan as string | null) ?? "free",
       status: (p.status as string | null) ?? null,
       publishedCount: published.get(p.id as string) ?? 0,
-      demoCount: demos.get(p.id as string) ?? 0,
       lastPublishedAt: lastPublished.get(p.id as string) ?? null,
     }));
 
