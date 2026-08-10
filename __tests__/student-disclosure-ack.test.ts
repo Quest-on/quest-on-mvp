@@ -50,12 +50,14 @@ const session = {
   device_fingerprint: null,
 };
 
-const exam = {
+// 기본은 서술형 시험 — 3줄 고지가 실제로 노출되는 시험이다.
+let exam: Record<string, unknown> = {
   id: "exam-1",
   status: "draft",
   started_at: null,
   duration: 60,
   type: "exam",
+  questions: [{ id: "q1", type: "essay", text: "..." }],
 };
 
 // sessions/exams 조회와 update 를 모두 받아내는 최소 스텁.
@@ -93,6 +95,15 @@ async function acceptPreflight() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // 시험 종류를 바꾸는 케이스가 있으므로 매번 서술형 기본으로 되돌린다.
+  exam = {
+    id: "exam-1",
+    status: "draft",
+    started_at: null,
+    duration: 60,
+    type: "exam",
+    questions: [{ id: "q1", type: "essay", text: "..." }],
+  };
   recordOnboardingEvent.mockResolvedValue(true);
   hasOnboardingEvent.mockResolvedValue(false);
 });
@@ -108,6 +119,32 @@ describe("preflight 수락이 고지 확인을 기록한다 (AC-15)", () => {
       event: "student_disclosure_ack",
       examId: "exam-1",
     });
+  });
+
+  // #149: 노출 판정과 기록 판정이 갈라져 있으면, 고지를 한 번도 못 본 학생이
+  // "확인 완료"가 되어 다음 서술형 시험에서 고지가 숨겨진다.
+  it("객관식 전용 시험 수락은 ACK 를 만들지 않는다 — 3줄 고지가 뜨지 않는 시험이다", async () => {
+    exam = {
+      ...exam,
+      questions: [
+        { id: "q1", type: "multiple-choice", text: "..." },
+        { id: "q2", type: "true-false", text: "..." },
+      ],
+    };
+
+    const res = await acceptPreflight();
+
+    expect(res.status).toBe(200);
+    expect(recordOnboardingEvent).not.toHaveBeenCalled();
+  });
+
+  it("문항 정보가 없으면 ACK 를 만들지 않는다 — 확인 못 한 것을 확인 처리하지 않는다", async () => {
+    exam = { ...exam, questions: null };
+
+    const res = await acceptPreflight();
+
+    expect(res.status).toBe(200);
+    expect(recordOnboardingEvent).not.toHaveBeenCalled();
   });
 
   it("계측이 실패해도 응시는 시작된다", async () => {
