@@ -153,7 +153,7 @@ describe("e2e 부트스트랩 배선", () => {
     // preflight 와 test-setup 이 쓰는 포트와 어긋나면 붙지 못한다.
     expect(config).toMatch(/^port = 54321$/m); // api
     expect(config).toMatch(/^port = 54322$/m); // db
-    expect(config).toMatch(/^port = 54324$/m); // inbucket — 이메일 확인 fixture
+    expect(config).toMatch(/^port = 54324$/m); // Mailpit — 이메일 확인 fixture
   });
 
   it("CI 가 supabase start 전에 설정 존재를 확인한다", () => {
@@ -179,5 +179,15 @@ describe("e2e 부트스트랩 배선", () => {
     expect(action).toContain(".env.test");
     expect(action).toContain("DISPOSABLE_LOCAL_DB_CONFIRMED=1");
     expect(action).toMatch(/127\.0\.0\.1:54321/);
+  });
+
+  it("CI 가 actual-auth 동의 flow를 필수 게이트로 실행한다", () => {
+    const workflow = fs.readFileSync(
+      path.join(REPO_ROOT, ".github", "workflows", "ci.yml"),
+      "utf8",
+    );
+
+    expect(workflow).toContain("e2e/browser/flows/consent-onboarding-flow.spec.ts");
+    expect(workflow).toContain("--project=browser-flows");
   });
 });

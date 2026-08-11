@@ -117,9 +117,8 @@ jobs:
           paths: test-results/api-results.xml
 
   browser-e2e-test:
-    # 뼈대(smoke/a11y/CSP/error-boundary)만 필수 게이트로 둔다.
-    # browser-flows 는 testid·클릭 순서에 물려 UI 변경마다 깨져서 CI 에서 제외한다.
-    # 필요할 때 로컬에서: npm run test:browser (flows 포함)
+    # 뼈대(smoke/a11y/CSP/error-boundary)와 개인정보 동의 actual-auth flow를
+    # 필수 게이트로 둔다. 나머지 browser-flows는 UI 변경 민감도가 높아 로컬 전용이다.
     name: Browser E2E Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -131,6 +130,9 @@ jobs:
         run: |
           mkdir -p test-results
           npx playwright test --project=browser-e2e --config=e2e/playwright.config.ts
+          PLAYWRIGHT_JUNIT_OUTPUT_NAME=test-results/consent-flow-results.xml \
+            npx playwright test e2e/browser/flows/consent-onboarding-flow.spec.ts \
+              --project=browser-flows --config=e2e/playwright.config.ts
         env:
           PLAYWRIGHT_JUNIT_OUTPUT_NAME: test-results/browser-results.xml
           NODE_ENV: test
