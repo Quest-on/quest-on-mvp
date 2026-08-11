@@ -410,3 +410,69 @@ model bulk_grading_messages {
 
   @@index([session_id, created_at], map: "idx_bulk_grading_messages_session_created")
 }
+/// 025: 개인정보 동의 원장. append-only — UPDATE 는 DB trigger 가 거부하고
+/// DELETE 는 purge_expired_consent_records RPC 경로만 허용한다.
+/// user_id 를 저장하지 않는다. 식별은 consent_subject_map 이 담당한다.
+/// This model contains row level security and requires additional setup for migrations.
+model consent_records {
+  id                      String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subject_ref             String
+  controller_type         String                  @default("platform")
+  consent_key             String
+  granted                 Boolean
+  policy_version          String
+  recorded_at             DateTime                @default(now()) @db.Timestamptz(6)
+  consent_policy_releases consent_policy_releases @relation(fields: [policy_version], references: [release_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([subject_ref, consent_key, recorded_at(sort: Desc)], map: "idx_consent_records_subject_key_recorded")
+  @@index([subject_ref], map: "idx_consent_records_subject_ref")
+}
+
+/// 025: 식별 매핑. 탈퇴 = 이 테이블 1행 DELETE.
+/// service_role 직접 권한은 회수됐고 register_consent_subject RPC 로만 쓴다.
+/// This model contains row level security and requires additional setup for migrations.
+model consent_subject_map {
+  user_id     String   @id
+  subject_ref String   @unique
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// 025: 불변 정책 릴리스. UPDATE/DELETE 를 trigger 가 거부한다.
+/// 최초 행은 026_seed_consent_policy_release.sql 이 소유한다.
+/// This model contains row level security and requires additional setup for migrations.
+model consent_policy_releases {
+  release_id         String            @id
+  content_hash       String            @db.Char(64)
+  effective_at       DateTime          @unique @db.Timestamptz(6)
+  requires_reconsent Boolean
+  created_at         DateTime          @default(now()) @db.Timestamptz(6)
+  consent_records    consent_records[]
+
+  @@index([effective_at(sort: Desc)], map: "idx_consent_policy_releases_effective")
+}
+
+/// 025: 탈퇴 후 3년 보존 기한. destroy_after 는 CHECK 로 DB 가 강제한다.
+/// This table contains check constraints and requires additional setup for migrations.
+/// This model contains row level security and requires additional setup for migrations.
+model consent_retention_index {
+  subject_ref   String   @id
+  deleted_at    DateTime @db.Timestamptz(6)
+  destroy_after DateTime @db.Timestamptz(6)
+
+  @@index([destroy_after], map: "idx_consent_retention_index_destroy_after")
+}
+
+/// 025: 파기 배치 실행 로그. 원·가명 user_id 를 기록하지 않는다.
+/// This table contains check constraints and requires additional setup for migrations.
+/// This model contains row level security and requires additional setup for migrations.
+model consent_purge_runs {
+  run_id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  job             String
+  started_at      DateTime  @default(now()) @db.Timestamptz(6)
+  finished_at     DateTime? @db.Timestamptz(6)
+  cutoff          DateTime? @db.Timestamptz(6)
+  candidate_count Int       @default(0)
+  deleted_count   Int       @default(0)
+  status          String
+  error           String?
+}
