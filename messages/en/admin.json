@@ -173,7 +173,8 @@
   },
   "nav": {
     "dashboard": "Dashboard",
-    "aiUsage": "AI Usage"
+    "aiUsage": "AI Usage",
+    "aiConfig": "AI config"
   },
   "agent": {
     "errors": {
@@ -240,6 +241,35 @@
       },
       "pending": "Agent is working…",
       "noSteps": "No steps yet."
+    }
+  },
+  "aiConfig": {
+    "title": "AI config",
+    "description": "Manage the model and request parameters per task. Saving creates a new immutable version and moves the production label.",
+    "currentVersion": "Current version",
+    "source": "Source",
+    "inherit": "Inherit",
+    "none": "None",
+    "reason": "Change reason",
+    "reasonPlaceholder": "Describe what you are changing and why",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "loadError": "Failed to load config",
+    "saveError": "Failed to save",
+    "fields": {
+      "model": "Model",
+      "timeoutMs": "Timeout (ms)",
+      "maxRetries": "Retries",
+      "maxTokens": "Token cap",
+      "temperature": "Temperature",
+      "reasoningEffort": "Reasoning effort"
+    },
+    "sources": {
+      "code": "Code default",
+      "global_env": "Global env",
+      "task_env": "Task env",
+      "admin": "Admin setting"
     }
   }
 }

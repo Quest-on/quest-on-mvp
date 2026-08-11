@@ -169,7 +169,8 @@ export async function POST(request: NextRequest) {
       streamSettled = true;
       await recordAiStreamEvent({
         context: {
-          feature: "assignment_chat",
+          // 학생 채팅 트래픽이다 — 기존 분석 축과 같은 feature 로 남겨야 합산된다.
+          feature: "student_chat",
           route: "/api/assignment-chat",
           model: AI_MODEL,
           userId: user.id,

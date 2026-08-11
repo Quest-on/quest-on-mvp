@@ -3,7 +3,7 @@ import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { insert, from } = vi.hoisted(() => {
-  const insert = vi.fn(async () => ({ error: null }));
+  const insert = vi.fn(async (_row: Record<string, unknown>) => ({ error: null }));
   return { insert, from: vi.fn(() => ({ insert })) };
 });
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseServer: () => ({ from }) }));
@@ -29,7 +29,7 @@ const ROUTE_SOURCE = readFileSync(
 );
 
 const BASE_CONTEXT = {
-  feature: "assignment_chat" as const,
+  feature: "student_chat" as const,
   route: "/api/assignment-chat",
   model: "gpt-5.6-luna",
   userId: "user-1",
