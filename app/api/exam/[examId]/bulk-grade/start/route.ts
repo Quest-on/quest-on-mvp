@@ -20,6 +20,19 @@ import {
 import type { ExtractedCriteria } from "@/lib/prompts";
 import { isUniqueViolation } from "@/lib/chat-idempotency";
 import { extractGradingCriteriaFromChat, isInterviewReady } from "@/lib/bulk-grading-criteria";
+import { loadCurrentVersion } from "@/lib/ai-config-store";
+import { buildRunProfileSnapshot } from "@/lib/ai-execution-context";
+import type { AiTask } from "@/lib/ai-task-profile";
+
+/**
+ * 런 시작 시 고정하는 태스크 집합 (이슈 #118).
+ * 이 런이 실행할 수 있는 모든 채점 태스크를 미리 해석해 스냅샷으로 박는다.
+ */
+const BULK_RUN_PINNED_TASKS: readonly AiTask[] = [
+  "bulk_grading_criteria_extract",
+  "bulk_grading_worker",
+  "bulk_grading_score_cluster",
+];
 
 const BULK_GRADE_START_RATE_LIMIT = { limit: 3, windowSec: 60 };
 const STALE_GRADING_MS = 10 * 60 * 1000;
@@ -235,6 +248,26 @@ export async function POST(
       criteria = extracted;
     }
 
+    // ── AI 설정 핀 (이슈 #118) ──────────────────────────────────────────
+    // production 라벨을 여기서 **한 번만** 읽고, 해석된 전체 프로필과 함께
+    // 아래 조건부 UPDATE 에 같이 박는다. 워커는 라벨을 다시 읽지 않으므로
+    // 런 도중 관리자가 설정을 바꿔도 이 런의 학생들은 전부 같은 설정으로 채점된다.
+    let pinnedVersionId: string | null = null;
+    let pinnedSnapshot: Record<string, unknown> | null = null;
+    try {
+      const version = await loadCurrentVersion();
+      pinnedVersionId = version.versionId;
+      pinnedSnapshot = buildRunProfileSnapshot({
+        tasks: BULK_RUN_PINNED_TASKS,
+        version,
+      }) as unknown as Record<string, unknown>;
+    } catch (error) {
+      logError("bulk-grade start: AI config pin failed", error, {
+        path: `/api/exam/${examId}/bulk-grade/start`,
+      });
+      return errorJson("INTERNAL_ERROR", "AI 설정을 불러오지 못해 채점을 시작할 수 없습니다.", 500);
+    }
+
     const attemptId = globalThis.crypto.randomUUID();
     const updatePayload: Record<string, unknown> = {
       grading_criteria: JSON.stringify(criteria),
@@ -248,6 +281,9 @@ export async function POST(
       calibration_status: "approved",
       status: "grading",
       updated_at: new Date().toISOString(),
+      // 버전과 스냅샷은 항상 함께 쓴다(DB 짝 제약이 이를 강제한다).
+      ai_config_version_id: pinnedVersionId,
+      ai_profile_snapshot: pinnedSnapshot,
     };
 
     updatePayload.proposed_grades = {};
@@ -292,12 +328,17 @@ export async function POST(
     }
 
     // Enqueue QStash jobs
+    // 컷오버 sentinel: 이 배포 이후 발행되는 작업은 전부 핀을 요구한다.
+    // 워커는 이 플래그로 "배포 전에 큐에 쌓인 레거시 작업" 과 "핀이 깨진 신규 작업" 을
+    // 구분한다 — 세션 행의 NULL 만 보고 폴백하면 둘을 구분할 수 없다.
     const jobs: BulkGradeJobPayload[] = targetSessionIds.map((sid) => ({
       gradingSessionId,
       studentSessionId: sid,
       examId,
       scope,
       attemptId,
+      pinRequired: true,
+      configVersionId: pinnedVersionId ?? undefined,
     }));
 
     const { published, failed: publishFailed } = await enqueueBulkGradeJobs(jobs);
