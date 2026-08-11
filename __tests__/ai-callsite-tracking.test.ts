@@ -115,3 +115,49 @@ describe("streaming path stamps the version it actually used", () => {
     expect(code).toMatch(/model:\s*aiContext\.profile\.model/);
   });
 });
+
+describe("config version reaches every profile-controlled event (migration 030)", () => {
+  const FILES: ReadonlyArray<[string, string]> = [
+    ["lib/grading.ts", "configVersion: aiVersion.versionId"],
+    ["lib/bulk-grading-criteria.ts", "configVersion: params.configVersionId"],
+    ["lib/bulk-grade-score-cluster.ts", "configVersion:"],
+    ["app/api/internal/bulk-grade-worker/route.ts", "configVersion: aiContext.configVersionId"],
+    ["app/api/assignment-chat/route.ts", "configVersion: aiContext.configVersionId"],
+  ];
+
+  it.each(FILES)("%s stamps the version it actually used", (file, marker) => {
+    // 안 찍으면 마이그레이션 030 의 컬럼이 빈 채로 남고, 어떤 설정이 이 결과를
+    // 만들었는지 성적 이의제기 때 되짚을 수 없다.
+    expect(stripComments(read(file))).toContain(marker);
+  });
+
+  it("the tracker persists config_version on both success and failure", () => {
+    const code = stripComments(read("lib/ai-tracking.ts"));
+    const stamps = code.match(/config_version:/g) ?? [];
+    // 스트림 기록기 1 + 성공 1 + 실패 1.
+    expect(stamps.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("admin overrides reach the ordinary grading tasks", () => {
+  it("grading resolves against the loaded version, not bare code defaults", () => {
+    const code = stripComments(read("lib/grading.ts"));
+    // overrides 를 넘기지 않으면 관리자 설정이 이 경로만 통째로 비켜 간다.
+    expect(code).toMatch(/loadCurrentVersion()/);
+    const resolves = code.match(/resolveAiTaskProfile\(\{[\s\S]{0,160}?\}\)/g) ?? [];
+    expect(resolves.length).toBe(3);
+    for (const call of resolves) {
+      expect(call).toMatch(/overrides:\s*aiVersion\.overrides/);
+    }
+  });
+});
+
+describe("inline dev dispatch takes the same code path as the queue", () => {
+  it("sends the cutover sentinel and the pinned version", () => {
+    const code = stripComments(read("app/api/exam/[examId]/bulk-grade/start/route.ts"));
+    // 빠뜨리면 워커가 레거시 분기로 떨어져 개발 환경만 핀 없이 돈다.
+    const sentinels = code.match(/pinRequired:\s*true/g) ?? [];
+    expect(sentinels.length).toBe(2);
+    expect(code).toMatch(/runBulkGradeInline\([\s\S]{0,200}?pinnedVersionId/);
+  });
+});

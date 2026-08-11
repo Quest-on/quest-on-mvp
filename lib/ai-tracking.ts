@@ -27,6 +27,12 @@ interface TrackedRequestContext {
   sessionId?: string | null;
   qIdx?: number | null;
   metadata?: JsonRecord;
+  /**
+   * 이 요청을 만든 AI 설정 버전 (이슈 #118).
+   * 프로필이 통제하는 호출은 반드시 넘겨야 한다 — 없으면 어떤 설정이 이 결과를
+   * 만들었는지 사후에 되짚을 수 없고 마이그레이션 030 의 컬럼이 빈 채로 남는다.
+   */
+  configVersion?: string | null;
 }
 
 interface TrackedRequestOptions<T> {
@@ -375,6 +381,7 @@ export async function callTrackedOpenAI<T>(
         request_id: requestId,
         response_id: responseId,
         error_code: null,
+        config_version: context.configVersion ?? null,
         metadata,
       },
       context.route
@@ -418,6 +425,7 @@ export async function callTrackedOpenAI<T>(
         request_id: null,
         response_id: null,
         error_code: getOpenAIErrorCode(failure.error),
+        config_version: context.configVersion ?? null,
         metadata: safeMetadata(context.metadata),
       },
       context.route

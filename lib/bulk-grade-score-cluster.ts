@@ -271,6 +271,7 @@ export async function recalibrateBulkGradesIfClustered(
           feature: "bulk_grading_chat",
           route: "lib/bulk-grade-score-cluster",
           model: clusterProfile.model,
+          configVersion: (sessionRow.ai_config_version_id as string | null) ?? null,
           examId,
           metadata: buildAiTextMetadata({ inputText: [prompt] }),
         },

@@ -153,6 +153,8 @@ export async function extractGradingCriteriaFromChat(params: {
   examId?: string;
   /** 런에 고정된 프로필 (이슈 #118). 없으면 현재 설정으로 해석한다. */
   profile?: ResolvedAiTaskProfile;
+  /** 런에 고정된 설정 버전. 이벤트에 그대로 찍는다. */
+  configVersionId?: string | null;
 }): Promise<ExtractedCriteria | null> {
   const transcript = params.messages
     .filter((m) => m.role === "user" || m.role === "assistant")
@@ -193,6 +195,7 @@ export async function extractGradingCriteriaFromChat(params: {
       feature: "bulk_grading_criteria_extract",
       route: "lib/bulk-grading-criteria",
       model: criteriaProfile.model,
+      configVersion: params.configVersionId ?? null,
       userId: params.userId,
       examId: params.examId,
       metadata: buildAiTextMetadata({ inputText: [systemPrompt, transcript] }),

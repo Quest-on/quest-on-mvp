@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getOpenAI } from "@/lib/openai";
 import { applyProfileToChatBody, resolveAiTaskProfile } from "@/lib/ai-task-profile";
+import { loadCurrentVersion } from "@/lib/ai-config-store";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import {
   buildSummaryGenerationSystemPrompt,
@@ -291,7 +292,12 @@ async function gradeSingleQuestion(params: {
 
   const userPrompt = `[학생의 채팅 기반 과제 수행 기록]\n${submission.answer || "(기록 없음)"}${finalAnswerSection}${aiSummaryText}`;
 
-  const questionProfile = resolveAiTaskProfile({ task: "auto_grading_question" }).profile;
+  // 관리자 설정이 이 경로에도 닿아야 한다. 라벨은 Redis 캐시(TTL 45초)를 통해 읽는다.
+  const aiVersion = await loadCurrentVersion();
+  const { profile: questionProfile } = resolveAiTaskProfile({
+    task: "auto_grading_question",
+    overrides: aiVersion.overrides,
+  });
 
   // 이슈 #118: 수동 재시도 루프를 제거했다.
   //
@@ -339,6 +345,7 @@ async function gradeSingleQuestion(params: {
         feature: "auto_grading_question",
         route: "lib/grading.ts",
         model: questionProfile.model,
+        configVersion: aiVersion.versionId,
         userId: studentId,
         examId: exam.id,
         sessionId,
@@ -579,7 +586,11 @@ JSON 형식으로 응답해주세요:
 }
 `;
 
-  const qSummaryProfile = resolveAiTaskProfile({ task: "auto_grading_question_summary" }).profile;
+  const aiVersion = await loadCurrentVersion();
+  const { profile: qSummaryProfile } = resolveAiTaskProfile({
+    task: "auto_grading_question_summary",
+    overrides: aiVersion.overrides,
+  });
 
     const tracked = await callTrackedChatCompletion(
       () =>
@@ -600,6 +611,7 @@ JSON 형식으로 응답해주세요:
         feature: "auto_grading_question_summary",
         route: "lib/grading.ts",
         model: qSummaryProfile.model,
+        configVersion: aiVersion.versionId,
         userId: studentId,
         examId,
         sessionId,
@@ -1655,7 +1667,11 @@ ${
         "keyQuotes": ["인용구1", "인용구2"]
       }`;
 
-  const summaryProfile = resolveAiTaskProfile({ task: "auto_grading_summary" }).profile;
+  const aiVersion = await loadCurrentVersion();
+  const { profile: summaryProfile } = resolveAiTaskProfile({
+    task: "auto_grading_summary",
+    overrides: aiVersion.overrides,
+  });
 
     const tracked = await callTrackedChatCompletion(
       () =>
@@ -1677,6 +1693,7 @@ ${
         feature: "auto_grading_summary",
         route: "lib/grading.ts",
         model: summaryProfile.model,
+        configVersion: aiVersion.versionId,
         userId: studentId,
         examId: exam.id,
         sessionId,

@@ -261,6 +261,7 @@ export async function POST(
         examId,
         // 기준 추출도 런에 고정된 프로필로 돈다.
         profile: criteriaProfile,
+        configVersionId: pinnedVersionId,
       });
 
       if (!extracted?.score_range) {
@@ -329,7 +330,14 @@ export async function POST(
     // Dev fallback: no QStash → inline sequential (non-Vercel only)
     if (!isQStashEnabled()) {
       // Dev: run inline (import lazily to avoid bundling in prod)
-      await runBulkGradeInline(gradingSessionId, targetSessionIds, examId, scope, attemptId);
+      await runBulkGradeInline(
+        gradingSessionId,
+        targetSessionIds,
+        examId,
+        scope,
+        attemptId,
+        pinnedVersionId,
+      );
       return successJson({ ok: true, total: targetSessionIds.length, mode: "inline", scope });
     }
 
@@ -387,6 +395,7 @@ async function runBulkGradeInline(
   examId: string,
   scope: BulkGradingScope,
   attemptId: string,
+  configVersionId: string,
 ): Promise<void> {
   // Dev-only: simulate worker calls sequentially
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -395,7 +404,17 @@ async function runBulkGradeInline(
       await fetch(`${baseUrl}/api/internal/bulk-grade-worker`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gradingSessionId, studentSessionId: sid, examId, scope, attemptId }),
+        // 인라인 경로도 큐 경로와 같은 sentinel 을 실어야 한다. 빠뜨리면 워커가
+        // 레거시 분기로 떨어져 핀을 무시하고, 개발 환경만 다른 코드 경로를 타게 된다.
+        body: JSON.stringify({
+          gradingSessionId,
+          studentSessionId: sid,
+          examId,
+          scope,
+          attemptId,
+          pinRequired: true,
+          configVersionId,
+        }),
       });
     } catch (err) {
       logError("bulk-grade inline: worker call failed", err, {
