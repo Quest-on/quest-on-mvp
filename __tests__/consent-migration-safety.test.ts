@@ -15,7 +15,7 @@ import path from "path";
  */
 
 const REPO_ROOT = path.resolve(__dirname, "..");
-const MIGRATION_PATH = path.join(REPO_ROOT, "database", "019_consent_records.sql");
+const MIGRATION_PATH = path.join(REPO_ROOT, "database", "025_consent_records.sql");
 const PRISMA_PATH = path.join(REPO_ROOT, "prisma", "schema.prisma");
 
 const sql = fs.readFileSync(MIGRATION_PATH, "utf-8");
@@ -48,7 +48,7 @@ function prismaModel(name: string): string {
   return prisma.slice(start, end);
 }
 
-describe("019 consent schema — 업무 필드 계약", () => {
+describe("025 consent schema — 업무 필드 계약", () => {
   const BUSINESS_FIELDS = [
     "subject_ref",
     "controller_type",
@@ -104,7 +104,7 @@ describe("019 consent schema — 업무 필드 계약", () => {
   });
 });
 
-describe("019 consent schema — append-only 불변식", () => {
+describe("025 consent schema — append-only 불변식", () => {
   it("consent_records 의 UPDATE 를 trigger 가 거부한다", () => {
     expect(sql).toContain("consent_records is append-only: UPDATE is not permitted");
     expect(sql).toMatch(/CREATE TRIGGER trg_consent_records_no_update[\s\S]*BEFORE UPDATE ON public\.consent_records/);
@@ -127,7 +127,7 @@ describe("019 consent schema — append-only 불변식", () => {
   });
 });
 
-describe("019 consent schema — 탈퇴와 보존", () => {
+describe("025 consent schema — 탈퇴와 보존", () => {
   it("탈퇴는 매핑 1행 DELETE 이며 원장을 건드리지 않는다", () => {
     const start = sql.indexOf("FUNCTION public.retire_consent_subject");
     expect(start).toBeGreaterThan(-1);
@@ -152,7 +152,7 @@ describe("019 consent schema — 탈퇴와 보존", () => {
   });
 });
 
-describe("019 consent schema — 권한", () => {
+describe("025 consent schema — 권한", () => {
   const TABLES = [
     "consent_records",
     "consent_subject_map",
@@ -192,7 +192,7 @@ describe("019 consent schema — 권한", () => {
   });
 });
 
-describe("019 consent schema — Prisma 모델 일치", () => {
+describe("025 consent schema — Prisma 모델 일치", () => {
   it("5개 모델이 전부 존재한다", () => {
     for (const model of [
       "consent_records",
@@ -221,18 +221,17 @@ describe("019 consent schema — Prisma 모델 일치", () => {
   });
 });
 
-describe("019 consent schema — 마이그레이션 형태", () => {
+describe("025 consent schema — 마이그레이션 형태", () => {
   it("단일 트랜잭션이다", () => {
     expect(sql.trimStart().startsWith("--") || sql.includes("BEGIN;")).toBe(true);
     expect(sql).toContain("BEGIN;");
     expect(sql).toContain("COMMIT;");
   });
 
-  it("019 가 database 디렉터리의 다음 순번이다", () => {
+  it("025 가 database 디렉터리의 다음 순번이다", () => {
     const files = fs.readdirSync(path.join(REPO_ROOT, "database"));
-    expect(files).toContain("019_consent_records.sql");
-    // 018 이 직전 번호여야 한다. 중간에 다른 019 가 있으면 충돌이다.
-    const nineteens = files.filter((f) => f.startsWith("019_"));
-    expect(nineteens).toHaveLength(1);
+    expect(files).toContain("025_consent_records.sql");
+    const twentyFives = files.filter((f) => f.startsWith("025_"));
+    expect(twentyFives).toHaveLength(1);
   });
 });

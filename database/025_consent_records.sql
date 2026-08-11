@@ -1,4 +1,4 @@
--- 019: 개인정보 동의 원장 · subject mapping · 정책 릴리스 · 보존 인덱스
+-- 025: 개인정보 동의 원장 · subject mapping · 정책 릴리스 · 보존 인덱스
 -- Epic #133 / 이슈 #134 / 명세 deep-interview-consent-system.md
 --
 -- 이 마이그레이션은 전부 "추가 전용"이고 forward-only foundation 이다.
