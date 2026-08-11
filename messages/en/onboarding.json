@@ -28,7 +28,7 @@
     "confirmTitle": "Confirm your role",
     "confirmDescInstructor": "Instructor (exam creator)",
     "confirmDescStudent": "Student (exam taker)",
-    "confirmDescSuffix": "You will continue as {role}. You can change this later in your profile settings.",
+    "confirmDescSuffix": "You will start as {role}. Your role is set once and cannot be changed later.",
     "reSelectBtn": "Choose again",
     "confirmBtn": "Confirm",
     "intakeTitle": "Almost done",
@@ -44,7 +44,8 @@
     "intakeSubject_general": "Other",
     "intakeSubmitBtn": "Create demo exam",
     "intakeSkipBtn": "Skip",
-    "intakeCreating": "Creating..."
+    "intakeCreating": "Creating...",
+    "roleAlreadyDifferent": "This account already has a different role. Please refresh the page."
   },
   "profileSetup": {
     "cardTitle": "Profile setup",
