@@ -215,6 +215,7 @@ model ai_events {
   error_code                String?
   metadata                  Json      @default("{}")
   created_at                DateTime  @default(now()) @db.Timestamptz(6)
+  config_version            String?   @db.Uuid
   exams                     exams?    @relation(fields: [exam_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   sessions                  sessions? @relation(fields: [session_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
 

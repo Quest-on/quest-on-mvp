@@ -8,6 +8,10 @@ import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { currentUser } from "@/lib/get-current-user";
 import { logError } from "@/lib/logger";
 import { buildAssignmentChatSystemPrompt } from "@/lib/prompts";
+import {
+  extractUsageFromOpenAIResult,
+  recordAiStreamEvent,
+} from "@/lib/ai-tracking";
 
 function getSupabase() {
   return getSupabaseServer();
@@ -147,6 +151,39 @@ export async function POST(request: NextRequest) {
       tools: [{ type: "web_search_preview" }],
     });
 
+    // ── 스트림 이벤트 1회성 기록 (이슈 #118) ────────────────────────────
+    // 이 경로는 지금까지 ai_events 에 아무것도 남기지 않았다. 학생 채팅 트래픽
+    // 전체가 비용·지연 관측에서 빠져 있었다는 뜻이다.
+    // 종료 사유가 넷(정상 완료 / 완료 이벤트 없이 종료 / 예외 / 클라이언트 취소)이라
+    // settled 플래그로 정확히 한 번만 기록한다.
+    const streamStartedAt = Date.now();
+    let streamSettled = false;
+    let capturedUsage: Parameters<typeof recordAiStreamEvent>[0]["usage"] = null;
+
+    const finalizeStreamEvent = async (outcome: {
+      status: "success" | "error" | "timeout" | "client_cancelled";
+      responseId?: string | null;
+      error?: unknown;
+    }): Promise<void> => {
+      if (streamSettled) return;
+      streamSettled = true;
+      await recordAiStreamEvent({
+        context: {
+          feature: "assignment_chat",
+          route: "/api/assignment-chat",
+          model: AI_MODEL,
+          userId: user.id,
+          sessionId,
+          metadata: { q_idx: 0 },
+        },
+        status: outcome.status,
+        latencyMs: Date.now() - streamStartedAt,
+        usage: capturedUsage,
+        responseId: outcome.responseId ?? null,
+        error: outcome.error,
+      });
+    };
+
     // Create SSE response stream
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
@@ -164,6 +201,8 @@ export async function POST(request: NextRequest) {
               );
             } else if (event.type === "response.completed") {
               responseId = event.response.id;
+              // 실제 usage 는 completed 이벤트에만 들어 있다. 추정하지 않는다.
+              capturedUsage = extractUsageFromOpenAIResult("responses", event.response);
 
               // Extract citations from output annotations
               const citations: Array<{ title: string; url: string }> = [];
@@ -205,7 +244,20 @@ export async function POST(request: NextRequest) {
             }))
           );
 
+          // 완료 이벤트를 못 받고 이터레이터가 끝난 경우도 성공이 아니다.
+          // usage 가 없으면 completed 가 오지 않은 것이다.
+          await finalizeStreamEvent(
+            capturedUsage
+              ? { status: "success", responseId }
+              : {
+                  status: "error",
+                  responseId,
+                  error: new Error("stream ended without response.completed"),
+                }
+          );
+
           // Save AI response to DB
+          // (메시지 저장은 OpenAI 이벤트 기록과 독립이다 — 하나가 실패해도 다른 하나는 남는다)
           await getSupabase().from("messages").insert([{
             session_id: sessionId,
             q_idx: 0,
@@ -217,11 +269,26 @@ export async function POST(request: NextRequest) {
           controller.close();
         } catch (error) {
           logError("[assignment-chat] Stream error", error, { path: "/api/assignment-chat" });
+          await finalizeStreamEvent({ status: "error", responseId, error });
           controller.enqueue(
             encoder.encode(sseEvent("error", { message: "Stream error occurred" }))
           );
           controller.close();
         }
+      },
+
+      /**
+       * 학생이 탭을 닫거나 이동하면 여기로 온다. 이건 실패가 아니라 정상 종료라
+       * client_cancelled 로 구분해 기록하고, 밑의 SDK 스트림도 같이 끊는다.
+       * 끊지 않으면 아무도 읽지 않는 응답에 계속 돈을 낸다.
+       */
+      async cancel() {
+        try {
+          stream.abort();
+        } catch {
+          // 이미 끝난 스트림이면 무시한다.
+        }
+        await finalizeStreamEvent({ status: "client_cancelled" });
       },
     });
 
