@@ -255,7 +255,7 @@ export async function recalibrateBulkGradesIfClustered(
             response_format: { type: "json_object" },
           }),
         {
-          feature: "bulk_grading_chat",
+          feature: "bulk_grading_execute",
           route: "lib/bulk-grade-score-cluster",
           model: AI_MODEL_BULK_GRADING_WORKER,
           examId,

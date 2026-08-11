@@ -165,7 +165,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
             response_format: { type: "json_object" },
           }),
         {
-          feature: "bulk_grading_chat",
+          feature: "bulk_grading_execute",
           route: "/api/internal/bulk-grade-worker",
           model: AI_MODEL_BULK_GRADING_WORKER,
           examId,
