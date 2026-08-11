@@ -46,6 +46,35 @@ export interface QuestionData {
   options?: string[];
 }
 
+/**
+ * AI 문항 초안 보존 (028_grade_provenance).
+ *
+ * `exams.questions` 는 단일 JSON blob 이라 저장할 때마다 통째로 덮어쓰인다. 그래서
+ * AI 가 만든 문항을 교수자가 편집하면 원본 초안이 사라지고, 무엇이 바뀌었는지 알 수 없다.
+ * 문항이 "처음" 채워지는 순간의 페이로드를 `ai_draft_questions` 로 한 번만 복사해 둔다.
+ *
+ * 초안은 시험당 정확히 하나(최초 1개)다. 이미 초안이 있으면 재생성이든 편집이든 건드리지 않는다.
+ * 반환값이 null 이면 호출부는 두 컬럼을 update 페이로드에 **아예 넣지 않아야** 한다 —
+ * null 로 보내면 이미 보존된 초안이 지워진다.
+ */
+export function buildAiDraftPreservation(
+  current: { questions?: unknown; ai_draft_questions?: unknown } | null | undefined,
+  nextQuestions: unknown,
+  now: string = new Date().toISOString()
+): { ai_draft_questions: unknown[]; ai_draft_generated_at: string } | null {
+  // 이미 보존된 초안이 있으면 절대 덮어쓰지 않는다 (재생성 포함).
+  if (current?.ai_draft_questions != null) return null;
+
+  const nextList = Array.isArray(nextQuestions) ? nextQuestions : [];
+  if (nextList.length === 0) return null;
+
+  // 최초 채움일 때만 기록한다. 기존 문항이 있으면 그건 교수자 편집이다.
+  const currentList = Array.isArray(current?.questions) ? current.questions : [];
+  if (currentList.length > 0) return null;
+
+  return { ai_draft_questions: nextList, ai_draft_generated_at: now };
+}
+
 export async function createExam(data: {
   title: string;
   code: string;
@@ -323,12 +352,13 @@ export async function updateExam(data: {
       id: string;
       questions: unknown;
       score_weights: unknown;
+      ai_draft_questions: unknown;
     } | null = null;
 
     if (needsCurrentExam) {
       const { data: foundExam, error: findError } = await getSupabase()
         .from("exams")
-        .select("id, questions, score_weights")
+        .select("id, questions, score_weights, ai_draft_questions")
         .eq("id", data.id)
         .eq("instructor_id", user.id)
         .maybeSingle();
@@ -341,6 +371,7 @@ export async function updateExam(data: {
         id: string;
         questions: unknown;
         score_weights: unknown;
+        ai_draft_questions: unknown;
       };
     }
 
@@ -470,6 +501,15 @@ export async function updateExam(data: {
       if (hasScoreWeightsUpdate) {
         updateWithoutRubric.score_weights = scoreWeights;
       }
+    }
+
+    // AI 초안 보존: 문항이 처음 채워지는 순간에만 두 컬럼을 덧붙인다.
+    if ("questions" in updateWithoutRubric) {
+      const aiDraft = buildAiDraftPreservation(
+        currentExam,
+        updateWithoutRubric.questions
+      );
+      if (aiDraft) Object.assign(updateWithoutRubric, aiDraft);
     }
 
     const { data: exam, error } = await getSupabase()
