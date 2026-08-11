@@ -46,10 +46,17 @@ describe("온보딩 페이지 배선", () => {
     expect(source).toMatch(/if \(!profile\?\.role\) \{/);
   });
 
-  it("프로필 단계에서 기존 학생 프로필을 조회한다", () => {
+  it("프로필 단계에서 역할별 기존 프로필을 조회한다", () => {
     expect(source).toContain('"/api/student/profile"');
-    // 학생 프로필 단계에서만 부른다 (강사 프로필 GET 은 없다)
-    expect(source).toMatch(/step !== "profile" \|\| role !== "student"/);
+    // 이제 강사도 기존 프로필을 프리필받는다.
+    //
+    // 예전에는 학생만 조회해서, 소급 동의 게이트가 켜지면 기존 강사가
+    // 빈 이름·학교 폼을 받고 그대로 제출해 기존 데이터를 덮어썼다.
+    // 그래서 조회 자체는 두 역할 모두 하고 대상 경로만 갈라진다.
+    expect(source).toContain('"/api/instructor/profile"');
+    expect(source).toMatch(/role === "student"\s*\?\s*"\/api\/student\/profile"/);
+    // 프로필 단계가 아니면 어느 쪽도 부르지 않는다.
+    expect(source).toMatch(/step !== "profile"/);
   });
 
   it("프리필이 사용자 입력을 덮어쓰지 않는다", () => {
