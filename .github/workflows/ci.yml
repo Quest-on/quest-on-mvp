@@ -21,7 +21,7 @@ jobs:
       - run: npm ci
       - run: npx eslint .
       - name: Verify consent policy release hash
-        run: npx tsx scripts/consent-policy-release.ts --verify database/020_seed_consent_policy_release.sql
+        run: npx tsx scripts/consent-policy-release.ts --verify database/027_seed_consent_policy_release.sql
       - run: npx tsc --noEmit
 
   build:

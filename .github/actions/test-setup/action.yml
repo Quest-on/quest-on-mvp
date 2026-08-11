@@ -185,7 +185,7 @@ runs:
         # Prisma 는 trigger/RLS/함수를 표현하지 못하므로 prisma db push 로는
         # 절대 생기지 않는다. 여기서 적용하지 않으면 CI 는 append-only 가
         # 강제되지 않는 DB 에서 돌아 운영과 다른 결과를 낸다.
-        # 최초 정책 릴리스 seed(026)는 PR3 이 소유한다 — 여기서 참조하지 않는다.
+        # 최초 정책 릴리스 seed(027)는 PR3 이 소유한다 — 여기서 참조하지 않는다.
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -v ON_ERROR_STOP=1 \
           -f database/025_consent_records.sql
@@ -193,10 +193,10 @@ runs:
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -v ON_ERROR_STOP=1 \
           -f database/026_close_quota_gaps.sql
-        # Consent policy seed is renumbered by the follow-up commit in this PR.
+        # 027 seeds the immutable initial policy release consumed by consent onboarding.
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -v ON_ERROR_STOP=1 \
-          -f database/020_seed_consent_policy_release.sql
+          -f database/027_seed_consent_policy_release.sql
         # Reload PostgREST schema cache so new functions are immediately callable
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -c "NOTIFY pgrst, 'reload schema';"

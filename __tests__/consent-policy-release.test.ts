@@ -8,7 +8,7 @@ import {
   readSeedHash,
 } from "../scripts/consent-policy-release";
 
-const seedPath = "database/020_seed_consent_policy_release.sql";
+const seedPath = "database/027_seed_consent_policy_release.sql";
 const temporaryFiles: string[] = [];
 
 afterEach(() => {
