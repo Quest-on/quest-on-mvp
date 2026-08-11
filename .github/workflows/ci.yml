@@ -129,10 +129,9 @@ jobs:
       - name: Run browser E2E tests
         run: |
           mkdir -p test-results
-          npx playwright test --project=browser-e2e --config=e2e/playwright.config.ts
-          PLAYWRIGHT_JUNIT_OUTPUT_NAME=test-results/consent-flow-results.xml \
-            npx playwright test e2e/browser/flows/consent-onboarding-flow.spec.ts \
-              --project=browser-flows --config=e2e/playwright.config.ts
+          npx playwright test \
+            --project=browser-e2e --project=consent-flow-ci \
+            --config=e2e/playwright.config.ts
         env:
           PLAYWRIGHT_JUNIT_OUTPUT_NAME: test-results/browser-results.xml
           NODE_ENV: test

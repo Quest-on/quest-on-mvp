@@ -72,6 +72,18 @@ export default defineConfig({
       },
     },
     {
+      name: "consent-flow-ci",
+      testDir: "./browser/flows",
+      testMatch: "consent-onboarding-flow.spec.ts",
+      use: {
+        baseURL: BASE_URL,
+        browserName: "chromium",
+        launchOptions: { args: LOCAL_OAUTH_BROWSER_ARGS },
+        screenshot: "only-on-failure",
+        trace: "retain-on-failure",
+      },
+    },
+    {
       name: "browser-flows",
       testDir: "./browser/flows",
       use: {
