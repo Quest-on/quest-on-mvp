@@ -172,7 +172,10 @@ export async function POST(
           comment: g.comment ?? "",
         },
       },
-      grade_type: "manual",
+      grade_type: "auto",
+      ai_proposed_score: g.score,
+      ai_proposed_at: nowIso,
+      ai_proposal_source: "bulk_grade_commit",
     }));
 
     try {
