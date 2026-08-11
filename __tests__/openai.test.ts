@@ -122,8 +122,17 @@ describe("grading no longer runs its own transport retry loop", () => {
   });
 
   it("passes retry and timeout as SDK request options instead", () => {
-    expect(GRADING_CODE).toMatch(/maxRetries:\s*2/);
     expect(GRADING_CODE).toMatch(/timeout:\s*attemptTimeoutMs/);
+    // 재시도 수는 하드코딩이 아니라 태스크 프로필에서 온다 — 관리자가 조정할 수 있어야 한다.
+    expect(GRADING_CODE).toMatch(/maxRetries:\s*\w+Profile\.maxRetries/);
+    expect(GRADING_CODE).not.toMatch(/maxRetries:\s*\d/);
+  });
+
+  it("takes its model from the resolved profile, never a hardcoded constant", () => {
+    // 하드코딩된 모델이 남아 있으면 관리자 설정이 이 경로만 비켜 간다.
+    expect(GRADING_CODE).not.toMatch(/AI_MODEL_HEAVY/);
+    expect(GRADING_CODE).toMatch(/applyProfileToChatBody\(/);
+    expect(GRADING_CODE).toMatch(/resolveAiTaskProfile\(/);
   });
 
   it("no longer disables wrapper retries through a dead option", () => {

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { getOpenAI, AI_MODEL_HEAVY } from "@/lib/openai";
+import { getOpenAI } from "@/lib/openai";
+import { applyProfileToChatBody, resolveAiTaskProfile } from "@/lib/ai-task-profile";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import {
   buildSummaryGenerationSystemPrompt,
@@ -290,6 +291,8 @@ async function gradeSingleQuestion(params: {
 
   const userPrompt = `[학생의 채팅 기반 과제 수행 기록]\n${submission.answer || "(기록 없음)"}${finalAnswerSection}${aiSummaryText}`;
 
+  const questionProfile = resolveAiTaskProfile({ task: "auto_grading_question" }).profile;
+
   // 이슈 #118: 수동 재시도 루프를 제거했다.
   //
   // 예전에는 여기서 3회 outer 루프를 돌리면서 래퍼의 내부 재시도를 끄는 식으로
@@ -322,21 +325,20 @@ async function gradeSingleQuestion(params: {
     const tracked = await callTrackedChatCompletion(
       () =>
         getOpenAI().chat.completions.create(
-          {
-            model: AI_MODEL_HEAVY,
+          applyProfileToChatBody(questionProfile, {
             messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
+              { role: "system" as const, content: systemPrompt },
+              { role: "user" as const, content: userPrompt },
             ],
-            response_format: { type: "json_object" },
-          },
+            response_format: { type: "json_object" as const },
+          }),
           // 재시도·타임아웃을 SDK 가 소유한다. deadline 이 남은 예산을 정한다.
-          { signal, timeout: attemptTimeoutMs, maxRetries: 2 }
+          { signal, timeout: attemptTimeoutMs, maxRetries: questionProfile.maxRetries }
         ),
       {
         feature: "auto_grading_question",
         route: "lib/grading.ts",
-        model: AI_MODEL_HEAVY,
+        model: questionProfile.model,
         userId: studentId,
         examId: exam.id,
         sessionId,
@@ -577,26 +579,27 @@ JSON 형식으로 응답해주세요:
 }
 `;
 
+  const qSummaryProfile = resolveAiTaskProfile({ task: "auto_grading_question_summary" }).profile;
+
     const tracked = await callTrackedChatCompletion(
       () =>
         getOpenAI().chat.completions.create(
-          {
-            model: AI_MODEL_HEAVY,
+          applyProfileToChatBody(qSummaryProfile, {
             messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
+              { role: "system" as const, content: systemPrompt },
+              { role: "user" as const, content: userPrompt },
             ],
-            response_format: { type: "json_object" },
-            temperature: 0.3,
+            response_format: { type: "json_object" as const },
+            // seed 는 호출부 소유다 — 세션 단위 결정성을 위해 프로필이 건드리지 않는다.
             seed: deriveSessionSeed(sessionId),
-          },
+          }),
           // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
-          { signal, timeout: timeoutMs, maxRetries: 2 }
+          { signal, timeout: timeoutMs, maxRetries: qSummaryProfile.maxRetries }
         ),
       {
         feature: "auto_grading_question_summary",
         route: "lib/grading.ts",
-        model: AI_MODEL_HEAVY,
+        model: qSummaryProfile.model,
         userId: studentId,
         examId,
         sessionId,
@@ -1652,27 +1655,28 @@ ${
         "keyQuotes": ["인용구1", "인용구2"]
       }`;
 
+  const summaryProfile = resolveAiTaskProfile({ task: "auto_grading_summary" }).profile;
+
     const tracked = await callTrackedChatCompletion(
       () =>
         getOpenAI().chat.completions.create(
-          {
-            model: AI_MODEL_HEAVY,
+          applyProfileToChatBody(summaryProfile, {
             messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
+              { role: "system" as const, content: systemPrompt },
+              { role: "user" as const, content: userPrompt },
             ],
-            response_format: { type: "json_object" },
-          },
+            response_format: { type: "json_object" as const },
+          }),
           // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
           {
             timeout: timeBudgetMs ? Math.min(timeBudgetMs - 5_000, 120_000) : 120_000,
-            maxRetries: 2,
+            maxRetries: summaryProfile.maxRetries,
           }
         ),
       {
         feature: "auto_grading_summary",
         route: "lib/grading.ts",
-        model: AI_MODEL_HEAVY,
+        model: summaryProfile.model,
         userId: studentId,
         examId: exam.id,
         sessionId,

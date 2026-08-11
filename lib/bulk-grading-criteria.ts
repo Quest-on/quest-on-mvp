@@ -2,7 +2,12 @@
  * Bulk grading criteria interview helpers — parse markers, extract structured criteria.
  */
 
-import { getOpenAI, AI_MODEL_BULK_GRADING_WORKER } from "@/lib/openai";
+import { getOpenAI } from "@/lib/openai";
+import {
+  applyProfileToChatBody,
+  resolveAiTaskProfile,
+  type ResolvedAiTaskProfile,
+} from "@/lib/ai-task-profile";
 import { callTrackedChatCompletion, buildAiTextMetadata } from "@/lib/ai-tracking";
 import {
   buildCriteriaExtractionSystemPrompt,
@@ -146,6 +151,8 @@ export async function extractGradingCriteriaFromChat(params: {
   isAssignment: boolean;
   userId?: string;
   examId?: string;
+  /** 런에 고정된 프로필 (이슈 #118). 없으면 현재 설정으로 해석한다. */
+  profile?: ResolvedAiTaskProfile;
 }): Promise<ExtractedCriteria | null> {
   const transcript = params.messages
     .filter((m) => m.role === "user" || m.role === "assistant")
@@ -164,21 +171,28 @@ export async function extractGradingCriteriaFromChat(params: {
     params.isAssignment,
   );
 
+  // 호출자가 런에 고정된 프로필을 넘기면 그걸 쓰고(공정성), 없으면 현재 설정으로
+  // 해석한다. 라벨을 여기서 다시 읽지 않는 것이 핵심이다.
+  const criteriaProfile =
+    params.profile ??
+    resolveAiTaskProfile({ task: "bulk_grading_criteria_extract" }).profile;
+
   const tracked = await callTrackedChatCompletion(
     () =>
-      getOpenAI().chat.completions.create({
-        model: AI_MODEL_BULK_GRADING_WORKER,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: transcript },
-        ],
-        max_completion_tokens: 800,
-        response_format: { type: "json_object" },
-      }),
+      getOpenAI().chat.completions.create(
+        applyProfileToChatBody(criteriaProfile, {
+          messages: [
+            { role: "system" as const, content: systemPrompt },
+            { role: "user" as const, content: transcript },
+          ],
+          response_format: { type: "json_object" as const },
+        }),
+        { timeout: criteriaProfile.timeoutMs, maxRetries: criteriaProfile.maxRetries }
+      ),
     {
       feature: "bulk_grading_criteria_extract",
       route: "lib/bulk-grading-criteria",
-      model: AI_MODEL_BULK_GRADING_WORKER,
+      model: criteriaProfile.model,
       userId: params.userId,
       examId: params.examId,
       metadata: buildAiTextMetadata({ inputText: [systemPrompt, transcript] }),

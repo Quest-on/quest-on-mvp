@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 import { NextRequest } from "next/server";
-import { getOpenAI, AI_MODEL } from "@/lib/openai";
+import { getOpenAI } from "@/lib/openai";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { currentUser } from "@/lib/get-current-user";
