@@ -9,6 +9,14 @@ interface ExamDetailHeaderProps {
   title: string;
   code: string;
   examId: string;
+  isDemo?: boolean;
+  demoPreviewLabel?: string;
+  /**
+   * 이미 제출한 데모를 다시 풀기 위한 라벨. 있으면 CTA 가 재응시 요청을 실어
+   * 보낸다 — 이게 없으면 제출 후에는 읽기 전용 화면만 떠서 "연습용인데 한 번
+   * 내면 끝"이 된다.
+   */
+  demoRestartLabel?: string;
   extraActions?: ReactNode;
 }
 
@@ -19,6 +27,9 @@ export function ExamDetailHeader({
   title,
   code,
   examId,
+  isDemo,
+  demoPreviewLabel,
+  demoRestartLabel,
   extraActions,
 }: ExamDetailHeaderProps) {
   const t = useTranslations("authoring");
@@ -32,6 +43,17 @@ export function ExamDetailHeader({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {isDemo && demoPreviewLabel && (
+            <Link
+              href={
+                demoRestartLabel
+                  ? `/exam/${code}?restartDemo=1`
+                  : `/exam/${code}`
+              }
+            >
+              <Button size="sm">{demoRestartLabel ?? demoPreviewLabel}</Button>
+            </Link>
+          )}
           {extraActions}
           <div className="flex items-center gap-2 flex-wrap">
             <Link href="/instructor">
@@ -41,7 +63,7 @@ export function ExamDetailHeader({
               </Button>
             </Link>
             <Link href={`/instructor/${examId}/edit`}>
-              <Button size="sm">{t("examDetailHeader.buttonEdit")}</Button>
+              <Button variant="outline" size="sm">{t("examDetailHeader.buttonEdit")}</Button>
             </Link>
           </div>
         </div>

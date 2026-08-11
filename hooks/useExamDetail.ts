@@ -195,6 +195,7 @@ export function useExamDetail({
           deadline: examResult.exam.deadline || null,
           assignment_prompt: examResult.exam.assignment_prompt || null,
           grades_released: examResult.exam.grades_released || false,
+          is_demo: examResult.exam.is_demo === true,
         } as InstructorExam,
         questionsCount: questionsArray.length,
         questionsRaw: questionsArray as Question[],

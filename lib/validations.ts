@@ -372,6 +372,10 @@ export const initExamSessionSchema = z.object({
   examCode: z.string().min(1, "Exam code is required").max(20),
   studentId: z.string().min(1, "Student ID is required"),
   deviceFingerprint: z.string().optional(),
+  // 데모 재응시 요청 (에픽 #79). 클라이언트가 보내는 "의도"일 뿐이고 서버는
+  // 이 값을 신뢰하지 않는다 — 데모 소유자일 때만 실제로 초기화한다.
+  // 스키마에서 빠지면 zod 가 필드를 떨어뜨려 재응시가 조용히 무시된다.
+  restartDemoAttempt: z.boolean().optional(),
 });
 
 export const createOrGetSessionSchema = z.object({

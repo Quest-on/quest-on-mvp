@@ -69,7 +69,6 @@ export default function OnboardingPage() {
 
   // JTBD 2문항 (AC-4). 프로필 수집이 아니라 데모 템플릿 선택 입력이다 —
   // 즉시 소비되지 않는 질문은 온보딩에 둘 이유가 없다.
-  const [assessTarget, setAssessTarget] = useState<"exam" | "assignment">("exam");
   const [subject, setSubject] = useState<
     "humanities" | "business" | "engineering" | "health" | "general"
   >("general");
@@ -321,7 +320,7 @@ export default function OnboardingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...(skipped ? {} : { assessTarget, subject }),
+          ...(skipped ? {} : { subject }),
           skipped,
           language: locale === "en" ? "en" : "ko",
         }),
@@ -417,31 +416,17 @@ export default function OnboardingPage() {
           <CardContent className="space-y-6">
             {error && <ErrorAlert message={error} />}
 
-            <div className="space-y-3">
-              <Label className="text-sm font-semibold">
-                {t("intakeAssessTargetLabel")}
-              </Label>
-              <RadioGroup
-                value={assessTarget}
-                onValueChange={(value) =>
-                  setAssessTarget(value as "exam" | "assignment")
-                }
-                className="grid grid-cols-2 gap-3"
-              >
-                {(["exam", "assignment"] as const).map((value) => (
-                  <Label
-                    key={value}
-                    htmlFor={`assess-${value}`}
-                    className="flex items-center gap-2 rounded-lg border-2 p-4 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5"
-                  >
-                    <RadioGroupItem value={value} id={`assess-${value}`} />
-                    <span className="text-sm font-medium">
-                      {t(`intakeAssessTarget_${value}`)}
-                    </span>
-                  </Label>
-                ))}
-              </RadioGroup>
-            </div>
+            {/* JTBD 1번(평가 대상)은 지금 묻지 않는다.
+                
+                과제형 데모를 만들 수는 있지만, 교수자가 그걸 학생 시점으로
+                겪을 경로가 없다. 과제는 응시(`/assignment/{code}`)·완주 판정·
+                제출 후 필수 quiz 가 시험과 완전히 다른 흐름인데,
+                `useAssignmentSession` 은 데모 미리보기를 아예 모른다. 즉 과제를
+                고르면 만들어는 지되 겪을 수 없는 데모가 생긴다.
+                
+                동작하지 않는 선택지를 보여주는 것보다 안 보여주는 게 낫다.
+                과제 응시 경로에 미리보기가 붙으면 그때 되살린다. 서버는
+                assessTarget 을 옵셔널로 받으므로 안 보내면 기본 템플릿이 된다. */}
 
             <div className="space-y-3">
               <Label className="text-sm font-semibold">

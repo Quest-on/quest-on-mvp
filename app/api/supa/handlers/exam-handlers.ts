@@ -616,7 +616,7 @@ export async function getExamById(data: { id: string }) {
     const { data: exam, error } = await getSupabase()
       .from("exams")
       .select(
-        "id, title, code, description, duration, questions, materials, materials_text, rubric, rubric_public, chat_weight, score_weights, status, instructor_id, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, type, deadline, assignment_prompt, grades_released, language"
+        "id, title, code, description, duration, questions, materials, materials_text, rubric, rubric_public, chat_weight, score_weights, status, instructor_id, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, type, deadline, assignment_prompt, grades_released, language, is_demo"
       )
       .eq("id", data.id)
       .eq("instructor_id", user.id) // Only allow instructors to view their own exams

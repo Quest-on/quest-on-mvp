@@ -13,6 +13,7 @@ import { ExamControlButtons } from "@/components/instructor/ExamControlButtons";
 import { LateEntryPanel } from "@/components/instructor/LateEntryPanel";
 import { ExamStudentRow } from "@/components/instructor/ExamStudentRow";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Collapsible,
   CollapsibleContent,
@@ -98,6 +99,27 @@ export default function ExamDetail({
     isSignedIn,
     userId: user?.id,
   });
+
+  const isDemoExam = exam?.is_demo === true;
+  const {
+    data: demoStatus,
+    isLoading: demoStatusLoading,
+    isError: demoStatusError,
+  } = useQuery<{ completed: boolean; aiRegenerationUnlocked: boolean }>({
+    queryKey: ["onboarding-demo-status", user?.id],
+    queryFn: async ({ signal }) => {
+      const response = await fetch("/api/onboarding/demo/status", { signal });
+      if (!response.ok) {
+        throw new Error("Failed to fetch demo status");
+      }
+      return response.json() as Promise<{ completed: boolean; aiRegenerationUnlocked: boolean }>;
+    },
+    enabled: isDemoExam && isLoaded && !!isSignedIn,
+  });
+
+  // 데모 완주는 학생 시점 채점 결과를 열어야 기록된다. 여기까지 닫아 두면
+  // 데모를 끝낼 수 없으므로 데모만 종료 상태와 관계없이 채점 결과를 연다.
+  const canOpenGrading = exam?.status === "closed" || isDemoExam;
 
   const hasGradingInProgress = useMemo(
     () => exam?.status === "closed",
@@ -376,6 +398,14 @@ export default function ExamDetail({
             title={exam.title}
             code={exam.code}
             examId={exam.id}
+            isDemo={isDemoExam}
+            demoPreviewLabel={t("examDetail.tryAsStudent")}
+            // 완주한 데모는 이미 제출본이 있어 그냥 들어가면 읽기 전용 화면만
+            // 뜬다. 연습용이므로 다시 풀 수 있어야 한다 — 라벨이 있으면 CTA 가
+            // 재응시를 요청한다.
+            demoRestartLabel={
+              demoStatus?.completed ? t("examDetail.retryAsStudent") : undefined
+            }
             extraActions={
               <>
                 {process.env.NODE_ENV === "development" && (
@@ -456,6 +486,26 @@ export default function ExamDetail({
               </>
             }
           />
+
+          {isDemoExam && (
+            <Alert className="mb-6 border-primary/30 bg-primary/5">
+              <Bot aria-hidden="true" />
+              <AlertTitle>
+                {demoStatus?.aiRegenerationUnlocked
+                  ? t("examDetail.demoAiRegenerationUnlockedTitle")
+                  : t("examDetail.demoAiRegenerationLockedTitle")}
+              </AlertTitle>
+              <AlertDescription>
+                {demoStatusLoading
+                  ? t("examDetail.demoAiRegenerationLoading")
+                  : demoStatusError
+                    ? t("examDetail.demoAiRegenerationUnavailable")
+                    : demoStatus?.aiRegenerationUnlocked
+                      ? t("examDetail.demoAiRegenerationUnlockedDescription")
+                      : t("examDetail.demoAiRegenerationLockedDescription")}
+              </AlertDescription>
+            </Alert>
+          )}
 
           <div className="space-y-3 mt-6 mb-6">
             <div id="exam-info-section">
@@ -697,7 +747,7 @@ export default function ExamDetail({
                         student={student}
                         rowNumber={index + 1}
                         examId={exam.id}
-                        canOpenGrading={exam.status === "closed"}
+                        canOpenGrading={canOpenGrading}
                         onLiveMonitoring={handleLiveMonitoring}
                       />
                     ),

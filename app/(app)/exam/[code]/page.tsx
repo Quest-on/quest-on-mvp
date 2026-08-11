@@ -157,6 +157,20 @@ export default function ExamPage() {
     saveViaBeacon: autoSave.saveViaBeacon,
   });
 
+  // 응시를 마친 뒤 어디로 보낼 것인가.
+  //
+  // 교수자가 자기 데모를 연습하고 나면 학생 대시보드가 아니라 데모 상세로
+  // 돌아와야 한다. /student 로 버려지면 방금 뭘 한 건지, 다음에 뭘 눌러야
+  // 하는지 알 수 없다 — 온보딩의 다음 단계(AI 재생성 개방 확인·다시 해보기)가
+  // 전부 그 화면에 있다.
+  //
+  // 데모 여부는 서버가 init 응답으로 준 값만 쓴다. 클라이언트가 스스로
+  // 판정하면 남의 데모나 일반 시험까지 이 경로를 타게 된다.
+  const exitDestination =
+    session.demoPreview && session.demoExamId
+      ? `/instructor/${session.demoExamId}`
+      : "/student";
+
   // 4. Submission
   const submission = useExamSubmission({
     exam,
@@ -445,7 +459,7 @@ export default function ExamPage() {
   };
 
   if (session.isSubmitted) {
-    return <SubmittedScreen examCode={examCode} duration={exam.duration} profile={profile} router={router} />;
+    return <SubmittedScreen examCode={examCode} duration={exam.duration} profile={profile} router={router} exitDestination={exitDestination} />;
   }
 
   if (session.showPreflight) {
@@ -473,7 +487,7 @@ export default function ExamPage() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{t("page.cancelKeep")}</AlertDialogCancel>
-              <AlertDialogAction onClick={() => router.push("/student")} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              <AlertDialogAction onClick={() => router.push(exitDestination)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                 {t("page.cancelConfirm")}
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -687,7 +701,7 @@ export default function ExamPage() {
       <ExamDialogs
         showExitConfirm={showExitConfirm}
         setShowExitConfirm={setShowExitConfirm}
-        onExitConfirm={async () => { await autoSave.manualSave(); router.push("/student"); }}
+        onExitConfirm={async () => { await autoSave.manualSave(); router.push(exitDestination); }}
         unansweredDialog={submission.unansweredDialog}
         setUnansweredDialog={submission.setUnansweredDialog}
         setCurrentQuestion={setCurrentQuestionWithReveal}
@@ -696,7 +710,7 @@ export default function ExamPage() {
         autoSubmitFailed={submission.autoSubmitFailed}
         setAutoSubmitFailed={submission.setAutoSubmitFailed}
         onAutoSubmitRetry={() => { submission.setAutoSubmitFailed(false); submission.handleSubmit(); }}
-        onAutoSubmitExit={async () => { await autoSave.manualSave(); router.push("/student"); }}
+        onAutoSubmitExit={async () => { await autoSave.manualSave(); router.push(exitDestination); }}
         manualSubmitFailed={submission.manualSubmitFailed}
         setManualSubmitFailed={submission.setManualSubmitFailed}
         onManualSubmitRetry={() => { submission.setManualSubmitFailed(false); submission.handleSubmit(); }}
@@ -713,18 +727,21 @@ function SubmittedScreen({
   duration,
   profile,
   router,
+  exitDestination,
 }: {
   examCode: string;
   duration: number;
   profile: { avatarUrl?: string | null; fullName?: string | null; email?: string | null } | null;
   router: ReturnType<typeof useRouter>;
+  /** 5초 뒤 이동할 곳. 데모 미리보기면 데모 상세, 아니면 학생 대시보드. */
+  exitDestination: string;
 }) {
   const t = useTranslations("exam");
   const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
     if (countdown <= 0) {
-      router.push("/student");
+      router.push(exitDestination);
       return;
     }
     const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
