@@ -163,7 +163,10 @@ describe("consent-records", () => {
 
     expect(spy.rpcCalls.map((c) => c.fn)).toContain("register_consent_subject");
     // 매핑 테이블에 직접 INSERT 하면 안 된다.
-    const insertedTables = spy.client.from.mock.calls.map((c) => c[0]);
+    // `from` 은 인자 없이도 호출될 수 있어 튜플 타입이 비어 있다. 안전하게 읽는다.
+    const insertedTables = spy.client.from.mock.calls.map(
+      (call) => (call as unknown as string[])[0],
+    );
     expect(insertedTables).not.toContain("consent_subject_map");
   });
 
