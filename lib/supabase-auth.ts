@@ -63,7 +63,9 @@ export async function currentUser(): Promise<AppUser | null> {
         };
       }
     }
-    return null;
+    // 헤더가 없거나 틀리면 바이패스만 무시하고 정상 Supabase 세션 검증으로
+    // 내려간다. 여기서 null을 반환하면 E2E에서 TEST_BYPASS_SECRET을 켠 순간
+    // 실제 email/OAuth 세션을 아무도 사용할 수 없게 된다.
   }
 
   const supabase = await getSupabaseAuthClient();

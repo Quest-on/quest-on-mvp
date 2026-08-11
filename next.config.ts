@@ -11,6 +11,23 @@ if (appEnvError) {
 
 const withNextIntl = createNextIntlPlugin("./lib/i18n/request.ts");
 
+function localSupabaseConnectSources(): string {
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!rawUrl) return "";
+
+  try {
+    const url = new URL(rawUrl);
+    if (url.hostname !== "localhost" && url.hostname !== "127.0.0.1") return "";
+
+    const websocketProtocol = url.protocol === "https:" ? "wss:" : "ws:";
+    return ` ${url.origin} ${websocketProtocol}//${url.host}`;
+  } catch {
+    return "";
+  }
+}
+
+const localSupabaseSources = localSupabaseConnectSources();
+
 const nextConfig: NextConfig = {
   // Legacy route redirects.
   // /exam/[code]/answer was consolidated into /exam/[code] (PR #12). 308 keeps
@@ -58,7 +75,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://*.supabase.co",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://va.vercel-scripts.com",
+              `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://va.vercel-scripts.com${localSupabaseSources}`,
               "frame-src 'self' https://challenges.cloudflare.com https://www.youtube.com",
               "worker-src 'self' blob:",
             ].join("; "),
