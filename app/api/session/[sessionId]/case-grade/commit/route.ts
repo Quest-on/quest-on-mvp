@@ -49,7 +49,6 @@ export async function POST(
         comment: comment ?? "",
       },
     };
-    const proposedAt = new Date().toISOString();
 
     await upsertGradesBySessionQuestion(
       access.ctx.supabase as never,
@@ -60,10 +59,7 @@ export async function POST(
           score,
           comment: comment ?? "",
           stage_grading: stageGrading,
-          grade_type: "auto",
-          ai_proposed_score: score,
-          ai_proposed_at: proposedAt,
-          ai_proposal_source: "case_grade_commit",
+          grade_type: "manual",
         },
       ],
       "case_grade_commit",

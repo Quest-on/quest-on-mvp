@@ -8,7 +8,9 @@ const {
   currentUserMock,
   checkRateLimitAsyncMock,
   requireBulkGradeAccessMock,
+  requireCaseGradeAccessMock,
   auditLogMock,
+  gradingSessionState,
   gradeRows,
   upsertHistory,
   supabaseMock,
@@ -20,7 +22,11 @@ const {
     currentUserMock: vi.fn(),
     checkRateLimitAsyncMock: vi.fn(),
     requireBulkGradeAccessMock: vi.fn(),
+    requireCaseGradeAccessMock: vi.fn(),
     auditLogMock: vi.fn(),
+    gradingSessionState: {
+      proposedGrades: {} as Record<string, Record<string, { score: number; comment: string }>>,
+    },
     gradeRows,
     upsertHistory,
     supabaseMock: { from: vi.fn() },
@@ -36,6 +42,10 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("@/lib/bulk-grade-access", () => ({
   requireBulkGradeAccess: requireBulkGradeAccessMock,
 }));
+vi.mock("@/lib/case-grade-access", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/case-grade-access")>();
+  return { ...original, requireCaseGradeAccess: requireCaseGradeAccessMock };
+});
 vi.mock("@/lib/bulk-grading", () => ({
   getBulkGradableQuestions: () => [{ qIdx: 0, questionPrompt: "Case" }],
 }));
@@ -56,6 +66,7 @@ vi.mock("@/lib/app-users", () => ({ batchGetUserInfo: vi.fn() }));
 vi.mock("@/lib/demo-completion", () => ({ recordDemoGradedViewed: vi.fn() }));
 
 import { POST as bulkGradeCommit } from "@/app/api/exam/[examId]/bulk-grade/commit/route";
+import { POST as caseGradeCommit } from "@/app/api/session/[sessionId]/case-grade/commit/route";
 import { POST as editIndividualGrade } from "@/app/api/session/[sessionId]/grade/route";
 
 function createChain(table: string) {
@@ -85,7 +96,12 @@ function createChain(table: string) {
     }
     if (table === "exam_grading_sessions" && operation === "select") {
       return {
-        data: { status: "grading_done", calibration_status: "complete", grading_scope: "full" },
+        data: {
+          status: "grading_done",
+          calibration_status: "complete",
+          grading_scope: "full",
+          proposed_grades: gradingSessionState.proposedGrades,
+        },
         error: null,
       };
     }
@@ -129,6 +145,9 @@ describe("grade provenance", () => {
     vi.clearAllMocks();
     gradeRows.clear();
     upsertHistory.length = 0;
+    gradingSessionState.proposedGrades = {
+      [SESSION_ID]: { "0": { score: 84, comment: "AI feedback" } },
+    };
     currentUserMock.mockResolvedValue({ id: "instructor-1", role: "instructor" });
     checkRateLimitAsyncMock.mockResolvedValue({ allowed: true });
     auditLogMock.mockResolvedValue(undefined);
@@ -141,27 +160,16 @@ describe("grade provenance", () => {
         supabase: supabaseMock,
       },
     });
-  });
-
-  it("keeps the bulk-committed value in score", async () => {
-    const response = await bulkGradeCommit(
-      request(`/api/exam/${EXAM_ID}/bulk-grade/commit`, {
-        grades: [{ session_id: SESSION_ID, q_idx: 0, score: 84, comment: "AI feedback" }],
-      }),
-      { params: Promise.resolve({ examId: EXAM_ID }) },
-    );
-
-    expect(response.status).toBe(200);
-    expect(gradeRows.get(`${SESSION_ID}:0`)).toMatchObject({
-      score: 84,
-      grade_type: "auto",
+    requireCaseGradeAccessMock.mockResolvedValue({
+      ok: true,
+      ctx: { user: { id: "instructor-1" }, supabase: supabaseMock },
     });
   });
 
-  it("preserves the AI proposal when an instructor edits the committed score", async () => {
+  it("stores the server-side AI proposal separately and preserves it after an instructor edit", async () => {
     const bulkResponse = await bulkGradeCommit(
       request(`/api/exam/${EXAM_ID}/bulk-grade/commit`, {
-        grades: [{ session_id: SESSION_ID, q_idx: 0, score: 84, comment: "AI feedback" }],
+        grades: [{ session_id: SESSION_ID, q_idx: 0, score: 91, comment: "Instructor commit" }],
       }),
       { params: Promise.resolve({ examId: EXAM_ID }) },
     );
@@ -169,28 +177,67 @@ describe("grade provenance", () => {
     expect(bulkResponse.status).toBe(200);
     const proposedAt = gradeRows.get(`${SESSION_ID}:0`)?.ai_proposed_at;
     expect(gradeRows.get(`${SESSION_ID}:0`)).toMatchObject({
-      score: 84,
+      score: 91,
       ai_proposed_score: 84,
-      grade_type: "auto",
+      ai_proposal_source: "bulk_grade_commit",
+      grade_type: "manual",
     });
     expect(proposedAt).toEqual(expect.any(String));
 
     const editResponse = await editIndividualGrade(
       request(`/api/session/${SESSION_ID}/grade`, {
         questionIdx: 0,
-        score: 91,
-        comment: "Instructor adjustment",
+        score: 93,
+        comment: "Later instructor adjustment",
       }),
       { params: Promise.resolve({ sessionId: SESSION_ID }) },
     );
 
     expect(editResponse.status).toBe(200);
     expect(gradeRows.get(`${SESSION_ID}:0`)).toMatchObject({
-      score: 91,
+      score: 93,
       grade_type: "manual",
       ai_proposed_score: 84,
       ai_proposed_at: proposedAt,
+      ai_proposal_source: "bulk_grade_commit",
     });
+    expect(upsertHistory.at(-1)).not.toHaveProperty("ai_proposed_score");
+    expect(upsertHistory.at(-1)).not.toHaveProperty("ai_proposed_at");
+    expect(upsertHistory.at(-1)).not.toHaveProperty("ai_proposal_source");
+  });
+
+  it("stores null provenance when no server-side AI proposal exists", async () => {
+    gradingSessionState.proposedGrades = {};
+
+    const response = await bulkGradeCommit(
+      request(`/api/exam/${EXAM_ID}/bulk-grade/commit`, {
+        grades: [{ session_id: SESSION_ID, q_idx: 0, score: 91, comment: "Instructor commit" }],
+      }),
+      { params: Promise.resolve({ examId: EXAM_ID }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(gradeRows.get(`${SESSION_ID}:0`)).toMatchObject({
+      score: 91,
+      grade_type: "manual",
+      ai_proposed_score: null,
+      ai_proposed_at: null,
+      ai_proposal_source: null,
+    });
+  });
+
+  it("keeps case-grade commit manual without AI provenance", async () => {
+    const response = await caseGradeCommit(
+      request(`/api/session/${SESSION_ID}/case-grade/commit`, {
+        qIdx: 0,
+        score: 77,
+        comment: "Discussion result",
+      }),
+      { params: Promise.resolve({ sessionId: SESSION_ID }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(upsertHistory.at(-1)).toMatchObject({ score: 77, grade_type: "manual" });
     expect(upsertHistory.at(-1)).not.toHaveProperty("ai_proposed_score");
     expect(upsertHistory.at(-1)).not.toHaveProperty("ai_proposed_at");
     expect(upsertHistory.at(-1)).not.toHaveProperty("ai_proposal_source");
