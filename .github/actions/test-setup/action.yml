@@ -189,6 +189,10 @@ runs:
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -v ON_ERROR_STOP=1 \
           -f database/025_consent_records.sql
+        # 026 은 데모 우회 범위·승인 반환값·SECURITY DEFINER PUBLIC 노출을 막는다.
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
+          -f database/026_close_quota_gaps.sql
         # Reload PostgREST schema cache so new functions are immediately callable
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -c "NOTIFY pgrst, 'reload schema';"
@@ -220,6 +224,23 @@ runs:
           -- CI 만 운영과 다른 보안 상태가 되어 검증이 무의미해진다.
           REVOKE ALL ON FUNCTION public.admit_exam_session(uuid, text, text, text) FROM anon, authenticated;
           REVOKE ALL ON FUNCTION public.restart_demo_attempt(uuid, text) FROM anon, authenticated;
+          -- 동의 원장 등 다른 SECURITY DEFINER 함수도 blanket GRANT 에 함께 열린다.
+          -- 다시 회수하지 않으면 CI 에서만 임의 매핑 선점·purge 호출이 열려,
+          -- 운영과 다른 보안 상태로 검증이 무의미해진다.
+          DO $do$
+          DECLARE fn record;
+          BEGIN
+            FOR fn IN
+              SELECT p.oid::regprocedure AS sig
+              FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+              WHERE n.nspname = 'public' AND p.prosecdef
+            LOOP
+              EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', fn.sig);
+              EXECUTE format('REVOKE ALL ON FUNCTION %s FROM anon, authenticated', fn.sig);
+              EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', fn.sig);
+            END LOOP;
+          END
+          $do$;
           -- 025 의 consent 테이블도 같은 이유로 다시 회수한다.
           -- 매핑과 보존 인덱스는 service_role 직접 접근도 막는다(RPC 로만 접근).
           REVOKE ALL ON public.consent_records FROM anon, authenticated;

@@ -223,7 +223,23 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          // Race-safe: upsert with ignoreDuplicates prevents duplicate sessions
+          // RPC 가 세션을 만들었으면 그걸 읽고, 장애로 못 만들었으면(fail-open)
+          // 여기서 만든다. 그때 발행 시각도 함께 남긴다 — 안 남기면 그 시험은
+          // 장애가 끝난 뒤에도 영영 "미발행"이라 발행 한도가 조용히 샌다.
+          if (admitError && (exam as { is_demo?: unknown }).is_demo !== true) {
+            const { error: publicationError } = await getSupabase()
+              .from("exams")
+              .update({ first_published_at: new Date().toISOString() })
+              .eq("id", exam.id)
+              .is("first_published_at", null);
+            if (publicationError) {
+              logError("[feedback] quota_fail_open publication", publicationError, {
+                path: "/api/feedback",
+                additionalData: { examId: exam.id },
+              });
+            }
+          }
+
           const { data: newSession, error: createError } = await getSupabase()
             .from("sessions")
             .upsert(

@@ -12,9 +12,6 @@
     "app/api/feedback/route.ts": {
       "maxDuration": 300
     },
-    "app/api/feedback-chat/route.ts": {
-      "maxDuration": 60
-    },
     "app/api/instructor/chat/route.ts": {
       "maxDuration": 60
     },
@@ -46,7 +43,10 @@
       "maxDuration": 120
     }
   },
-  "regions": ["iad1", "icn1"],
+  "regions": [
+    "iad1",
+    "icn1"
+  ],
   "crons": [
     {
       "path": "/api/cron/grading-sweep",
