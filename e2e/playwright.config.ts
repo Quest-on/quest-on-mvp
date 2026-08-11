@@ -15,6 +15,10 @@ assertLocalTestEnv();
 const PORT = process.env.E2E_PORT ?? "3000";
 const BASE_URL = `http://localhost:${PORT}`;
 
+const LOCAL_OAUTH_BROWSER_ARGS = [
+  "--host-resolver-rules=MAP host.docker.internal 127.0.0.1",
+];
+
 export default defineConfig({
   testDir: ".",
   timeout: 30_000,
@@ -62,6 +66,7 @@ export default defineConfig({
       use: {
         baseURL: BASE_URL,
         browserName: "chromium",
+        launchOptions: { args: LOCAL_OAUTH_BROWSER_ARGS },
         screenshot: "only-on-failure",
         trace: "retain-on-failure",
       },
@@ -72,6 +77,7 @@ export default defineConfig({
       use: {
         baseURL: BASE_URL,
         browserName: "chromium",
+        launchOptions: { args: LOCAL_OAUTH_BROWSER_ARGS },
         screenshot: "only-on-failure",
         trace: "retain-on-failure",
       },

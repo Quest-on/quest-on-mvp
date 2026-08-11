@@ -1,7 +1,6 @@
 import { test as base, type Page, type APIRequestContext } from "@playwright/test";
 import { assertLocalTestEnv } from "../../helpers/assert-local-test-env";
 import { getTestSupabase } from "../../helpers/supabase-test-client";
-import { createClient } from "@supabase/supabase-js";
 
 /**
  * 동의 흐름 전용 실제 인증 fixture.
@@ -11,8 +10,8 @@ import { createClient } from "@supabase/supabase-js";
  * 안 거치게 된다.
  *
  * 두 경로를 모두 준비한다:
- *   · 이메일 — 로컬 Inbucket 에서 확인 링크를 꺼내 실제 GoTrue 왕복을 탄다
- *   · OAuth  — admin `generateLink` 로 실제 one-time code 를 받아 callback 을 탄다
+ *   · 이메일 — 실제 UI 가입 → Mailpit 확인 링크 → PKCE callback
+ *   · OAuth  — 실제 Google 버튼 → 로컬 OIDC stub → GoTrue/app callback
  *
  * 로컬 Supabase 에서만 동작한다. 세 조건을 먼저 강제한다.
  */
@@ -25,18 +24,30 @@ export interface ConsentAuthFixtures {
   freshUserPage: Page;
   /** 이 테스트가 만든 사용자 id. */
   freshUserId: string;
-  /** 이메일 확인 링크를 실제로 소비해 세션을 만든다. */
-  signInViaEmailLink: (page: Page) => Promise<void>;
-  /** OAuth 처럼 one-time code 를 callback 에 넘겨 세션을 만든다. */
-  signInViaCallbackCode: (page: Page) => Promise<void>;
+  /** UI 가입과 이메일 확인 링크를 실제로 소비해 세션을 만든다. */
+  signUpViaEmailLink: (page: Page) => Promise<void>;
+  /** Google 버튼에서 로컬 OIDC stub을 거쳐 실제 callback 세션을 만든다. */
+  signUpViaGoogleOAuthStub: (page: Page) => Promise<void>;
 }
 
 function uniqueEmail(): string {
   return `consent-e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`;
 }
 
-/** Inbucket 에서 해당 주소로 온 가장 최근 메일의 본문을 꺼낸다. */
-async function latestInbucketBody(
+async function deleteAuthUserByEmail(email: string): Promise<void> {
+  const supabase = getTestSupabase();
+  const { data, error } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (error) throw new Error(`test user lookup failed: ${error.message}`);
+
+  const user = data.users.find((candidate) => candidate.email === email);
+  if (user) {
+    const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id);
+    if (deleteError) throw new Error(`test user cleanup failed: ${deleteError.message}`);
+  }
+}
+
+/** Mailpit 에서 해당 주소로 온 가장 최근 메일의 본문을 꺼낸다. */
+async function latestMailpitBody(
   request: APIRequestContext,
   email: string,
 ): Promise<string> {
@@ -113,52 +124,106 @@ export const test = base.extend<ConsentAuthFixtures>({
     delete process.env.__CONSENT_E2E_PASSWORD;
   },
 
-  signInViaEmailLink: async ({ request, freshUserId }, use) => {
-    void freshUserId;
-    const email = process.env.__CONSENT_E2E_EMAIL!;
+  signUpViaEmailLink: async ({ request }, use) => {
+    assertLocalTestEnv();
+    const email = uniqueEmail();
+    const password = `Pw-${Math.random().toString(36).slice(2)}-1A!`;
 
     await use(async (page: Page) => {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        { auth: { persistSession: false } },
-      );
-      // admin.generateLink 는 링크만 만들고 메일을 보내지 않는다. 실제
-      // GoTrue → SMTP → Inbucket 경로를 타려면 OTP 요청을 사용해야 한다.
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: "http://localhost:3000/auth/callback" },
+      const requestFailures: string[] = [];
+      page.on("requestfailed", (request) => {
+        requestFailures.push(
+          `${request.method()} ${request.url()} — ${request.failure()?.errorText ?? "unknown"}`,
+        );
       });
-      if (error) throw new Error(`magiclink request failed: ${error.message}`);
-
-      const body = await latestInbucketBody(request, email);
-      await page.goto(extractLink(body), { waitUntil: "networkidle" });
-    });
-  },
-
-  signInViaCallbackCode: async ({ freshUserId }, use) => {
-    void freshUserId;
-    const email = process.env.__CONSENT_E2E_EMAIL!;
-
-    await use(async (page: Page) => {
-      const supabase = getTestSupabase();
-      // OAuth 도 결국 callback 에 one-time code 를 넘긴다. 그 마지막 구간을
-      // 실제로 태워서 `app/auth/callback` 의 코드 교환과 리다이렉트를 검증한다.
-      const { data, error } = await supabase.auth.admin.generateLink({
-        type: "magiclink",
-        email,
-      });
-      if (error || !data?.properties?.hashed_token) {
-        throw new Error(`callback code generation failed: ${error?.message}`);
+      // 실제 사용자가 타는 UI sign-up 경로에서 PKCE verifier를 브라우저에
+      // 만들고, Mailpit 확인 링크를 같은 context에서 소비한다.
+      await page.goto("/sign-up", { waitUntil: "domcontentloaded" });
+      await page.fill("#email", email);
+      await page.fill("#password", password);
+      await page.click('form button[type="submit"]');
+      try {
+        await page.waitForSelector("#otp", { state: "visible", timeout: 10_000 });
+      } catch {
+        const visibleError = await page.locator("p.text-destructive").textContent().catch(() => null);
+        throw new Error(
+          `UI sign-up did not reach verification. error=${visibleError ?? "none"}; ` +
+            `requestFailures=${requestFailures.join(" | ") || "none"}`,
+        );
       }
 
-      const verifyUrl =
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/verify` +
-        `?token=${data.properties.hashed_token}&type=magiclink` +
-        `&redirect_to=${encodeURIComponent("http://localhost:3000/auth/callback")}`;
-
-      await page.goto(verifyUrl, { waitUntil: "networkidle" });
+      const body = await latestMailpitBody(request, email);
+      await page.goto(extractLink(body), { waitUntil: "networkidle" });
+      await page.waitForURL(/\/onboarding(?:\?|$)/, { timeout: 15_000 });
     });
+
+    await deleteAuthUserByEmail(email);
+  },
+
+  signUpViaGoogleOAuthStub: async ({}, use) => {
+    assertLocalTestEnv();
+    const email = "consent-google-e2e@example.test";
+    await deleteAuthUserByEmail(email);
+
+    await use(async (page: Page) => {
+      let sawGoogleAuthorize = false;
+      const oauthEvents: string[] = [];
+      page.on("requestfailed", (request) => {
+        const url = new URL(request.url());
+        oauthEvents.push(`FAILED ${url.origin}${url.pathname} ${request.failure()?.errorText ?? ""}`);
+      });
+      page.on("response", (response) => {
+        const url = new URL(response.url());
+        if (url.pathname.includes("/auth/") || url.pathname.includes("/oauth/")) {
+          oauthEvents.push(`${response.status()} ${url.origin}${url.pathname}`);
+        }
+      });
+
+      // GoTrue built-in Google issuer는 override 불가다. 로컬에서만 실제
+      // Google 버튼의 authorize 요청을 configurable OIDC adapter로 바꾼다.
+      // PKCE query와 redirect_to는 그대로 보존한다.
+      // GoTrue 컨테이너는 host.docker.internal 로 mock server를 보지만,
+      // Windows Chromium은 그 호스트명을 해석하지 못한다. 브라우저가 provider
+      // authorize 화면으로 갈 때만 같은 서버의 127.0.0.1 주소로 바꾼다.
+      await page.route("**/oauth/keycloak/**", async (route) => {
+        const url = new URL(route.request().url());
+        url.hostname = "127.0.0.1";
+        await route.continue({ url: url.toString() });
+      });
+
+      await page.route("**/auth/v1/authorize**", async (route) => {
+        const url = new URL(route.request().url());
+        if (url.searchParams.get("provider") !== "google") {
+          await route.continue();
+          return;
+        }
+
+        sawGoogleAuthorize = true;
+        const redirectTo = url.searchParams.get("redirect_to") ?? "";
+        if (!redirectTo.includes("/auth/callback")) {
+          throw new Error("Google authorize request lost the app callback redirect");
+        }
+        url.searchParams.set("provider", "keycloak");
+        await route.continue({ url: url.toString() });
+      });
+
+      await page.goto("/sign-up", { waitUntil: "domcontentloaded" });
+      await page.getByRole("button", { name: /Google/i }).click();
+      try {
+        await page.waitForURL(/\/onboarding(?:\?|$)/, { timeout: 20_000 });
+      } catch {
+        throw new Error(
+          `Google OAuth stub did not return to onboarding; url=${page.url()}; ` +
+            `events=${oauthEvents.join(" | ") || "none"}`,
+        );
+      }
+
+      if (!sawGoogleAuthorize) {
+        throw new Error("Google button did not initiate a GoTrue authorize request");
+      }
+    });
+
+    await deleteAuthUserByEmail(email);
   },
 
   freshUserPage: async ({ page, freshUserId }, use) => {

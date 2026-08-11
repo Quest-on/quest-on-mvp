@@ -11,6 +11,28 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 
 const headerStore = new Map<string, string>();
+let authUser: { id: string; email: string } | null = null;
+let authProfile: {
+  role: string;
+  status: string;
+  display_name: string | null;
+  avatar_url: string | null;
+} | null = null;
+
+vi.mock("@supabase/ssr", () => ({
+  createServerClient: () => ({
+    auth: {
+      getUser: async () => ({ data: { user: authUser } }),
+    },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: async () => ({ data: authProfile }),
+        }),
+      }),
+    }),
+  }),
+}));
 
 vi.mock("next/headers", () => ({
   headers: async () => ({
@@ -30,6 +52,8 @@ async function loadCurrentUser() {
 
 beforeEach(() => {
   headerStore.clear();
+  authUser = null;
+  authProfile = null;
 });
 
 afterEach(() => {
@@ -103,5 +127,24 @@ describe("currentUser test bypass", () => {
 
     const currentUser = await loadCurrentUser();
     expect(await currentUser()).toBeNull();
+  });
+
+  it("falls through to a real Supabase session when bypass headers are absent", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_ENV", "development");
+    vi.stubEnv("TEST_BYPASS_SECRET", "local-secret");
+    authUser = { id: "real-user", email: "real@example.test" };
+    authProfile = {
+      role: "student",
+      status: "approved",
+      display_name: "Real User",
+      avatar_url: null,
+    };
+
+    const currentUser = await loadCurrentUser();
+    await expect(currentUser()).resolves.toMatchObject({
+      id: "real-user",
+      email: "real@example.test",
+      role: "student",
+    });
   });
 });

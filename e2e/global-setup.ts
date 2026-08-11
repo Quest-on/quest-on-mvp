@@ -290,22 +290,34 @@ async function globalSetup() {
   }
 
   // Start the OpenAI mock server
-  mockServer = spawn(
-    process.platform === "win32" ? "npx.cmd" : "npx",
-    ["tsx", "scripts/start-mock-server.ts"],
-    {
+  if (process.platform === "win32") {
+    // GoTrue는 Docker 안에서 `host.docker.internal:4010`으로 OAuth token/userinfo
+    // stub을 호출한다. Windows 프로세스로 띄우면 WSL2 Docker bridge에서 닿지
+    // 않으므로 mock server 자체를 WSL host에 띄운다.
+    const root = path.resolve(__dirname, "..");
+    const wslRoot = execSync(`wsl.exe -- wslpath -a "${root}"`, {
+      encoding: "utf8",
+    }).trim();
+    const command =
+      `cd /tmp && exec npx --yes tsx@4.20.6 ` +
+      `'${wslRoot}/scripts/start-mock-server.ts'`;
+    mockServer = spawn("wsl.exe", ["--", "bash", "-lc", command], {
+      stdio: "pipe",
+      env: { ...process.env, NODE_ENV: "test" },
+    });
+  } else {
+    mockServer = spawn("npx", ["tsx", "scripts/start-mock-server.ts"], {
       cwd: path.resolve(__dirname, ".."),
       stdio: "pipe",
       env: { ...process.env, NODE_ENV: "test" },
-      shell: process.platform === "win32",
-    },
-  );
+    });
+  }
 
   // Wait for mock server to be ready
   await new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new Error("Mock server failed to start within 10s"));
-    }, 10_000);
+      reject(new Error("Mock server failed to start within 30s"));
+    }, 30_000);
 
     mockServer!.stdout?.on("data", (data: Buffer) => {
       const msg = data.toString();

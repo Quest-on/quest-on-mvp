@@ -1,4 +1,34 @@
 import { test, expect } from "../fixtures/consent-auth.fixture";
+import type { Page } from "@playwright/test";
+
+async function assertSupabaseSession(page: Page): Promise<void> {
+  const cookies = await page.context().cookies();
+  const sessionCookies = cookies
+    .filter(
+      ({ name }) => name.includes("auth-token") && !name.includes("code-verifier"),
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  expect(sessionCookies, "callback did not establish Supabase session cookies").not.toHaveLength(0);
+
+  const encoded = sessionCookies.map(({ value }) => value).join("");
+  const serialized = encoded.startsWith("base64-")
+    ? Buffer.from(encoded.slice("base64-".length), "base64url").toString("utf8")
+    : decodeURIComponent(encoded);
+  const session = JSON.parse(serialized) as { access_token?: string };
+  expect(session.access_token, "Supabase session cookie has no access token").toBeTruthy();
+
+  const response = await page.request.get(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`,
+    {
+      headers: {
+        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        authorization: `Bearer ${session.access_token}`,
+      },
+    },
+  );
+  expect(response.status(), await response.text()).toBe(200);
+}
 
 /**
  * AC-S1 / AC-S2 / AC-S3 / AC-E1~E3 (live) — 온보딩 동의 흐름.
@@ -158,17 +188,24 @@ test.describe("온보딩 동의 흐름 — 조합과 복귀", () => {
 });
 
 test.describe("온보딩 동의 흐름 — 실제 auth 경로", () => {
-  test("이메일 확인 링크로 세션을 만들면 온보딩으로 온다", async ({
+  test("UI 이메일 가입 → Mailpit → PKCE callback이 세션을 만든다", async ({
     page,
-    signInViaEmailLink,
+    signUpViaEmailLink,
   }) => {
-    await signInViaEmailLink(page);
-    // 콜백은 항상 온보딩을 거친다. 바로 보호 화면으로 들어가면 안 된다.
-    expect(page.url()).toMatch(/\/onboarding|\/sign-in/);
+    await signUpViaEmailLink(page);
+    expect(new URL(page.url()).pathname).toBe("/onboarding");
+    // `/sign-in`도 성공으로 인정하지 않는다. session cookie의 access token으로
+    // GoTrue `/user`가 200을 반환해야 callback 성공이다.
+    await assertSupabaseSession(page);
   });
 
-  test("callback code 경로도 온보딩으로 온다", async ({ page, signInViaCallbackCode }) => {
-    await signInViaCallbackCode(page);
-    expect(page.url()).toMatch(/\/onboarding|\/sign-in/);
+  test("Google 버튼 → OIDC stub → callback이 세션을 만든다", async ({
+    page,
+    signUpViaGoogleOAuthStub,
+  }) => {
+    await signUpViaGoogleOAuthStub(page);
+    expect(new URL(page.url()).pathname).toBe("/onboarding");
+
+    await assertSupabaseSession(page);
   });
 });

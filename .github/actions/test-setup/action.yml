@@ -96,13 +96,55 @@ runs:
           -- 없으면 PGRST205: public.profiles 테이블을 찾지 못해 조회가 실패한다.
           CREATE TABLE IF NOT EXISTS profiles (
             id TEXT PRIMARY KEY,
-            role TEXT NOT NULL DEFAULT 'student',
+            role TEXT,
             status TEXT NOT NULL DEFAULT 'approved',
             display_name TEXT,
             avatar_url TEXT,
+            school TEXT,
+            student_id TEXT,
             created_at TIMESTAMPTZ DEFAULT now(),
             updated_at TIMESTAMPTZ DEFAULT now()
           );
+          ALTER TABLE profiles ALTER COLUMN role DROP NOT NULL;
+          ALTER TABLE profiles ALTER COLUMN role DROP DEFAULT;
+          ALTER TABLE profiles ADD COLUMN IF NOT EXISTS school TEXT;
+          ALTER TABLE profiles ADD COLUMN IF NOT EXISTS student_id TEXT;
+
+          -- 실제 email/OAuth 가입이 auth.users 만 만들고 public.profiles 를
+          -- 만들지 않으면 currentUser() 가 null이 되어 onboarding API가 401이다.
+          -- 이메일은 metadata role을 사용하고, OAuth는 role을 NULL로 남겨
+          -- /api/user/role 이 단 한 번 claim하게 한다.
+          CREATE OR REPLACE FUNCTION public.handle_new_auth_user_profile()
+          RETURNS trigger
+          LANGUAGE plpgsql
+          SECURITY DEFINER
+          SET search_path = public
+          AS \$\$
+          DECLARE
+            signup_role text;
+          BEGIN
+            signup_role := CASE
+              WHEN NEW.raw_user_meta_data ->> 'role' IN ('student', 'instructor')
+                THEN NEW.raw_user_meta_data ->> 'role'
+              ELSE NULL
+            END;
+
+            INSERT INTO public.profiles (id, role, status, display_name)
+            VALUES (
+              NEW.id::text,
+              signup_role,
+              CASE WHEN signup_role = 'instructor' THEN 'pending' ELSE 'approved' END,
+              COALESCE(NEW.raw_user_meta_data ->> 'full_name', NEW.raw_user_meta_data ->> 'name')
+            )
+            ON CONFLICT (id) DO NOTHING;
+            RETURN NEW;
+          END;
+          \$\$;
+
+          DROP TRIGGER IF EXISTS on_auth_user_created_profile ON auth.users;
+          CREATE TRIGGER on_auth_user_created_profile
+            AFTER INSERT ON auth.users
+            FOR EACH ROW EXECUTE FUNCTION public.handle_new_auth_user_profile();
 
           CREATE TABLE IF NOT EXISTS error_logs (
             id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
