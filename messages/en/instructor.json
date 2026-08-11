@@ -385,7 +385,8 @@
     "colorRed": "Red",
     "colorPurple": "Purple",
     "colorPink": "Pink",
-    "colorGray": "Gray"
+    "colorGray": "Gray",
+    "toastExamCodeBlocked": "You have reached the publish limit, so this code cannot be copied yet. Verify your account and try again."
   },
   "new": {
     "createExamFailed": "Failed to create exam"

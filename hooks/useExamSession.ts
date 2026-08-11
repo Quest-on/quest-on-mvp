@@ -200,9 +200,16 @@ export function useExamSession({
           ENTRY_WINDOW_CLOSED: "entry_window_closed",
           INIT_SESSION_FAILED: "server_error",
           NETWORK_ERROR: "network_error",
+          // 한도 초과를 network_error 로 뭉개면 안 된다. 학생은 "네트워크 오류"를
+          // 보고 새로고침만 반복하게 되고, 실제 원인(교수자 계정 인증 필요)이
+          // 전달되지 않는다.
+          PUBLISH_LIMIT_REACHED: "publish_limit",
+          STUDENT_LIMIT_REACHED: "student_limit",
         };
         const errorParam = errorCodeMap[errorData.error] || "network_error";
-        router.push(`/join?error=${errorParam}`);
+        // 시험 코드를 함께 넘긴다. 지금은 리다이렉트 후 코드가 빈 값이라
+        // "같은 코드로 다시 시도"가 불가능하다 — 학생이 코드를 다시 받아야 한다.
+        router.push(`/join?error=${errorParam}&code=${encodeURIComponent(examCode)}`);
       }
       return;
     }

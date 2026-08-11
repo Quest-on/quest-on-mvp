@@ -196,6 +196,7 @@ export function useExamDetail({
           assignment_prompt: examResult.exam.assignment_prompt || null,
           grades_released: examResult.exam.grades_released || false,
           is_demo: examResult.exam.is_demo === true,
+          first_published_at: examResult.exam.first_published_at ?? null,
         } as InstructorExam,
         questionsCount: questionsArray.length,
         questionsRaw: questionsArray as Question[],

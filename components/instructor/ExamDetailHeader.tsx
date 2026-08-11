@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { ExamCode, type ExamCodeQuota } from "@/components/instructor/ExamCode";
 import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 
@@ -23,6 +24,8 @@ interface ExamDetailHeaderProps {
    * 누르기 전에 알려야 한다. 라벨만 있고 이 경고가 없으면 안 된다.
    */
   demoRestartHint?: string;
+  /** 발행 한도 상태. 없으면 게이트가 열린 것으로 본다(fail-open). */
+  quota?: ExamCodeQuota;
   extraActions?: ReactNode;
 }
 
@@ -37,6 +40,7 @@ export function ExamDetailHeader({
   demoPreviewLabel,
   demoRestartLabel,
   demoRestartHint,
+  quota,
   extraActions,
 }: ExamDetailHeaderProps) {
   const t = useTranslations("authoring");
@@ -45,9 +49,9 @@ export function ExamDetailHeader({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-bold">{title}</h1>
-          <p className="text-muted-foreground">
-            {t("examDetailHeader.examCode", { code })}
-          </p>
+          {/* 코드는 ExamCode 만 내보낸다. 여기서 직접 그리면 발행 한도 게이트를
+              우회하게 되고, 교수자가 코드를 배포한 뒤 학생 전원이 튕긴다. */}
+          <ExamCode code={code} quota={quota} className="mt-1" />
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {isDemo && demoPreviewLabel && (

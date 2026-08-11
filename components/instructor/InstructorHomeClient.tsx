@@ -383,9 +383,15 @@ export default function InstructorHome() {
     [locale]
   );
 
-  const handleCopyExamCode = async (code?: string) => {
+  const handleCopyExamCode = async (code?: string, gateBlocked?: boolean) => {
     if (!code) {
       toast.error(t("drive.toastExamCodeMissing"));
+      return;
+    }
+    // 발행 한도에 도달한 미발행 시험의 코드는 복사시키지 않는다 (이슈 #84).
+    // 복사해 수업 자료에 붙인 뒤에 막으면, 수업 중에 학생 전원이 튕긴다.
+    if (gateBlocked) {
+      toast.error(t("drive.toastExamCodeBlocked"));
       return;
     }
     try {

@@ -101,6 +101,19 @@ export default function ExamDetail({
   });
 
   const isDemoExam = exam?.is_demo === true;
+
+  // 발행 한도. 교수자가 **코드를 건네기 전에** 알아야 한다 — 최종 강제는
+  // 세션 생성 시 DB 가 하지만, 그때는 이미 코드를 배포한 뒤다.
+  // 데모는 한도를 소모하지 않으므로 조회하지 않는다.
+  const { data: quotaData } = useQuery<{ publishesRemaining: number | null }>({
+    queryKey: ["instructor-quota", user?.id],
+    queryFn: async ({ signal }) => {
+      const response = await fetch("/api/instructor/quota", { signal });
+      if (!response.ok) throw new Error("Failed to fetch quota");
+      return response.json() as Promise<{ publishesRemaining: number | null }>;
+    },
+    enabled: !!user?.id && !isDemoExam,
+  });
   const {
     data: demoStatus,
     isLoading: demoStatusLoading,
@@ -399,6 +412,11 @@ export default function ExamDetail({
             code={exam.code}
             examId={exam.id}
             isDemo={isDemoExam}
+            quota={{
+              isDemo: isDemoExam,
+              alreadyPublished: !!exam.first_published_at,
+              publishesRemaining: quotaData?.publishesRemaining ?? null,
+            }}
             demoPreviewLabel={t("examDetail.tryAsStudent")}
             // 완주한 데모는 이미 제출본이 있어 그냥 들어가면 읽기 전용 화면만
             // 뜬다. 연습용이므로 다시 풀 수 있어야 한다 — 라벨이 있으면 CTA 가
@@ -521,7 +539,10 @@ export default function ExamDetail({
                       <div className="flex items-center gap-3">
                         <h3 className="font-semibold">{t("examDetail.examInfo")}</h3>
                         <span className="text-sm text-muted-foreground">
-                          {exam.duration}분 &bull; {exam.code}
+                          {/* 코드는 헤더의 ExamCode 가 이미 내보낸다. 여기서
+                              한 번 더 그리면 게이트를 우회하는 두 번째 표면이
+                              된다 — 소요 시간만 남긴다. */}
+                          {exam.duration}분
                         </span>
                       </div>
                       {examInfoOpen ? (

@@ -405,5 +405,11 @@
     "buttonAIGenerate": "AI로 {count}개 생성",
     "buttonAddManual": "추가",
     "optional": "선택"
+  },
+  "examCode": {
+    "copyAria": "시험 코드 복사",
+    "warning": "무료 등급에서 앞으로 {remaining}개 시험까지 학생을 받을 수 있습니다.",
+    "blockedTitle": "코드를 배포하기 전에 계정 인증이 필요합니다",
+    "blockedBody": "무료 등급의 발행 한도에 도달했습니다. 지금 코드를 배포하면 학생이 입장하지 못합니다. 인증을 마치면 코드가 다시 표시됩니다."
   }
 }

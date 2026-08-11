@@ -690,78 +690,64 @@ export async function initExamSession(data: {
         initialStatus = "late_pending"; // 유한 + 시작 후 입장: 강사 승인 필요
       }
 
-      // Upsert session (race-safe: uses UNIQUE(exam_id, student_id) constraint)
-      // ignoreDuplicates: true prevents overwriting existing session data (timer, status)
+      // 입장 판정과 세션 생성을 하나의 원자 연산으로 맡긴다 (이슈 #84).
+      //
+      // 여기서 "세어보고 → 괜찮으면 → 넣기"를 하면 TOCTOU 다. 수업 시작 순간
+      // 30명이 동시에 들어오면 전부 카운트를 읽고 전부 통과해 한도를 넘긴다.
+      // 함수가 교수자 단위 advisory lock 으로 직렬화하고, 기존 학생 통과·데모
+      // 우회·학생 수 한도·발행 한도·세션 삽입·first_published_at 기록을
+      // 한 트랜잭션에서 처리한다.
+      const { data: admission, error: admitError } = await getSupabase().rpc(
+        "admit_exam_session",
+        {
+          p_exam_id: exam.id,
+          p_student_id: data.studentId,
+          p_status: initialStatus,
+          p_fingerprint: incomingFingerprint ?? null,
+        }
+      );
+
+      // 한도 판정이 깨지면 학생을 들여보낸다(fail-open). 한도 계산 장애로
+      // 수업이 멈추는 것보다 잠시 한도가 풀리는 쪽이 낫다. 대신 이 로그가
+      // 없으면 한도가 조용히 풀린 걸 아무도 모른다.
+      if (admitError) {
+        logError("[initExamSession] quota_fail_open", admitError, {
+          path: "/api/supa/session-handlers",
+          additionalData: { examId: exam.id, reason: "admit_rpc_failed" },
+        });
+      }
+
+      const verdict = Array.isArray(admission) ? admission[0] : admission;
+
+      if (verdict && verdict.admitted === false) {
+        return errorJson(
+          verdict.denial_reason === "publish_limit"
+            ? "PUBLISH_LIMIT_REACHED"
+            : "STUDENT_LIMIT_REACHED",
+          verdict.denial_reason === "publish_limit"
+            ? "Instructor verification required before more exams can be published"
+            : "This exam has reached its student limit",
+          403
+        );
+      }
+
       const { data: upsertedSession, error: upsertError } = await getSupabase()
         .from("sessions")
-        .upsert(
-          {
-            exam_id: exam.id,
-            student_id: data.studentId,
-            used_clarifications: 0,
-            is_active: true,
-            last_heartbeat_at: now,
-            device_fingerprint: incomingFingerprint,
-            created_at: now,
-            status: initialStatus,
-            started_at: initialStatus === "in_progress" ? now : null,
-            attempt_timer_started_at: initialStatus === "in_progress" ? now : null,
-          },
-          { onConflict: "exam_id,student_id", ignoreDuplicates: true }
-        )
         .select()
+        .eq("exam_id", exam.id)
+        .eq("student_id", data.studentId)
         .maybeSingle();
 
       if (upsertError) throw upsertError;
 
-      // ignoreDuplicates skipped the insert — fetch existing session
+      // RPC 가 세션을 만들었으므로 여기서는 읽기만 한다.
+      //
+      // first_published_at 기록도 RPC 안에서 세션 삽입과 같은 트랜잭션에 있다.
+      // 밖에서 하면 세션은 생겼는데 발행이 안 잡혀 한도가 영영 차지 않는다.
       if (!upsertedSession) {
-        const { data: existing, error: fetchError } = await getSupabase()
-          .from("sessions")
-          .select("id, exam_id, student_id, submitted_at, is_active, status, started_at, attempt_timer_started_at, device_fingerprint, created_at, used_clarifications, compressed_session_data, compression_metadata, last_heartbeat_at")
-          .eq("exam_id", exam.id)
-          .eq("student_id", data.studentId)
-          .single();
-        if (fetchError) throw fetchError;
-        session = existing;
-      } else {
-        session = upsertedSession;
-
-        // 018 이전 DB는 is_demo 컬럼 조회가 실패한다. 세션 삽입 뒤에만 격리해
-        // 실패해도 학생 입장을 막지 않고, 발행 계측만 건너뛴다.
-        try {
-          const { data: publicationExam, error: demoQueryError } = await getSupabase()
-            .from("exams")
-            .select("is_demo")
-            .eq("id", exam.id)
-            .maybeSingle();
-
-          if (demoQueryError) {
-            logError("[initExamSession] Failed to check whether exam is a demo", demoQueryError, {
-              path: "/api/supa/session-handlers",
-              additionalData: { examId: exam.id },
-            });
-          } else if (!publicationExam?.is_demo) {
-            const { error: publicationError } = await getSupabase()
-              .from("exams")
-              .update({ first_published_at: now })
-              .eq("id", exam.id)
-              .is("first_published_at", null);
-
-            if (publicationError) {
-              logError("[initExamSession] Failed to record first publication", publicationError, {
-                path: "/api/supa/session-handlers",
-                additionalData: { examId: exam.id },
-              });
-            }
-          }
-        } catch (publicationError) {
-          logError("[initExamSession] Failed to record first publication", publicationError, {
-            path: "/api/supa/session-handlers",
-            additionalData: { examId: exam.id },
-          });
-        }
+        return errorJson("INIT_SESSION_FAILED", "Failed to initialize session", 500);
       }
+      session = upsertedSession;
     }
 
     if (!session) {
