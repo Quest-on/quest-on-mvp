@@ -293,7 +293,10 @@ async function resolveTempSession(params: {
   examId?: string;
   studentId?: string;
 }): Promise<{
-  actualSessionId: string;
+  /** 한도 초과로 입장이 거부되면 null. 호출부가 그 경우를 처리해야 한다. */
+  actualSessionId: string | null;
+  /** 거부 사유. 없으면 정상. */
+  denied?: string;
   usedClarifications?: number;
   skipIncrementUsedClarifications: boolean;
 }> {
@@ -327,19 +330,48 @@ async function resolveTempSession(params: {
     };
   }
 
-  // 새 세션은 첫 대화에서 used_clarifications가 1이 되도록 바로 세팅 (추가 update 왕복 제거)
+  // 이 경로도 같은 원자 연산을 거친다 (이슈 #84).
+  //
+  // 여기서 직접 INSERT 하면 인증 학생이 임의 examId 로 채팅을 열어 발행·학생
+  // 한도와 advisory lock 을 통째로 우회할 수 있다. 게다가 그렇게 만들어진
+  // 학생은 이후 "기존 학생 무조건 통과" 분기에 걸려 영구히 grandfather 된다.
+  const { data: admission, error: admitError } = await getSupabase().rpc(
+    "admit_exam_session",
+    {
+      p_exam_id: examId,
+      p_student_id: studentId,
+      p_status: "in_progress",
+      p_fingerprint: null,
+    }
+  );
+
+  if (admitError) {
+    logError("[chat] quota_fail_open", admitError, {
+      path: "/api/chat",
+      additionalData: { examId, reason: "admit_rpc_failed" },
+    });
+  }
+
+  const verdict = Array.isArray(admission) ? admission[0] : admission;
+  if (verdict && verdict.admitted === false) {
+    return {
+      actualSessionId: null,
+      usedClarifications,
+      skipIncrementUsedClarifications,
+      denied: verdict.denial_reason as string,
+    };
+  }
+
   const { data: newSession } = await getSupabase()
     .from("sessions")
-    .insert([
-      { exam_id: examId, student_id: studentId, used_clarifications: 1 },
-    ])
     .select("id, used_clarifications")
-    .single();
+    .eq("exam_id", examId)
+    .eq("student_id", studentId)
+    .maybeSingle();
 
   if (newSession) {
     actualSessionId = newSession.id;
-    usedClarifications = newSession.used_clarifications ?? 1;
-    skipIncrementUsedClarifications = true;
+    usedClarifications = newSession.used_clarifications ?? 0;
   }
 
   return {
@@ -610,7 +642,20 @@ export async function POST(request: NextRequest) {
         actualSessionId,
         usedClarifications,
         skipIncrementUsedClarifications,
+        denied,
       } = await resolveTempSession({ sessionId, examId, studentId });
+
+      // 한도 초과로 입장이 거부되면 채팅도 열지 않는다. 여기서 계속 진행하면
+      // sessionId 가 null 인 채로 흘러가 엉뚱한 곳에서 터진다.
+      if (denied || !actualSessionId) {
+        return errorJson(
+          denied === "publish_limit"
+            ? "PUBLISH_LIMIT_REACHED"
+            : "STUDENT_LIMIT_REACHED",
+          "This exam is not accepting new students",
+          403
+        );
+      }
 
       // exam 언어/문항 조회. 언어는 영문 프롬프트 분기용, 문항은 강사 채점 컨텍스트
       // (ai_context)를 서버에서 직접 파생하기 위함(클라이언트는 ai_context 를 받지 않음).

@@ -51,11 +51,11 @@ const CODE_RENDER_REGISTRY: Record<string, string> = {
     "코드 렌더는 ExamCode 로 옮겼다. 남은 writeText 는 그 컴포넌트가 이미 게이트를 통과시킨 코드다.",
 };
 
-function collectSources(dirs: string[]): Array<[string, string]> {
+export function collectSources(dirs: string[]): Array<[string, string]> {
   const out: Array<[string, string]> = [];
   const walk = (abs: string) => {
     if (statSync(abs).isFile()) {
-      if (!/\.tsx$/.test(abs)) return;
+      if (!/\.tsx?$/.test(abs)) return;
       out.push([
         path.relative(root, abs).replace(/\\/g, "/"),
         readFileSync(abs, "utf8").replace(/\r\n/g, "\n"),
@@ -246,5 +246,65 @@ describe("원자적 강제 (024)", () => {
     // 한쪽만 풀면 다른 쪽이 계속 막는다. 캐시 지연도 알아야 한다.
     expect(sql).toMatch(/max_publishes = NULL, max_students = NULL/);
     expect(sql).toMatch(/60초 캐시/);
+  });
+});
+
+describe("세션 writer 가 저장소 전역에서 하나뿐이다", () => {
+  // 이번에 chat·feedback-chat 두 곳을 놓쳤다. 한 파일만 검사하는 감사는
+  // 방어선이 아니다 — 새 경로가 생기면 그대로 우회한다.
+  const WRITER_REGISTRY: Record<string, string> = {
+    "app/api/supa/handlers/session-handlers.ts":
+      "admit_exam_session 을 호출하고, RPC 장애 시에만 fail-open 폴백으로 직접 만든다.",
+    "app/api/feedback/route.ts":
+      "제출 cold-start 도 admit_exam_session 을 거친다. 폴백은 fail-open 계약.",
+  };
+
+  it("등록되지 않은 파일이 sessions 행을 만들지 않는다", () => {
+    const offenders: string[] = [];
+    for (const [file, source] of collectSources(["app", "lib"])) {
+      if (WRITER_REGISTRY[file]) continue;
+      if (/from\("sessions"\)[\s\S]{0,80}?\.(insert|upsert)\(/.test(source)) {
+        offenders.push(file);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("등록된 writer 는 모두 admission RPC 를 거친다", () => {
+    for (const file of Object.keys(WRITER_REGISTRY)) {
+      expect(read(file), `${file} 이 RPC 를 안 거친다`).toMatch(/admit_exam_session/);
+    }
+  });
+});
+
+describe("데모 우회가 소유자에게만 열린다 (026)", () => {
+  const sql = read("database/026_close_quota_gaps.sql");
+
+  it("소유자 여부를 함께 판정한다", () => {
+    // is_demo 만 보면 데모 코드가 무제한 입장권이 된다. 실제로 외부 학생
+    // 6명이 전부 통과했다 — 무료 한도의 존재 이유가 사라진다.
+    expect(sql).toMatch(/v_owner_preview :=/);
+    expect(sql).toMatch(/v_exam\.instructor_id::text = p_student_id/);
+  });
+
+  it("소유자가 아니면 한도를 적용한다", () => {
+    expect(sql).toMatch(/IF NOT v_owner_preview THEN/);
+  });
+
+  it("데모는 여전히 발행 카운트에 안 들어간다", () => {
+    // 소유자가 아니어도 데모 자체는 발행으로 세면 안 된다.
+    expect(sql).toMatch(/AND NOT COALESCE\(v_exam\.is_demo, false\) THEN/);
+  });
+
+  it("승인이 없는 교수자에게 성공을 반환하지 않는다", () => {
+    expect(sql).toMatch(/GET DIAGNOSTICS v_updated = ROW_COUNT/);
+    expect(sql).toMatch(/IF v_updated = 0 THEN\s*\n\s*RETURN false;/);
+  });
+
+  it("SECURITY DEFINER 함수의 PUBLIC 실행권을 회수한다", () => {
+    // PostgreSQL 은 함수에 PUBLIC EXECUTE 를 기본으로 준다. anon·authenticated
+    // 만 회수하면 나머지 롤이 그대로 실행할 수 있다.
+    expect(sql).toMatch(/REVOKE ALL ON FUNCTION %s FROM PUBLIC/);
+    expect(sql).toMatch(/p\.prosecdef/);
   });
 });

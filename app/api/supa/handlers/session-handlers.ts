@@ -519,8 +519,28 @@ export async function initExamSession(data: {
         ? null
         : unsubmittedSessions.find((s) => !s.device_fingerprint) || null;
 
+    // 다른 기기에서 다시 들어온 경우도 **같은 세션을 인계**한다.
+    //
+    // 이게 없으면 수업 중 노트북이 끊겨 휴대폰으로 들어온 학생이 반쪽 상태가
+    // 된다: DB 는 (exam_id, student_id) 로 통과시켜 정원이 차도 안 튕기지만,
+    // 여기서 기기 지문이 다르다는 이유로 existingSession 을 null 로 두면
+    // 재활성화·fingerprint 갱신·이전 AI 대화 로드를 전부 건너뛴다. 화면은
+    // 응시 중인데 heartbeat 는 SESSION_INACTIVE 로 계속 실패하고 대화는 비어
+    // 있다. 새로고침해도 지문은 계속 다르니 영영 복구되지 않는다.
+    //
+    // 인계 범위는 **같은 사용자의 미제출 세션**뿐이다. student_id 는 이미
+    // 인증 사용자와 일치하는지 확인했으므로 남의 세션을 가져올 수 없다.
+    const crossDeviceSession =
+      incomingFingerprint === null
+        ? null
+        : unsubmittedSessions[0] || null;
+
     let existingSession: (typeof existingSessions)[0] | null =
-      resetDemoSession || exactDeviceMatch || claimableLegacySession || null;
+      resetDemoSession ||
+      exactDeviceMatch ||
+      claimableLegacySession ||
+      crossDeviceSession ||
+      null;
 
     let session = existingSession;
     let sessionReactivated = false;
@@ -640,7 +660,7 @@ export async function initExamSession(data: {
         // 지각 학생: 강사 승인 대기 중 — heartbeat만 업데이트, 상태 전환 없음
         const { data: updatedSession } = await getSupabase()
           .from("sessions")
-          .update({ is_active: true, last_heartbeat_at: now })
+          .update({ is_active: true, last_heartbeat_at: now, device_fingerprint: incomingFingerprint })
           .eq("id", existingSession.id)
           .eq("status", "late_pending")
           .select()
