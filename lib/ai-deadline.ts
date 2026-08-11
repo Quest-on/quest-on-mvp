@@ -60,6 +60,25 @@ export function createRouteDeadline(params: {
   return params.startedAtMs + params.maxDurationSec * 1000 - margin;
 }
 
+/**
+ * 프로필 타임아웃과 라우트가 계산한 남은 예산 중 **더 짧은 쪽**을 고른다.
+ *
+ * 두 축이 각각 필요하다:
+ *   - 프로필 타임아웃은 관리자가 낮출 수 있어야 한다. ad-hoc 값만 쓰면
+ *     관리자 오버라이드가 조용히 무시된다.
+ *   - 남은 deadline 예산은 서버리스 강제 종료를 막는다. 프로필이 더 길어도
+ *     예산을 넘길 수 없다.
+ *
+ * 세 채점 호출부가 이 함수 하나를 공유한다 — 각자 Math.min 을 적으면
+ * 한 곳만 되돌아가도 아무도 눈치채지 못한다.
+ */
+export function clampTimeoutToProfile(
+  profile: Pick<ResolvedAiTaskProfile, "timeoutMs">,
+  budgetMs: number
+): number {
+  return Math.min(profile.timeoutMs, budgetMs);
+}
+
 export type AiRequestBudget = {
   /** SDK 요청 옵션에 그대로 전달한다. */
   readonly timeout: number;

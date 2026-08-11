@@ -122,6 +122,7 @@ test.describe("ai_config 스키마 — live 보안 경계", () => {
 test.describe("exam_grading_sessions 런 핀 — live 불변식", () => {
   // 남의 행을 빌려 쓰면 병렬 테스트와 충돌하고, 없으면 skip 으로 조용히 통과한다.
   // 둘 다 검증을 무의미하게 만들므로 이 파일이 소유하는 행을 직접 만든다.
+  const OWNER = "e2e-ai-config";
   let ownedSessionId: string | null = null;
   let productionVersionId: string | null = null;
 
@@ -133,18 +134,34 @@ test.describe("exam_grading_sessions 런 핀 — live 불변식", () => {
       .single();
     productionVersionId = (label?.version_id as string) ?? null;
 
-    const { data: exam } = await supabase
+    // exams.code 와 exams.duration 은 non-null 이다(prisma/schema.prisma).
+    // 빠뜨리면 insert 가 조용히 실패하고, serial 모드에서는 뒤 테스트가 전부 안 돈다.
+    const uniqueCode = `E2EAI${Date.now().toString(36).toUpperCase().slice(-6)}`;
+
+    const { data: exam, error: examError } = await supabase
       .from("exams")
-      .insert({ title: "e2e-ai-config-pin", questions: [], instructor_id: "e2e-ai-config" })
+      .insert({
+        title: "e2e-ai-config-pin",
+        code: uniqueCode,
+        duration: 60,
+        status: "draft",
+        questions: [],
+        instructor_id: OWNER,
+      })
       .select("id")
       .single();
 
-    const { data: session } = await supabase
+    // 에러를 삼키면 픽스처가 없는 채로 아래 검증이 무의미하게 통과한다.
+    expect(examError).toBeNull();
+    expect(exam?.id).toBeTruthy();
+
+    const { data: session, error: sessionError } = await supabase
       .from("exam_grading_sessions")
-      .insert({ exam_id: exam?.id, instructor_id: "e2e-ai-config", status: "draft" })
+      .insert({ exam_id: exam?.id, instructor_id: OWNER, status: "draft" })
       .select("id")
       .single();
 
+    expect(sessionError).toBeNull();
     ownedSessionId = (session?.id as string) ?? null;
   });
 
@@ -152,7 +169,7 @@ test.describe("exam_grading_sessions 런 핀 — live 불변식", () => {
     if (ownedSessionId) {
       await supabase.from("exam_grading_sessions").delete().eq("id", ownedSessionId);
     }
-    await supabase.from("exams").delete().eq("instructor_id", "e2e-ai-config");
+    await supabase.from("exams").delete().eq("instructor_id", OWNER);
   });
 
   test("픽스처가 실제로 만들어졌다", async () => {
@@ -182,7 +199,7 @@ test.describe("exam_grading_sessions 런 핀 — live 불변식", () => {
 
   test("버전과 스냅샷을 함께 쓰면 통과한다", async () => {
     // 짝 제약이 정상적인 핀까지 막으면 채점을 아예 시작할 수 없다.
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("exam_grading_sessions")
       .update({
         ai_config_version_id: productionVersionId,
@@ -190,9 +207,13 @@ test.describe("exam_grading_sessions 런 핀 — live 불변식", () => {
           bulk_grading_worker: { model: "gpt-5.6-luna", timeoutMs: 120000, maxRetries: 2 },
         },
       })
-      .eq("id", ownedSessionId as string);
+      .eq("id", ownedSessionId as string)
+      .select("id, ai_config_version_id");
 
     expect(error).toBeNull();
+    // 업데이트가 실제로 소유한 행에 적용됐는지 확인한다 — 0행 업데이트도 error 는 null 이다.
+    expect(data?.[0]?.id).toBe(ownedSessionId);
+    expect(data?.[0]?.ai_config_version_id).toBe(productionVersionId);
   });
 });
 

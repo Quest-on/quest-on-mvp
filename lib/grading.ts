@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getOpenAI } from "@/lib/openai";
 import { applyProfileToChatBody, resolveAiTaskProfile } from "@/lib/ai-task-profile";
 import { loadCurrentVersion } from "@/lib/ai-config-store";
+import { clampTimeoutToProfile } from "@/lib/ai-deadline";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import {
   buildSummaryGenerationSystemPrompt,
@@ -342,7 +343,7 @@ async function gradeSingleQuestion(params: {
           // 프로필 타임아웃이 상한이다 — 관리자가 낮추면 실제로 낮아져야 한다.
           {
             signal,
-            timeout: Math.min(questionProfile.timeoutMs, attemptTimeoutMs),
+            timeout: clampTimeoutToProfile(questionProfile, attemptTimeoutMs),
             maxRetries: questionProfile.maxRetries,
           }
         ),
@@ -612,7 +613,7 @@ JSON 형식으로 응답해주세요:
           // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
           {
             signal,
-            timeout: Math.min(qSummaryProfile.timeoutMs, timeoutMs),
+            timeout: clampTimeoutToProfile(qSummaryProfile, timeoutMs),
             maxRetries: qSummaryProfile.maxRetries,
           }
         ),
@@ -1694,8 +1695,8 @@ ${
           }),
           // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
           {
-            timeout: Math.min(
-              summaryProfile.timeoutMs,
+            timeout: clampTimeoutToProfile(
+              summaryProfile,
               timeBudgetMs ? timeBudgetMs - 5_000 : summaryProfile.timeoutMs,
             ),
             maxRetries: summaryProfile.maxRetries,

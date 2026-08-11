@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveAiTaskProfile, applyProfileToChatBody } from "@/lib/ai-task-profile";
+import { clampTimeoutToProfile } from "@/lib/ai-deadline";
 
 /**
  * 요청 옵션 런타임 검증 (이슈 #118)
@@ -14,10 +15,10 @@ import { resolveAiTaskProfile, applyProfileToChatBody } from "@/lib/ai-task-prof
 
 const CLEAN_ENV: Record<string, string | undefined> = {};
 
-/** 프로덕션 코드와 같은 clamp 규칙. 프로필 타임아웃이 상한이다. */
-function effectiveTimeout(profileTimeoutMs: number, adHocMs: number): number {
-  return Math.min(profileTimeoutMs, adHocMs);
-}
+// 프로덕션이 쓰는 바로 그 함수를 부른다. 여기서 Math.min 을 다시 구현하면
+// lib/grading.ts 가 되돌아가도 이 테스트는 계속 통과한다(무의미해진다).
+const effectiveTimeout = (profileTimeoutMs: number, adHocMs: number) =>
+  clampTimeoutToProfile({ timeoutMs: profileTimeoutMs }, adHocMs);
 
 describe("admin timeout overrides actually take effect", () => {
   it("lowers the effective timeout when the admin lowers the profile", () => {
@@ -136,5 +137,27 @@ describe("a real SDK call receives the profile-derived options", () => {
       bulk_grading_worker: { reasoningEffort: "xhigh" },
     });
     expect(body.reasoning_effort).toBe("xhigh");
+  });
+});
+
+describe("all three grading callsites share the production clamp", () => {
+  it("uses clampTimeoutToProfile at every site, with no local Math.min clone", async () => {
+    const { readFileSync } = await import("node:fs");
+    const path = await import("node:path");
+    const code = readFileSync(path.join(process.cwd(), "lib", "grading.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+
+    // 세 곳 전부여야 한다. 하나만 맞아도 통과하면 나머지 두 곳이 되돌아가도 모른다.
+    const clamps = code.match(/timeout: clampTimeoutToProfile\(/g) ?? [];
+    expect(clamps.length).toBe(3);
+
+    // 각 호출부가 자기 프로필을 넘기는지 이름으로 확인한다.
+    expect(code).toMatch(/clampTimeoutToProfile\(questionProfile,/);
+    expect(code).toMatch(/clampTimeoutToProfile\(qSummaryProfile,/);
+    expect(code).toMatch(/clampTimeoutToProfile\(\s*summaryProfile,/);
+
+    // 지역 Math.min 클론이 다시 생기면 공유 규칙이 갈라진다.
+    expect(code).not.toMatch(/timeout: Math\.min\(/);
   });
 });

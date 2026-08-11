@@ -123,7 +123,9 @@ describe("grading no longer runs its own transport retry loop", () => {
 
   it("passes retry and timeout as SDK request options instead", () => {
     // 타임아웃도 프로필이 상한을 갖는다 — ad-hoc 값만 쓰면 관리자 오버라이드가 무력화된다.
-    expect(GRADING_CODE).toMatch(/timeout:\s*Math\.min\(\s*\w+Profile\.timeoutMs/);
+    // 타임아웃은 세 곳이 공유하는 프로덕션 헬퍼를 거친다. 지역 Math.min 클론이
+    // 생기면 한 곳만 되돌아가도 아무도 눈치채지 못한다.
+    expect(GRADING_CODE).toMatch(/timeout:\s*clampTimeoutToProfile\(/);
     // 재시도 수는 하드코딩이 아니라 태스크 프로필에서 온다 — 관리자가 조정할 수 있어야 한다.
     expect(GRADING_CODE).toMatch(/maxRetries:\s*\w+Profile\.maxRetries/);
     expect(GRADING_CODE).not.toMatch(/maxRetries:\s*\d/);
