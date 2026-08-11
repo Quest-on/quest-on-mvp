@@ -11,6 +11,7 @@
  * 이 모듈은 순수하다 — I/O 없음, 전역 상태 없음.
  */
 
+import type OpenAI from "openai";
 import { resolveModelPricing } from "@/lib/ai-pricing";
 import { AI_MODEL, AI_MODEL_HEAVY, AI_MODEL_BULK_GRADING_WORKER } from "@/lib/ai-models";
 
@@ -555,32 +556,56 @@ function toWireReasoningEffort(effort: ReasoningEffort): unknown {
   return effort as unknown;
 }
 
+/**
+ * 변환기가 얹는 필드. `Record<string, unknown>` 을 반환하면 호출부마다 SDK 파라미터
+ * 타입으로 캐스팅해야 하고, 그러면 격리하려던 캐스트가 저장소 전체로 번진다.
+ * 그래서 얹는 필드를 정확히 선언해 호출부가 캐스트 없이 쓸 수 있게 한다.
+ */
+type ChatProfileFields = {
+  model: string;
+  max_completion_tokens?: number;
+  temperature?: number;
+  /**
+   * 선언 타입은 SDK 의 좁은 union 을 쓰지만 런타임 값은 잠긴 wire 계약
+   * (`none|low|medium|high|xhigh`)을 그대로 싣는다. 이 불일치를 **이 선언 한 곳에**
+   * 가둬 두는 것이 목적이다 — 호출부마다 캐스팅하면 격리가 무너진다.
+   */
+  reasoning_effort?: OpenAI.ReasoningEffort;
+};
+
+type ResponsesProfileFields = {
+  model: string;
+  max_output_tokens?: number;
+  temperature?: number;
+  reasoning?: { effort: OpenAI.ReasoningEffort };
+};
+
 /** Chat Completions 바디에 프로필 소유 필드만 얹는다. 부재는 키 자체를 만들지 않는다. */
 export function applyProfileToChatBody<T extends Record<string, unknown>>(
   profile: ResolvedAiTaskProfile,
   body: T
-): T & Record<string, unknown> {
+): T & ChatProfileFields {
   const out: Record<string, unknown> = { ...body, model: profile.model };
   if (profile.maxTokens !== undefined) out.max_completion_tokens = profile.maxTokens;
   if (profile.temperature !== undefined) out.temperature = profile.temperature;
   if (profile.reasoningEffort !== undefined) {
     out.reasoning_effort = toWireReasoningEffort(profile.reasoningEffort);
   }
-  return out as T & Record<string, unknown>;
+  return out as T & ChatProfileFields;
 }
 
 /** Responses(create/stream) 바디. 토큰 필드 이름과 reasoning 모양이 Chat 과 다르다. */
 export function applyProfileToResponsesBody<T extends Record<string, unknown>>(
   profile: ResolvedAiTaskProfile,
   body: T
-): T & Record<string, unknown> {
+): T & ResponsesProfileFields {
   const out: Record<string, unknown> = { ...body, model: profile.model };
   if (profile.maxTokens !== undefined) out.max_output_tokens = profile.maxTokens;
   if (profile.temperature !== undefined) out.temperature = profile.temperature;
   if (profile.reasoningEffort !== undefined) {
     out.reasoning = { effort: toWireReasoningEffort(profile.reasoningEffort) };
   }
-  return out as T & Record<string, unknown>;
+  return out as T & ResponsesProfileFields;
 }
 
 /** 엔드포인트에 맞는 변환기를 고른다. */
@@ -588,8 +613,10 @@ export function applyProfileToBody<T extends Record<string, unknown>>(
   task: AiTask,
   profile: ResolvedAiTaskProfile,
   body: T
-): T & Record<string, unknown> {
-  return TASK_REGISTRY[task].endpoint === "chat.completions"
-    ? applyProfileToChatBody(profile, body)
-    : applyProfileToResponsesBody(profile, body);
+): T & ChatProfileFields & ResponsesProfileFields {
+  return (
+    TASK_REGISTRY[task].endpoint === "chat.completions"
+      ? applyProfileToChatBody(profile, body)
+      : applyProfileToResponsesBody(profile, body)
+  ) as T & ChatProfileFields & ResponsesProfileFields;
 }

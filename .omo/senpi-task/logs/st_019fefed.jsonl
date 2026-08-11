@@ -1,0 +1,104 @@
+{"type":"transition_applied","payload":{"type":"transition_applied","status":"running","residency_state":"resident"}}
+{"type":"assistant_message","payload":{"text":"I read this as an executable implementation assignment — preserve the first AI-generated question draft in `exams.ai_draft_questions`, with baseline→failing→green test discipline, full verification, manual QA, and a commit.\n\nLet me start by exploring the worktree."}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Worktree is clean on `feat/grade-provenance`, migration is in place. Now reading the in-scope files."}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":true}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"No existing tests for these handlers. Reading the AI routes and the rest of the exam update path."}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Critical finding: both AI routes are pure generators — neither writes to the DB. Persistence happens in the handlers. Let me trace how the client commits AI questions."}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Both schemas are `.strict()` and `lib/validations.ts` is out of scope — so a client-sent provenance flag is impossible. Let me confirm how questions actually reach the DB before settling the design."}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"No AI-provenance marker exists anywhere, and both update schemas are `.strict()`. The design is forced: capture at the empty→populated transition, server-side. Let me check existing Supabase-mocking test conventions."}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Now let me verify the score-weights helpers so my mocked update path passes validation, and check import direction between handlers."}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Design is forced and correct: the AI routes are pure generators with no DB access, both update schemas are `.strict()`, and `lib/validations.ts` is out of scope — so provenance must be inferred server-side at the empty→populated transition. Writing STEP 1 (baseline characterization) now."}}
+{"type":"tool_execution","payload":{"tool":"write","is_error":false}}
+{"type":"assistant_message","payload":{"text":"**STEP 1** — capturing the baseline passing on unchanged production code:"}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"**STEP 1 captured: 2 passed on unchanged production code.** Now STEP 2 — appending the failing-first requirements, including the stale-state probe and assignment-handler coverage."}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"edit","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"edit","is_error":false}}
+{"type":"assistant_message","payload":{"text":"**STEP 2** — capturing the new tests failing on unchanged production code:"}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Test 4 failed for a harness reason, not a production reason (a non-`questions` update makes no select call, desyncing the fixed queue). Fixing the harness to route by call type instead of ordering."}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"edit","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Applying the same routing fix to the assignment harness:"}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"edit","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Now the clean failing-first capture:"}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Failing for exactly the right reason: `ai_draft_questions` is `undefined` because production never writes it. **STEP 3** — the production change."}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Untyped client, so row shapes are loose. Applying the production change to `exam-handlers.ts`:"}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"edit","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":true}}
+{"type":"tool_execution","payload":{"tool":"edit","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Now the write site in `updateExam`, immediately before the DB update:"}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"edit","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Now `assignment-handlers.ts`:"}}
+{"type":"tool_execution","payload":{"tool":"read","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"edit","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"edit","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"edit","is_error":false}}
+{"type":"assistant_message","payload":{"text":"All three edits applied. Running the test suite:"}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Green. Now the VERIFY commands and the full suite for regressions:"}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Lint: 0 errors. Confirming no warnings landed in my changed files, and running the full suite for regressions:"}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Two failures elsewhere. Verifying they are pre-existing by stashing my changes:"}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Re-run is fully green (1142/1142). The earlier 2 failures were cold-transform-cache timeouts (5s limit, 52s transform on first run). Confirming those files are unrelated and stable:"}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Confirmed unrelated. Now the required MANUAL-QA script:"}}
+{"type":"tool_execution","payload":{"tool":"write","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Binary observable met. Deleting the throwaway script:"}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Final VERIFY run and status, then the commit:"}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"tool_execution","payload":{"tool":"bash","is_error":false}}
+{"type":"assistant_message","payload":{"text":"Done. Commit `9bdf2b11964c9e78bf6fe77ca693e57ba642a1bb`.\n\n## Key finding that shaped the design\n\nBoth AI routes are **pure generators** — `generate-questions/route.ts` and `generate-questions-stream/route.ts` never touch the database. They have no `examId` and no Supabase import; they return questions to the client, which later commits them via `update_exam` / `update_assignment`. So the only place `exams.questions` is ever written is the two handlers.\n\nI also could not add a client-sent `aiGenerated` flag: `updateExamSchema` and `updateAssignmentSchema` are both `.strict()` (an extra key is a hard 400), and `lib/validations.ts` plus the instructor pages are outside the scope list. Provenance therefore had to be inferred server-side, which the spec's own wording licenses — \"the moment `exams.questions` is first populated\". The rule is: write the draft only when the stored draft is null **and** current questions are empty **and** the incoming array is non-empty.\n\n## STEP 1 — baseline (passing on unchanged code)\n```\n✓ __tests__/ai-draft-preservation.test.ts (2 tests) 8ms\n Test Files  1 passed (1)      Tests  2 passed (2)\n```\n\n## STEP 2 — failing first, for the right reason\n```\n× (i) 문항이 처음 채워질 때 ai_draft_questions 와 생성 시각을 함께 기록한다\nAssertionError: expected undefined to deeply equal [ { id: 'q1', …(2) }, …(1) ]\n+ Received: undefined                       ← production never writes the column\n× (i) 문항이 처음 채워질 때 초안을 기록한다   (updateAssignment, same reason)\n Tests  2 failed | 7 passed (9)\n```\nOne honest caveat: assertions (ii) and (iii) pass *vacuously* before the fix, since nothing is written at all. They only become load-bearing after (i) starts writing — that is the point of pairing them.\n\n## VERIFY (real output)\n1. `npx vitest run __tests__/ai-draft-preservation.test.ts` → `Test Files 1 passed (1) / Tests 9 passed (9)`\n2. `npx tsc --noEmit` → `=== tsc exit: 0 ===` (no output)\n3. `npm run lint` → `✖ 121 problems (0 errors, 121 warnings)`, exit 0; grep for my three files → `NO LINT OUTPUT FOR CHANGED FILES`\n4. `git status --short` → before: clean; after: `M` both handlers + `??` the new test; post-commit: clean\n\nFull suite: **1142 passed / 112 files.**\n\n## MANUAL-QA\n(a) first AI commit → `keys: [\"questions\",\"updated_at\",\"ai_draft_questions\",\"ai_draft_generated_at\"]`, both `true`.\n(b) later instructor edit → `keys: [\"questions\",\"updated_at\"]`, both `false` — absent, not null.\nCleanup: `removed 'ai-draft-payload-qa.mjs'` / `ls: cannot access ...: No such file or directory`.\n\n## Adversarial classes\n- **stale_state** — covered by `(iii) 재생성은 이미 저장된 ai_draft_questions 를 덮어쓰지 않는다`. It models the nastiest ordering: instructor deletes every question (so `questions` is empty again, which would otherwise re-trigger \"first population\") then regenerates. The `ai_draft_questions != null` guard is the load-bearing one; the test compares `JSON.stringify` before/after to prove byte-identity.\n- **misleading_success_output** — stating it plainly: **the streaming route has zero test coverage here, and zero production change.** It persists nothing, so there was nothing to await before `controller.close()`; the SSE event protocol and response shape are untouched. Coverage lives entirely at the handler layer because that is the only layer that writes to `exams`. A green suite here is honest only because the streaming route is genuinely not on the write path — not because I mocked it away.\n- **dirty_worktree** — clean before, clean after commit (both pasted above).\n\nNot applicable: **malformed input** — handler inputs are already zod-validated upstream and the helper coerces non-arrays via `Array.isArray`; **prompt injection** — no prompt or model output is consumed by this change; **cancel/resume** — no long-running or resumable operation added; **hung commands** — every command finished well under timeout; **flaky tests** — the new tests are pure synchronous payload assertions with no timers or sleeps (the two transient failures in the first full-suite run were pre-existing 5s-timeout flakes in `student-disclosure-ack.test.ts` on a cold 52s transform cache, in files that never call the changed handlers; green on re-run and in isolation); **repeated interruptions** — single uninterrupted session.\n\n## DoneClaim\n- **changed_files**: `app/api/supa/handlers/exam-handlers.ts` (new exported `buildAiDraftPreservation`, select widened, conditional assign before update), `app/api/supa/handlers/assignment-handlers.ts` (select widened, conditional assign), `__tests__/ai-draft-preservation.test.ts` (new). Neither AI route was modified — deliberately.\n- **tests**: 9 in the new file (2 baseline characterization + 5 `updateExam` + 2 `updateAssignment`); full suite 1142 passing.\n- **manual_qa**: both payloads pasted; binary observable satisfied.\n- **cleanup**: `/tmp` script deleted, `rm -v` receipt pasted; no DB contact, no `.env*` read, no dependency added.\n- **risks**: (1) Provenance is inferred from the empty→populated transition, not from an explicit AI flag — a manually authored *first* question set is also recorded as the \"AI draft\". Closing this properly needs an `aiGenerated` flag threaded through `lib/validations.ts` and the instructor pages, both out of scope. (2) Both handlers now `select` `ai_draft_questions`, so migration 028 must be applied before deploy or those selects error — note `createExam` has a precedent comment about exactly this hazard for `is_demo`. (3) `updateAssignment` now reads two extra columns per call; negligible, same round trip."}}
+{"type":"transition_applied","payload":{"type":"transition_applied","status":"completed","residency_state":"resident"}}
+{"type":"reconcile_reattached","payload":{"session_path":"C:\\Users\\basqu\\Projects\\quest-on\\.omo\\senpi-task\\children\\st_019fefed\\sessions\\st_019fefed\\2026-08-11T08-24-23-310Z_019fefec-380e-7b7f-8d95-7a246f82b035.jsonl"}}

@@ -1,0 +1,1132 @@
+I read this as deep technical research for a production Postgres/Supabase design - below is a documented-vs-inferred architecture, exact DDL, concurrency recipes, migration guidance, and failure analysis.
+
+# Recommendation
+
+Use three layers:
+
+1. **`memory_version`** — bi-temporal fact versions. Historical payloads never change; the only permitted mutation is setting `superseded_at`.
+2. **`memory_write_event`** — physically append-only audit ledger containing actor, reason, source, extractor version, and idempotency key.
+3. **A normal current view plus partial indexes** — no materialized view or duplicated current table at this scale.
+
+For correct bi-temporal history, do **not** shorten the old row's `valid_to` when new knowledge arrives. Instead:
+
+- system-close the old assertion by setting `superseded_at`;
+- insert replacement assertion(s) representing the newly believed valid-time history.
+
+That preserves what the database believed before the correction.
+
+## Evidence labels
+
+- **DOCUMENTED** — behavior or recommendation explicitly supported by cited documentation.
+- **INFERRED** — engineering recommendation derived from documented behavior and the stated scale.
+
+---
+
+# 1. Bi-temporal modeling in plain PostgreSQL
+
+## Semantics
+
+A fact has two independent timelines:
+
+| Timeline | Columns | Meaning |
+|---|---|---|
+| Valid/business time | `valid_from`, `valid_to` | When the fact is true in the modeled world |
+| System/transaction time | `recorded_at`, `superseded_at` | When the database believed that version |
+
+**DOCUMENTED:** PostgreSQL range types represent bounded or unbounded intervals and support overlap operators and GiST exclusion constraints. `tstzrange` is the range type for `timestamp with time zone`. [PostgreSQL range types](https://www.postgresql.org/docs/current/rangetypes.html)
+
+**DOCUMENTED:** An exclusion constraint can guarantee that no two rows have equal scalar keys while their ranges overlap. PostgreSQL's own documentation illustrates room reservations using `EXCLUDE USING gist (... WITH =, ... WITH &&)`. [Range constraints](https://www.postgresql.org/docs/current/rangetypes.html#RANGETYPES-CONSTRAINT)
+
+**DOCUMENTED:** `btree_gist` supplies GiST operator classes with B-tree-equivalent equality behavior for types such as UUID and text, allowing scalar equality and range overlap in one GiST constraint. [btree_gist](https://www.postgresql.org/docs/current/btree-gist.html)
+
+This is closely related to:
+
+- **SCD Type 2:** preserve history by closing the prior record and inserting a new record. [Kimball Group, Slowly Changing Dimensions](https://www.kimballgroup.com/2008/08/slowly-changing-dimensions/)
+- **System-versioned emulation:** a period column/range plus triggers or controlled write procedures. The established PostgreSQL `temporal_tables` extension uses a `tstzrange` system period and a versioning trigger. [arkhipov/temporal_tables](https://github.com/arkhipov/temporal_tables)
+- **Bi-temporal modeling:** valid time and transaction time are separate concerns; corrections to prior knowledge must not erase the earlier transaction-time state. [Martin Fowler, Bitemporal History](https://martinfowler.com/articles/bitemporal-history.html)
+
+## Production DDL
+
+```sql
+begin;
+
+create extension if not exists btree_gist;
+
+create schema if not exists private;
+
+create table if not exists private.memory_version (
+    version_id       bigint generated always as identity primary key,
+
+    owner_id         uuid not null references auth.users(id) on delete restrict,
+    subject_key      text not null,
+    predicate        text not null,
+    value            jsonb not null,
+
+    -- Valid/business time: [valid_from, valid_to)
+    valid_from       timestamptz not null,
+    valid_to         timestamptz,
+
+    valid_period     tstzrange generated always as (
+        tstzrange(valid_from, valid_to, '[)')
+    ) stored,
+
+    -- System/transaction time: [recorded_at, superseded_at)
+    recorded_at      timestamptz not null default transaction_timestamp(),
+    superseded_at    timestamptz,
+
+    -- Generation of the logical key, useful to readers and diagnostics.
+    generation       bigint not null,
+
+    source_event_id  bigint,
+    created_by       uuid,
+
+    constraint memory_version_subject_not_empty
+        check (length(btrim(subject_key)) > 0),
+
+    constraint memory_version_predicate_not_empty
+        check (length(btrim(predicate)) > 0),
+
+    constraint memory_version_valid_bounds
+        check (valid_to is null or valid_to > valid_from),
+
+    constraint memory_version_system_bounds
+        check (
+            superseded_at is null
+            or superseded_at >= recorded_at
+        ),
+
+    constraint memory_version_generation_positive
+        check (generation > 0),
+
+    /*
+     * Historical, system-closed assertions may overlap because later
+     * corrections can revise what was believed about valid time.
+     * Only the current system-time belief must be non-overlapping.
+     */
+    constraint memory_version_no_active_belief_overlap
+        exclude using gist (
+            owner_id    with =,
+            subject_key with =,
+            predicate   with =,
+            valid_period with &&
+        )
+        where (superseded_at is null)
+        deferrable initially immediate
+);
+
+commit;
+```
+
+### Why the exclusion constraint is partial
+
+Suppose the database originally believed:
+
+```text
+valid [2026-01-01, infinity)
+system [2026-01-10, 2026-02-01)
+value A
+```
+
+On February 1 it learns the actual valid-time transition happened January 20. The new current belief may contain:
+
+```text
+valid [2026-01-01, 2026-01-20), system [2026-02-01, infinity), value A
+valid [2026-01-20, infinity),  system [2026-02-01, infinity), value B
+```
+
+The old, system-closed assertion overlaps both new assertions in valid time. That overlap is necessary for historical “what did we believe then?” queries.
+
+**INFERRED:** Applying the exclusion constraint to all history would prevent legitimate bi-temporal corrections. Therefore it should apply only where `superseded_at IS NULL`.
+
+## Append-mostly enforcement
+
+A classic SCD2 table is not physically append-only because it updates the old row's closing timestamp. The following trigger permits only that closure mutation:
+
+```sql
+create or replace function private.enforce_memory_version_history()
+returns trigger
+language plpgsql
+set search_path = pg_catalog
+as $$
+begin
+    if tg_op = 'DELETE' then
+        raise exception 'memory versions cannot be deleted'
+            using errcode = '55000';
+    end if;
+
+    if old.superseded_at is null
+       and new.superseded_at is not null
+       and new.superseded_at >= old.recorded_at
+       and (to_jsonb(new) - 'superseded_at')
+           is not distinct from
+           (to_jsonb(old) - 'superseded_at')
+    then
+        return new;
+    end if;
+
+    raise exception
+        'memory versions are immutable except for initial supersession'
+        using errcode = '55000';
+end;
+$$;
+
+drop trigger if exists memory_version_history_guard
+    on private.memory_version;
+
+create trigger memory_version_history_guard
+before update or delete on private.memory_version
+for each row execute function private.enforce_memory_version_history();
+```
+
+**INFERRED:** This is the practical compromise between efficient system-time queries and physical append-only storage. The audit ledger below remains fully append-only.
+
+A strictly insert-only version table would need immutable assertion and retraction events, deriving `superseded_at` from those events. That makes current-state and non-overlap constraints substantially harder because superseded rows remain physically eligible for the exclusion constraint.
+
+## Correct as-of queries
+
+### What is believed now and valid now?
+
+```sql
+select *
+from private.memory_version
+where owner_id = $1
+  and superseded_at is null
+  and valid_period @> transaction_timestamp();
+```
+
+### What was believed at system time `$2` and valid at business time `$3`?
+
+```sql
+select *
+from private.memory_version
+where owner_id = $1
+  and recorded_at <= $2
+  and (superseded_at is null or $2 < superseded_at)
+  and valid_period @> $3;
+```
+
+Both timelines use half-open intervals:
+
+```text
+[lower, upper)
+```
+
+That allows adjacent intervals `[a,b)` and `[b,c)` without overlap.
+
+## Time and range gotchas
+
+### Half-open intervals
+
+**DOCUMENTED:** PostgreSQL distinguishes inclusive and exclusive range bounds. `[` is inclusive; `)` is exclusive. [Range inclusivity](https://www.postgresql.org/docs/current/rangetypes.html#RANGETYPES-INCLUSIVITY)
+
+**INFERRED:** Standardize on `[)` everywhere. Mixing `[a,b]` and `[b,c)` produces overlap at `b`.
+
+### NULL versus timestamp infinity
+
+For the generated range:
+
+```sql
+tstzrange(valid_from, null, '[)')
+```
+
+the NULL upper constructor argument means an **unbounded range**.
+
+**DOCUMENTED:** A missing range bound is not identical to the timestamp value `'infinity'`; unbounded range bounds sort beyond subtype infinity values. [Infinite ranges](https://www.postgresql.org/docs/current/rangetypes.html#RANGETYPES-INFINITE)
+
+**INFERRED:** Use nullable `valid_to`/`superseded_at` consistently. Do not mix NULL, `'infinity'::timestamptz`, and sentinel dates such as `9999-12-31`.
+
+### Time zones
+
+**DOCUMENTED:** `timestamptz` stores an absolute instant internally and converts display/input according to the session time zone. PostgreSQL does not retain the originally supplied zone name. [Date/time types](https://www.postgresql.org/docs/current/datatype-datetime.html)
+
+Use:
+
+- `timestamptz`, never `timestamp without time zone`, for instants;
+- ISO 8601 values with explicit offsets at API boundaries;
+- UTC database/application sessions for predictable logs;
+- a separate IANA zone column only when the user's civil-time zone is itself business data.
+
+### Timestamp functions
+
+**DOCUMENTED:** `transaction_timestamp()`/`now()` are fixed at transaction start; `statement_timestamp()` is fixed at statement start; `clock_timestamp()` changes during a statement. [Date/time functions](https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT)
+
+**INFERRED:** Use one transaction timestamp for all rows in an atomic revision. Never rely on timestamp uniqueness; use `version_id` or `generation` as the tie-breaker.
+
+## Index strategy
+
+```sql
+-- Current open-ended assertions for a logical key.
+create unique index if not exists memory_version_one_open_current
+    on private.memory_version (owner_id, subject_key, predicate)
+    where valid_to is null and superseded_at is null;
+
+-- Fast current reads by owner.
+create index if not exists memory_version_current_owner
+    on private.memory_version (owner_id, subject_key, predicate)
+    include (version_id, valid_from, generation)
+    where superseded_at is null;
+
+-- Transaction-time history.
+create index if not exists memory_version_history
+    on private.memory_version (
+        owner_id,
+        subject_key,
+        predicate,
+        recorded_at desc
+    );
+
+-- Optional when arbitrary valid-time range searches are frequent.
+create index if not exists memory_version_valid_period_gist
+    on private.memory_version using gist (valid_period);
+```
+
+The exclusion constraint already creates a supporting GiST index for its indexed population.
+
+**DOCUMENTED:** Partial indexes contain only rows satisfying their predicate, and PostgreSQL can use them when it can prove the query condition implies that predicate. Parameterized or differently phrased predicates may prevent matching. [Partial indexes](https://www.postgresql.org/docs/current/indexes-partial.html)
+
+**INFERRED:** At tens of facts per user, the owner/current B-tree partial index will usually dominate. Add the standalone valid-period GiST only after query plans show a need.
+
+### Important distinction
+
+A unique index only on:
+
+```sql
+where valid_to is null
+```
+
+is insufficient for proper bi-temporal history because historical system versions may also retain an unbounded valid interval. The production predicate should be:
+
+```sql
+where valid_to is null and superseded_at is null
+```
+
+It guarantees one currently believed, open-ended fact per logical key. It does not mean “valid right now” when future-dated or closed intervals exist; use `valid_period @> now()` for that.
+
+---
+
+# 2. Current-state options
+
+## Recommended view
+
+```sql
+create or replace view private.memory_current
+with (security_invoker = true)
+as
+select
+    version_id,
+    owner_id,
+    subject_key,
+    predicate,
+    value,
+    valid_from,
+    valid_to,
+    generation,
+    recorded_at,
+    created_by
+from private.memory_version
+where superseded_at is null
+  and valid_period @> transaction_timestamp();
+```
+
+Views are not materialized; this executes against the base table and its indexes.
+
+## Comparison
+
+| Option | Correctness | Read performance | Write complexity | Recommendation |
+|---|---|---:|---:|---|
+| Normal view over versions | One source of truth | Excellent at this scale with partial index | Lowest | **Use this** |
+| Partial unique/current index | Enforces key invariants; not a separate representation | Excellent | Low | **Use with view** |
+| Separate `memory_current` table | Can drift unless transactionally maintained | Fastest constant-size reads | High; duplicated state | Only for measured need |
+| Materialized view | Stale until refresh; refresh coordination required | Fast between refreshes | Refresh overhead | Wrong default for live memory |
+
+**INFERRED:** With tens of rows per user and thousands of users, this is a small relational workload. A partial B-tree current index and normal view avoid consistency machinery while remaining fast.
+
+A separate current table becomes reasonable if:
+
+- current rows have a materially different schema;
+- almost every request reads them;
+- history has grown to millions of versions per hot tenant;
+- measurements show the view/index path is inadequate.
+
+If used, update the current table and insert history/ledger rows in the same database transaction. Treat it as a projection, not the canonical record.
+
+---
+
+# 3. Immutable event/audit ledger
+
+## Schema
+
+```sql
+create table if not exists private.memory_write_event (
+    event_id           bigint generated always as identity primary key,
+    occurred_at        timestamptz not null default transaction_timestamp(),
+
+    owner_id           uuid not null references auth.users(id) on delete restrict,
+
+    operation          text not null check (
+        operation in (
+            'assert',
+            'correct',
+            'supersede',
+            'retract',
+            'migration'
+        )
+    ),
+
+    subject_key        text not null,
+    predicate          text not null,
+
+    version_id         bigint references private.memory_version(version_id),
+
+    actor_kind         text not null check (
+        actor_kind in ('user', 'service', 'extractor', 'migration')
+    ),
+    actor_user_id      uuid,
+    actor_service      text,
+
+    reason             text,
+    source_kind        text not null,
+    source_ref         text,
+    extractor_name     text,
+    extractor_version  text,
+
+    correlation_id     uuid,
+    producer           text not null,
+    idempotency_key    text,
+
+    before_value       jsonb,
+    after_value        jsonb,
+    metadata           jsonb not null default '{}'::jsonb,
+
+    constraint memory_write_event_actor
+        check (
+            (actor_kind = 'user' and actor_user_id is not null)
+            or actor_kind <> 'user'
+        )
+);
+
+create unique index if not exists memory_write_event_idempotency
+    on private.memory_write_event (owner_id, producer, idempotency_key)
+    where idempotency_key is not null;
+
+create index if not exists memory_write_event_owner_time
+    on private.memory_write_event (owner_id, occurred_at desc);
+```
+
+Record:
+
+- **who:** `actor_kind`, `actor_user_id`, `actor_service`;
+- **what:** operation, logical key, before/after values, resulting version;
+- **why:** `reason`;
+- **where from:** source kind/reference;
+- **which code/model:** extractor name/version;
+- **request lineage:** correlation ID and metadata;
+- **retry identity:** producer/idempotency key.
+
+Do not rely solely on application logs: they can be lost independently of the transaction.
+
+## Privilege enforcement
+
+```sql
+revoke all on private.memory_write_event from public, anon, authenticated;
+revoke update, delete, truncate
+    on private.memory_write_event
+    from service_role;
+
+grant insert, select
+    on private.memory_write_event
+    to service_role;
+
+grant usage, select
+    on sequence private.memory_write_event_event_id_seq
+    to service_role;
+```
+
+**DOCUMENTED:** PostgreSQL supports separate `INSERT`, `SELECT`, `UPDATE`, `DELETE`, and `TRUNCATE` privileges, which can be revoked independently. Owners and superusers retain special authority. [Privileges](https://www.postgresql.org/docs/current/ddl-priv.html)
+
+## Trigger defense
+
+```sql
+create or replace function private.reject_ledger_mutation()
+returns trigger
+language plpgsql
+set search_path = pg_catalog
+as $$
+begin
+    raise exception 'memory_write_event is append-only'
+        using errcode = '55000';
+end;
+$$;
+
+drop trigger if exists memory_write_event_no_update_delete
+    on private.memory_write_event;
+
+create trigger memory_write_event_no_update_delete
+before update or delete on private.memory_write_event
+for each row execute function private.reject_ledger_mutation();
+
+drop trigger if exists memory_write_event_no_truncate
+    on private.memory_write_event;
+
+create trigger memory_write_event_no_truncate
+before truncate on private.memory_write_event
+for each statement execute function private.reject_ledger_mutation();
+```
+
+### Rules versus triggers
+
+PostgreSQL rules can rewrite `UPDATE`/`DELETE`, but a `DO INSTEAD NOTHING` rule can make an attempted mutation appear successful while silently doing nothing.
+
+**INFERRED:** Prefer privilege revocation plus a trigger that raises an explicit error. Rules are inferior for audit enforcement.
+
+No database-only mechanism protects against the table owner or a superuser deliberately disabling triggers or changing the schema. For stronger tamper evidence, export ledger hashes or WAL/audit records to an independently controlled system.
+
+Supabase also exposes `pgaudit` for database-level statement auditing. [Supabase pgAudit](https://supabase.com/docs/guides/database/extensions/pgaudit)
+
+## Retention and partitioning
+
+**INFERRED:** Do not partition initially. At the stated scale, partitioning creates more operational and key/FK complexity than value.
+
+Partition by `occurred_at` monthly only when retention, vacuum, or archival operations justify it:
+
+```sql
+create table private.memory_write_event_p (
+    like private.memory_write_event
+        including defaults
+        including generated
+        including constraints
+) partition by range (occurred_at);
+
+create table private.memory_write_event_2026_08
+partition of private.memory_write_event_p
+for values from ('2026-08-01 00:00:00+00')
+         to ('2026-09-01 00:00:00+00');
+```
+
+**DOCUMENTED:** Partition pruning and fast detach/drop operations are primary benefits of declarative partitioning. PostgreSQL requires partitioned unique/primary-key constraints to include all partition keys. [Declarative partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html)
+
+Consequences:
+
+- a partitioned primary key generally needs `(occurred_at, event_id)`;
+- a global unique idempotency constraint cannot be enforced across time partitions unless it includes `occurred_at`;
+- retain a small unpartitioned idempotency/receipt table if global retry deduplication is required;
+- detach and archive partitions rather than deleting individual audit rows;
+- retention must follow legal/security policy, not convenience.
+
+---
+
+# 4. Concurrency recipes
+
+A background extractor must never overwrite a user edit based on a stale snapshot.
+
+## Preferred recipe: optimistic compare-and-supersede
+
+The extractor reads the current `version_id` or `generation`. Its write transaction closes the row only if it is still current and still the expected version:
+
+```sql
+begin;
+
+with closed as (
+    update private.memory_version
+       set superseded_at = transaction_timestamp()
+     where version_id = $expected_version_id
+       and owner_id = $owner_id
+       and superseded_at is null
+     returning *
+)
+select count(*) from closed;
+```
+
+If the result is zero, abort: the current fact changed after extraction began. Do not insert the stale extractor result.
+
+Then insert the replacement version(s) and ledger event in the **same transaction**.
+
+A conventional generation CAS is:
+
+```sql
+update private.memory_head
+set generation = generation + 1,
+    current_version_id = $new_version_id
+where owner_id = $owner_id
+  and subject_key = $subject_key
+  and predicate = $predicate
+  and generation = $expected_generation
+returning generation;
+```
+
+Zero rows means a conflict.
+
+**DOCUMENTED:** At Read Committed isolation, an `UPDATE` rechecks its predicate after waiting for a concurrent updater; `RETURNING` reports rows actually updated. [Transaction isolation](https://www.postgresql.org/docs/current/transaction-iso.html)
+
+**INFERRED:** CAS is the best default for long-running extraction because no database lock is held while the model or external service runs.
+
+### Correct job flow
+
+1. Read source conversation and expected current memory version.
+2. Perform extraction outside a transaction.
+3. Begin a short transaction.
+4. Claim idempotency key.
+5. CAS-close the expected version.
+6. If CAS fails, mark/requeue for reconciliation rather than overwrite.
+7. Insert replacement version(s) and ledger event.
+8. Commit.
+
+## `SELECT ... FOR UPDATE`
+
+For short, database-local revisions:
+
+```sql
+begin;
+
+select version_id, generation, value
+from private.memory_version
+where owner_id = $1
+  and subject_key = $2
+  and predicate = $3
+  and superseded_at is null
+  and valid_period @> transaction_timestamp()
+for update;
+
+-- Revalidate, system-close, insert replacement(s), append ledger.
+
+commit;
+```
+
+**DOCUMENTED:** `FOR UPDATE` locks selected rows against concurrent writers and lockers until transaction end. It does not block ordinary reads. [Explicit locking](https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS)
+
+Do not hold this lock while calling an LLM, external API, or processing a long conversation.
+
+For a missing logical key there is no row to lock. Use either:
+
+- a permanent `memory_head` row;
+- an advisory lock;
+- or a unique/exclusion constraint and handle a conflict.
+
+## Advisory transaction locks
+
+```sql
+select pg_advisory_xact_lock(
+    hashtextextended(
+        $owner_id::text || E'\x1f' || $subject_key || E'\x1f' || $predicate,
+        0
+    )
+);
+```
+
+**DOCUMENTED:** PostgreSQL supports session-level and transaction-level advisory locks; transaction-level locks release automatically at transaction end. [Advisory locks](https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS)
+
+Use `pg_advisory_xact_lock`, not session-level locks, with pooled Supabase connections.
+
+Caveats:
+
+- every writer of the logical key must follow the same convention;
+- hash collisions can unnecessarily serialize unrelated keys, though they do not violate correctness;
+- locks are not durable job ownership;
+- do not acquire several keys in inconsistent order, or deadlocks become possible.
+
+## Idempotency for retries
+
+Claim the retry key transactionally:
+
+```sql
+insert into private.memory_write_event (
+    owner_id,
+    operation,
+    subject_key,
+    predicate,
+    actor_kind,
+    actor_service,
+    source_kind,
+    producer,
+    idempotency_key,
+    metadata
+)
+values (
+    $owner_id,
+    'assert',
+    $subject_key,
+    $predicate,
+    'extractor',
+    'memory-extraction-worker',
+    'conversation',
+    $producer,
+    $idempotency_key,
+    jsonb_build_object('status', 'claimed')
+)
+on conflict (owner_id, producer, idempotency_key)
+    where idempotency_key is not null
+do nothing
+returning event_id;
+```
+
+If no row is returned, fetch the existing event/result and do not apply the revision again.
+
+**DOCUMENTED:** `INSERT ... ON CONFLICT` provides atomic insert-or-conflict behavior under concurrency. [INSERT](https://www.postgresql.org/docs/current/sql-insert.html)
+
+**INFERRED:** The claim, version writes, and final ledger event should be one transaction. If the transaction rolls back, the claim rolls back and the retry can safely proceed.
+
+For richer lifecycle tracking, use a separate mutable job table plus immutable job events. Do not mutate audit events to change `claimed` into `completed`.
+
+## Combining mechanisms
+
+Recommended:
+
+- **Long extraction:** idempotency + optimistic CAS.
+- **Short interactive edit:** row lock or optimistic CAS.
+- **Creation/no row exists:** transaction advisory lock or head-row lock.
+- **Invariant backstop:** exclusion and unique constraints.
+
+A lock alone does not prevent stale writes if the expensive extraction happened before acquiring it. Revalidate the expected version after the lock is acquired.
+
+---
+
+# 5. Supabase specifics
+
+## Direct authenticated reads, service-only writes
+
+If the table is exposed through a Data API schema:
+
+```sql
+alter table public.memory_version enable row level security;
+
+revoke all on public.memory_version from anon, authenticated;
+grant select on public.memory_version to authenticated;
+
+drop policy if exists memory_owner_read on public.memory_version;
+
+create policy memory_owner_read
+on public.memory_version
+for select
+to authenticated
+using (
+    (select auth.uid()) is not null
+    and (select auth.uid()) = owner_id
+);
+```
+
+Create **no** `INSERT`, `UPDATE`, or `DELETE` policy for `authenticated` or `anon`.
+
+**DOCUMENTED:** Supabase recommends enabling RLS on tables in exposed schemas and uses `auth.uid() = user_id` ownership policies. It explicitly notes that `auth.uid()` returns NULL when unauthenticated and recommends an explicit non-NULL check. [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security)
+
+**DOCUMENTED:** Service-role/secret keys authorize the `service_role`, which bypasses RLS and must only be used in trusted server components. [Supabase API keys](https://supabase.com/docs/guides/api/api-keys)
+
+Do not treat “no write policy” as protection against `service_role`: service role bypasses RLS. Enforce service behavior with grants, controlled SQL functions, and the immutable triggers.
+
+## Safe read view
+
+For PostgreSQL 15+:
+
+```sql
+create or replace view public.memory_current
+with (security_invoker = true)
+as
+select
+    version_id,
+    owner_id,
+    subject_key,
+    predicate,
+    value,
+    valid_from,
+    valid_to,
+    generation,
+    recorded_at
+from public.memory_version
+where superseded_at is null
+  and valid_period @> transaction_timestamp();
+
+grant select on public.memory_current to authenticated;
+```
+
+**DOCUMENTED:** Views normally execute with view-owner privileges and may bypass underlying RLS. PostgreSQL 15's `security_invoker` option makes access checks and RLS use the invoking user instead. [CREATE VIEW](https://www.postgresql.org/docs/current/sql-createview.html), [Supabase RLS and views](https://supabase.com/docs/guides/database/postgres/row-level-security#views)
+
+A view restricts columns, not just rows. Ensure the invoker has only the base-column privileges required by the view if the base table itself is API-exposed.
+
+## Server-only application pattern
+
+If all memory access is through trusted server-side service-role queries:
+
+```sql
+create schema if not exists private;
+revoke all on schema private from public, anon, authenticated;
+grant usage on schema private to service_role;
+```
+
+Keep the tables in a schema that is not exposed through the Data API.
+
+**DOCUMENTED:** Supabase recommends a private schema for tables that should not be exposed through the Data API. [Hardening the Data API](https://supabase.com/docs/guides/database/hardening-data-api)
+
+**INFERRED:** RLS adds little tenant protection when every query uses `service_role`, because that role bypasses it. In this architecture:
+
+- private schema and least-privilege grants are the actual database boundary;
+- every server query must still include `owner_id`;
+- RLS can remain enabled as defense against accidental future exposure, but it must not be represented as protecting service-role queries;
+- stronger tenant isolation requires executing requests under the user's JWT/database role rather than service role.
+
+Never put a service-role or secret key in a browser/mobile client.
+
+## Safe RPC alternative
+
+A public `SECURITY DEFINER` function can expose only current owned rows while base tables remain private, but it must explicitly check ownership because its owner can bypass RLS:
+
+```sql
+create or replace function public.get_my_current_memory()
+returns table (
+    version_id bigint,
+    subject_key text,
+    predicate text,
+    value jsonb,
+    valid_from timestamptz,
+    valid_to timestamptz,
+    generation bigint
+)
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, private
+as $$
+    select
+        mv.version_id,
+        mv.subject_key,
+        mv.predicate,
+        mv.value,
+        mv.valid_from,
+        mv.valid_to,
+        mv.generation
+    from private.memory_version mv
+    where auth.uid() is not null
+      and mv.owner_id = auth.uid()
+      and mv.superseded_at is null
+      and mv.valid_period @> transaction_timestamp();
+$$;
+
+revoke all on function public.get_my_current_memory() from public;
+grant execute on function public.get_my_current_memory() to authenticated;
+```
+
+Keep the owner non-login where practical, schema-qualify referenced objects, fix `search_path`, and revoke default `PUBLIC` execution.
+
+## `pg_cron` versus external cron
+
+**DOCUMENTED:** Supabase Cron uses `pg_cron`; jobs can run SQL/functions or make HTTP requests. Supabase recommends no more than eight concurrently running jobs and no job longer than ten minutes. [Supabase Cron](https://supabase.com/docs/guides/cron)
+
+Use `pg_cron` for:
+
+- short SQL maintenance;
+- enqueueing due extraction work;
+- partition creation;
+- cleanup of already-expired operational rows;
+- invoking a small database function.
+
+Use an external scheduler/worker for:
+
+- LLM extraction;
+- long or variable-duration work;
+- sophisticated retries/backoff;
+- distributed concurrency controls;
+- external API calls needing observability and secret rotation.
+
+**INFERRED:** Schedule/enqueue in Postgres; execute expensive extraction externally.
+
+## Triggers calling external services
+
+Supabase Database Webhooks are implemented using triggers and `pg_net`, and are asynchronous. [Supabase Database Webhooks](https://supabase.com/docs/guides/database/webhooks)
+
+**DOCUMENTED:** Supabase presents asynchronous webhooks/`pg_net` as the supported mechanism for trigger-driven HTTP rather than blocking network work inside a normal trigger.
+
+**INFERRED:** Do not make synchronous external calls from the memory write transaction. Prefer:
+
+1. insert an outbox/job row in the same transaction;
+2. let an external worker consume it;
+3. use idempotency and CAS when writing the result.
+
+Database webhooks are suitable for notification, but the durable outbox/job row should be the retryable source of truth.
+
+---
+
+# 6. Migration hygiene and no-downtime rollout
+
+## Idempotency
+
+Useful primitives:
+
+```sql
+create extension if not exists btree_gist;
+create schema if not exists private;
+create table if not exists ...;
+create index if not exists ...;
+drop trigger if exists ...;
+create trigger ...;
+create or replace function ...;
+drop policy if exists ...;
+create policy ...;
+```
+
+However:
+
+**INFERRED:** `CREATE TABLE IF NOT EXISTS` is not schema reconciliation. It succeeds even if an existing table has wrong columns or constraints. Production migrations should be versioned, applied once, and fail on incompatible drift.
+
+For constraints lacking convenient `IF NOT EXISTS`, inspect the catalog:
+
+```sql
+do $$
+begin
+    if not exists (
+        select 1
+        from pg_constraint
+        where conrelid = 'private.memory_version'::regclass
+          and conname = 'memory_version_no_active_belief_overlap'
+    ) then
+        alter table private.memory_version
+        add constraint memory_version_no_active_belief_overlap
+        exclude using gist (
+            owner_id with =,
+            subject_key with =,
+            predicate with =,
+            valid_period with &&
+        )
+        where (superseded_at is null);
+    end if;
+end;
+$$;
+```
+
+## No-downtime rollout
+
+For a new table:
+
+1. Install `btree_gist`.
+2. Create new tables, functions, triggers, and indexes.
+3. Grant only intended privileges.
+4. Backfill historical/current facts in bounded batches.
+5. Validate invariants.
+6. Begin dual-writing old and new representations, or route writes through one transactional adapter.
+7. Compare old current state against `memory_current`.
+8. Switch reads.
+9. Stop old writes.
+10. Retain the old table read-only until rollback confidence is sufficient.
+
+For adding constraints to an existing populated table:
+
+```sql
+alter table existing_memory
+add constraint existing_memory_valid_bounds
+check (valid_to is null or valid_to > valid_from)
+not valid;
+
+alter table existing_memory
+validate constraint existing_memory_valid_bounds;
+```
+
+**DOCUMENTED:** `NOT VALID` avoids the initial full-table validation scan while enforcing the constraint for new/changed rows; `VALIDATE CONSTRAINT` checks existing rows later with a lighter lock profile. [ALTER TABLE](https://www.postgresql.org/docs/current/sql-altertable.html)
+
+For large ordinary indexes:
+
+```sql
+create index concurrently if not exists ...
+```
+
+**DOCUMENTED:** `CREATE INDEX CONCURRENTLY` avoids blocking normal writes but performs additional work, cannot run inside a transaction block, and can leave an invalid index after failure. [Building indexes concurrently](https://www.postgresql.org/docs/current/sql-createindex.html#SQL-CREATEINDEX-CONCURRENTLY)
+
+Exclusion constraints cannot be attached from a concurrently built ordinary index in the same way a compatible unique/primary-key constraint can. Schedule the final exclusion constraint after cleaning overlaps and during a controlled low-write window.
+
+## Backfill outline
+
+```sql
+insert into private.memory_version (
+    owner_id,
+    subject_key,
+    predicate,
+    value,
+    valid_from,
+    valid_to,
+    recorded_at,
+    generation,
+    created_by
+)
+select
+    owner_id,
+    subject_key,
+    predicate,
+    value,
+    coalesce(original_created_at, migration_cutover_at),
+    null,
+    coalesce(original_created_at, migration_cutover_at),
+    1,
+    null
+from legacy_memory
+where id > $last_id
+order by id
+limit $batch_size;
+```
+
+Record a corresponding `operation = 'migration'` ledger event with migration name/version and legacy key. Do not fabricate precision unavailable in the legacy data; document inferred timestamps in metadata.
+
+## Validation before cutover
+
+```sql
+-- No current valid-time overlap.
+select
+    a.version_id,
+    b.version_id
+from private.memory_version a
+join private.memory_version b
+  on a.version_id < b.version_id
+ and a.owner_id = b.owner_id
+ and a.subject_key = b.subject_key
+ and a.predicate = b.predicate
+ and a.superseded_at is null
+ and b.superseded_at is null
+ and a.valid_period && b.valid_period;
+
+-- No duplicate current open-ended assertions.
+select owner_id, subject_key, predicate, count(*)
+from private.memory_version
+where superseded_at is null
+  and valid_to is null
+group by owner_id, subject_key, predicate
+having count(*) > 1;
+
+-- Invalid system-time bounds.
+select *
+from private.memory_version
+where superseded_at < recorded_at;
+```
+
+## Rollback
+
+Schema rollback:
+
+1. Switch reads back to the legacy representation.
+2. Stop dual writes.
+3. Preserve new version and ledger tables for diagnosis.
+4. Drop API views/policies/grants first.
+5. Drop triggers/functions.
+6. Drop tables only after confirming no writes exist exclusively in them.
+7. Do not automatically remove `btree_gist`; another object may use it.
+
+A rollback that deletes audit history should be a separate, explicitly approved destructive operation.
+
+---
+
+# Failure modes
+
+1. **Updating `valid_to` on an old historical assertion.**  
+   Retroactively changes what the database appeared to believe. System-close it and insert replacement valid-time segments.
+
+2. **Applying the exclusion constraint to all system history.**  
+   Prevents legitimate corrections because old and corrected beliefs overlap in valid time.
+
+3. **Only indexing `WHERE valid_to IS NULL`.**  
+   Historical system versions may also be valid-time-unbounded. Include `superseded_at IS NULL`.
+
+4. **Treating `valid_to IS NULL` as “valid now.”**  
+   Future-dated rows can be open-ended. Use `valid_period @> now()`.
+
+5. **Closed intervals on both ends.**  
+   `[a,b]` and `[b,c]` overlap at `b`. Standardize on `[)`.
+
+6. **Mixing NULL, timestamp infinity, and sentinel dates.**  
+   Produces inconsistent comparisons and range semantics.
+
+7. **Using `timestamp without time zone`.**  
+   Makes instants dependent on interpretation and daylight-saving assumptions.
+
+8. **Assuming timestamp uniqueness.**  
+   Transaction timestamps are shared across statements in a transaction. Use IDs/generations.
+
+9. **Holding row/advisory locks during extraction.**  
+   Causes long blocking, pool exhaustion, deadlocks, and failed interactive edits.
+
+10. **Locking after extraction without revalidation.**  
+    The result may already be stale. CAS the expected version after acquiring the lock.
+
+11. **Using advisory locks in only the background worker.**  
+    Non-participating user writes are not protected.
+
+12. **Locking a nonexistent current row.**  
+    `FOR UPDATE` locks nothing. Use a head row, advisory lock, or uniqueness invariant.
+
+13. **Retrying without an idempotency key.**  
+    Creates duplicate versions/events after network timeout or worker restart.
+
+14. **Recording idempotency outside the write transaction.**  
+    Can permanently claim a job whose memory revision rolled back.
+
+15. **Writing history but not the audit event atomically.**  
+    Leaves unaudited facts or audit events for changes that never committed.
+
+16. **Assuming RLS protects service-role queries.**  
+    `service_role` bypasses RLS. Use private schemas, grants, and mandatory tenant predicates.
+
+17. **Putting a service-role key in a client.**  
+    Gives the client RLS-bypassing authority.
+
+18. **Using a default security-definer view as a safe RLS path.**  
+    It can execute with owner privileges. Use `security_invoker` or a carefully hardened RPC.
+
+19. **Granting table UPDATE/DELETE and relying only on convention.**  
+    A bug can rewrite audit history. Revoke privileges and raise from guard triggers.
+
+20. **Using silent `DO INSTEAD NOTHING` rules.**  
+    Makes forbidden mutations appear successful.
+
+21. **Claiming the ledger is tamper-proof.**  
+    Table owners/superusers can disable local safeguards. External export/hash anchoring is required for independent tamper evidence.
+
+22. **Partitioning too early.**  
+    Complicates primary keys, FKs, idempotency uniqueness, and migrations without helping a small table.
+
+23. **Partitioning by time while requiring global idempotency uniqueness.**  
+    PostgreSQL partitioned unique constraints must include the partition key. Use a separate receipt table.
+
+24. **Running LLM extraction directly in `pg_cron`.**  
+    Long, network-heavy work conflicts with Supabase's job-duration/concurrency guidance.
+
+25. **Synchronous network calls in write triggers.**  
+    Increase transaction latency and couple database availability to an external service. Use an outbox or asynchronous webhook.
+
+26. **Materialized current view without refresh correctness.**  
+    Serves stale memory and adds refresh races.
+
+27. **Separate current table updated in another transaction.**  
+    Current state and history drift.
+
+28. **Adding a populated-table constraint before cleaning existing overlaps.**  
+    Migration blocks or fails. Audit and clean first; use staged validation where supported.
+
+29. **Running `CREATE INDEX CONCURRENTLY` inside a migration transaction.**  
+    PostgreSQL rejects it. Run it as a separate non-transactional migration and check for invalid indexes.
+
+30. **Assuming `IF NOT EXISTS` proves the schema is correct.**  
+    It only proves an object with that name already exists.
+
+---
+
+# Source index
+
+Primary sources:
+
+- [PostgreSQL range types](https://www.postgresql.org/docs/current/rangetypes.html)
+- [PostgreSQL constraints](https://www.postgresql.org/docs/current/ddl-constraints.html)
+- [PostgreSQL `btree_gist`](https://www.postgresql.org/docs/current/btree-gist.html)
+- [PostgreSQL partial indexes](https://www.postgresql.org/docs/current/indexes-partial.html)
+- [PostgreSQL date/time types](https://www.postgresql.org/docs/current/datatype-datetime.html)
+- [PostgreSQL current time functions](https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT)
+- [PostgreSQL explicit/advisory locking](https://www.postgresql.org/docs/current/explicit-locking.html)
+- [PostgreSQL transaction isolation](https://www.postgresql.org/docs/current/transaction-iso.html)
+- [PostgreSQL `INSERT ... ON CONFLICT`](https://www.postgresql.org/docs/current/sql-insert.html)
+- [PostgreSQL privileges](https://www.postgresql.org/docs/current/ddl-priv.html)
+- [PostgreSQL partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html)
+- [PostgreSQL concurrent indexes](https://www.postgresql.org/docs/current/sql-createindex.html#SQL-CREATEINDEX-CONCURRENTLY)
+- [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security)
+- [Supabase API keys/service role](https://supabase.com/docs/guides/api/api-keys)
+- [Supabase Data API hardening](https://supabase.com/docs/guides/database/hardening-data-api)
+- [Supabase Cron](https://supabase.com/docs/guides/cron)
+- [Supabase Database Webhooks](https://supabase.com/docs/guides/database/webhooks)
+- [Supabase pgAudit](https://supabase.com/docs/guides/database/extensions/pgaudit)
+
+Established patterns and real implementations:
+
+- [Martin Fowler: Bitemporal History](https://martinfowler.com/articles/bitemporal-history.html)
+- [Kimball Group: Slowly Changing Dimensions](https://www.kimballgroup.com/2008/08/slowly-changing-dimensions/)
+- [`temporal_tables`: PostgreSQL system-versioning implementation](https://github.com/arkhipov/temporal_tables)

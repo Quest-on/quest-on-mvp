@@ -12,6 +12,10 @@ import {
   extractUsageFromOpenAIResult,
   recordAiStreamEvent,
 } from "@/lib/ai-tracking";
+import { createCurrentExecutionContext } from "@/lib/ai-execution-context";
+import { createRouteDeadline } from "@/lib/ai-deadline";
+import { applyProfileToResponsesBody } from "@/lib/ai-task-profile";
+import { loadCurrentVersion } from "@/lib/ai-config-store";
 
 function getSupabase() {
   return getSupabaseServer();
@@ -138,18 +142,33 @@ export async function POST(request: NextRequest) {
       prevResponseId = lastMsg?.response_id || null;
     }
 
-    // Create streaming response using OpenAI Responses API
+    // ── 실행 컨텍스트 (이슈 #118) ────────────────────────────────────────
+    // 모델·요청 옵션·이벤트에 찍힐 config 버전이 전부 이 컨텍스트 하나에서 나온다.
+    // 하드코딩된 AI_MODEL 을 쓰면 관리자 설정이 이 경로만 비켜 가고, 이벤트의
+    // config_version 도 NULL 로 남아 "어느 설정이 이 응답을 만들었나" 를 못 되짚는다.
     const openai = getOpenAI();
-
-    const stream = openai.responses.stream({
-      model: AI_MODEL,
-      instructions: systemPrompt,
-      input: message,
-      previous_response_id: prevResponseId || undefined,
-      store: true,
-      stream: true,
-      tools: [{ type: "web_search_preview" }],
+    const aiContext = createCurrentExecutionContext({
+      task: "assignment_chat_stream",
+      version: await loadCurrentVersion(),
+      deadlineMs: createRouteDeadline({ startedAtMs: Date.now(), maxDurationSec: 60 }),
+      externalSignal: request.signal,
     });
+
+    const stream = openai.responses.stream(
+      applyProfileToResponsesBody(aiContext.profile, {
+        instructions: systemPrompt,
+        input: message,
+        previous_response_id: prevResponseId || undefined,
+        store: true,
+        stream: true,
+        tools: [{ type: "web_search_preview" }],
+      }) as Parameters<typeof openai.responses.stream>[0],
+      {
+        timeout: aiContext.budget.timeout,
+        maxRetries: aiContext.budget.maxRetries,
+        signal: aiContext.budget.signal,
+      }
+    );
 
     // ── 스트림 이벤트 1회성 기록 (이슈 #118) ────────────────────────────
     // 이 경로는 지금까지 ai_events 에 아무것도 남기지 않았다. 학생 채팅 트래픽
@@ -172,7 +191,7 @@ export async function POST(request: NextRequest) {
           // 학생 채팅 트래픽이다 — 기존 분석 축과 같은 feature 로 남겨야 합산된다.
           feature: "student_chat",
           route: "/api/assignment-chat",
-          model: AI_MODEL,
+          model: aiContext.profile.model,
           userId: user.id,
           sessionId,
           metadata: { q_idx: 0 },
@@ -182,6 +201,8 @@ export async function POST(request: NextRequest) {
         usage: capturedUsage,
         responseId: outcome.responseId ?? null,
         error: outcome.error,
+        // 요청을 만든 그 컨텍스트의 버전을 그대로 찍는다(라벨 재조회 금지).
+        configVersion: aiContext.configVersionId,
       });
     };
 

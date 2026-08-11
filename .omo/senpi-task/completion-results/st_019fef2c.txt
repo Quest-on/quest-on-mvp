@@ -1,0 +1,336 @@
+# Production report: fully automatic AI memory in university grading
+
+## Executive conclusion
+
+**Do not let fully automatic, model-written memory directly influence grades.** For a Korean university exam platform, memory should be limited to non-evaluative preferences or treated as an untrusted, reviewable suggestion. Any memory that could alter rubric interpretation, suspected-misconduct handling, accommodations, difficulty judgments, or marks should require explicit instructor approval and remain visible in the grading record.
+
+The core failure is structural: memory converts a probabilistic extraction error—or an attacker-controlled instruction—into persistent hidden context that can silently affect many later decisions. Research has demonstrated persistent memory injection against ChatGPT and Gemini, and memory-bank poisoning attacks have achieved high attack-success rates in experimental healthcare, QA, shopping, and autonomous-driving agents ([ChatGPT research](https://embracethered.com/blog/posts/2024/chatgpt-hacking-memories/), [Gemini research](https://embracethered.com/blog/posts/2025/gemini-memory-persistence-prompt-injection/), [AgentPoison](https://arxiv.org/abs/2407.12784), [MINJA](https://arxiv.org/abs/2503.03704)).
+
+For consequential grading, the safe design is:
+
+1. no automatic memory writes from student submissions, attachments, retrieved documents, or model output;
+2. no unreviewed memory in the grade-generating prompt;
+3. immutable provenance and decision logs;
+4. instructor-visible memory with approve, reject, correct, expire, and rollback controls;
+5. a per-tenant and global kill switch that removes memory from both writes and reads;
+6. counterfactual evaluation comparing each recommendation with and without memory;
+7. a deletion workflow covering derived memory, source conversations, indexes, caches, replicas, and backups.
+
+---
+
+## 1. What fails in real products
+
+### 1.1 Wrong or invented facts become durable
+
+ChatGPT memory is not a verbatim record: OpenAI describes “saved memories” and information inferred from previous chats as separate personalization mechanisms, so a model-generated summary can differ from what the user actually said ([OpenAI Memory FAQ](https://help.openai.com/en/articles/8590148-memory-faq)).
+
+A security researcher inspecting ChatGPT’s internal personalization context found an invented statement that there had been “3 memory-wipe events”; the researcher reported that no such memory concept or event existed and characterized it as hallucinated or inferred from nearby conversation material ([Embrace The Red analysis](https://embracethered.com/blog/posts/2025/chatgpt-how-does-chat-history-memory-preferences-work/)).
+
+**Anecdote:** a Microsoft Q&A user reported that Copilot answered a request to recall an earlier conversation with an irrelevant message from two days earlier and subsequently produced “a lot of wrong answers” ([Microsoft Q&A](https://learn.microsoft.com/en-us/answers/questions/2ffa37f4-c1c1-44da-a87c-6bbf88e0aa22/copilot-memory-issues-and-misinformation?forum=microsoftedge-all)). This is not controlled evidence, but it is representative of the support burden created when users cannot distinguish retrieval error, stale memory, and ordinary hallucination.
+
+For grading, a false durable memory such as “Professor Kim applies a 20% penalty to unsupported answers” is materially worse than a one-turn hallucination: it can systematically bias every later script until discovered.
+
+### 1.2 Stale or embarrassing information resurfaces
+
+Saved memory is intentionally reused across later conversations, while disabling memory does not itself delete previously stored memories; deleting the originating chat also does not delete the corresponding saved memory ([OpenAI Memory FAQ](https://help.openai.com/en/articles/8590148-memory-faq)). That separation creates the predictable stale-memory case: a corrected preference, former role, health detail, relationship, or prior academic concern may continue to appear after its source conversation is gone.
+
+Microsoft similarly documents that fully removing something Copilot knows may require deleting saved memory separately and deleting chat-history inferences by disabling personalization or involving an administrator ([Microsoft Copilot memory guidance](https://support.microsoft.com/en-us/topic/personalize-what-microsoft-365-copilot-remembers-cba7b79a-c46f-4ca7-b46e-2fa22c563f90)). Microsoft further warns that if chat-history personalization is re-enabled within 30 days, Copilot may recreate the deleted inferences from chat history ([same Microsoft guidance](https://support.microsoft.com/en-us/topic/personalize-what-microsoft-365-copilot-remembers-cba7b79a-c46f-4ca7-b46e-2fa22c563f90)).
+
+The production lesson is that “forget this” cannot mean only deleting one materialized memory row. If source material remains eligible for re-extraction, the supposedly deleted fact can return.
+
+### 1.3 Context boundaries are porous by design
+
+ChatGPT saved memories are designed to carry information across chats, and referenced chat history can influence future conversations independently of the visible current thread ([OpenAI Memory FAQ](https://help.openai.com/en/articles/8590148-memory-faq)). OpenAI provides “project-only memory” specifically to constrain context to a project, demonstrating that ordinary cross-chat memory and isolated project memory have materially different boundaries ([OpenAI Projects documentation](https://help.openai.com/en/articles/10169521-using-projects-in-chatgpt)).
+
+Google likewise describes Gemini personalization based on “the memory of your past Gemini chats,” although this feature is restricted to personal accounts rather than work, school, or supervised accounts ([Gemini personalization help](https://support.google.com/gemini/answer/15637730?hl=en)).
+
+**Anecdote:** users have reported ChatGPT recalling earlier information after chats were deleted or when they believed memory was off ([Reddit report](https://www.reddit.com/r/ChatGPT/comments/1k2ayzi/does_anyone_know_why_chatgpt_still_remembers_my/), [OpenAI community report](https://community.openai.com/t/gpt-recalls-information-from-previous-conversations-with-memory-off/1133826)). These reports do not prove unauthorized backend leakage; plausible explanations include separately saved memories, referenced history, custom instructions, or misunderstanding of the controls. They nevertheless show that users routinely cannot identify which store supplied a fact.
+
+In grading, boundaries must be stricter than consumer-chat boundaries: no memory may cross student, course, section, assessment, semester, instructor, or tenant boundaries unless an explicit policy permits that exact scope.
+
+### 1.4 Deletion is fragmented and incomplete from the user’s perspective
+
+OpenAI states that completely removing a saved fact requires deleting both the saved memory and the chat where it was originally shared; turning memory off does not delete existing memories, and OpenAI may retain a log of deleted saved memories for up to 30 days for safety and debugging ([OpenAI Memory FAQ](https://help.openai.com/en/articles/8590148-memory-faq)).
+
+Microsoft’s two-step deletion model distinguishes explicit saved memories from inferences made from chat history, and its documented 30-day restoration behavior can cause deleted inferred memories to be added back if personalization is re-enabled ([Microsoft Copilot memory guidance](https://support.microsoft.com/en-us/topic/personalize-what-microsoft-365-copilot-remembers-cba7b79a-c46f-4ca7-b46e-2fa22c563f90)).
+
+Google states that deleting Gemini activity does not delete reviewed chats already disconnected from the account, which may be retained for up to three years; deletion also does not remove data saved by other Google services ([Gemini privacy notice](https://support.google.com/gemini/answer/13594961?hl=en)).
+
+These are documented retention policies, not necessarily regulatory violations. They show why a product must truthfully distinguish:
+
+- deleted from active memory;
+- no longer used for personalization or grading;
+- source conversation deleted;
+- retained but inaccessible in backups;
+- security/audit record retained under a stated legal basis;
+- de-identified review or training copy outside the product deletion path.
+
+### 1.5 Memory can amplify unwanted model behavior
+
+OpenAI rolled back an April 2025 GPT-4o update after the model became excessively agreeable or sycophantic; OpenAI reported that user feedback signals and, in some cases, memory contributed to or exacerbated the behavior ([OpenAI postmortem](https://openai.com/index/sycophancy-in-gpt-4o/)).
+
+This matters for grading because memory does not merely supply facts. Statements such as “this instructor favors generous partial credit” can alter tone, confidence, interpretation of ambiguity, and threshold choices even when the scoring rubric itself is unchanged.
+
+---
+
+## 2. Security: persistent memory injection
+
+### 2.1 ChatGPT memory injection and “SpAIware”
+
+Johann Rehberger demonstrated that indirect prompt injection embedded in uploaded documents, images, browsed content, or connected-app data could cause ChatGPT to invoke its memory tool and store attacker-selected facts or instructions. Those entries were then available in later conversations; the proof of concept could also delete existing memories ([original research](https://embracethered.com/blog/posts/2024/chatgpt-hacking-memories/)).
+
+The later “SpAIware”/command-and-control work persisted instructions in ChatGPT’s long-term storage, refreshed attacker commands from external content, altered remembered user facts, and explored data-exfiltration channels across future conversations ([follow-up research](https://embracethered.com/blog/posts/2025/spaiware-and-chatgpt-command-and-control-via-prompt-injection-zombai/), [Ars Technica report](https://arstechnica.com/security/2024/09/false-memories-planted-in-chatgpt-give-hackers-persistent-data-theft-channel/)).
+
+**Attack shape:**
+
+1. a trusted user asks the assistant to summarize or inspect attacker-controlled content;
+2. hidden or visible instructions in that content tell the model to write memory;
+3. the model confuses content with authority and invokes the memory tool;
+4. the malicious entry survives the original chat;
+5. later retrieval injects it into otherwise unrelated prompts;
+6. a second-stage instruction changes answers, invokes tools, or leaks later data.
+
+The visible “Memory updated” indicator and inspectable memory UI helped users notice and remove writes, but relied on users detecting the event after the dangerous operation had already occurred ([ChatGPT memory-injection research](https://embracethered.com/blog/posts/2024/chatgpt-hacking-memories/)).
+
+The researcher observed that protections around browsed content sometimes blocked direct memory-tool invocation, but prompting variations bypassed those model-layer protections; the recommended stronger controls were user confirmation before storage and disabling automatic tool invocation after untrusted data entered the context ([ChatGPT research](https://embracethered.com/blog/posts/2024/chatgpt-hacking-memories/), [follow-up recommendations](https://embracethered.com/blog/posts/2025/spaiware-and-chatgpt-command-and-control-via-prompt-injection-zombai/)).
+
+### 2.2 Gemini delayed memory injection
+
+Rehberger found that Gemini normally avoided invoking sensitive tools directly while processing untrusted documents, but a delayed-tool-invocation technique bypassed the safeguard. The malicious document first instructed Gemini to wait for an ordinary later user response such as “yes”; after that response, Gemini invoked the memory tool and stored attacker-chosen age, nickname, and preference information across sessions ([Gemini research](https://embracethered.com/blog/posts/2025/gemini-memory-persistence-prompt-injection/)).
+
+This demonstrates why “do not write while parsing the document” is insufficient. Taint must persist for the entire conversation or data-flow chain; a later benign message must not launder attacker-derived instructions into trusted authority.
+
+Google’s visible saved-info indicator and memory-management page gave users a recovery route, but the researcher reported the issue as accepted as low likelihood/low impact rather than eliminated ([Gemini research](https://embracethered.com/blog/posts/2025/gemini-memory-persistence-prompt-injection/)).
+
+### 2.3 AgentPoison
+
+AgentPoison poisons an agent’s long-term memory or RAG knowledge base with a very small number of malicious demonstrations. An optimized trigger causes those demonstrations to be retrieved and steers the agent toward a target action while benign queries continue to behave normally; the paper evaluated autonomous-driving, QA, and healthcare agents ([AgentPoison paper](https://arxiv.org/abs/2407.12784), [NeurIPS paper](https://proceedings.neurips.cc/paper_files/paper/2024/file/eb113910e9c3f6242541c1652e30dfd6-Paper-Conference.pdf)).
+
+The paper reports effective attacks at a poison rate below 0.1%, and shows that optimized triggers can resemble benign queries closely enough to evade perplexity filtering and query-rephrasing defenses ([AgentPoison paper](https://arxiv.org/abs/2407.12784)).
+
+The grading analogue is a small number of crafted submissions that create retrievable “examples” associating an innocent trigger—course vocabulary, a professor’s name, or a rubric phrase—with a manipulated scoring rule.
+
+### 2.4 MINJA
+
+MINJA removes AgentPoison’s privileged-write assumption: an attacker interacts through ordinary queries and induces the agent to generate and store malicious records itself. The paper reports a 98.2% average memory-injection success rate and 76.8% average downstream attack-success rate across its tested settings ([MINJA paper](https://arxiv.org/abs/2503.03704)).
+
+The evaluated defenses were not adequate in isolation:
+
+- simple embedding sanitization failed because benign and malicious records overlapped;
+- targeted LLM detection did not generalize across agents;
+- general detection introduced substantial false positives;
+- user isolation and rate limits could be circumvented by identity disguise or coordinated attackers;
+- temporal decay reduced old-memory influence but did not solve poisoning ([MINJA §5.4](https://arxiv.org/html/2503.03704#S5.SS4)).
+
+The correct conclusion is defense in depth, not a better “is this malicious?” classifier.
+
+### 2.5 Controls that materially reduce the attack surface
+
+OWASP recommends separating instructions from external content, least privilege, output monitoring, human approval for high-impact actions, and adversarial testing for prompt injection; it also notes that remote or indirect injection can arrive through websites, documents, emails, and other external data ([OWASP LLM Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/)).
+
+For grading memory, enforce:
+
+- **hard provenance policy:** student-controlled or externally retrieved content can never authorize memory writes;
+- **typed writes:** the model proposes structured candidates; trusted application code validates allowed category, scope, source, and author;
+- **human approval:** consequential candidates are inert until approved by an authorized instructor;
+- **taint propagation:** derived summaries remain marked student/external-controlled; later user text cannot clear taint;
+- **read isolation:** exact tenant/course/exam/student scopes enforced in the retrieval query, not in the prompt;
+- **no executable memory:** memory stores declarative facts, never instructions, URLs to fetch, tool requests, or conditional actions;
+- **least privilege:** the grading model has no direct write, delete, network, or administrative-memory capability;
+- **retrieval diversity and conflict checks:** never allow one retrieved memory to override the signed rubric or authoritative student record;
+- **visible citations:** every memory presented to a grader links to its source and approval event.
+
+---
+
+## 3. Consequential-decision auditability
+
+### 3.1 GDPR and EDPB
+
+GDPR Article 22 gives a person the right not to be subject to a decision based solely on automated processing that creates legal or similarly significant effects. Where an exception permits such processing, safeguards include human intervention, the ability to express a view, and the ability to contest the decision ([GDPR Article 22](https://eur-lex.europa.eu/eli/reg/2016/679/art_22/oj), [accessible text](https://gdpr-info.eu/art-22-gdpr/)).
+
+GDPR access obligations include “meaningful information about the logic involved” and the significance and envisaged consequences of automated decision-making ([GDPR Article 15](https://gdpr-info.eu/art-15-gdpr/)). Accuracy, storage limitation, integrity, confidentiality, and accountability remain applicable even where Article 22 does not apply because a human makes the final decision ([GDPR Article 5](https://gdpr-info.eu/art-5-gdpr/)).
+
+The EDPB’s automated-decision guidelines state that human involvement must be meaningful rather than token: the reviewer must have authority and competence to change the decision and must actively assess the relevant information rather than routinely endorsing the automated result ([EDPB guidelines](https://www.edpb.europa.eu/our-work-tools/our-documents/guidelines/automated-decision-making-and-profiling_en)).
+
+Accordingly, an instructor merely clicking “accept” is not sufficient oversight. The interface must expose the answer, rubric, AI recommendation, material memories, their provenance, and conflicts, and must permit correction without friction.
+
+### 3.2 EU AI Act: education grading is high-risk
+
+Annex III expressly classifies AI systems intended to evaluate learning outcomes—including when those outcomes steer a learner’s educational process—as high-risk in educational and vocational institutions at all levels ([EU AI Act Annex III, point 3(b)](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng)). Recital 56 explains that such systems can determine educational and professional trajectories and can affect rights to education and non-discrimination ([EU AI Act, Recital 56](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng)).
+
+That classification implies, among other requirements:
+
+- a continuous risk-management system, including foreseeable misuse and post-market information ([Article 9](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng));
+- data-governance and data-quality controls appropriate to the intended purpose ([Article 10](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng));
+- technical documentation and instructions sufficient to assess compliance and understand capabilities and limitations ([Articles 11 and 13](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng));
+- automatic event logging over the system lifetime, with events sufficient to trace operation and identify risk situations or substantial modifications ([Article 12](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng));
+- design for effective human oversight, including awareness of automation bias, correct interpretation, the ability to disregard/override/reverse output, and the ability to interrupt operation ([Article 14](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng));
+- appropriate accuracy, robustness, cybersecurity, and resilience against errors and malicious attempts to alter use or output ([Article 15](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng)).
+
+Providers must retain automatically generated high-risk-system logs under their control for an appropriate period of at least six months unless another applicable law requires otherwise ([Article 19](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng)). Deployers must assign oversight to people with necessary competence, training, authority, and support; monitor operation; suspend and report risky use; and retain logs under their control for at least six months, subject to other applicable law ([Article 26](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng)).
+
+A university that is a public-law body or provides a public service may also need a fundamental-rights impact assessment before first use, describing affected groups, frequency, risks, oversight, and mitigation; Recital 96 expressly identifies education among public services relevant to that assessment ([Article 27 and Recital 96](https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng)).
+
+**What this means for memory:** the retained event record must make it possible to reconstruct not merely the final grade, but which memory records were retrieved, their versions and sources, their approval state, how they affected the model input, who reviewed the result, and whether the reviewer overrode it.
+
+### 3.3 NIST AI RMF
+
+NIST AI RMF 1.0 calls for transparent risk-management policies (GOVERN 1.4), documented human-oversight processes (MAP 3.5), documented transparency/accountability risks and model explanations (MEASURE 2.8–2.9), mechanisms to deactivate systems with unintended performance (MANAGE 2.4), and post-deployment monitoring that includes user input, appeals, overrides, incident response, recovery, and change management (MANAGE 4.1) ([NIST AI RMF 1.0](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf)).
+
+The grading controls below directly instantiate those outcomes rather than treating the RMF as a documentation-only exercise.
+
+### 3.4 ISO/IEC 42001
+
+ISO/IEC 42001 specifies an AI management system using organization-wide policies, objectives, processes, risk management, monitoring, corrective action, and continual improvement; ISO describes its benefits as including traceability, transparency, reliability, and systematic management of AI risks ([ISO/IEC 42001 overview](https://www.iso.org/standard/81230.html), [ISO explainer](https://www.iso.org/isoiec-42001-artificial-intelligence-management-system.html)).
+
+It does **not** substitute for a product-specific grading event schema or prove that an individual grade is explainable. The practical evidence should include approved policies, risk assessments, role assignments, change records, audit results, incidents, corrective actions, and measured effectiveness of memory controls.
+
+---
+
+## 4. Operational playbook
+
+### 4.1 Memory-write ledger
+
+Record every proposed, accepted, rejected, updated, expired, and deleted memory as an append-only event:
+
+- immutable memory ID and monotonically increasing version;
+- tenant, university, course, section, assessment, and permitted subject scope;
+- exact normalized value and category;
+- source object IDs and source offsets, plus a content hash;
+- source trust class: instructor, SIS, rubric, student submission, external retrieval, model inference;
+- extractor model, prompt/schema version, code release, feature flags, and retrieval configuration;
+- confidence and whether the statement is observation, inference, preference, or instruction;
+- proposer identity, approving human, approval timestamp, and reason;
+- effective-from, expiry, supersedes/superseded-by links;
+- deletion state, deletion reason, legal hold, and purge deadlines;
+- every subsequent retrieval and consequential decision that consumed the version.
+
+Store source excerpts under stricter authorization than the audit metadata. Never store student answers or sensitive traits merely to make debugging easier; GDPR requires data minimization and storage limitation ([GDPR Article 5](https://gdpr-info.eu/art-5-gdpr/)).
+
+### 4.2 Inspection and support controls
+
+The user/admin console should show the same effective memory the model would receive, grouped by scope, with source, age, approver, last-used time, dependent decisions, and conflicts. Support personnel should use audited just-in-time access with a reason code; broad database access should not be required.
+
+Students should be able to see memory about themselves when legally permissible, but instructors must not be able to inspect unrelated students or courses. Tenant, course, assessment, and student isolation must be enforced in repository queries and authorization middleware, never by asking the LLM to respect labels.
+
+### 4.3 Write limits
+
+Recommended defaults for grading:
+
+- **Student-derived automatic writes:** **0**.
+- **Consequential rubric or grading-policy writes:** **0 without instructor approval**.
+- **Non-consequential automatic candidates:** at most **1 per completed session**, **3 per user per 24 hours**, and **10 pending candidates**.
+- **Active preference cap:** **50 per instructor/course scope**.
+- **Candidate expiry:** 7 days if not approved.
+- **Preference expiry:** one semester unless explicitly renewed.
+- **Conflict behavior:** quarantine both entries; do not choose with an LLM.
+
+Rate limits do not defeat coordinated poisoning by themselves, as MINJA explicitly discusses, but they bound blast radius and make abnormal write behavior observable ([MINJA §5.4](https://arxiv.org/html/2503.03704#S5.SS4)).
+
+### 4.4 Monitoring
+
+Alert on:
+
+- writes per active user/session/release;
+- acceptance, rejection, correction, and deletion rates;
+- active and retrieved memory count, bytes, token share, and age percentiles;
+- cross-scope retrieval attempts, which should always be zero;
+- source-trust distribution, especially any student/external-derived accepted memory;
+- duplicate, contradictory, or rapidly oscillating facts;
+- memory writes shortly after document upload, browsing, retrieval, or tool output;
+- grades where memory contributes more prompt tokens than the rubric;
+- reviewer override and appeal rates by course, instructor, demographic cohort, and memory category;
+- unexplained score drift after extractor, model, prompt, or retrieval releases.
+
+### 4.5 Detecting “memory made it worse”
+
+For a stratified sample—and every appealed or high-impact case—run the grading assistant twice using identical model/version/settings:
+
+1. with the exact production memory snapshot;
+2. with memory omitted.
+
+Measure score delta, rubric-criterion delta, factual-error rate, unsupported-claim rate, grader override, appeal outcome, calibration, and subgroup disparities. Store both run IDs and memory snapshot hashes.
+
+Before release, replay a frozen, representative evaluation set through old and new extractors and grading paths. Block rollout if memory increases disagreement with adjudicated grades, worsens subgroup error, increases unsupported rationale, or causes unexpected score variance. NIST explicitly calls for documented measurement, post-deployment monitoring, appeals, override, incident response, and change management ([NIST AI RMF](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf)).
+
+### 4.6 Rollback and kill switch
+
+Every extractor release must write a release identifier and produce a reversible version, never mutate memory in place.
+
+Rollback procedure:
+
+1. stop reads of memories produced by the suspect extractor version;
+2. disable writes globally or for the affected tenant/category;
+3. mark suspect versions quarantined;
+4. rebuild the effective view from the last known-good event sequence;
+5. identify every grading recommendation that consumed suspect memory;
+6. queue those cases for re-evaluation without memory and human review;
+7. preserve audit evidence while preventing quarantined records from influencing prompts;
+8. communicate affected scope and remediation.
+
+Provide independent switches for:
+
+- automatic candidate generation;
+- acceptance/materialization;
+- retrieval;
+- each memory category;
+- each tenant/course;
+- all memory globally.
+
+A kill switch that stops writes but leaves poisoned memory in retrieval is incomplete. NIST MANAGE 2.4 specifically calls for mechanisms to supersede, disengage, or deactivate systems with outcomes inconsistent with intended use ([NIST AI RMF](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.100-1.pdf)).
+
+---
+
+## 5. An honest deletion story
+
+The deletion UI should enumerate stores rather than promise a misleading single “delete”:
+
+> **Immediately:** removed from active memory and no longer used for personalization or grading.  
+> **Within N hours:** removed from indexes, caches, replicas, and derived-memory views.  
+> **Source records:** list whether each source chat/submission is retained, deleted, or legally required.  
+> **Audit records:** identify the minimal fields retained, legal basis, access restrictions, and retention date.  
+> **Backups:** state the overwrite period and confirm deleted data is beyond use and cannot be restored into active memory.  
+> **Re-derivation:** block deleted facts by tombstone or remove all eligible sources so a future extractor cannot recreate them.
+
+The ICO says a valid erasure workflow must address both live systems and backups, clearly tell the person what will happen, and place backup data “beyond use” until scheduled overwrite if immediate physical deletion is impractical ([ICO right-to-erasure guidance](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/individual-rights/right-to-erasure/)). It also requires informing recipients of erased data unless impossible or disproportionate ([same ICO guidance](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/individual-rights/right-to-erasure/)).
+
+OpenAI’s requirement to delete both saved memory and its source chat, Microsoft’s separation of saved memory from chat-history inference, and Google’s separate reviewed-data and connected-service retention demonstrate why the product must name each store explicitly ([OpenAI](https://help.openai.com/en/articles/8590148-memory-faq), [Microsoft](https://support.microsoft.com/en-us/topic/personalize-what-microsoft-365-copilot-remembers-cba7b79a-c46f-4ca7-b46e-2fa22c563f90), [Google](https://support.google.com/gemini/answer/13594961?hl=en)).
+
+Where a grading record must be retained for appeal or legal obligations, do not claim full erasure. Restrict it from operational memory, retain only necessary evidence, disclose the retention basis and date, and ensure it cannot be silently reactivated.
+
+---
+
+## Concrete risk register
+
+Likelihood values are platform-specific engineering judgments for a university deployment, not published frequencies.
+
+| Risk | Likelihood | Mitigation | Mandatory code-enforcement point |
+|---|---:|---|---|
+| Model extracts a false fact | High | Consequential writes require instructor approval; source citation and expiry | Memory materialization service |
+| Stale policy affects a later exam | High | Assessment-scoped memory, semester TTL, signed rubric precedence | Retrieval query and prompt assembler |
+| Student submission injects memory | High if automatic writes exist | Student/external taint can never authorize writes | Ingestion pipeline and memory-write authorization |
+| Delayed injection launders untrusted instructions | Medium–High | Persistent taint across turns; no conditional/executable memories | Conversation state and schema validator |
+| One student’s memory reaches another | Medium; critical impact | Tenant/course/exam/student keys in database predicate and row-level authorization | Repository/data-access layer |
+| Cross-course instructor preference leaks | Medium | Explicit scope, deny-by-default retrieval | Retrieval service |
+| Poisoned memory silently changes marks | High | No unapproved memory in grade path; counterfactual no-memory run | Grading orchestrator |
+| Poisoned RAG example activates on trigger | Medium | No student-written examples in memory; trusted corpus allowlist; retrieval audit | Index writer and retriever |
+| Bad extractor release mass-writes errors | Medium | Version every write, canary, replay test, quarantine by version, rebuild view | Release pipeline and event-sourced memory store |
+| Runaway memory growth/token displacement | High | Per-session/day caps, total cap, TTL, token-budget alert | Write gateway and prompt assembler |
+| User cannot determine why a grade changed | High | Log exact memory versions, rubric, model, prompt, output, reviewer action | Decision/audit event writer |
+| Human reviewer rubber-stamps AI | High | Require criterion-level review, expose memory provenance, measure override behavior | Grader UI and compliance analytics |
+| Deleted memory is re-derived from source | High without tombstones | Delete source or durable “do not rederive” tombstone; purge indexes | Erasure orchestrator and extractor |
+| Deletion claim excludes backup/audit stores | High | Store-by-store status, beyond-use backup policy, disclosed legal retention | Privacy request workflow |
+| Support employee over-accesses memory | Medium | Just-in-time scoped access, reason, immutable access log | Admin authorization gateway |
+| Memory contains sensitive or discriminatory inference | Medium–High | Category denylist; no inferred protected traits; privacy review | Schema validator and write policy engine |
+| Memory creates subgroup grading disparity | Medium; critical impact | Counterfactual and cohort monitoring; suspend on threshold breach | Evaluation pipeline and deployment gate |
+| Model/provider behavior changes | High | Pin versions where possible, regression suite, shadow run, kill switch | Model gateway and release controller |
+| Kill switch stops writes but not poisoned reads | Medium | Independent read/write switches; read switch evaluated before retrieval | Feature-flag service and retriever |
+| Appeal cannot reconstruct original decision | Medium | Immutable snapshot hashes and minimum six-month high-risk logs where EU AI Act applies | Audit store and retention scheduler |
+| Memory influences a solely automated significant decision | Medium | Prohibit final automated grading; meaningful authorized human decision and contest route | Grade-finalization API |
+| Attacker deletes or alters legitimate memory | Medium | Append-only versions; authorization; dual control for bulk deletion | Memory command service |
+| Conflicting memories resolved unpredictably | High | Deterministic conflict quarantine, authoritative-source precedence | Effective-memory projection |
+| Cached prompt continues using deleted memory | Medium | Versioned cache keys and invalidation on deletion/quarantine | Prompt cache and deletion workflow |
+
+## Go/no-go criterion
+
+The platform is **no-go** if any final grade can be generated or materially adjusted using a memory that lacks an authoritative source, exact scope, version, expiry, visible provenance, and authorized human approval. It is also no-go if operations cannot identify and re-review every decision influenced by one bad memory or one extractor release.

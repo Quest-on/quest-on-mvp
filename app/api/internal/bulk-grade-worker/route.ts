@@ -3,7 +3,14 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { withQStashSignature } from "@/lib/qstash-signature";
-import { getOpenAI, AI_MODEL_BULK_GRADING_WORKER } from "@/lib/openai";
+import { getOpenAI } from "@/lib/openai";
+import {
+  createCurrentExecutionContext,
+  createPinnedExecutionContext,
+} from "@/lib/ai-execution-context";
+import { createRouteDeadline } from "@/lib/ai-deadline";
+import { applyProfileToChatBody } from "@/lib/ai-task-profile";
+
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { logError } from "@/lib/logger";
 import { bulkGradeWorkerSchema, validateRequest } from "@/lib/validations";
@@ -203,20 +210,40 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     let success = false;
     const gradesMap: Record<number, { score: number; comment: string }> = {};
 
+    // 런 시작 시 고정된 스냅샷으로 실행 컨텍스트를 만든다. 라벨을 다시 읽지 않으므로
+    // 런 도중 설정이 바뀌어도 이 런의 학생들은 전부 같은 설정으로 채점된다.
+    // sentinel 이 없는 레거시 작업은 핀이 없으므로 코드 기본값으로 해석한다.
+    const aiContext = pinRequired
+      ? createPinnedExecutionContext({
+          task: "bulk_grading_worker",
+          configVersionId: rowConfigVersionId,
+          profileSnapshot: rowProfileSnapshot,
+          deadlineMs: createRouteDeadline({ startedAtMs: Date.now(), maxDurationSec: 60 }),
+        })
+      : createCurrentExecutionContext({
+          task: "bulk_grading_worker",
+          version: { versionId: "", overrides: {} },
+          deadlineMs: createRouteDeadline({ startedAtMs: Date.now(), maxDurationSec: 60 }),
+        });
+
     try {
       const tracked = await callTrackedChatCompletion(
         () =>
-          getOpenAI().chat.completions.create({
-            model: AI_MODEL_BULK_GRADING_WORKER,
-            messages: [{ role: "system", content: systemPrompt }],
-            max_completion_tokens: 1500,
-            temperature: 0,
-            response_format: { type: "json_object" },
-          }),
+          getOpenAI().chat.completions.create(
+            applyProfileToChatBody(aiContext.profile, {
+              messages: [{ role: "system" as const, content: systemPrompt }],
+              response_format: { type: "json_object" as const },
+            }),
+            {
+              timeout: aiContext.budget.timeout,
+              maxRetries: aiContext.budget.maxRetries,
+              signal: aiContext.budget.signal,
+            }
+          ),
         {
           feature: "bulk_grading_chat",
           route: "/api/internal/bulk-grade-worker",
-          model: AI_MODEL_BULK_GRADING_WORKER,
+          model: aiContext.profile.model,
           examId,
           sessionId: studentSessionId,
           metadata: buildAiTextMetadata({

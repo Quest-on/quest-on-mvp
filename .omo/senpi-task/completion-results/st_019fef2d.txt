@@ -1,0 +1,840 @@
+I read this as implementation-level research across Letta Server, Letta Code, and their docs - I traced the current repositories at pinned commits and separated current paths from deprecated compatibility code.
+
+# Scope and source snapshots
+
+- **Letta server/framework:** [`letta-ai/letta`](https://github.com/letta-ai/letta), commit [`ff19ffe`](https://github.com/letta-ai/letta/tree/ff19ffeafeb54bd2a7dc5d4a552f10191732a235).
+- **Letta Code:** the actual package is **`@letta-ai/letta-code`**, repository [`letta-ai/letta-code`](https://github.com/letta-ai/letta-code), commit [`d5d9263`](https://github.com/letta-ai/letta-code/tree/d5d9263a404fbfbc08798eca5e87cb014a763b64). The package metadata confirms both names: [`package.json#L102-L116`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/package.json#L102-L116).
+- **Docs mirror:** [`letta-ai/letta-docs-md`](https://github.com/letta-ai/letta-docs-md), commit [`663d5af`](https://github.com/letta-ai/letta-docs-md/tree/663d5afb3b902e3c24de6675810c85b7da816b64).
+- The separate [`sleep-time-compute`](https://github.com/letta-ai/sleep-time-compute) repository is the 2025 research/evaluation artifact, not the production implementation now used by Letta Code.
+
+A key distinction throughout: **Letta Server still supports classic Postgres memory blocks and archival passages, while current Letta Code primarily uses Git-backed MemFS and its own client-side memory tools.**
+
+---
+
+# 1. Memory block implementation
+
+## 1.1 Data model
+
+The current Pydantic block model defines:
+
+```python
+value: str
+limit: int = CORE_MEMORY_BLOCK_CHAR_LIMIT
+project_id: Optional[str]
+template_name: Optional[str]
+is_template: bool
+template_id: Optional[str]
+base_template_id: Optional[str]
+deployment_id: Optional[str]
+entity_id: Optional[str]
+preserve_on_migration: Optional[bool]
+label: Optional[str]
+read_only: bool
+description: Optional[str]
+metadata: Optional[dict]
+hidden: Optional[bool]
+```
+
+Source: [`letta/schemas/block.py#L13-L44`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/schemas/block.py#L13-L44). The default limit is **100,000 characters**: [`letta/constants.py#L432-L435`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/constants.py#L432-L435).
+
+The SQL row adds:
+
+- `current_history_entry_id`
+- an integer `version`
+- SQLAlchemy optimistic locking via `__mapper_args__ = {"version_id_col": version}`
+- many-to-many relationships to agents, identities, and groups.
+
+Source: [`letta/orm/block.py#L20-L85`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/orm/block.py#L20-L85).
+
+### Attached and shared semantics
+
+A block is **not embedded inside an agent row**. It is a separate `block` row joined through `blocks_agents`. The junction table enforces:
+
+```python
+UniqueConstraint("agent_id", "block_label", name="unique_label_per_agent")
+UniqueConstraint("agent_id", "block_id", name="unique_agent_block")
+```
+
+Source: [`letta/orm/blocks_agents.py#L7-L34`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/orm/blocks_agents.py#L7-L34).
+
+Consequences:
+
+- **Attach** adds the existing block row to an agent's `core_memory`.
+- **Detach** removes only that relationship; it does not delete the block.
+- Multiple agents can attach the **same block ID**, meaning they read and mutate the same value.
+- `read_only` belongs to the block row, not the attachment. Despite descriptions saying “agent has read-only access,” it is effectively global for every agent attached to that block.
+- One agent cannot attach two blocks with the same label.
+
+Attach/detach implementation: [`letta/services/agent_manager.py#L2162-L2224`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/agent_manager.py#L2162-L2224).
+
+When a prompt-affecting field changes (`description`, `label`, `limit`, `read_only`, or `value`), `BlockManager` rebuilds the system prompts of **all connected agents**: [`letta/services/block_manager.py#L32-L68`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/block_manager.py#L32-L68), [`#L211-L270`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/block_manager.py#L211-L270).
+
+## 1.2 Prompt rendering
+
+For ordinary agents, the current serialization is:
+
+```python
+s.write("<memory_blocks>\nThe following memory blocks are currently engaged in your core memory unit:\n\n")
+...
+s.write(f"<{label}>\n")
+s.write("<description>\n")
+s.write(f"{desc}\n")
+s.write("</description>\n")
+s.write("<metadata>")
+if getattr(block, "read_only", False):
+    s.write("\n- read_only=true")
+s.write(f"\n- chars_current={chars_current}")
+s.write(f"\n- chars_limit={limit}\n")
+s.write("</metadata>\n")
+s.write("<value>\n")
+s.write(f"{value}\n")
+s.write("</value>\n")
+s.write(f"</{label}>\n")
+...
+s.write("\n</memory_blocks>")
+```
+
+Source: [`letta/schemas/memory.py#L142-L173`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/schemas/memory.py#L142-L173).
+
+Anthropic-backed `letta_v1`, `memgpt_v2`, and sleep-time agents get a line-numbered rendering:
+
+```text
+<warning>
+# NOTE: Line numbers shown below ...
+</warning>
+<value>
+1→ ...
+2→ ...
+</value>
+```
+
+Selection and rendering: [`letta/schemas/memory.py#L175-L203`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/schemas/memory.py#L175-L203), [`#L688-L713`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/schemas/memory.py#L688-L713).
+
+### Git-backed rendering
+
+For Git-enabled agents:
+
+- only `system/*` blocks are directly inlined;
+- `system/persona` becomes `<self>`;
+- other `system/*` labels become nested XML;
+- non-system files appear only as a tree under `<external_projection>`;
+- every inlined item includes a `$MEMORY_DIR/...md` projection path.
+
+Example implementation:
+
+```python
+s.write("\n\n<self>\n")
+s.write("<projection>$MEMORY_DIR/system/persona.md</projection>\n")
+...
+s.write("\n\n<memory>\n")
+...
+s.write(f"{pad}  <projection>$MEMORY_DIR/system/{projection_path}.md</projection>\n")
+...
+s.write("<external_projection>\n")
+s.write("${MEMORY_DIR}/\n")
+```
+
+Source: [`letta/schemas/memory.py#L205-L349`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/schemas/memory.py#L205-L349).
+
+This is the core of progressive disclosure: system files are content-bearing prompt material; external files contribute paths/descriptions, not full bodies.
+
+## 1.3 What happens when `value` exceeds `limit`
+
+The surprising current behavior is: **the declared block character limit is not actually enforced on ordinary create/update or memory-tool writes.**
+
+Evidence:
+
+- `BaseBlock` sanitizes NUL bytes but has no `len(value) <= limit` validator: [`letta/schemas/block.py#L51-L64`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/schemas/block.py#L51-L64).
+- `update_block_value` assigns the complete string without checking `limit`: [`letta/schemas/memory.py#L771-L780`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/schemas/memory.py#L771-L780).
+- `BlockManager.update_block_async` assigns arbitrary update values directly: [`letta/services/block_manager.py#L211-L268`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/block_manager.py#L211-L268).
+- Even `bulk_update_block_values_async` claims it raises when limits are exceeded, but the body simply assigns `block.value = new_val`; the documented check is absent: [`letta/services/block_manager.py#L797-L836`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/block_manager.py#L797-L836).
+
+Therefore an oversized block is persisted and rendered with metadata such as `chars_current=120000` and `chars_limit=100000`. If the resulting system prompt reaches the model context limit, Letta stops with:
+
+> “The system prompt tokens … exceeds the context window … Please reduce the size of your system prompt, memory blocks, or increase the context window.”
+
+Sources: [`letta/errors.py#L364-L371`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/errors.py#L364-L371), [`letta/agents/letta_agent_v3.py#L741-L756`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/agents/letta_agent_v3.py#L741-L756).
+
+In Git-backed memory, `limit` is explicitly described as deprecated and is omitted from Markdown frontmatter: [`letta/services/memory_repo/block_markdown.py#L1-L12`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/memory_repo/block_markdown.py#L1-L12), [`#L40-L54`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/memory_repo/block_markdown.py#L40-L54).
+
+---
+
+# 2. Memory-editing tools and their actual decision criteria
+
+## 2.1 Which tools are current
+
+The server still registers several generations:
+
+```python
+BASE_MEMORY_TOOLS = [
+    "core_memory_append",
+    "core_memory_replace",
+    "memory",
+    "memory_apply_patch",
+]
+
+BASE_MEMORY_TOOLS_V2 = [
+    "memory_replace",
+    "memory_insert",
+]
+
+BASE_SLEEPTIME_TOOLS = [
+    "memory_replace",
+    "memory_insert",
+    "memory_rethink",
+    "memory_finish_edits",
+]
+```
+
+Source: [`letta/constants.py#L112-L143`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/constants.py#L112-L143).
+
+Current `letta_v1_agent` and `memgpt_v2_agent` base-tool selection uses the v2 set; classic agents use the old set. Sleep-time agents get the broader sleep-time set: [`letta/services/agent_manager.py#L389-L425`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/agent_manager.py#L389-L425).
+
+There is **no `memory_rehydrate` tool** in this revision. Searches only find “rehydration” as Pydantic reconstruction commentary. Likewise, `rethink_memory` is legacy naming; the registered current tool is `memory_rethink`.
+
+## 2.2 Verbatim tool descriptions
+
+These docstrings generate the model-visible schemas.
+
+### `core_memory_append`
+
+> “Append to the contents of core memory.”
+
+Arguments:
+
+> `label`: “Section of the memory to be edited.”  
+> `content`: “Content to write to the memory. All unicode (including emojis) are supported.”
+
+Source: [`letta/functions/function_sets/base.py#L246-L260`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/functions/function_sets/base.py#L246-L260).
+
+### `core_memory_replace`
+
+> “Replace the contents of core memory. To delete memories, use an empty string for new_content.”
+
+Arguments:
+
+> `old_content`: “String to replace. Must be an exact match.”  
+> `new_content`: “Content to write to the memory. All unicode (including emojis) are supported.”
+
+Source: [`letta/functions/function_sets/base.py#L263-L280`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/functions/function_sets/base.py#L263-L280).
+
+Unlike v2 replacement, old `core_memory_replace` replaces **every occurrence** once it confirms the substring exists.
+
+### `memory_replace`
+
+> “The memory_replace command allows you to replace a specific string in a memory block with a new string. This is used for making precise edits.  
+> Do NOT attempt to replace long strings, e.g. do not attempt to replace the entire contents of a memory block with a new string.”
+
+Arguments:
+
+> `old_string`: “The text to replace (must match exactly, including whitespace and indentation).”  
+> `new_string`: “The new text to insert in place of the old text. Do not include line number prefixes.”
+
+Source: [`letta/functions/function_sets/base.py#L311-L342`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/functions/function_sets/base.py#L311-L342).
+
+Execution guards require `old_string` to occur **exactly once**; zero and multiple matches both fail. Tabs are expanded before matching, and display-only line-number prefixes/warnings are rejected: [`letta/services/tool_executor/core_tool_executor.py#L346-L401`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/tool_executor/core_tool_executor.py#L346-L401).
+
+### `memory_insert`
+
+> “The memory_insert command allows you to insert text at a specific location in a memory block.”
+
+Arguments:
+
+> `new_string`: “The text to insert. Do not include line number prefixes.”  
+> `insert_line`: “The line number after which to insert the text (0 for beginning of file). Defaults to -1 (end of the file).”
+
+Source: [`letta/functions/function_sets/base.py#L391-L409`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/functions/function_sets/base.py#L391-L409).
+
+The executor bounds the insertion to `0..n_lines`, with `-1` meaning append: [`letta/services/tool_executor/core_tool_executor.py#L683-L741`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/tool_executor/core_tool_executor.py#L683-L741).
+
+### `memory_rethink`
+
+> “The memory_rethink command allows you to completely rewrite the contents of a memory block. Use this tool to make large sweeping changes (e.g. when you want to condense or reorganize the memory blocks), do NOT use this tool to make small precise edits (e.g. add or remove a line, replace a specific string, etc).”
+
+Source: [`letta/functions/function_sets/base.py#L488-L517`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/functions/function_sets/base.py#L488-L517).
+
+This is the explicit distinction between **surgical edits** and **whole-block consolidation**.
+
+### `memory_finish_edits`
+
+It is a sentinel that returns `None`; sleep-time prompting says to call it once blocks are organized, or immediately when no meaningful update exists. Implementation: [`letta/services/tool_executor/core_tool_executor.py#L775-L776`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/tool_executor/core_tool_executor.py#L775-L776). Decision criteria are in the sleep-time prompt:
+
+> “If there are no meaningful updates to make to the memory, you call the finish tool directly.  
+> Not every observation warrants a memory edit, be selective in your memory editing, but also aim to have high recall.”
+
+Source: [`letta/prompts/system_prompts/sleeptime_v2.py#L19-L28`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/prompts/system_prompts/sleeptime_v2.py#L19-L28).
+
+### Omni `memory`
+
+The compatibility omni-tool supports `create`, `str_replace`, `insert`, `delete`, and `rename`, with paths such as `/memories/user_preferences`: [`letta/functions/function_sets/base.py#L10-L68`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/functions/function_sets/base.py#L10-L68).
+
+### `memory_apply_patch`
+
+It supports single-block unified patches and multi-block operations:
+
+```text
+*** Add Block: <label>
+*** Delete Block: <label>
+*** Update Block: <label>
+*** Move to: <new_label>
+```
+
+The description explicitly rejects display line numbers and permits create/delete/update/rename in one patch: [`letta/functions/function_sets/base.py#L453-L485`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/functions/function_sets/base.py#L453-L485). Patch hunks must match a unique context location; ambiguous matches fail rather than guessing: [`letta/services/tool_executor/core_tool_executor.py#L431-L512`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/tool_executor/core_tool_executor.py#L431-L512).
+
+## 2.3 Letta Code’s actual memory schemas
+
+Letta Code does **not** depend on the above server tools for MemFS. It creates agents with `include_base_tools: false`, then sends client tools at runtime: [`src/agent/create-agent-request.ts#L154-L178`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/create-agent-request.ts#L154-L178).
+
+Its `memory` schema requires:
+
+```json
+{
+  "required": ["command", "reason"],
+  "properties": {
+    "command": {
+      "enum": [
+        "str_replace",
+        "insert",
+        "delete",
+        "rename",
+        "update_description",
+        "create"
+      ]
+    },
+    "reason": {
+      "description": "Required commit message for this memory change. Used as the git commit message."
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+Full schema: [`src/tools/schemas/Memory.json`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/tools/schemas/Memory.json).
+
+Its model-visible description begins:
+
+> “A convenience tool for memories stored in the memory directory (`$MEMORY_DIR`) that automatically commits changes. The harness pushes clean committed memory changes after the turn for remote MemFS agents.”
+
+It also says:
+
+> “Files stored inside of `system/` eventually become part of the agent's system prompt, so are always in the context window and do not need to be re-read. Other files only have metadata in the system prompt, so may need to be explicitly read to be updated.”
+
+Full verbatim description: [`src/tools/descriptions/Memory.md`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/tools/descriptions/Memory.md).
+
+`memory_apply_patch` requires `reason` and `input`, confines paths to `$MEMORY_DIR`, validates memory Markdown/frontmatter, protects `read_only: true`, stages changed paths, and commits under the agent identity: [`src/tools/schemas/MemoryApplyPatch.json`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/tools/schemas/MemoryApplyPatch.json), [`src/tools/descriptions/MemoryApplyPatch.md`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/tools/descriptions/MemoryApplyPatch.md).
+
+---
+
+# 3. Sleep-time compute / dreaming
+
+There are two materially different production designs.
+
+## 3.1 Letta Server sleep-time agents
+
+For current `letta_v1_agent`, `AgentLoop` chooses `SleeptimeMultiAgentV4` when `enable_sleeptime` and a sleep-time group exist: [`letta/agents/agent_loop.py#L15-L43`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/agents/agent_loop.py#L15-L43).
+
+### Trigger
+
+- A foreground step completes.
+- The group counter is bumped when a frequency is configured.
+- Sleep-time runs when frequency is `None` or `turns_counter % frequency == 0`.
+- Streaming invokes sleep-time in `finally`, specifically because the stream can terminate with `GeneratorExit`.
+- Runs are created as background `Run` records and launched via `safe_create_task`.
+
+Source: [`letta/groups/sleeptime_multi_agent_v4.py#L43-L168`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/groups/sleeptime_multi_agent_v4.py#L43-L168).
+
+### Prompt passed to the background agent
+
+Verbatim:
+
+> “You are a sleeptime agent - a background agent that asynchronously processes conversations after they occur.
+>
+> IMPORTANT: You are NOT the primary agent. You are reviewing a conversation that already happened between a primary agent and its user:
+> - Messages labeled "assistant" are from the primary agent (not you)
+> - Messages labeled "user" are from the primary agent's user
+>
+> Your primary role is memory management. Review the conversation and use your memory tools to update any relevant memory blocks with information worth preserving. Check your memory_persona block for any additional instructions or policies.”
+
+Source: [`letta/groups/sleeptime_multi_agent_v4.py#L229-L253`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/groups/sleeptime_multi_agent_v4.py#L229-L253).
+
+The sleep-time system prompt adds:
+
+> “Your goal is to make sure the memory blocks are comprehensive, readable, and up to date.”
+
+and requires absolute dates rather than “today” or “recently”: [`letta/prompts/system_prompts/sleeptime_v2.py#L12-L28`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/prompts/system_prompts/sleeptime_v2.py#L12-L28).
+
+### Allowed changes
+
+The sleep-time agent is a separate agent with `memory_replace`, `memory_insert`, `memory_rethink`, and `memory_finish_edits`. Blocks attached to the foreground agent are also attached to its paired sleep-time agent: [`letta/services/agent_manager.py#L2162-L2187`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/agent_manager.py#L2162-L2187).
+
+Thus it changes shared block rows, not the foreground agent's message buffer or identity row.
+
+### Concurrency and clobbering
+
+The server implementation has some protection, but it is not a full semantic merge system:
+
+- background agent has a separate conversation/message state;
+- `last_processed_message_id` prevents intentionally replaying the same transcript range;
+- block rows have SQL optimistic version locking;
+- `read_only` checks reject forbidden edits.
+
+However:
+
+- group counter and `last_processed_message_id` are read-modify-write operations without an explicit row lock: [`letta/services/group_manager.py#L258-L288`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/group_manager.py#L258-L288);
+- block optimistic locking catches overlapping SQL flushes, but it does not merge a model edit derived from stale prompt contents;
+- there is no retry/rebase loop for a stale semantic memory edit.
+
+So the server design avoids direct foreground-message clobbering, but **shared-block write races can still produce stale last-writer behavior** outside a simultaneous SQL conflict.
+
+## 3.2 Letta Code dreaming
+
+Letta Code’s newer design is much stronger.
+
+### Trigger
+
+At successful turn completion, it appends a transcript delta, then evaluates:
+
+- `step-count`, or
+- `compaction-event`.
+
+It refuses to dream without MemFS: [`src/cli/helpers/post-turn-reflection.ts#L18-L75`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/cli/helpers/post-turn-reflection.ts#L18-L75). Headless wiring: [`src/headless.ts#L5126-L5158`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/headless.ts#L5126-L5158).
+
+The docs describe the same two modes: [`configuration/memory/index.md#L28-L33`](https://github.com/letta-ai/letta-docs-md/blob/663d5afb3b902e3c24de6675810c85b7da816b64/configuration/memory/index.md#L28-L33).
+
+### Prompt and decision rules
+
+The reflection agent is explicitly told:
+
+> “Skills are not the default. A one-off task, a fact, or a preference belongs in memory, not a skill.”
+
+> “Mistakes and corrections” first, then “Preferences and patterns,” “New durable facts,” contradictions, and reusable procedures.
+
+> “The raw conversation is already searchable — don't re-record it.”
+
+> “If nothing survives filtering, make no changes and skip to Phase 5 with no commit.”
+
+Source: [`src/agent/subagents/builtin/reflection.md#L9-L20`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/subagents/builtin/reflection.md#L9-L20), [`#L69-L87`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/subagents/builtin/reflection.md#L69-L87).
+
+It only receives `Bash` and `Edit`, not memory or recall tools, and all writes must stay in its assigned `$MEMORY_DIR`: [`reflection.md#L22-L35`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/subagents/builtin/reflection.md#L22-L35).
+
+### Isolation and merge
+
+Each reflection gets:
+
+- a new Git branch `letta/reflection/<timestamp-id>`;
+- a separate Git worktree;
+- writable access only to that worktree and Git common dir;
+- read-only access to the parent memory location.
+
+Source: [`src/agent/memory-worktree.ts#L119-L205`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/memory-worktree.ts#L119-L205).
+
+Concurrency controls:
+
+- in-memory reservation allows only one active reflection per parent agent;
+- a second trigger is queued and threshold-rechecked later;
+- transcript state uses a per-agent/per-conversation mutex;
+- reflection cursors advance only after successful integration;
+- new transcript lines appended while reflection runs remain unconsumed.
+
+Sources: [`src/cli/helpers/reflection-launcher.ts#L247-L337`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/cli/helpers/reflection-launcher.ts#L247-L337), [`src/cli/helpers/reflection-transcript.ts#L1663-L1709`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/cli/helpers/reflection-transcript.ts#L1663-L1709), [`#L1900-L1955`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/cli/helpers/reflection-transcript.ts#L1900-L1955).
+
+Finalization refuses to merge when:
+
+- reflection left uncommitted changes;
+- parent memory became dirty;
+- reflection failed;
+- merge conflicts;
+- explicit integration failed to merge.
+
+In every failure case the transcript remains retryable: [`src/agent/memory-worktree.ts#L306-L565`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/memory-worktree.ts#L306-L565).
+
+This is the clearest production answer to “how does dreaming avoid clobbering the main agent?”
+
+---
+
+# 4. Archival memory
+
+## 4.1 Schema
+
+An archive is a shareable collection with:
+
+- `name`
+- `description`
+- `organization_id`
+- `vector_db_provider`
+- optional `embedding_config`
+- metadata.
+
+Source: [`letta/schemas/archive.py#L11-L40`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/schemas/archive.py#L11-L40).
+
+An archival passage has:
+
+- `id`
+- `archive_id`
+- `organization_id`
+- `text`
+- optional embedding
+- embedding config
+- metadata
+- tags
+- timestamps.
+
+Source: [`letta/schemas/passage.py#L14-L95`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/schemas/passage.py#L14-L95).
+
+Postgres uses `pgvector Vector(MAX_EMBEDDING_DIM)` and separately stores archival and source passages: [`letta/orm/passage.py#L21-L103`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/orm/passage.py#L21-L103).
+
+## 4.2 Embedding configuration
+
+`EmbeddingConfig` includes:
+
+```python
+embedding_endpoint_type
+embedding_endpoint
+embedding_model
+embedding_dim
+embedding_chunk_size = 300
+handle
+batch_size = 32
+```
+
+The default OpenAI configuration is `text-embedding-3-small`, dimension 1536, chunk size 300: [`letta/schemas/embedding_config.py#L8-L62`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/schemas/embedding_config.py#L8-L62).
+
+Vector storage can be native Postgres/SQLite or Turbopuffer; an archive records its selected provider: [`letta/services/archive_manager.py#L30-L51`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/archive_manager.py#L30-L51).
+
+## 4.3 Passage chunking
+
+A critical implementation detail: **agent-created archival memories are not chunked today.**
+
+The insertion code literally says:
+
+```python
+# TODO: check to make sure token count is okay for embedding model
+text_chunks = [text]
+```
+
+Source: [`letta/services/passage_manager.py#L543-L604`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/passage_manager.py#L543-L604).
+
+`embedding_chunk_size=300` applies primarily to **ingested source files**, which use LlamaIndex splitters. The file processor creates a `LlamaIndexChunker` from that config: [`letta/services/file_processor/file_processor.py#L45-L70`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/file_processor/file_processor.py#L45-L70). The chunker generally uses `SentenceSplitter(chunk_size, chunk_overlap)` with fallback splitters: [`letta/services/file_processor/chunker/llama_index_chunker.py#L27-L167`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/file_processor/chunker/llama_index_chunker.py#L27-L167).
+
+## 4.4 Search tool
+
+Verbatim description:
+
+> “Search archival memory using semantic similarity to find relevant information.
+>
+> This tool searches your long-term memory storage by meaning, not exact keyword matching. Use it when you need to recall information from past conversations or knowledge you've stored.
+>
+> Search strategy:
+> - Query by concept/meaning, not exact phrases
+> - Use tags to narrow results when you know the category
+> - Start broad, then narrow with tags if needed
+> - Results are ranked by semantic relevance”
+
+Schema arguments include `query`, `tags`, `tag_match_mode`, `top_k`, `start_datetime`, and `end_datetime`: [`letta/functions/function_sets/base.py#L194-L243`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/functions/function_sets/base.py#L194-L243).
+
+Native search embeds the query and orders by cosine distance; without an embedding config, it falls back to case-insensitive substring search: [`letta/services/helpers/agent_manager_helper.py#L1180-L1295`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/helpers/agent_manager_helper.py#L1180-L1295). Turbopuffer uses hybrid vector/full-text search: [`letta/services/agent_manager.py#L2433-L2477`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/agent_manager.py#L2433-L2477).
+
+## 4.5 Search versus blocks
+
+The base prompt’s decision rule is:
+
+> “You respond directly to the user when your immediate context (core memory and files) contain all the information required to respond.”
+
+> “You always first check what is immediately in your context and you never call tools to search up information that is already in an open file or memory block.”
+
+> “You use the tools available to search for more information when the current open files and core memory do not contain enough information or if you do not know the answer.”
+
+Source: [`letta/prompts/system_prompts/memgpt_v2_chat.py#L32-L35`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/prompts/system_prompts/memgpt_v2_chat.py#L32-L35).
+
+But note the current default tool wiring:
+
+- `archival_memory_insert` and `archival_memory_search` are marked deprecated in default tool selection.
+- `letta_v1_agent` gets `conversation_search`, `memory_replace`, and `memory_insert` by default, not archival tools.
+- Letta Code sets `include_base_tools: false` and therefore does not ship server archival tools by default.
+
+Sources: [`letta/constants.py#L112-L126`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/constants.py#L112-L126), [`letta/services/helpers/agent_manager_helper.py#L1298-L1303`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/helpers/agent_manager_helper.py#L1298-L1303).
+
+So archival memory remains implemented and attachable, but **current Letta Code’s preferred long-term store is MemFS, not archival passages**.
+
+---
+
+# 5. Letta Code specifically
+
+## 5.1 Default blocks
+
+Current standard defaults are only:
+
+```ts
+export const MEMORY_BLOCK_LABELS = ["persona", "human"] as const;
+```
+
+Project and style blocks were removed from default creation; skills are request-scoped/system-reminder material: [`src/agent/memory.ts#L10-L16`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/memory.ts#L10-L16).
+
+Default seed values are:
+
+- `persona`: “I'm a coding assistant, ready to be shaped by how we work together.”
+- `human`: “I haven't gotten to know this person yet…” plus guidance to learn their work, background, preferences, frustrations, and motivations.
+
+Sources: [`src/agent/prompts/persona.mdx`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/prompts/persona.mdx), [`src/agent/prompts/human.mdx`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/prompts/human.mdx).
+
+The default “Memo” personality overrides those values with larger continuity/personality prompts: [`src/agent/defaults.ts#L30-L55`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/defaults.ts#L30-L55), [`persona_memo.mdx`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/prompts/persona_memo.mdx), [`human_memo.mdx`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/prompts/human_memo.mdx).
+
+Subagents are deliberately ephemeral and receive no blocks: [`src/agent/create.ts#L217-L221`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/create.ts#L217-L221), [`#L259-L287`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/create.ts#L259-L287).
+
+## 5.2 Agent memory scope versus project scope
+
+The durable memory root is **per agent**, not per repository:
+
+```text
+~/.letta/agents/<agent-id>/memory
+```
+
+Source: [`src/agent/memory-filesystem.ts#L26-L80`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/memory-filesystem.ts#L26-L80).
+
+Therefore:
+
+- the same agent carries memory across conversations, machines, and working directories;
+- repository/project memory is organized by paths within that agent’s MemFS, not stored in the application repo by default;
+- `/init` tells the agent to use the actual project name as a directory prefix, e.g. `system/letta-code/...` and `reference/letta-code/...`, precisely to avoid ambiguity across projects.
+
+Source: [`src/skills/builtin/initializing-memory/SKILL.md#L71-L103`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/skills/builtin/initializing-memory/SKILL.md#L71-L103).
+
+The actual project working directory is separately injected as session context; it is not the memory namespace. This makes Letta Code’s model **one identity with many project subtrees**, rather than one isolated memory record per repository.
+
+Project-scoped skills are different: `.agents/skills` belongs to the local project/environment, while agent-scoped skills live in MemFS. The README summarizes the three levels: [`README.md#L20-L27`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/README.md#L20-L27).
+
+## 5.3 MemFS and block interaction
+
+The server-side `GitEnabledBlockManager` states the intended source-of-truth order:
+
+> “Write to git (GCS) first - source of truth”  
+> “Update PostgreSQL as cache”
+
+Source: [`letta/services/block_manager_git.py#L1-L40`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/block_manager_git.py#L1-L40).
+
+Labels map to Markdown paths:
+
+```text
+system/persona -> system/persona.md
+reference/foo  -> reference/foo.md
+```
+
+Markdown carries `description`, optional `read_only`, and optional metadata in YAML frontmatter. The body is the block value. `limit` is omitted: [`letta/services/memory_repo/block_markdown.py#L27-L54`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/memory_repo/block_markdown.py#L27-L54).
+
+The CLI operates directly on the projection. Every normal `memory` operation:
+
+1. resolves a path under the active agent’s MemFS;
+2. rejects a dirty memory repository;
+3. applies the edit;
+4. commits only affected paths with the agent identity;
+5. reports that the harness will sync after the turn.
+
+Source: [`src/tools/impl/memory.ts#L98-L150`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/tools/impl/memory.ts#L98-L150).
+
+## 5.4 What it does at session end
+
+There is **no automatic “summarize everything into memory at session exit” operation**.
+
+Memory durability occurs earlier:
+
+- each memory tool commits immediately;
+- clean pending commits are pushed after turns;
+- dreaming can run after turns or compaction;
+- session exit runs `SessionEnd` hooks, records telemetry/history, closes MCP, and exits.
+
+Session exit path: [`src/cli/app/AppCoordinator.tsx#L3913-L3945`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/cli/app/AppCoordinator.tsx#L3913-L3945).
+
+Post-turn synchronization:
+
+- refuses to push dirty repos;
+- pushes clean ahead commits;
+- on non-fast-forward, performs `pull --rebase` and retries push;
+- reports conflict rather than silently resetting.
+
+Source: [`src/agent/memory-git.ts#L1957-L2096`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/memory-git.ts#L1957-L2096).
+
+---
+
+# 6. Multi-agent and shared blocks
+
+## Classic shared blocks
+
+Classic sharing is literal row sharing:
+
+```text
+agent A ─┐
+         ├── block-123
+agent B ─┘
+```
+
+An update by either agent changes the same block and triggers system-prompt rebuilds for every connected agent. This is suitable for a small, always-in-context shared state, but it implies:
+
+- one global character budget;
+- one global `read_only` setting;
+- one label per attached agent;
+- concurrent writers need optimistic locking or stronger merge semantics;
+- every update causes prompt invalidation/recompilation across all surfaces.
+
+Groups also have a `groups_blocks` relation, and group setup attaches each shared block to every participant/manager agent: [`letta/orm/groups_blocks.py`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/orm/groups_blocks.py), [`letta/services/group_manager.py#L400-L440`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/group_manager.py#L400-L440).
+
+## Current shared-memory direction
+
+The current docs explicitly call shared blocks legacy:
+
+> “Older Letta API guides use shared memory blocks for one in-context memory block attached to multiple agents. The legacy memory block API still supports this pattern, but users should migrate to shared memory repositories instead.”
+
+Source: [`concepts/shared-memory/index.md#L6-L15`](https://github.com/letta-ai/letta-docs-md/blob/663d5afb3b902e3c24de6675810c85b7da816b64/concepts/shared-memory/index.md#L6-L15).
+
+Current shared memory is an organization-owned Git repository cloned beside each agent’s MemFS:
+
+```text
+$MEMORY_DIR/../<repository-name>/
+```
+
+Agents edit with file/Git tools, commit, push, and other agents pull: [`concepts/shared-memory/index.md#L17-L27`](https://github.com/letta-ai/letta-docs-md/blob/663d5afb3b902e3c24de6675810c85b7da816b64/concepts/shared-memory/index.md#L17-L27).
+
+### Implication for “one memory, many surfaces”
+
+For a per-professor memory used by many prompt surfaces, the classic block model is actually closer to the requirement than Letta Code’s shared Git repositories:
+
+- one canonical professor row/document;
+- many surfaces reference its ID;
+- compile it afresh per request;
+- writes affect all future surfaces.
+
+The important distinction is to share **the source memory entity**, not copied prompt strings. Prompt strings should be generated views/cache artifacts.
+
+---
+
+# 7. Hard-won production lessons visible in the code
+
+## Good lessons
+
+1. **Precise edits must fail on ambiguity.** `memory_replace` requires exactly one match; patches require unique hunk context. This prevents an LLM from accidentally editing multiple similar facts.
+
+2. **Read-only enforcement occurs in the executor, not merely the prompt.** Every core memory write checks `read_only`: [`core_tool_executor.py#L319-L355`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/tool_executor/core_tool_executor.py#L319-L355).
+
+3. **Display metadata must not round-trip into writes.** Letta renders line numbers for editing assistance, then explicitly rejects line-number prefixes and warning banners in memory-tool input.
+
+4. **Memory edits need provenance and history.** Classic blocks have checkpoints plus actor IDs; MemFS uses commits authored by agent ID. Block history implementation: [`letta/services/block_manager.py#L842-L900`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/block_manager.py#L842-L900).
+
+5. **No-op writes are rejected.** Letta skips no-op block updates; Letta Code errors if a memory operation produces no effective commit. This avoids meaningless versions.
+
+6. **Background consolidation should work from immutable snapshots.** Letta Code’s branch/worktree model is much safer than directly editing live memory.
+
+7. **Do not consume the source transcript until integration succeeds.** Failed reflections remain retryable; successful reflections advance only to the snapshotted end line.
+
+8. **Keep hot memory and cold memory structurally distinct.** `system/*` is always in context; external files expose paths/descriptions only. Reflection is explicitly told to demote verbose material.
+
+9. **Cap indexes and previews, not source data.** Letta Code’s MemFS tree defaults to 500 lines, 20,000 characters, and 50 children per directory: [`src/utils/directory-limits.ts#L16-L25`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/utils/directory-limits.ts#L16-L25). Reflection previews truncate with an explicit path telling the agent where to read the full file: [`reflection-transcript.ts#L486-L602`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/cli/helpers/reflection-transcript.ts#L486-L602).
+
+10. **Bound individual tool returns.** Server v3 caps one tool return at approximately 20% of context, minimum 5,000 characters: [`letta_agent_v3.py#L143-L153`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/agents/letta_agent_v3.py#L143-L153).
+
+11. **Filter recursive search results.** Conversation search excludes tool messages and prior conversation-search calls to prevent recursive nesting and exponential escaping: [`core_tool_executor.py#L151-L167`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/tool_executor/core_tool_executor.py#L151-L167).
+
+12. **Treat dirty state as a blocker, not something to auto-reset.** Letta Code refuses memory writes against an uncommitted repo: [`src/agent/memory-git.ts#L1271-L1284`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/memory-git.ts#L1271-L1284).
+
+13. **Constrain background agents at the filesystem boundary.** Reflection gets a worktree-specific writable scope. Letta Code also has an unbypassable cross-agent guard for in-process file tools and kernel confinement for memory subagents: [`src/permissions/cross-agent-guard.ts#L1-L30`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/permissions/cross-agent-guard.ts#L1-L30), [`src/memory-confinement.ts#L13-L27`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/memory-confinement.ts#L13-L27).
+
+14. **Never store secrets in durable memory.** Letta Code emphasizes that memory is Git-tracked and may leave the machine: [`src/agent/prompts/letta.md#L28-L33`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/prompts/letta.md#L28-L33).
+
+## Weaknesses/cautions
+
+1. **The character limit is advisory in current server code.** Do not copy that behavior.
+2. **Block labels are interpolated directly into XML tag names without escaping or validation in the renderer.** Arbitrary labels can create malformed or adversarial prompt structure: [`letta/schemas/memory.py#L149-L170`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/schemas/memory.py#L149-L170).
+3. **Memory values/descriptions are also inserted into prompt XML without escaping.** This is not a robust prompt-injection boundary.
+4. **Letta Code says `<system-reminder>` content is runtime instruction even when tags appear in user messages.** That convention is susceptible to tag spoofing unless the transport keeps trusted reminders structurally separate: [`src/agent/prompts/letta.md#L132-L135`](https://github.com/letta-ai/letta-code/blob/d5d9263a404fbfbc08798eca5e87cb014a763b64/src/agent/prompts/letta.md#L132-L135).
+5. **Archival insert does not actually chunk or preflight embedding token size.**
+6. **Native SQL tag filtering occurs after query limiting**, which can return fewer relevant tagged results than requested: [`letta/services/agent_manager.py#L2494-L2529`](https://github.com/letta-ai/letta/blob/ff19ffeafeb54bd2a7dc5d4a552f10191732a235/letta/services/agent_manager.py#L2494-L2529).
+7. **SQL optimistic locking is not semantic conflict resolution.** A model-derived stale rewrite can still overwrite newer logical content if transactions do not overlap.
+8. **Server sleep-time failures are logged and marked failed but do not have the branch/retry semantics of Letta Code.**
+
+---
+
+# Patterns worth stealing for Next.js + Supabase Postgres
+
+1. **Canonical memory entity plus attachments.** Model a professor memory separately from prompt surfaces. Each surface references the professor/memory ID; do not duplicate memory text per surface.
+
+2. **Structured hot-memory sections.** Store distinct sections such as:
+   - identity/background;
+   - teaching preferences;
+   - communication style;
+   - course/project context;
+   - known corrections and constraints.
+
+   Give every section a stable label, description, value, hard size limit, read-only policy, and revision.
+
+3. **Descriptions are routing instructions.** Letta’s most transferable idea is that a block description tells the model how the value should influence behavior. Treat descriptions as reviewed product configuration, not model-authored prose.
+
+4. **One deterministic compiler.** Build every LLM prompt from the same memory compiler so all surfaces see the same ordering, metadata, escaping, and truncation rules.
+
+5. **Hard enforcement at write time.** Unlike Letta, reject or require consolidation before a section exceeds its limit. Also enforce a total professor-memory token budget.
+
+6. **Separate exact-edit and whole-section operations.**
+   - append/insert for genuinely additive facts;
+   - exact unique-match replacement for corrections;
+   - explicit rewrite/consolidate operation for large reorganizations.
+
+7. **Optimistic compare-and-swap.** Require `expected_revision` on model writes. On conflict, reload and ask the consolidation process to rebase its proposed change; never silently last-write-wins.
+
+8. **Append-only revision history.** Store old/new values, diff, actor, source prompt/conversation, reason, and timestamp. Make rollback first-class.
+
+9. **Background consolidation from snapshots.** Give the worker:
+   - an immutable conversation range;
+   - the memory revision it started from;
+   - narrow write capabilities;
+   - an explicit “no durable update” outcome.
+
+   Advance the conversation cursor only after a successful CAS write.
+
+10. **Selective write criteria.** Steal Letta Code’s filters nearly verbatim:
+    - durable, not session-specific;
+    - not already represented;
+    - generalized rather than transcript-like;
+    - corrections beat additions;
+    - absolute dates;
+    - no secrets;
+    - no write when nothing survives filtering.
+
+11. **Hot versus cold memory.** Keep a small always-injected professor profile. Store verbose history/reference material separately and retrieve it only for relevant prompts.
+
+12. **Prompt-safe serialization.** Do better than Letta:
+    - fixed tag names or JSON fields;
+    - escape values;
+    - never derive XML element names from user/model labels;
+    - clearly delimit memory as data;
+    - keep trusted runtime instructions in separate message roles/transport fields.
+
+13. **Per-surface projection rules.** The canonical professor memory may be shared, but each prompt should select only relevant blocks. “One memory” should not mean “inject the entire memory into every call.”
+
+14. **Observe memory quality operationally.** Track:
+    - injected tokens by block and surface;
+    - edit acceptance/conflict rates;
+    - duplicate/stale facts;
+    - memory-derived answer failures;
+    - rollback frequency;
+    - sections approaching limits.
+
+---
+
+# Patterns not applicable, or not worth copying
+
+1. **Git/MemFS as the primary store.** For a Next.js + Supabase application with short structured professor profiles, Postgres revisions and row-level security are simpler, faster, and easier to transact. Git worktrees are justified for arbitrary agent-owned file trees, not ordinary profile memory.
+
+2. **An autonomous persona that rewrites itself.** Letta Code is optimizing for persistent agent identity. A per-professor product should usually keep product/system policy read-only and permit writes only to professor-specific facts/preferences.
+
+3. **Separate sleep-time agent identities sharing live blocks.** Use a background job operating on a snapshot and revision, not another persistent agent attached to the same mutable row.
+
+4. **Always-in-context project file trees.** A professor memory is likely compact and schema-like. Do not reproduce MemFS hierarchy unless professors accumulate substantial documents and workflows.
+
+5. **Archival vector search by default.** Do not add embeddings merely because Letta has them. For tens or hundreds of structured professor facts, relational filtering and full-text search may be sufficient. Add vectors only when the corpus becomes genuinely semantic and unstructured.
+
+6. **Advisory character limits.** Letta’s current unenforced `limit` should not be copied.
+
+7. **Raw XML labels and unescaped memory.** This is a prompt-integrity hazard.
+
+8. **Automatic model writes from every interaction.** Use explicit eligibility rules, confidence/provenance, and potentially human review for sensitive professor facts.
+
+9. **Global shared mutable blocks for high-contention writes.** The “one row attached everywhere” read model is useful; the uncoordinated many-writer model is not. Use one canonical row plus CAS/versioned writes.
+
+10. **Session-end summarization.** Letta Code itself has moved away from relying on exit-time persistence. Persist facts transactionally when learned or consolidate asynchronously from durable conversation logs; process exit is not a reliable event boundary.
