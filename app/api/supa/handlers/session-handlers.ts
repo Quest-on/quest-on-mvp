@@ -11,6 +11,7 @@ import {
   ONBOARDING_EVENTS,
   hasOnboardingEvent,
 } from "@/lib/onboarding-events";
+import { isDemoPreview } from "@/lib/demo-completion";
 
 /** 5-second grace period for network latency (shared across heartbeat/initExamSession/feedback) */
 const GRACE_PERIOD_MS = 5_000;
@@ -323,7 +324,14 @@ export async function initExamSession(data: {
     //
     // 범위를 is_demo=true + 소유자로 좁힌다. 이걸 일반 시험까지 열으면 교수자가
     // 자기 시험에 세션을 만들어 통계·발행 카운트를 오염시킬 수 있다.
-    const isDemoPreview = exam.is_demo === true && exam.instructor_id === user.id;
+    // 판정은 lib/demo-completion.ts 한 곳에 둔다. 계측 격리(#167)와 이 진입
+    // 판정이 같은 정의를 써야 한쪽만 고쳐졌을 때 지표가 갈라지지 않는다.
+    const isDemoPreviewAttempt =
+      isDemoPreview({
+        isDemo: exam.is_demo,
+        instructorId: exam.instructor_id,
+        userId: user.id,
+      }) === true;
 
     // ✅ Gate 방식: 시험 상태 및 입장 가능 여부 확인
     const now = new Date().toISOString();
@@ -764,7 +772,7 @@ export async function initExamSession(data: {
       sessionReactivated, // 세션 복원 여부 (브라우저 닫기 후 재진입 시)
       disclosureAcknowledged,
       // 클라이언트 프로필 게이트가 이걸 보고 데모 소유자를 우회시킨다 (AC-7).
-      demoPreview: isDemoPreview,
+      demoPreview: isDemoPreviewAttempt,
     });
   } catch (error) {
     logError("[initExamSession] Failed to initialize exam session", error, { path: "/api/supa/session-handlers" });

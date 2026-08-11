@@ -16,6 +16,7 @@ import {
   recordOnboardingEvent,
 } from "@/lib/onboarding-events";
 import { hasAiChatQuestions } from "@/lib/grading-helpers";
+import { isDemoPreview } from "@/lib/demo-completion";
 
 /**
  * POST /api/session/[sessionId]/preflight
@@ -68,7 +69,7 @@ export async function POST(
 
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("id, status, started_at, duration, type, questions")
+      .select("id, status, started_at, duration, type, questions, is_demo, instructor_id")
       .eq("id", session.exam_id)
       .single();
 
@@ -158,7 +159,22 @@ export async function POST(
       exam.questions as ReadonlyArray<{ type?: string }> | null
     );
 
-    if (disclosureWasShown) {
+    // 교수자가 자기 데모를 학생 시점으로 겪는 경우는 기록하지 않는다(#167).
+    //
+    // #166 이 그 경로를 열면서, 데모 템플릿이 전부 서술형이라 위 판정이 참이
+    // 되고 **교수자 id 가 role:"student" 로 학생 퍼널에 박혔다.** 에픽 DoD 의
+    // `COUNT(DISTINCT user_id)` 학생 지표가 온보딩을 마친 교수자 전원만큼
+    // 부풀었다. 고지 자체는 그대로 보여준다 — 안 보여주는 게 아니라 안 세는 것이다.
+    //
+    // 판정 불능(null)이면 기록하지 않는다. 018 미적용 등으로 컬럼을 못 읽었을 때
+    // "일반 학생"으로 단정하면 그 순간 오염이 다시 시작된다.
+    const preview = isDemoPreview({
+      isDemo: (exam as { is_demo?: unknown }).is_demo,
+      instructorId: (exam as { instructor_id?: unknown }).instructor_id,
+      userId: user.id,
+    });
+
+    if (disclosureWasShown && preview === false) {
       // await 하되 실패해도 무시한다 — 이 함수는 throw 하지 않고 boolean 만
       // 돌려준다. 계측 때문에 응시 시작이 막히면 그게 더 큰 사고다.
       await recordOnboardingEvent({
