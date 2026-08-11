@@ -232,4 +232,11 @@ export const qk = {
       return key;
     },
   },
+  /**
+   * 동의 상태. 온보딩 게이트와 설정 화면이 같은 키를 쓴다.
+   * 사용자별로 갈라야 계정 전환 시 이전 사용자의 상태가 남지 않는다.
+   */
+  consent: {
+    status: (userId: string) => ["consent-status", userId] as const,
+  },
 } as const;
