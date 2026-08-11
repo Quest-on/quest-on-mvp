@@ -8,6 +8,7 @@ import { successJson, errorJson } from "@/lib/api-response";
 import { auditLog } from "@/lib/audit";
 import { logError } from "@/lib/logger";
 import { triggerGradingIfNeeded } from "@/lib/grading-trigger";
+import { isDemoPreview } from "@/lib/demo-completion";
 
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Validate exam submission from Supabase
     const { data: exam, error: examError } = await getSupabase()
       .from("exams")
-      .select("id, code, status, duration")
+      .select("id, code, status, duration, is_demo, instructor_id")
       .eq("code", examCode)
       .single();
 
@@ -349,15 +350,31 @@ export async function POST(request: NextRequest) {
       }
 
       // Atomic student_count increment (race-safe via RPC)
-      const { error: rpcError } = await getSupabase().rpc(
-        "increment_student_count",
-        { p_exam_id: exam.id }
-      );
-      if (rpcError) {
-        logError("Failed to increment student_count via RPC", rpcError, {
-          path: "/api/feedback",
-          additionalData: { examId: exam.id },
-        });
+      //
+      // 교수자가 자기 데모를 학생 시점으로 겪는 경우는 세지 않는다(#167).
+      // 안 그러면 데모 상세에 교수자 자신이 학생 1명으로 잡히고, 데모의
+      // student_count 가 올라간다 — 데모는 목록·통계·한도 어디에도 나타나면
+      // 안 된다는 AC-17 과 정면으로 어긋난다.
+      //
+      // 판정 불능(null)이면 세지 않는다. "일반 학생"으로 단정하는 순간 오염이
+      // 다시 시작되고, 이 카운터는 #84 의 학생 5명 상한이 읽는 값이다.
+      const preview = isDemoPreview({
+        isDemo: (exam as { is_demo?: unknown }).is_demo,
+        instructorId: (exam as { instructor_id?: unknown }).instructor_id,
+        userId: verifiedStudentId,
+      });
+
+      if (preview === false) {
+        const { error: rpcError } = await getSupabase().rpc(
+          "increment_student_count",
+          { p_exam_id: exam.id }
+        );
+        if (rpcError) {
+          logError("Failed to increment student_count via RPC", rpcError, {
+            path: "/api/feedback",
+            additionalData: { examId: exam.id },
+          });
+        }
       }
 
       await triggerGradingIfNeeded(finalSessionId, "feedback");

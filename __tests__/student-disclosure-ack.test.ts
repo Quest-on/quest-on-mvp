@@ -108,6 +108,8 @@ beforeEach(() => {
     duration: 60,
     type: "exam",
     questions: [{ id: "q1", type: "essay", text: "..." }],
+    is_demo: false,
+    instructor_id: "other-instructor",
   };
   recordOnboardingEvent.mockResolvedValue(true);
   hasOnboardingEvent.mockResolvedValue(false);

@@ -26,19 +26,19 @@ describe("데모 미리보기 서버 판정 (AC-7)", () => {
   it("데모 미리보기는 is_demo 와 소유자 둘 다 만족할 때만이다", () => {
     // is_demo 만이거나, 소유자만이면 안 된다. 둘 다여야 데모 미리보기다.
     expect(handlers).toMatch(
-      /const isDemoPreview = exam\.is_demo === true && exam\.instructor_id === user\.id;/
+      /const isDemoPreviewAttempt =\n      isDemoPreview\(\{/
     );
   });
 
   it("init 응답이 demoPreview 를 실어 본다", () => {
-    expect(handlers).toMatch(/demoPreview: isDemoPreview,/);
+    expect(handlers).toMatch(/demoPreview: isDemoPreviewAttempt,/);
   });
 
   it("범위를 좁히는 이유가 주석에 남아 있다 — 일반 시험까지 열리면 통계를 오염시킨다", () => {
     // 이 주석이 지워지면 다음 사람이 "그냥 instructor_id 만 본다"로 완화할 수 있다.
     const demoPreviewBlock = handlers.slice(
-      handlers.indexOf("const isDemoPreview") - 400,
-      handlers.indexOf("const isDemoPreview")
+      handlers.indexOf("const isDemoPreviewAttempt") - 400,
+      handlers.indexOf("const isDemoPreviewAttempt")
     );
     expect(demoPreviewBlock).toContain("is_demo=true");
     expect(demoPreviewBlock).toContain("오염");
