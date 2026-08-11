@@ -7,7 +7,6 @@ import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
 import { createExam } from "@/app/api/supa/handlers/exam-handlers";
 import {
-  ASSESS_TARGETS,
   SUBJECT_CATEGORIES,
   selectDemoTemplate,
 } from "@/lib/demo-templates";
@@ -33,7 +32,6 @@ import {
  */
 const BodySchema = z
   .object({
-    assessTarget: z.enum(ASSESS_TARGETS).optional(),
     subject: z.enum(SUBJECT_CATEGORIES).optional(),
     /** 2문항을 건너뛰었는가 (AC-6) */
     skipped: z.boolean().optional(),
@@ -79,7 +77,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return errorJson("INVALID_INPUT", "Invalid input", 400);
     }
-    const { assessTarget, subject, skipped, language } = parsed.data;
+    const { subject, skipped, language } = parsed.data;
 
     const supabase = getSupabaseServer();
 
@@ -111,7 +109,6 @@ export async function POST(request: NextRequest) {
     }
 
     const template = selectDemoTemplate({
-      assessTarget,
       subject,
       language,
     });
@@ -155,7 +152,6 @@ export async function POST(request: NextRequest) {
       event: ONBOARDING_EVENTS.INTAKE_SUBMITTED,
       examId,
       metadata: {
-        assessTarget: assessTarget ?? null,
         subject: subject ?? null,
         // 건너뛴 교수자는 발행 직전에 같은 질문을 다시 받아야 한다(AC-6).
         // 그 판단 근거가 이 플래그다 — 별도 테이블 없이 여기 남긴다.

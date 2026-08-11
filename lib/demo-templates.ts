@@ -24,9 +24,6 @@
  */
 
 /** JTBD 1번: 무엇을 평가하는가. */
-export const ASSESS_TARGETS = ["exam", "assignment"] as const;
-export type AssessTarget = (typeof ASSESS_TARGETS)[number];
-
 /**
  * JTBD 2번: 담당 과목 계열.
  *
@@ -41,10 +38,6 @@ export const SUBJECT_CATEGORIES = [
   "general",
 ] as const;
 export type SubjectCategory = (typeof SUBJECT_CATEGORIES)[number];
-
-export function isAssessTarget(value: unknown): value is AssessTarget {
-  return ASSESS_TARGETS.includes(value as AssessTarget);
-}
 
 export function isSubjectCategory(value: unknown): value is SubjectCategory {
   return SUBJECT_CATEGORIES.includes(value as SubjectCategory);
@@ -138,9 +131,9 @@ const SUBJECT_CONTENT: Record<SubjectCategory, SubjectContent> = {
 
 export type DemoTemplate = {
   title: string;
-  /** `exams.type` 값 */
-  examType: AssessTarget;
-  /** 분 단위. 과제는 마감 기반이라 무제한(0)이다. */
+  /** `exams.type` 값. 데모는 시험만 만든다 — 아래 주석 참조. */
+  examType: "exam";
+  /** 분 단위 */
   duration: number;
   questionText: string;
   rubric: string;
@@ -148,35 +141,36 @@ export type DemoTemplate = {
 };
 
 /**
- * 타입·과목으로 템플릿 한 벌을 고른다 (AC-5).
+ * 과목으로 템플릿 한 벌을 고른다 (AC-5).
  *
  * 알 수 없는 값이면 `general` 로 떨어진다 — 온보딩이 입력값 때문에 멈추면 안 된다.
- * 건너뛴 교수자(AC-6)도 같은 경로로 `exam` + `general` 기본 템플릿을 받는다.
+ * 건너뛴 교수자(AC-6)도 같은 경로로 기본 템플릿을 받는다.
+ *
+ * **과제형 데모는 만들지 않는다.** 만들 수는 있었지만 교수자가 그걸 학생 시점으로
+ * 겪을 경로가 없다 — `useAssignmentSession` 은 데모 미리보기를 모르고, 응시
+ * (`/assignment/{code}`)·완주 판정·제출 후 필수 quiz 가 시험과 완전히 다른
+ * 흐름이다. 즉 겪을 수 없는 데모가 생긴다. UI 에서만 숨기면 API 를 직접 부르는
+ * 경로로 여전히 만들어지므로 계약에서 뺐다. 과제 응시에 미리보기가 붙으면
+ * 그때 되살린다.
  */
 export function selectDemoTemplate(params: {
-  assessTarget?: unknown;
   subject?: unknown;
   language?: DemoLanguage;
 }): DemoTemplate {
-  const examType: AssessTarget = isAssessTarget(params.assessTarget)
-    ? params.assessTarget
-    : "exam";
   const subject: SubjectCategory = isSubjectCategory(params.subject)
     ? params.subject
     : "general";
   const language: DemoLanguage = params.language === "en" ? "en" : "ko";
 
   const content = SUBJECT_CONTENT[subject];
-  const isAssignment = examType === "assignment";
 
   return {
     title: content.title[language],
-    examType,
-    // 과제는 마감 기준이라 응시 타이머가 없다. 시험 데모는 짧게 끝나야 한다 —
-    // 데모의 목적은 완주지 시간 압박 체험이 아니다.
-    duration: isAssignment ? 0 : 20,
+    examType: "exam",
+    // 데모는 짧게 끝나야 한다 — 목적은 완주지 시간 압박 체험이 아니다.
+    duration: 20,
     questionText: content.prompt[language],
     rubric: content.rubric[language],
-    assignmentPrompt: isAssignment ? content.prompt[language] : null,
+    assignmentPrompt: null,
   };
 }

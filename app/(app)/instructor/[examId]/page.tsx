@@ -406,6 +406,11 @@ export default function ExamDetail({
             demoRestartLabel={
               demoStatus?.completed ? t("examDetail.retryAsStudent") : undefined
             }
+            demoRestartHint={
+              demoStatus?.completed
+                ? t("examDetail.retryAsStudentHint")
+                : undefined
+            }
             extraActions={
               <>
                 {process.env.NODE_ENV === "development" && (

@@ -396,42 +396,34 @@ export async function initExamSession(data: {
 
     if (mostRecentSubmittedSession) {
       if (isDemoPreviewAttempt && data.restartDemoAttempt === true) {
-        const sessionId = mostRecentSubmittedSession.id;
-        const resetResults = await Promise.all([
-          getSupabase().from("grades").delete().eq("session_id", sessionId),
-          getSupabase().from("submissions").delete().eq("session_id", sessionId),
-          getSupabase().from("messages").delete().eq("session_id", sessionId),
-          getSupabase().from("grading_chats").delete().eq("session_id", sessionId),
-        ]);
-        const resetError = resetResults.find((result) => result.error)?.error;
-        if (resetError) throw resetError;
+        // 초기화를 DB 함수 하나로 맡긴다.
+        //
+        // 여기서 DELETE 를 여러 번 + UPDATE 로 하면 각각이 독립 커밋이라, 중간에
+        // 실패하면 답안은 지워졌는데 세션은 제출 상태로 남는 깨진 상태가
+        // 영구화된다 — 다시 풀 수도, 예전 결과를 볼 수도 없게 된다.
+        //
+        // 함수는 세션 행을 잠그고 데모·소유자 여부를 **다시** 확인한다. 여기서
+        // 이미 판정했더라도 그게 유일한 삭제 경로여야 한다.
+        const { data: restartedId, error: restartRpcError } = await getSupabase().rpc(
+          "restart_demo_attempt",
+          { p_exam_id: exam.id, p_user_id: data.studentId }
+        );
+        if (restartRpcError) throw restartRpcError;
 
-        const { data: restartedSession, error: restartError } = await getSupabase()
-          .from("sessions")
-          .update({
-            submitted_at: null,
-            is_active: true,
-            status: "in_progress",
-            started_at: now,
-            attempt_timer_started_at: now,
-            auto_submitted: false,
-            used_clarifications: 0,
-            compressed_session_data: null,
-            compression_metadata: null,
-            ai_summary: null,
-            grading_progress: null,
-            final_answer: null,
-            final_answer_updated_at: null,
-            last_heartbeat_at: now,
-            device_fingerprint: data.deviceFingerprint || null,
-          })
-          .eq("id", sessionId)
-          .eq("student_id", data.studentId)
-          .select()
-          .single();
-        if (restartError) throw restartError;
-        resetDemoSession = restartedSession;
-      } else {
+        if (restartedId) {
+          const { data: restartedSession, error: reloadError } = await getSupabase()
+            .from("sessions")
+            .update({ device_fingerprint: data.deviceFingerprint || null })
+            .eq("id", restartedId)
+            .eq("student_id", data.studentId)
+            .select()
+            .single();
+          if (reloadError) throw reloadError;
+          resetDemoSession = restartedSession;
+        }
+      }
+
+      if (!resetDemoSession) {
         // 제출된 세션이 있으면 재시험 불가 - 제출된 세션만 반환
 
         // Get messages for submitted session (read-only)

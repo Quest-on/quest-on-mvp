@@ -110,7 +110,7 @@ describe("POST /api/onboarding/demo — 데모 생성 (AC-5)", () => {
   it("교수자가 아니면 403 이고 아무것도 만들지 않는다", async () => {
     sessionUser = { id: "student-1", role: "student" };
 
-    const res = await callDemo({ assessTarget: "exam", subject: "business" });
+    const res = await callDemo({ subject: "business" });
 
     expect(res.status).toBe(403);
     expect(createExam).not.toHaveBeenCalled();
@@ -125,7 +125,6 @@ describe("POST /api/onboarding/demo — 데모 생성 (AC-5)", () => {
 
   it("intake 답에 맞는 템플릿으로 is_demo=true exam 을 만든다", async () => {
     const res = await callDemo({
-      assessTarget: "assignment",
       subject: "engineering",
       language: "ko",
     });
@@ -135,7 +134,9 @@ describe("POST /api/onboarding/demo — 데모 생성 (AC-5)", () => {
 
     const payload = createExam.mock.calls[0][0] as Record<string, any>;
     expect(payload.is_demo).toBe(true);
-    expect(payload.type).toBe("assignment");
+    // 데모는 항상 시험이다. 과제형은 교수자가 학생 시점으로 겪을 경로가 없어
+    // 계약에서 뺐다 — 겪을 수 없는 데모를 만드는 건 도움이 아니다.
+    expect(payload.type).toBe("exam");
     expect(payload.status).toBe("draft");
     expect(payload.questions).toHaveLength(1);
     // 공학 템플릿이 실제로 선택됐는지 — 아무 템플릿이나 나오면 AC-5 가 의미 없다.
@@ -146,7 +147,7 @@ describe("POST /api/onboarding/demo — 데모 생성 (AC-5)", () => {
   it("이미 데모가 있으면 새로 만들지 않고 기존 것을 돌려준다", async () => {
     existingDemo = { id: "exam-old", code: "OLD123", title: "[데모] 기존" };
 
-    const res = await callDemo({ assessTarget: "exam", subject: "business" });
+    const res = await callDemo({ subject: "business" });
 
     expect(res.status).toBe(200);
     expect(res.body.created).toBe(false);
@@ -160,14 +161,14 @@ describe("POST /api/onboarding/demo — 데모 생성 (AC-5)", () => {
   it("기존 데모 조회가 실패하면 만들지 않고 500 이다 — 조용히 하나 더 만들지 않는다", async () => {
     lookupError = new Error("db down");
 
-    const res = await callDemo({ assessTarget: "exam", subject: "business" });
+    const res = await callDemo({ subject: "business" });
 
     expect(res.status).toBe(500);
     expect(createExam).not.toHaveBeenCalled();
   });
 
   it("스키마 밖 필드는 거부한다 — 데모 생성으로 임의 컬럼을 쓰지 못한다", async () => {
-    const res = await callDemo({ assessTarget: "exam", is_demo: false, instructor_id: "other" });
+    const res = await callDemo({ is_demo: false, instructor_id: "other" });
 
     expect(res.status).toBe(400);
     expect(createExam).not.toHaveBeenCalled();
@@ -196,7 +197,7 @@ describe("건너뛰기 (AC-6)", () => {
 
 describe("마일스톤 기록 (AC-7 계측)", () => {
   it("intake_submitted 와 demo_created 를 둘 다 남긴다", async () => {
-    await callDemo({ assessTarget: "exam", subject: "health" });
+    await callDemo({ subject: "health" });
 
     const events = recordOnboardingEvent.mock.calls.map(
       (call) => call[0].event
@@ -208,20 +209,19 @@ describe("마일스톤 기록 (AC-7 계측)", () => {
   it("계측이 실패해도 데모 생성은 성공이다", async () => {
     recordOnboardingEvent.mockResolvedValue(false);
 
-    const res = await callDemo({ assessTarget: "exam", subject: "health" });
+    const res = await callDemo({ subject: "health" });
 
     expect(res.status).toBe(200);
     expect(res.body.examId).toBe("exam-1");
   });
 
   it("intake 답을 metadata 로 남긴다 — 세그먼트 분석의 유일한 근거다", async () => {
-    await callDemo({ assessTarget: "assignment", subject: "humanities" });
+    await callDemo({ subject: "humanities" });
 
     const intake = recordOnboardingEvent.mock.calls.find(
       (call) => call[0].event === "intake_submitted"
     );
     expect(intake?.[0].metadata).toMatchObject({
-      assessTarget: "assignment",
       subject: "humanities",
     });
   });

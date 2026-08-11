@@ -105,7 +105,8 @@
     "demoAiRegenerationUnlockedDescription": "You completed the demo, so AI regeneration is unlocked.",
     "demoAiRegenerationLoading": "Checking AI regeneration access.",
     "demoAiRegenerationUnavailable": "AI regeneration access is unavailable right now.",
-    "retryAsStudent": "Try the demo again"
+    "retryAsStudent": "Retake the demo",
+    "retryAsStudentHint": "Retaking clears your previous answers, AI conversations, and grading results."
   },
   "assignmentDetail": {
     "error": "Error",

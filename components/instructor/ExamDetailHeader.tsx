@@ -17,6 +17,12 @@ interface ExamDetailHeaderProps {
    * 내면 끝"이 된다.
    */
   demoRestartLabel?: string;
+  /**
+   * 재응시가 무엇을 지우는지 알리는 문구. 서버는 이전 제출·채점·대화를
+   * 실제로 삭제하므로(UNIQUE(exam_id, student_id) 아래 새 세션을 못 만든다),
+   * 누르기 전에 알려야 한다. 라벨만 있고 이 경고가 없으면 안 된다.
+   */
+  demoRestartHint?: string;
   extraActions?: ReactNode;
 }
 
@@ -30,6 +36,7 @@ export function ExamDetailHeader({
   isDemo,
   demoPreviewLabel,
   demoRestartLabel,
+  demoRestartHint,
   extraActions,
 }: ExamDetailHeaderProps) {
   const t = useTranslations("authoring");
@@ -44,15 +51,22 @@ export function ExamDetailHeader({
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {isDemo && demoPreviewLabel && (
-            <Link
-              href={
-                demoRestartLabel
-                  ? `/exam/${code}?restartDemo=1`
-                  : `/exam/${code}`
-              }
-            >
-              <Button size="sm">{demoRestartLabel ?? demoPreviewLabel}</Button>
-            </Link>
+            <div className="flex flex-col items-start gap-1">
+              <Link
+                href={
+                  demoRestartLabel
+                    ? `/exam/${code}?restartDemo=1`
+                    : `/exam/${code}`
+                }
+              >
+                <Button size="sm">{demoRestartLabel ?? demoPreviewLabel}</Button>
+              </Link>
+              {demoRestartLabel && demoRestartHint && (
+                <span className="text-xs text-muted-foreground">
+                  {demoRestartHint}
+                </span>
+              )}
+            </div>
           )}
           {extraActions}
           <div className="flex items-center gap-2 flex-wrap">

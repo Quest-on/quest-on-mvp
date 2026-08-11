@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { currentUserMock, supabaseMock } = vi.hoisted(() => ({
   currentUserMock: vi.fn(),
-  supabaseMock: { from: vi.fn() },
+  supabaseMock: { from: vi.fn(), rpc: vi.fn() },
 }));
 
 vi.mock("@/lib/get-current-user", () => ({ currentUser: currentUserMock }));
@@ -209,19 +209,20 @@ describe("데모 세션 수명주기", () => {
       grading_chats: [{ data: null, error: null }],
     });
 
+    supabaseMock.rpc.mockResolvedValue({ data: NOW_SESSION.id, error: null });
+
     const result = await body({ restartDemoAttempt: true });
 
     expect(result.status).toBe(200);
     expect(result.body.session.status).toBe("in_progress");
-    expect(chains.grades[0].delete).toHaveBeenCalledOnce();
-    expect(chains.submissions[0].delete).toHaveBeenCalledOnce();
-    expect(chains.messages[0].delete).toHaveBeenCalledOnce();
-    expect(chains.grading_chats[0].delete).toHaveBeenCalledOnce();
-    expect(chains.sessions[1].update).toHaveBeenCalledWith(expect.objectContaining({
-      submitted_at: null,
-      status: "in_progress",
-      grading_progress: null,
-    }));
+
+    // 초기화는 흩어진 DELETE 가 아니라 원자적 RPC 하나여야 한다. 여러 DELETE 를
+    // 각각 커밋하면 중간 실패 시 "답안은 지워졌는데 세션은 제출 상태"가
+    // 영구화돼, 다시 풀 수도 예전 결과를 볼 수도 없게 된다.
+    expect(supabaseMock.rpc).toHaveBeenCalledWith("restart_demo_attempt", {
+      p_exam_id: "exam-1",
+      p_user_id: "owner-1",
+    });
   });
 
   it("일반 학생은 제출 후 restartDemoAttempt를 보내도 재응시할 수 없다", async () => {

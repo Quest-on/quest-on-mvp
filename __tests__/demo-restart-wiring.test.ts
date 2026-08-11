@@ -33,6 +33,29 @@ describe("재응시 사슬이 끊기지 않았다", () => {
     expect(header).toMatch(/demoRestartLabel \?\? demoPreviewLabel/);
   });
 
+  it("재응시가 무엇을 지우는지 누르기 전에 알린다", () => {
+    // 서버는 이전 제출·채점·대화를 실제로 삭제한다(UNIQUE(exam_id, student_id)
+    // 아래 새 세션을 못 만들기 때문이다). 라벨만 있고 경고가 없으면 사용자는
+    // 되돌릴 수 없는 삭제를 모르고 누른다.
+    expect(header).toMatch(/demoRestartHint\?: string/);
+    expect(header).toMatch(/demoRestartLabel && demoRestartHint/);
+    expect(detail).toMatch(/demoRestartHint=\{/);
+
+    for (const loc of ["ko", "en"]) {
+      const messages = JSON.parse(read(`messages/${loc}/instructor.json`));
+      expect(messages.examDetail.retryAsStudentHint).toBeTruthy();
+    }
+  });
+
+  it("경고 문구가 삭제 사실을 실제로 말한다", () => {
+    const ko = JSON.parse(read("messages/ko/instructor.json"));
+    const en = JSON.parse(read("messages/en/instructor.json"));
+    // "다시 풀 수 있습니다" 같은 무해한 문구로 바뀌면 경고가 아니다.
+    expect(ko.examDetail.retryAsStudentHint).toMatch(/사라|삭제|지워/);
+    expect(en.examDetail.retryAsStudentHint).toMatch(/clear|delete|erase|lose/i);
+  });
+
+
   it("훅이 그 파라미터를 읽어 서버로 전달한다", () => {
     expect(hook).toMatch(/searchParams\.get\("restartDemo"\) === "1"/);
     expect(hook).toMatch(/restartDemoAttempt: true/);
@@ -66,5 +89,59 @@ describe("재응시 사슬이 끊기지 않았다", () => {
       const messages = JSON.parse(read(`messages/${loc}/instructor.json`));
       expect(messages.examDetail.retryAsStudent).toBeTruthy();
     }
+  });
+});
+
+describe("원자적 초기화 (023)", () => {
+  const sql = read("database/023_restart_demo_attempt.sql");
+
+  it("함수가 데모·소유자를 스스로 다시 확인한다", () => {
+    // 애플리케이션이 이미 판정했더라도 이게 유일한 삭제 경로여야 한다.
+    expect(sql).toMatch(/e\.is_demo = true/);
+    expect(sql).toMatch(/e\.instructor_id::text = p_user_id/);
+  });
+
+  it("세션 행을 잠근다", () => {
+    // 두 탭이 동시에 누르면 한쪽이 지우는 중 다른 쪽이 초기화해
+    // 반쯤 지워진 시도가 남는다.
+    expect(sql).toMatch(/FOR UPDATE/);
+  });
+
+  it("제출된 시도가 없으면 아무것도 지우지 않는다", () => {
+    // 푸는 중인 세션을 지우면 새로고침만으로 작성 중인 답안이 날아간다.
+    expect(sql).toMatch(/s\.submitted_at IS NOT NULL/);
+  });
+
+  it("시도 종속 데이터를 전부 지운다", () => {
+    // 하나라도 남으면 새 시도 화면에 이전 흔적이 섞여 나온다.
+    for (const table of [
+      "grades",
+      "grading_chats",
+      "messages",
+      "submissions",
+      "session_quiz_attempts",
+      "paste_logs",
+    ]) {
+      expect(sql).toMatch(
+        new RegExp(`DELETE FROM public\\.${table} WHERE session_id = v_session_id;`)
+      );
+    }
+  });
+
+  it("완주 마일스톤과 AI 비용은 지우지 않는다", () => {
+    // 완주는 특정 시도가 아니라 사람 단위 사실이고, ai_events 는 실제로
+    // 발생한 비용이라 감사 대상이다.
+    expect(sql).not.toMatch(/DELETE FROM public\.onboarding_events/);
+    expect(sql).not.toMatch(/DELETE FROM public\.ai_events/);
+  });
+
+  it("권한이 service_role 로 좁혀져 있다", () => {
+    expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.restart_demo_attempt\(uuid, text\) FROM anon;/);
+    expect(sql).toMatch(/GRANT EXECUTE ON FUNCTION public\.restart_demo_attempt\(uuid, text\) TO service_role;/);
+  });
+
+  it("CI 가 이 마이그레이션을 적용한다", () => {
+    const setup = read(".github/actions/test-setup/action.yml");
+    expect(setup).toMatch(/database\/023_restart_demo_attempt\.sql/);
   });
 });

@@ -149,6 +149,11 @@ runs:
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -v ON_ERROR_STOP=1 \
           -f database/022_clean_demo_preview_metrics.sql
+        # 023 은 데모 재응시를 원자적으로 처리하는 RPC 다. 적용하지 않으면
+        # 재응시 호출이 CI 에서만 함수 없음으로 실패한다.
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
+          -f database/023_restart_demo_attempt.sql
         # Reload PostgREST schema cache so new functions are immediately callable
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -c "NOTIFY pgrst, 'reload schema';"
