@@ -95,6 +95,11 @@ async function acceptPreflight() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // 이 파일은 라우트를 동적 import 한다. 워커가 파일 간 모듈 레지스트리를
+  // 재사용하면 앞선 테스트 파일이 세운 목이 붙은 라우트 인스턴스를 잡아,
+  // 전체 스위트에서만 산발적으로 실패한다(단독 실행은 항상 통과).
+  // 매번 새 모듈을 받게 해서 결정적으로 만든다.
+  vi.resetModules();
   // 시험 종류를 바꾸는 케이스가 있으므로 매번 서술형 기본으로 되돌린다.
   exam = {
     id: "exam-1",

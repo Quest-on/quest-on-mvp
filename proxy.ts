@@ -9,7 +9,6 @@ const isPublicRoute = (pathname: string) =>
     "/sign-in",
     "/sign-up",
     "/onboarding",
-    "/instructor-pending",
     "/auth/callback",
   ].some((r) => pathname === r || pathname.startsWith(r + "/"));
 
@@ -38,8 +37,7 @@ export async function proxy(request: NextRequest) {
     const bypassCookie = request.cookies.get("__test_bypass")?.value;
     if (bypassCookie === bypassSecret) {
       const role = request.cookies.get("__test_user_role")?.value || null;
-      const isPending = false;
-      return applyRouteGuards(request, response, pathname, role, isPending);
+      return applyRouteGuards(request, response, pathname, role);
     }
   }
 
@@ -68,17 +66,21 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/sign-in", request.url));
   }
 
-  // profiles 테이블에서 role/status 읽기
+  // profiles 테이블에서 role 읽기.
+  //
+  // status 는 더 이상 라우팅에 쓰지 않는다. 승인 대기(pending)로 교수자를 막던
+  // 게이트를 걷어냈기 때문이다 — 에픽 #79 의 결정은 "승인은 차단이 아니라
+  // plan 승격"이고, 여기서 막으면 가입 직후 데모를 겪게 하려던 흐름 전체가
+  // 도달 불가가 된다.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, status")
+    .select("role")
     .eq("id", user.id)
     .single();
 
   const role = profile?.role ?? null;
-  const isPending = profile?.status === "pending";
 
-  return applyRouteGuards(request, response, pathname, role, isPending);
+  return applyRouteGuards(request, response, pathname, role);
 }
 
 function applyRouteGuards(
@@ -86,7 +88,6 @@ function applyRouteGuards(
   response: NextResponse,
   pathname: string,
   role: string | null,
-  isPending: boolean,
 ): NextResponse {
   // 로그인된 유저가 공개 라우트(홈, 로그인 등)에 접근 → role에 맞는 대시보드로 리다이렉트
   // /onboarding은 제외: role이 없으면 여기서 설정해야 하므로 통과, role이 있어도 접근 허용 (페이지가 자체 처리)
@@ -95,12 +96,6 @@ function applyRouteGuards(
       return NextResponse.redirect(new URL("/onboarding", request.url));
     }
     if (role === "instructor") {
-      if (isPending) {
-        if (pathname !== "/instructor-pending") {
-          return NextResponse.redirect(new URL("/instructor-pending", request.url));
-        }
-        return response;
-      }
       return NextResponse.redirect(new URL("/instructor", request.url));
     }
     // student
@@ -110,9 +105,6 @@ function applyRouteGuards(
   if (isInstructorRoute(pathname)) {
     if (role !== "instructor") {
       return NextResponse.redirect(new URL("/student", request.url));
-    }
-    if (isPending) {
-      return NextResponse.redirect(new URL("/instructor-pending", request.url));
     }
   }
 

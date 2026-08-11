@@ -27,9 +27,19 @@ import {
  * `status` 는 클라이언트가 못 정한다. `plan` 은 아예 손대지 않는다(기본 `free`).
  * 둘을 올리는 건 관리자 엔드포인트뿐이다.
  */
-const ROLE_STATUS: Record<SignupRole, "pending" | "approved"> = {
-  // 교수자는 관리자 확인 전까지 pending. #84 의 무료 한도가 이 값을 읽는다.
-  instructor: "pending",
+/**
+ * 역할별 초기 `status`.
+ *
+ * 교수자도 `approved` 다. 예전에는 `pending` 으로 두고 미들웨어가 교수자를
+ * `/instructor-pending` 으로 돌려보냈는데, 그러면 에픽 #79 의 목표("관리자 승인을
+ * 기다리지 않고 가입 직후 자기 과목 데모를 겪는다")가 런타임에서 정확히 반대로
+ * 동작한다. 데모 생성·완주·미리보기를 다 만들어 놓고 진입을 막고 있었다.
+ *
+ * 승인은 차단이 아니라 **`profiles.plan` 승격**이다(ADR-006). 미인증 계정을
+ * 제어하는 건 `status` 가 아니라 무료 한도이고, 그 값은 `plan_limits` 가 정한다.
+ */
+const ROLE_STATUS: Record<SignupRole, "approved"> = {
+  instructor: "approved",
   student: "approved",
 };
 

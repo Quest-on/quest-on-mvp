@@ -142,15 +142,17 @@ describe("POST /api/user/role — 최초 1회 클레임 (AC-21)", () => {
     expect(is).toHaveBeenCalledWith("role", null);
   });
 
-  it("교수자 클레임의 status 는 서버가 pending 으로 강제한다", async () => {
-    select.mockResolvedValue({ data: [{ role: "instructor", status: "pending" }], error: null });
+  it("status 는 서버가 정한다 — 본문 값이 실리지 않는다", async () => {
+    select.mockResolvedValue({ data: [{ role: "instructor", status: "approved" }], error: null });
 
-    await claimRole({ role: "instructor", status: "approved" });
+    await claimRole({ role: "instructor", status: "pending" });
 
     const payload = update.mock.calls[0][0] as Record<string, unknown>;
     expect(payload.role).toBe("instructor");
-    // 본문의 status:"approved" 가 절대 실리면 안 된다.
-    expect(payload.status).toBe("pending");
+    // 승인 대기 게이트는 제거됐다(#79 P0). 교수자도 즉시 approved 이고,
+    // 미인증 계정 제어는 status 가 아니라 plan_limits 의 무료 한도가 맡는다.
+    // 본문이 무엇을 보내든 서버 값이 이긴다는 게 이 테스트의 요점이다.
+    expect(payload.status).toBe("approved");
     expect(payload).not.toHaveProperty("plan");
   });
 
