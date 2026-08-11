@@ -260,7 +260,9 @@ app.post("/v1/responses", (req, res) => {
       id: responseId,
       object: "response",
       created_at: Math.floor(Date.now() / 1000),
-      model: "gpt5.2-chat-latest",
+      // 이슈 #118: 요청 모델을 그대로 반향한다. 고정값이면 "이벤트에 기록된
+      // 모델 == 프로필이 요청한 모델" 을 검증할 수 없어 관측 테스트가 무의미해진다.
+      model: (req.body?.model as string) ?? "gpt5.2-chat-latest",
       status: "completed",
       output: [
         {
