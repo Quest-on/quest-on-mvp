@@ -138,7 +138,9 @@ export const test = base.extend<ConsentAuthFixtures>({
       });
       // 실제 사용자가 타는 UI sign-up 경로에서 PKCE verifier를 브라우저에
       // 만들고, Mailpit 확인 링크를 같은 context에서 소비한다.
-      await page.goto("/sign-up", { waitUntil: "domcontentloaded" });
+      // 실제 auth 버튼은 React handler가 붙은 뒤 눌러야 한다. dev server에서
+      // DOMContentLoaded 직후 클릭하면 빈 state로 signUp이 호출돼 flake한다.
+      await page.goto("/sign-up", { waitUntil: "networkidle" });
       await page.fill("#email", email);
       await page.fill("#password", password);
       await page.click('form button[type="submit"]');
@@ -207,7 +209,7 @@ export const test = base.extend<ConsentAuthFixtures>({
         await route.continue({ url: url.toString() });
       });
 
-      await page.goto("/sign-up", { waitUntil: "domcontentloaded" });
+      await page.goto("/sign-up", { waitUntil: "networkidle" });
       await page.getByRole("button", { name: /Google/i }).click();
       try {
         await page.waitForURL(/\/onboarding(?:\?|$)/, { timeout: 20_000 });
