@@ -3,6 +3,27 @@ import { currentUser } from "@/lib/get-current-user";
 import { successJson, errorJson } from "@/lib/api-response";
 import { logError } from "@/lib/logger";
 
+export async function GET() {
+  try {
+    const user = await currentUser();
+    if (!user) return errorJson("UNAUTHORIZED", "Unauthorized", 401);
+
+    const supabase = getSupabaseServer();
+    const { data: profile, error } = await supabase
+      .from("instructor_profiles")
+      .select("id, name, email, school, status")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (error) throw error;
+    return successJson({ profile: profile ?? null });
+  } catch (error) {
+    logError("[instructor-profile] Failed to fetch profile", error, {
+      path: "/api/instructor/profile",
+    });
+    return errorJson("FETCH_PROFILE_FAILED", "Failed to fetch profile", 500);
+  }
+}
 export async function POST(request: Request) {
   try {
     const user = await currentUser();

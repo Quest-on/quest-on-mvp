@@ -72,7 +72,7 @@ COMMENT ON TABLE public.consent_subject_map IS
 -- 3. consent_policy_releases — 불변 정책 릴리스 레지스트리
 -- ─────────────────────────────────────────────────────────────
 -- 이게 없으면 문구를 바꿔도 재동의 트리거가 없어 기존 사용자가 무고지로 통과한다.
--- seed 는 넣지 않는다 — 최초 행은 020 (PR3 #136) 이 소유한다.
+-- seed 는 넣지 않는다 — 최초 행은 027 (PR3 #136) 이 소유한다.
 CREATE TABLE IF NOT EXISTS public.consent_policy_releases (
   release_id        text        PRIMARY KEY,
   content_hash      char(64)    NOT NULL,

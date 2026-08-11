@@ -438,7 +438,7 @@ model consent_subject_map {
 }
 
 /// 025: 불변 정책 릴리스. UPDATE/DELETE 를 trigger 가 거부한다.
-/// 최초 행은 026_seed_consent_policy_release.sql 이 소유한다.
+/// 최초 행은 027_seed_consent_policy_release.sql 이 소유한다.
 /// This model contains row level security and requires additional setup for migrations.
 model consent_policy_releases {
   release_id         String            @id

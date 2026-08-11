@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 
 /**
- * AC-S4 — 019 마이그레이션과 Prisma 모델이 명세의 스키마 계약을 구조적으로 강제하는지
+ * AC-S4 — 025 마이그레이션과 Prisma 모델이 명세의 스키마 계약을 구조적으로 강제하는지
  * 검사한다. 이 테스트는 DB 에 붙지 않는다(정적 검사). live RLS/trigger 동작은
  * e2e/api/consent-schema-security.spec.ts 가 별도로 확인한다.
  *
@@ -122,7 +122,7 @@ describe("025 consent schema — append-only 불변식", () => {
     expect(sql).toContain("consent_policy_releases is immutable");
   });
 
-  it("019 는 최초 릴리스 seed 를 넣지 않는다 (020 이 소유)", () => {
+  it("025 는 최초 릴리스 seed 를 넣지 않는다 (027 이 소유)", () => {
     expect(sql).not.toMatch(/INSERT INTO public\.consent_policy_releases/);
   });
 });
@@ -233,5 +233,11 @@ describe("025 consent schema — 마이그레이션 형태", () => {
     expect(files).toContain("025_consent_records.sql");
     const twentyFives = files.filter((f) => f.startsWith("025_"));
     expect(twentyFives).toHaveLength(1);
+  });
+
+  it("027 정책 seed도 database 디렉터리에서 유일한 순번이다", () => {
+    const files = fs.readdirSync(path.join(REPO_ROOT, "database"));
+    expect(files).toContain("027_seed_consent_policy_release.sql");
+    expect(files.filter((file) => file.startsWith("027_"))).toHaveLength(1);
   });
 });
