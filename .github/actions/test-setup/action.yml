@@ -15,7 +15,30 @@ runs:
       with:
         version: 2.113.0
 
+    - name: Verify local Supabase project config
+      run: |
+        if [ ! -f supabase/config.toml ]; then
+          echo "supabase/config.toml 이 없다. 로컬 스택을 재현할 수 없다." >&2
+          exit 1
+        fi
+      shell: bash
+
     - run: supabase start
+      shell: bash
+
+    # DB 안전 멈춤 규칙의 preflight가 요구하는 폐기 로컬 DB 증거를 러너에만 만든다.
+    - name: Create disposable local .env.test
+      run: |
+        ANON_KEY="$(supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2- | tr -d '"')"
+        SERVICE_KEY="$(supabase status -o env | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2- | tr -d '"')"
+        {
+          echo "NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON_KEY}"
+          echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_KEY}"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          echo "DISPOSABLE_LOCAL_DB_CONFIRMED=1"
+        } > .env.test
+        echo "DISPOSABLE_LOCAL_DB_CONFIRMED=1" >> "$GITHUB_ENV"
       shell: bash
 
     - run: npm ci
