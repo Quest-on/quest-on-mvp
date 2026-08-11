@@ -117,7 +117,8 @@ export async function getFolderContents(data: {
       *,
       exams!inner (
         ${examColumns},
-        is_demo
+        is_demo,
+        first_published_at
       )
     `;
 

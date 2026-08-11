@@ -65,6 +65,17 @@ BEGIN
   -- 같은 교수자의 동시 입장만 줄 세우므로 다른 교수자의 시험은 영향이 없다.
   PERFORM pg_advisory_xact_lock(hashtext(v_exam.instructor_id::text));
 
+  -- 잠근 뒤 exam 을 **다시 읽는다.**
+  --
+  -- 잠금 전에 읽은 first_published_at 을 그대로 쓰면, 마지막 무료 슬롯의 시험에
+  -- 학생 여럿이 동시에 들어올 때 전부 "아직 미발행"으로 보고 발행 카운트를
+  -- 검사한다. 첫 호출이 발행을 기록해도 뒤따르는 호출들은 낡은 NULL 을 들고
+  -- 있어 한도 초과로 거부된다 — 정상 학생들이 첫 수업 입장에서 튕긴다.
+  SELECT e.id, e.instructor_id, e.is_demo, e.first_published_at
+    INTO v_exam
+  FROM public.exams e
+  WHERE e.id = p_exam_id;
+
   -- 1) 기존 학생은 무조건 통과. 기기 지문이 아니라 (exam_id, student_id) 다.
   SELECT s.id INTO v_existing_id
   FROM public.sessions s
@@ -153,6 +164,41 @@ REVOKE ALL ON FUNCTION public.admit_exam_session(uuid, text, text, text) FROM PU
 REVOKE ALL ON FUNCTION public.admit_exam_session(uuid, text, text, text) FROM anon;
 REVOKE ALL ON FUNCTION public.admit_exam_session(uuid, text, text, text) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.admit_exam_session(uuid, text, text, text) TO service_role;
+
+
+-- ─────────────────────────────────────────────────────────────
+-- 교수자 승인 = plan 승격 (AC-13)
+-- ─────────────────────────────────────────────────────────────
+-- 두 테이블을 따로 UPDATE 하면 각각 독립 커밋이라, 첫 번째가 성공하고 두 번째가
+-- 실패하면 instructor_profiles 는 approved 인데 profiles.plan 은 free 인 상태가
+-- 영구히 남는다. 관리자는 승인했다고 믿고, 교수자는 계속 무료 한도에 묶인다.
+CREATE OR REPLACE FUNCTION public.approve_instructor(p_instructor_id text)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.instructor_profiles
+  SET status = 'approved',
+      approved_at = now(),
+      updated_at = now()
+  WHERE id = p_instructor_id;
+
+  UPDATE public.profiles
+  SET status = 'approved',
+      plan = 'verified',
+      updated_at = now()
+  WHERE id::text = p_instructor_id;
+
+  RETURN true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.approve_instructor(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.approve_instructor(text) FROM anon;
+REVOKE ALL ON FUNCTION public.approve_instructor(text) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.approve_instructor(text) TO service_role;
 
 COMMIT;
 

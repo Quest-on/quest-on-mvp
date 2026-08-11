@@ -33,6 +33,18 @@ const CODE_RENDER_REGISTRY: Record<string, string> = {
     "채점 결과지 안의 시험 식별 표기다. 응시가 끝난 시험이라 발행 한도와 무관하다.",
   "components/landing/DemoExperienceSection.tsx":
     "랜딩의 하드코딩된 예시 화면이다. 실제 시험 코드가 아니다.",
+  "components/exam/WaitingRoom.tsx":
+    "학생이 이미 입장한 대기실이다. 코드로 새 학생을 부르는 표면이 아니다.",
+  "components/exam/LateEntryWaiting.tsx":
+    "학생의 지각 입장 대기 화면이다. 이미 입장 판정을 통과한 뒤다.",
+  "components/report/ReportCardTemplate.tsx":
+    "채점 결과지의 시험 식별 표기다. 응시가 끝난 시험이라 발행 한도와 무관하다.",
+  "components/student/StudentDashboardClient.tsx":
+    "학생 본인이 응시한 시험 목록이다. 교수자 반출 표면이 아니다.",
+  "components/instructor/ExamQuickActionsCard.tsx":
+    "응시 종료 후 채점 액션 카드다. 이미 학생을 받은 시험이라 발행 한도와 무관하다.",
+  "components/instructor/ExamDetailsCard.tsx":
+    "복사 핸들러가 codeGateBlocked 를 먼저 확인하고 막는다. 코드 렌더는 헤더의 ExamCode 가 맡는다.",
   "components/instructor/InstructorHomeClient.tsx":
     "복사 핸들러가 gateBlocked 를 먼저 확인하고 막는다. 코드 렌더는 ExamCard 의 ExamCode 가 맡는다.",
   "app/(app)/instructor/assignment/[assignmentId]/page.tsx":
@@ -73,10 +85,12 @@ describe("코드 반출 표면이 하나로 수렴한다", () => {
       //   - `code={exam.code}` → 위반 아님(ExamCode 에 넘기는 것)
       //   - `code: exam.code` → 위반 아님(데이터 전달)
       const rendersRawCode =
-        /(?:^|[>\s])\{\s*[\w.?]*\bexam\??\.code\s*\}/m.test(
+        /(?:^|[>\s])\{\s*[\w.?]*\b(?:exam\??\.code|createdExamCode|examCode)\s*\}/m.test(
           source.replace(/\bcode=\{[^}]*\}/g, "")
         ) ||
-        /clipboard\.writeText\(\s*[\w.?]*\bcode\b/.test(source);
+        /clipboard\.writeText\(\s*[\w.?]*\b(?:code|examCode|createdExamCode)\b/.test(source) ||
+        // 삼항으로 코드를 그리는 패턴(`copied ? "복사됨" : exam.code`)도 반출이다.
+        /\?[^\n]{0,80}:\s*[\w.?]*\bexam\??\.code\b/.test(source);
       if (rendersRawCode) offenders.push(file);
     }
 
@@ -142,5 +156,95 @@ describe("차단 상태에서는 코드를 아예 내보내지 않는다", () =>
     );
     expect(blocked).not.toMatch(/\{code\}/);
     expect(blocked).toMatch(/blockedTitle/);
+  });
+});
+
+describe("게이트가 실제로 배선돼 있다", () => {
+  const drive = read("components/instructor/InstructorHomeClient.tsx");
+  const driveHandlers = read("app/api/supa/handlers/drive-handlers.ts");
+  const handlers = read("app/api/supa/handlers/session-handlers.ts");
+  const sql = read("database/024_admit_exam_session.sql");
+
+  it("드라이브 복사 핸들러가 차단 여부를 실제로 전달받는다", () => {
+    // 인자를 안 넘기면 게이트가 있어도 없는 것과 같다. 실제로 그 상태였다.
+    expect(drive).toMatch(/handleCopyExamCode\(/);
+    expect(drive).toMatch(/resolveCodeGate\(/);
+    expect(drive).toMatch(/\}\) === "blocked"/);
+  });
+
+  it("드라이브 조회가 판정에 필요한 컬럼을 함께 읽는다", () => {
+    // 없으면 alreadyPublished 가 항상 false 라 이미 발행된 시험까지 막힌다.
+    expect(driveHandlers).toMatch(/first_published_at/);
+  });
+
+  it("세션 생성이 RPC 를 거친다 — 우회 삽입이 없다", () => {
+    expect(handlers).toMatch(/"admit_exam_session"/);
+    // 정상 경로에 upsert 가 남아 있으면 한도를 통과하지 않고 세션이 생긴다.
+    // fail-open 폴백 하나만 허용하고, 그건 quota_fail_open 로그 직후여야 한다.
+    const upserts = handlers.match(/\.upsert\(/g) ?? [];
+    expect(upserts).toHaveLength(1);
+    expect(handlers).toMatch(/quota_fail_open[\s\S]{0,600}?\.upsert\(/);
+  });
+
+  it("한도 초과가 학생에게 전용 코드로 전달된다", () => {
+    const hook = read("hooks/useExamSession.ts");
+    // network_error 로 뭉개면 학생은 새로고침만 반복한다.
+    expect(hook).toMatch(/PUBLISH_LIMIT_REACHED: "publish_limit"/);
+    expect(hook).toMatch(/STUDENT_LIMIT_REACHED: "student_limit"/);
+    // 코드가 보존돼야 "같은 코드로 다시 시도"가 가능하다.
+    expect(hook).toMatch(/code=\$\{encodeURIComponent\(examCode\)\}/);
+  });
+
+  it("승인이 plan 을 승격한다 (AC-13)", () => {
+    const approve = read("app/api/admin/instructors/approve/route.ts");
+    // 승인과 plan 승격이 한 트랜잭션이어야 한다. 따로 하면 첫 번째만 성공했을 때
+    // instructor_profiles 는 approved 인데 plan 은 free 인 상태가 영구히 남는다.
+    expect(approve).toMatch(/approve_instructor/);
+    expect(approve).toMatch(/approveError[\s\S]{0,300}?return errorJson\(/);
+    expect(sql).toMatch(/plan = 'verified'/);
+  });
+});
+
+describe("원자적 강제 (024)", () => {
+  const sql = read("database/024_admit_exam_session.sql");
+
+  it("교수자 단위로 직렬화한다", () => {
+    // count-check-insert 는 TOCTOU 다. 30명이 동시에 들어오면 전부 통과한다.
+    // 아직 없는 행은 SELECT FOR UPDATE 로 잠글 수 없다.
+    expect(sql).toMatch(/pg_advisory_xact_lock\(hashtext\(v_exam\.instructor_id::text\)\)/);
+  });
+
+  it("기존 학생을 기기 지문이 아니라 (exam_id, student_id) 로 판정한다", () => {
+    // 지문으로 좁히면 다른 기기로 재접속한 학생이 신규로 분류돼,
+    // 정원이 찼을 때 수업 중인 학생이 튕긴다 (AC-10a).
+    const block = sql.slice(sql.indexOf("-- 1)"), sql.indexOf("-- 2)"));
+    expect(block).toMatch(/s\.exam_id = p_exam_id/);
+    expect(block).toMatch(/AND s\.student_id = p_student_id/);
+    expect(block).not.toMatch(/device_fingerprint/);
+  });
+
+  it("데모는 두 한도와 발행 기록을 모두 우회한다", () => {
+    expect(sql).toMatch(/IF NOT COALESCE\(v_exam\.is_demo, false\) THEN/);
+  });
+
+  it("이미 발행된 시험에는 발행 한도를 재적용하지 않는다", () => {
+    // 재적용하면 한도를 넘긴 교수자의 진행 중인 시험이 수업 도중 멈춘다.
+    expect(sql).toMatch(/v_max_publishes IS NOT NULL AND v_exam\.first_published_at IS NULL/);
+  });
+
+  it("발행 카운트에서 데모를 뺀다", () => {
+    // 빼지 않으면 데모를 만들어 본 교수자가 무료 한도를 한 칸 잃는다.
+    expect(sql).toMatch(/e\.is_demo = false/);
+  });
+
+  it("권한이 service_role 로 좁혀져 있다", () => {
+    expect(sql).toMatch(/FROM anon;/);
+    expect(sql).toMatch(/TO service_role;/);
+  });
+
+  it("비상 해제 절차가 문서에 있다", () => {
+    // 한쪽만 풀면 다른 쪽이 계속 막는다. 캐시 지연도 알아야 한다.
+    expect(sql).toMatch(/max_publishes = NULL, max_students = NULL/);
+    expect(sql).toMatch(/60초 캐시/);
   });
 });

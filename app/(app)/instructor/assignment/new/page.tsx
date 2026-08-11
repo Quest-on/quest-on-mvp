@@ -1,4 +1,6 @@
 "use client";
+import { ExamCode } from "@/components/instructor/ExamCode";
+import { useQuery } from "@tanstack/react-query";
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,15 @@ export default function CreateAssignment() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [createdExamCode, setCreatedExamCode] = useState("");
+
+  const { data: quotaData } = useQuery<{ publishesRemaining: number | null }>({
+    queryKey: ["instructor-quota"],
+    queryFn: async ({ signal }) => {
+      const response = await fetch("/api/instructor/quota", { signal });
+      if (!response.ok) throw new Error("quota");
+      return response.json() as Promise<{ publishesRemaining: number | null }>;
+    },
+  });
 
   const [examData, setExamData] = useState({
     title: "",
@@ -262,10 +273,8 @@ export default function CreateAssignment() {
                   <div>
                     <Label className="text-sm font-medium">{t("newAssignment.dialogAssignmentCode")}</Label>
                     <div className="flex items-center gap-2 mt-1">
-                      <code className="px-4 py-2 bg-muted rounded-md exam-code text-lg font-semibold">{createdExamCode}</code>
-                      <Button type="button" variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(createdExamCode); toast.success(t("newAssignment.dialogCopied"), { id: "copy-code" }); }}>
-                        {t("newAssignment.dialogCopy")}
-                      </Button>
+                      {/* 코드는 ExamCode 만 내보낸다 (이슈 #84). 새로 만든 과제는 항상 미발행이다. */}
+                      <ExamCode code={createdExamCode} quota={{ alreadyPublished: false, publishesRemaining: quotaData?.publishesRemaining ?? null }} />
                     </div>
                     <p className="text-sm text-muted-foreground mt-2">{t("newAssignment.dialogShare")}</p>
                   </div>

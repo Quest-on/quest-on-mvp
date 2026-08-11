@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { ExamCode } from "@/components/instructor/ExamCode";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -70,6 +72,16 @@ export default function CreateExam() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSignUpDialogOpen, setIsSignUpDialogOpen] = useState(false);
   const [createdExamCode, setCreatedExamCode] = useState("");
+
+  // 발행 한도. 코드를 건네기 전에 알아야 한다(이슈 #84).
+  const { data: quotaData } = useQuery<{ publishesRemaining: number | null }>({
+    queryKey: ["instructor-quota"],
+    queryFn: async ({ signal }) => {
+      const response = await fetch("/api/instructor/quota", { signal });
+      if (!response.ok) throw new Error("quota");
+      return response.json() as Promise<{ publishesRemaining: number | null }>;
+    },
+  });
 
   // 데모 모드 체크: 로그인하지 않았거나 데모 페이지에서 온 경우
   const isDemoMode = !isLoaded || !isSignedIn || !user;
@@ -933,23 +945,19 @@ export default function CreateExam() {
                     <div className="space-y-3">
                       <div>
                         <Label className="text-sm font-medium">{t("newExam.dialogExamCode")}</Label>
-                        <div className="flex items-center gap-2 mt-1">
-                          <code className="px-4 py-2 bg-muted rounded-md exam-code text-lg font-semibold">
-                            {createdExamCode}
-                          </code>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              navigator.clipboard.writeText(createdExamCode);
-                              toast.success(t("newExam.dialogCopied"), {
-                                id: "copy-exam-code",
-                              });
+                        {/* 코드는 ExamCode 만 내보낸다 (이슈 #84).
+                            여기가 교수자의 최단 경로다 — 생성 직후 이 대화상자에서
+                            코드를 복사해 수업 자료에 붙인다. 여기서 안 막으면
+                            네 번째 시험 코드를 배포한 뒤 수업 중에 학생 전원이
+                            튕긴다. 새로 만든 시험은 항상 미발행이다. */}
+                        <div className="mt-1">
+                          <ExamCode
+                            code={createdExamCode}
+                            quota={{
+                              alreadyPublished: false,
+                              publishesRemaining: quotaData?.publishesRemaining ?? null,
                             }}
-                          >
-                            {t("newExam.dialogCopy")}
-                          </Button>
+                          />
                         </div>
                         <p className="text-sm text-muted-foreground mt-2">
                           {t("newExam.dialogShare")}

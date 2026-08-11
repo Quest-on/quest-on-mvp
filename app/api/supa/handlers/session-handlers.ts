@@ -231,20 +231,47 @@ export async function createOrGetSession(data: { examId: string; studentId: stri
       return errorJson("UNAUTHORIZED", "Student ID mismatch", 403);
     }
 
-    // Upsert session (race-safe: uses UNIQUE(exam_id, student_id) constraint)
-    // Use ignoreDuplicates to avoid overwriting existing session data
+    // 이 경로도 같은 원자 연산을 거친다 (이슈 #84).
+    //
+    // `create_or_get_session` 은 API 액션으로 노출돼 있어서, 여기서 직접
+    // upsert 하면 학생이 이 액션을 불러 발행·학생 한도를 통째로 우회할 수
+    // 있다. 한도는 한 문(門)으로만 지나가야 한다.
+    const { data: admission, error: admitError } = await getSupabase().rpc(
+      "admit_exam_session",
+      {
+        p_exam_id: data.examId,
+        p_student_id: data.studentId,
+        p_status: "joined",
+        p_fingerprint: null,
+      }
+    );
+
+    if (admitError) {
+      // fail-open. 한도 계산 장애로 수업이 멈추는 것보다 낫다.
+      logError("[createOrGetSession] quota_fail_open", admitError, {
+        path: "/api/supa/session-handlers",
+        additionalData: { examId: data.examId, reason: "admit_rpc_failed" },
+      });
+    }
+
+    const verdict = Array.isArray(admission) ? admission[0] : admission;
+    if (verdict && verdict.admitted === false) {
+      return errorJson(
+        verdict.denial_reason === "publish_limit"
+          ? "PUBLISH_LIMIT_REACHED"
+          : "STUDENT_LIMIT_REACHED",
+        verdict.denial_reason === "publish_limit"
+          ? "Instructor verification required before more exams can be published"
+          : "This exam has reached its student limit",
+        403
+      );
+    }
+
     const { data: upsertedSession, error: upsertError } = await getSupabase()
       .from("sessions")
-      .upsert(
-        {
-          exam_id: data.examId,
-          student_id: data.studentId,
-          used_clarifications: 0,
-          created_at: new Date().toISOString(),
-        },
-        { onConflict: "exam_id,student_id", ignoreDuplicates: true }
-      )
       .select()
+      .eq("exam_id", data.examId)
+      .eq("student_id", data.studentId)
       .maybeSingle();
 
     if (upsertError) throw upsertError;
@@ -708,13 +735,34 @@ export async function initExamSession(data: {
       );
 
       // 한도 판정이 깨지면 학생을 들여보낸다(fail-open). 한도 계산 장애로
-      // 수업이 멈추는 것보다 잠시 한도가 풀리는 쪽이 낫다. 대신 이 로그가
-      // 없으면 한도가 조용히 풀린 걸 아무도 모른다.
+      // 수업이 멈추는 것보다 잠시 한도가 풀리는 쪽이 낫다.
+      //
+      // 로그만 남기고 넘어가면 fail-open 이 아니다 — RPC 가 세션을 못 만들었으니
+      // 아래 조회가 비어 500 이 된다. 그래서 여기서 직접 만들어 준다.
       if (admitError) {
         logError("[initExamSession] quota_fail_open", admitError, {
           path: "/api/supa/session-handlers",
           additionalData: { examId: exam.id, reason: "admit_rpc_failed" },
         });
+
+        const { error: fallbackError } = await getSupabase()
+          .from("sessions")
+          .upsert(
+            {
+              exam_id: exam.id,
+              student_id: data.studentId,
+              used_clarifications: 0,
+              is_active: true,
+              last_heartbeat_at: now,
+              device_fingerprint: incomingFingerprint,
+              created_at: now,
+              status: initialStatus,
+              started_at: initialStatus === "in_progress" ? now : null,
+              attempt_timer_started_at: initialStatus === "in_progress" ? now : null,
+            },
+            { onConflict: "exam_id,student_id", ignoreDuplicates: true }
+          );
+        if (fallbackError) throw fallbackError;
       }
 
       const verdict = Array.isArray(admission) ? admission[0] : admission;

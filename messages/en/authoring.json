@@ -113,7 +113,8 @@
     "toastNoticeCopyFailed": "Could not copy the notice",
     "noticeHeading": "[Quest-On] Exam notice",
     "noticeCodeLabel": "Entry code",
-    "noticeFooter": "Questions? Contact your instructor."
+    "noticeFooter": "Questions? Contact your instructor.",
+    "toastCodeBlocked": "You have reached the publish limit, so this code cannot be copied yet. Verify your account and try again."
   },
   "examInfoForm": {
     "cardTitleAssignment": "Assignment Info",

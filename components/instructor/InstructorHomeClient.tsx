@@ -1,4 +1,5 @@
 "use client";
+import { resolveCodeGate } from "@/components/instructor/ExamCode";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -113,6 +114,10 @@ interface ExamNode {
     type?: string | null;
     deadline?: string | null;
     open_at?: string | null;
+    /** 발행 한도 판정용 (이슈 #84). 데모는 한도를 소모하지 않는다. */
+    is_demo?: boolean;
+    /** 이미 학생을 받은 시험에는 발행 한도를 재적용하지 않는다. */
+    first_published_at?: string | null;
     created_at: string;
     updated_at: string;
   } | null;
@@ -382,6 +387,16 @@ export default function InstructorHome() {
     },
     [locale]
   );
+
+  // 발행 한도. 교수자가 코드를 건네기 전에 알아야 한다(이슈 #84).
+  const { data: quotaData } = useQuery<{ publishesRemaining: number | null }>({
+    queryKey: ["instructor-quota"],
+    queryFn: async ({ signal }) => {
+      const response = await fetch("/api/instructor/quota", { signal });
+      if (!response.ok) throw new Error("quota");
+      return response.json() as Promise<{ publishesRemaining: number | null }>;
+    },
+  });
 
   const handleCopyExamCode = async (code?: string, gateBlocked?: boolean) => {
     if (!code) {
@@ -760,7 +775,16 @@ export default function InstructorHome() {
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();
-                handleCopyExamCode(node.exams?.code);
+                // 발행 한도에 걸린 미발행 시험은 코드를 복사시키지 않는다.
+                // 이 인자를 안 넘기면 게이트가 있어도 없는 것과 같다.
+                handleCopyExamCode(
+                  node.exams?.code,
+                  resolveCodeGate({
+                    isDemo: node.exams?.is_demo,
+                    alreadyPublished: !!node.exams?.first_published_at,
+                    publishesRemaining: quotaData?.publishesRemaining ?? null,
+                  }) === "blocked"
+                );
               }}
             >
               <Copy className="w-4 h-4 mr-2" aria-hidden="true" />

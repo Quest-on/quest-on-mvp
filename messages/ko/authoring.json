@@ -113,7 +113,8 @@
     "toastNoticeCopyFailed": "공지문 복사에 실패했습니다",
     "noticeHeading": "[퀘스트온] 시험 안내",
     "noticeCodeLabel": "입장 코드",
-    "noticeFooter": "문의는 담당 교수자에게 해주세요."
+    "noticeFooter": "문의는 담당 교수자에게 해주세요.",
+    "toastCodeBlocked": "발행 한도에 도달해 지금은 코드를 복사할 수 없습니다. 계정 인증 후 다시 시도해 주세요."
   },
   "examInfoForm": {
     "cardTitleAssignment": "과제 정보",

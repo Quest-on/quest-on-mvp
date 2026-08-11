@@ -13,6 +13,8 @@ interface ExamDetailsCardProps {
   duration: number;
   createdAt: string;
   examCode: string;
+  /** 발행 한도에 걸려 코드 반출을 막아야 하는가 (이슈 #84). */
+  codeGateBlocked?: boolean;
   examTitle?: string;
   /**
    * 이 시험에서 학생이 AI 채팅을 쓸 수 있는가(= 서술형/CASE 문항이 있는가).
@@ -29,12 +31,21 @@ export function ExamDetailsCard({
   duration,
   createdAt,
   examCode,
+  codeGateBlocked,
   examTitle = "",
   aiChatAvailable,
 }: ExamDetailsCardProps) {
   const t = useTranslations("authoring");
   const tExam = useTranslations("exam");
   const handleCopyCode = async () => {
+    // 발행 한도에 걸린 미발행 시험의 코드는 복사시키지 않는다 (이슈 #84).
+    // 복사해 수업 자료에 붙인 뒤에 막으면 수업 중에 학생 전원이 튕긴다.
+    if (codeGateBlocked) {
+      toast.error(t("examDetailsCard.toastCodeBlocked"), {
+        id: "copy-exam-code-blocked",
+      });
+      return;
+    }
     try {
       await navigator.clipboard.writeText(examCode);
       toast.success(t("examDetailsCard.toastCodeCopied"), {

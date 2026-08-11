@@ -183,6 +183,12 @@ runs:
           REVOKE ALL ON public.onboarding_events FROM anon, authenticated;
           REVOKE ALL ON public.profiles FROM anon, authenticated;
           GRANT SELECT ON public.profiles TO anon, authenticated;
+          -- SECURITY DEFINER 함수도 blanket GRANT 에 함께 열린다. 열린 채 두면
+          -- 인증된 학생이 admit_exam_session 을 직접 불러 임의 student_id 로
+          -- 세션을 만들거나 restart_demo_attempt 로 남의 제출을 지울 수 있다.
+          -- CI 만 운영과 다른 보안 상태가 되어 검증이 무의미해진다.
+          REVOKE ALL ON FUNCTION public.admit_exam_session(uuid, text, text, text) FROM anon, authenticated;
+          REVOKE ALL ON FUNCTION public.restart_demo_attempt(uuid, text) FROM anon, authenticated;
           NOTIFY pgrst, 'reload schema';
         "
       shell: bash
