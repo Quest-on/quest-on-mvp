@@ -88,6 +88,47 @@ export function LateEntryWaiting({
     };
   }, [sessionId]);
 
+  // Realtime 이벤트를 놓쳐도 복구한다.
+  //
+  // 구독이 붙기 전에 교수자가 승인했거나 연결이 끊기면, 서버 타이머는 계속
+  // 줄어드는데 화면은 "강사 승인 대기 중"에 영원히 남는다. 학생은 나가는
+  // 버튼도 없어 갇힌다. 일반 대기실에는 이미 같은 폴백이 있다.
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const poll = async () => {
+      try {
+        const response = await fetch("/api/supa", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "check_gate_status", data: { sessionId } }),
+        });
+        if (!response.ok) return;
+        const result = await response.json();
+        const status = result?.session?.status ?? result?.status;
+
+        if (status === "in_progress") {
+          onGateStartRef.current?.({
+            sessionStatus: "in_progress",
+            sessionStartTime:
+              result?.session?.attempt_timer_started_at ??
+              result?.session?.started_at ??
+              null,
+            timeRemaining: null,
+          });
+        } else if (status === "denied") {
+          setIsDenied(true);
+        }
+      } catch {
+        // 폴백이 실패해도 조용히 넘어간다. Realtime 이 살아 있을 수 있다.
+      }
+    };
+
+    void poll();
+    const timer = setInterval(poll, 15_000);
+    return () => clearInterval(timer);
+  }, [sessionId]);
+
   if (isDenied) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white dark:from-slate-950 dark:to-slate-900 flex items-center justify-center p-4">

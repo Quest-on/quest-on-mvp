@@ -70,24 +70,24 @@ vi.mock("@/lib/supabase-server", () => ({
         eq: () => chain,
         single: async () => ({ data: row, error: null }),
         maybeSingle: async () => ({ data: row, error: null }),
-        update: () => ({
-          eq: () => ({
-            eq: () => ({
-              select: () => ({
-                single: async () => ({
-                  data: { ...session, preflight_accepted_at: "now", status: "waiting" },
-                  error: null,
-                }),
-              }),
+        // update 체인은 호출 깊이가 경로마다 다르다(대기 유지 vs 즉시 시작).
+        // 어떤 깊이로 불러도 같은 행을 돌려주도록 자기참조 체인으로 둔다.
+        update: () => {
+          const upd: Record<string, unknown> = {
+            eq: () => upd,
+            is: () => upd,
+            select: () => upd,
+            single: async () => ({
+              data: { ...session, preflight_accepted_at: "now", status: "in_progress" },
+              error: null,
             }),
-            select: () => ({
-              single: async () => ({
-                data: { ...session, preflight_accepted_at: "now", status: "waiting" },
-                error: null,
-              }),
+            maybeSingle: async () => ({
+              data: { ...session, preflight_accepted_at: "now", status: "in_progress" },
+              error: null,
             }),
-          }),
-        }),
+          };
+          return upd;
+        },
       };
       return chain;
     },

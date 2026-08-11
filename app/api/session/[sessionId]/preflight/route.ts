@@ -111,8 +111,24 @@ export async function POST(
         return errorJson("INTERNAL_ERROR", "Failed to accept preflight", 500);
       }
       reconciledSession = updatedSession;
-    } else if (isExamStarted(exam.status, exam.started_at, nowTime) || (exam.type && exam.type !== "exam")) {
-      // 시험이 이미 시작되었거나, 비시험 유형인 경우 바로 in_progress로 전환
+    } else if (
+      isExamStarted(exam.status, exam.started_at, nowTime) ||
+      (exam.type && exam.type !== "exam") ||
+      // 교수자가 자기 데모를 학생 시점으로 겪는 경우도 바로 시작한다.
+      //
+      // 이게 없으면 initExamSession 이 in_progress 로 만든 세션을 여기서
+      // waiting 으로 덮어써, 교수자가 자기 데모 대기실에 갇힌다. 나가려면 다른
+      // 탭에서 교수자용 "시험 시작"을 눌러야 하는데 아무도 그걸 안내하지
+      // 않는다 — 에픽의 핵심 동선이 여기서 끊긴다.
+      //
+      // 판정은 세션 생성 때와 같은 순수 함수를 쓴다. 정의가 갈라지면 한쪽만
+      // 고쳐졌을 때 이 증상이 그대로 재발한다.
+      isDemoPreview({
+        isDemo: (exam as { is_demo?: unknown }).is_demo,
+        instructorId: (exam as { instructor_id?: unknown }).instructor_id,
+        userId: user.id,
+      }) === true
+    ) {
       reconciledSession = await promoteSessionToInProgress(session, now, {
         preflightAcceptedAt: now,
       });

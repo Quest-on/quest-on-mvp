@@ -763,6 +763,23 @@ export async function initExamSession(data: {
             { onConflict: "exam_id,student_id", ignoreDuplicates: true }
           );
         if (fallbackError) throw fallbackError;
+
+        // 발행 시각도 함께 기록한다. 이걸 빼면 fail-open 으로 들어온 시험이
+        // 영영 "미발행"으로 남아 발행 한도가 조용히 새어 나간다 — 장애가
+        // 끝난 뒤에도 그 시험은 카운트되지 않는다.
+        if (exam.is_demo !== true) {
+          const { error: publicationError } = await getSupabase()
+            .from("exams")
+            .update({ first_published_at: now })
+            .eq("id", exam.id)
+            .is("first_published_at", null);
+          if (publicationError) {
+            logError("[initExamSession] quota_fail_open publication", publicationError, {
+              path: "/api/supa/session-handlers",
+              additionalData: { examId: exam.id },
+            });
+          }
+        }
       }
 
       const verdict = Array.isArray(admission) ? admission[0] : admission;

@@ -7,6 +7,7 @@ import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ExamDetailHeader } from "@/components/instructor/ExamDetailHeader";
+import { resolveCodeGate } from "@/components/instructor/ExamCode";
 import { ExamDetailsCard } from "@/components/instructor/ExamDetailsCard";
 import { QuestionsListCard } from "@/components/instructor/QuestionsListCard";
 import { ExamControlButtons } from "@/components/instructor/ExamControlButtons";
@@ -555,6 +556,15 @@ export default function ExamDetail({
                   <CollapsibleContent>
                     <div className="px-4 pb-4">
                       <ExamDetailsCard
+                        // 발행 한도에 걸린 미발행 시험은 이 카드에서도 코드를
+                        // 반출하면 안 된다. 헤더만 막으면 카드가 우회로가 된다.
+                        codeGateBlocked={
+                          resolveCodeGate({
+                            isDemo: isDemoExam,
+                            alreadyPublished: !!exam.first_published_at,
+                            publishesRemaining: quotaData?.publishesRemaining ?? null,
+                          }) === "blocked"
+                        }
                         description={exam.description}
                         duration={exam.duration}
                         createdAt={exam.createdAt}
