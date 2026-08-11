@@ -147,8 +147,7 @@ flowchart LR
     currentUser --> route{"role?"}
     route -->|없음| onboarding["/onboarding"]
     route -->|student| studentHome["/student"]
-    route -->|instructor pending| pending["/instructor-pending"]
-    route -->|instructor approved| instructorHome["/instructor"]
+    route -->|instructor| instructorHome["/instructor"]
 
     adminLogin["/admin/login"] --> adminAuth["requireAdmin()<br/>lib/admin-auth.ts<br/>HMAC-SHA256 JWT · httpOnly 24h"]
     adminAuth --> adminHome["/admin"]
@@ -361,7 +360,6 @@ flowchart LR
         i2["/instructor/[examId] · /edit"]
         i3["/instructor/[examId]/grade/[studentId]"]
         i4["/instructor/assignment/*"]
-        i5["/instructor-pending"]
     end
     subgraph adm["운영자"]
         a1["/admin/login → /admin"]

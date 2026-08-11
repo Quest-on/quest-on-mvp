@@ -20,7 +20,9 @@ export async function POST(request: Request) {
         name: name || "",
         email: email || "",
         school: school || null,
-        status: "pending",
+        // 승인 대기 개념을 없앴다(#79). 교수자는 가입 즉시 활동하고, 미인증
+        // 계정 제어는 status 가 아니라 plan_limits 의 무료 한도가 맡는다.
+        status: "approved",
         updated_at: new Date().toISOString(),
       }, { onConflict: "id" });
 
