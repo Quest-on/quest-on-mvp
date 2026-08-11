@@ -10,8 +10,8 @@ import { test, expect } from "@playwright/test";
  */
 
 const PROCESSORS = [
-  "OpenAI, L.L.C.",
-  "Supabase, Inc.",
+  "OpenAI OpCo, LLC",
+  "Supabase Pte. Ltd",
   "Vercel Inc.",
   "Upstash, Inc.",
 ] as const;
@@ -49,7 +49,10 @@ for (const locale of ["ko", "en"] as const) {
     test("국외이전 공개항목이 모두 보인다", async ({ page }) => {
       const body = await page.locator("body").innerText();
       // 수령자 명칭·연락처·국가·시기·방법이 빠지면 공개 의무 미이행이다.
-      expect(body).toMatch(/privacy@openai\.com|privacy@supabase\.io/);
+      expect(body).toContain("privacy@openai.com");
+      expect(body).toContain("privacy@supabase.io");
+      expect(body).toContain("privacy@upstash.com");
+      expect(body).toMatch(/Singapore|싱가포르/);
       expect(body.length).toBeGreaterThan(500);
     });
   });
