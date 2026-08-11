@@ -227,20 +227,9 @@ runs:
           -- 동의 원장 등 다른 SECURITY DEFINER 함수도 blanket GRANT 에 함께 열린다.
           -- 다시 회수하지 않으면 CI 에서만 임의 매핑 선점·purge 호출이 열려,
           -- 운영과 다른 보안 상태로 검증이 무의미해진다.
-          DO $do$
-          DECLARE fn record;
-          BEGIN
-            FOR fn IN
-              SELECT p.oid::regprocedure AS sig
-              FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-              WHERE n.nspname = 'public' AND p.prosecdef
-            LOOP
-              EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', fn.sig);
-              EXECUTE format('REVOKE ALL ON FUNCTION %s FROM anon, authenticated', fn.sig);
-              EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', fn.sig);
-            END LOOP;
-          END
-          $do$;
+          -- 동의 원장 RPC 도 SECURITY DEFINER 다. blanket GRANT 뒤 다시 회수하지
+          -- 않으면 CI 에서만 임의 매핑 선점·purge 호출이 열려 검증이 무의미해진다.
+          -- (DO 블록은 셸의 달러 확장과 충돌하므로 파일로 적용한다.)
           -- 025 의 consent 테이블도 같은 이유로 다시 회수한다.
           -- 매핑과 보존 인덱스는 service_role 직접 접근도 막는다(RPC 로만 접근).
           REVOKE ALL ON public.consent_records FROM anon, authenticated;
@@ -252,4 +241,11 @@ runs:
           REVOKE ALL ON public.consent_retention_index FROM service_role;
           NOTIFY pgrst, 'reload schema';
         "
+        # blanket GRANT 가 SECURITY DEFINER 함수까지 다시 열었다. 026 을 재적용해
+        # 권한을 원래대로 회수한다 — 함수 정의는 멱등(CREATE OR REPLACE)이다.
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
+          -f database/026_close_quota_gaps.sql
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -c "NOTIFY pgrst, 'reload schema';"
       shell: bash
