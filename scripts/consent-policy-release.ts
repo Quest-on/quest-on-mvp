@@ -19,7 +19,7 @@ function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, "utf8")) as T;
 }
 
-export function buildCanonicalInput() {
+export function buildCanonicalInput(): JsonValue {
   const koOnboarding = readJson<OnboardingMessages>("messages/ko/onboarding.json");
   const enOnboarding = readJson<OnboardingMessages>("messages/en/onboarding.json");
   const koLegal = readJson<LegalMessages>("messages/ko/legal.json");
@@ -74,7 +74,9 @@ export function computeContentHash(input: JsonValue = buildCanonicalInput()): st
 
 export function readSeedHash(sqlPath: string): string | null {
   const sql = readFileSync(sqlPath, "utf8");
-  return sql.match(/VALUES\s*\(\s*'[^']+'\s*,\s*'([0-9a-f]{64})'/is)?.[1] ?? null;
+  // `s`(dotAll) 플래그는 tsconfig target 이 es2018 미만이라 쓸 수 없다.
+  // `[\s\S]` 로 같은 효과를 내면서 target 을 건드리지 않는다.
+  return sql.match(/VALUES[\s\S]*?'[^']+'[\s\S]*?'([0-9a-f]{64})'/i)?.[1] ?? null;
 }
 
 function main() {
