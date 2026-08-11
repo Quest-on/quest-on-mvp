@@ -59,14 +59,19 @@ async function runGeneration(
     try {
       const tracked = await callTrackedChatCompletion(
         () =>
-          getOpenAI().chat.completions.create({
-            model: AI_MODEL_HEAVY,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: userPrompt },
-            ],
-            response_format: { type: "json_object" },
-          }),
+          getOpenAI().chat.completions.create(
+            {
+              model: AI_MODEL_HEAVY,
+              messages: [
+                { role: "system", content: system },
+                { role: "user", content: userPrompt },
+              ],
+              response_format: { type: "json_object" },
+            },
+            // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
+            // 클라이언트 기본 maxRetries 가 0 이므로 여기서 명시해야 재시도가 산다.
+            { timeout: 120_000, maxRetries: 2 }
+          ),
         {
           feature: "generate_questions_stream",
           route: "/api/ai/generate-questions-stream",
@@ -81,7 +86,6 @@ async function runGeneration(
           }),
         },
         {
-          timeoutMs: 120_000,
           metadataBuilder: (result) =>
             buildAiTextMetadata({
               outputText:

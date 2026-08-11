@@ -120,9 +120,11 @@ export async function POST(request: NextRequest) {
               ],
               response_format: { type: "json_object" },
             },
+            // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
+            // 목 헤더가 있으면 결정론을 위해 재시도를 끈다.
             hasMockHeaders
-              ? { headers: mockHeaders, maxRetries: 0 }
-              : undefined
+              ? { headers: mockHeaders, maxRetries: 0, timeout: GENERATION_TIMEOUT_MS }
+              : { maxRetries: 2, timeout: GENERATION_TIMEOUT_MS }
           ),
         {
           feature: "generate_questions",
@@ -141,8 +143,6 @@ export async function POST(request: NextRequest) {
           }),
         },
         {
-          timeoutMs: GENERATION_TIMEOUT_MS,
-          maxAttempts: hasMockHeaders ? 1 : undefined,
           metadataBuilder: (result) =>
             buildAiTextMetadata({
               outputText:

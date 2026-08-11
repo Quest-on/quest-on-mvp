@@ -290,129 +290,95 @@ async function gradeSingleQuestion(params: {
 
   const userPrompt = `[학생의 채팅 기반 과제 수행 기록]\n${submission.answer || "(기록 없음)"}${finalAnswerSection}${aiSummaryText}`;
 
-  // Retry loop: up to 2 retries (3 total attempts) with exponential backoff (1s, 2s)
-  const MAX_GRADING_RETRIES = 2;
-  const RETRY_DELAYS_MS = [1_000, 2_000];
-  /** Minimum useful timeout per attempt — below this it's not worth trying */
+  // 이슈 #118: 수동 재시도 루프를 제거했다.
+  //
+  // 예전에는 여기서 3회 outer 루프를 돌리면서 래퍼의 내부 재시도를 끄는 식으로
+  // 균형을 잡았다. 문제는 SDK 자체가 기본 maxRetries=2 로 조용히 재시도하고 있어서
+  // 실제 전송 횟수가 곱해졌고, 관리자가 maxRetries 를 조정할 수 있게 되면 이 루프와
+  // 다시 곱해진다. 재시도 계층은 하나여야 한다.
+  //
+  // 지금은 SDK 요청 옵션 한 층이 재시도를 소유하고, 남은 deadline 예산이 실효
+  // 재시도 수와 시도별 타임아웃을 정한다. 전송 시도 상한(예산이 넉넉할 때 3회)은
+  // 이전 최악값과 같다.
   const MIN_ATTEMPT_TIMEOUT_MS = 15_000;
-  /** Hard cap per attempt */
   const MAX_ATTEMPT_TIMEOUT_MS = 75_000;
-  /** Safety buffer before deadline (for DB writes, progress updates, etc.) */
   const DEADLINE_SAFETY_BUFFER_MS = 10_000;
 
+  const remainingMs = deadline - Date.now() - DEADLINE_SAFETY_BUFFER_MS;
+  if (remainingMs < MIN_ATTEMPT_TIMEOUT_MS) {
+    logError("[AUTO_GRADE] Insufficient time remaining — skipping call", null, {
+      path: "lib/grading.ts",
+      additionalData: { sessionId, qIdx, remainingMs },
+    });
+    return { ok: false, failureReason: "Insufficient time remaining before deadline" };
+  }
+  const attemptTimeoutMs = Math.max(
+    MIN_ATTEMPT_TIMEOUT_MS,
+    Math.min(MAX_ATTEMPT_TIMEOUT_MS, remainingMs)
+  );
+
   let rawParsed: unknown = null;
-  let lastError: unknown = null;
-  for (let attempt = 0; attempt <= MAX_GRADING_RETRIES; attempt++) {
-    if (attempt > 0) {
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt - 1]));
-      logError(
-        `[AUTO_GRADE] Retrying grading API call (attempt ${attempt + 1}/${MAX_GRADING_RETRIES + 1})`,
-        null,
-        {
-          path: "lib/grading.ts",
-          additionalData: { sessionId, qIdx, attempt },
-        }
-      );
-    }
-
-    // Deadline-aware per-attempt timeout:
-    // Distribute remaining time evenly across remaining attempts so retries
-    // never push past the caller-provided grading deadline.
-    const remainingMs = deadline - Date.now() - DEADLINE_SAFETY_BUFFER_MS;
-    if (remainingMs < MIN_ATTEMPT_TIMEOUT_MS) {
-      logError("[AUTO_GRADE] Insufficient time remaining — skipping attempt", null, {
-        path: "lib/grading.ts",
-        additionalData: { sessionId, qIdx, attempt, remainingMs },
-      });
-      return { ok: false, failureReason: "Insufficient time remaining before deadline" };
-    }
-    const remainingAttempts = MAX_GRADING_RETRIES - attempt + 1;
-    const attemptTimeoutMs = Math.max(
-      MIN_ATTEMPT_TIMEOUT_MS,
-      Math.min(MAX_ATTEMPT_TIMEOUT_MS, Math.floor(remainingMs / remainingAttempts))
-    );
-
-    try {
-      const tracked = await callTrackedChatCompletion(
-        () =>
-          getOpenAI().chat.completions.create(
-            {
-              model: AI_MODEL_HEAVY,
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
-              ],
-              response_format: { type: "json_object" },
-            },
-            { signal }
-          ),
-        {
-          feature: "auto_grading_question",
-          route: "lib/grading.ts",
-          model: AI_MODEL_HEAVY,
-          userId: studentId,
-          examId: exam.id,
-          sessionId,
-          qIdx,
-          metadata: buildAiTextMetadata({
-            inputText: [systemPrompt, userPrompt],
-            extra: {
-              chat_weight: chatWeight,
-              rubric_item_count: rubricItems.length,
-              message_count: questionMessages.length,
-              attempt,
-              attemptTimeoutMs,
-            },
-          }),
-        },
-        {
-          timeoutMs: attemptTimeoutMs,
-          // Disable internal retries — gradeSingleQuestion's own deadline-aware
-          // retry loop handles all retry logic. Without this, callOpenAIWithTelemetry
-          // retries 3× on 5xx/429, multiplying per-question time up to 3× 225s = 675s.
-          maxAttempts: 1,
-          metadataBuilder: (result) =>
-            buildAiTextMetadata({
-              outputText:
-                (result as { choices?: Array<{ message?: { content?: string | null } }> })
-                  .choices?.[0]?.message?.content ?? null,
-            }),
-        }
-      );
-      const c = tracked.data;
-      if (!c.choices?.length) {
-        throw new Error("Empty AI response (no choices)");
-      }
-      rawParsed = JSON.parse(c.choices[0]?.message?.content || "{}");
-      break; // success
-    } catch (err) {
-      lastError = err;
-      if (attempt === MAX_GRADING_RETRIES) {
-        logError(
-          `[AUTO_GRADE] All ${MAX_GRADING_RETRIES + 1} grading attempts failed`,
-          err,
+  try {
+    const tracked = await callTrackedChatCompletion(
+      () =>
+        getOpenAI().chat.completions.create(
           {
-            path: "lib/grading.ts",
-            additionalData: { sessionId, qIdx },
-          }
-        );
-        return {
-          ok: false,
-          failureReason: `API failed after ${MAX_GRADING_RETRIES + 1} attempts: ${err instanceof Error ? err.message : String(err)}`,
-        };
+            model: AI_MODEL_HEAVY,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            response_format: { type: "json_object" },
+          },
+          // 재시도·타임아웃을 SDK 가 소유한다. deadline 이 남은 예산을 정한다.
+          { signal, timeout: attemptTimeoutMs, maxRetries: 2 }
+        ),
+      {
+        feature: "auto_grading_question",
+        route: "lib/grading.ts",
+        model: AI_MODEL_HEAVY,
+        userId: studentId,
+        examId: exam.id,
+        sessionId,
+        qIdx,
+        metadata: buildAiTextMetadata({
+          inputText: [systemPrompt, userPrompt],
+          extra: {
+            chat_weight: chatWeight,
+            rubric_item_count: rubricItems.length,
+            message_count: questionMessages.length,
+            attempt_timeout_ms: attemptTimeoutMs,
+            requested_max_retries: 2,
+          },
+        }),
+      },
+      {
+        metadataBuilder: (result) =>
+          buildAiTextMetadata({
+            outputText:
+              (result as { choices?: Array<{ message?: { content?: string | null } }> })
+                .choices?.[0]?.message?.content ?? null,
+          }),
       }
-      logError(`[AUTO_GRADE] Grading attempt ${attempt + 1} failed, will retry`, err, {
-        path: "lib/grading.ts",
-        additionalData: { sessionId, qIdx, attempt },
-      });
+    );
+    const c = tracked.data;
+    if (!c.choices?.length) {
+      throw new Error("Empty AI response (no choices)");
     }
+    rawParsed = JSON.parse(c.choices[0]?.message?.content || "{}");
+  } catch (err) {
+    logError("[AUTO_GRADE] Grading call failed", err, {
+      path: "lib/grading.ts",
+      additionalData: { sessionId, qIdx },
+    });
+    return {
+      ok: false,
+      failureReason: `API failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 
   if (rawParsed === null) {
-    return {
-      ok: false,
-      failureReason: `Grading failed: ${lastError instanceof Error ? lastError.message : "unknown"}`,
-    };
+    return { ok: false, failureReason: "Grading failed: empty response" };
   }
 
   const assignmentResponseSchema = z.object({
@@ -624,7 +590,8 @@ JSON 형식으로 응답해주세요:
             temperature: 0.3,
             seed: deriveSessionSeed(sessionId),
           },
-          { signal }
+          // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
+          { signal, timeout: timeoutMs, maxRetries: 2 }
         ),
       {
         feature: "auto_grading_question_summary",
@@ -640,7 +607,6 @@ JSON 형식으로 응답해주세요:
         }),
       },
       {
-        timeoutMs,
         metadataBuilder: (result) =>
           buildAiTextMetadata({
             outputText:
@@ -1688,14 +1654,21 @@ ${
 
     const tracked = await callTrackedChatCompletion(
       () =>
-        getOpenAI().chat.completions.create({
-          model: AI_MODEL_HEAVY,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          response_format: { type: "json_object" },
-        }),
+        getOpenAI().chat.completions.create(
+          {
+            model: AI_MODEL_HEAVY,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            response_format: { type: "json_object" },
+          },
+          // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
+          {
+            timeout: timeBudgetMs ? Math.min(timeBudgetMs - 5_000, 120_000) : 120_000,
+            maxRetries: 2,
+          }
+        ),
       {
         feature: "auto_grading_summary",
         route: "lib/grading.ts",
@@ -1711,7 +1684,6 @@ ${
         }),
       },
       {
-        timeoutMs: timeBudgetMs ? Math.min(timeBudgetMs - 5_000, 120_000) : 120_000,
         metadataBuilder: (result) =>
           buildAiTextMetadata({
             outputText:

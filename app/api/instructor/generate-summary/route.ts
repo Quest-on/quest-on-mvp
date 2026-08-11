@@ -205,14 +205,18 @@ JSON 형식으로 응답해주세요:
 
     const tracked = await callTrackedChatCompletion(
       () =>
-        getOpenAI().chat.completions.create({
-          model: AI_MODEL_HEAVY,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          response_format: { type: "json_object" },
-        }),
+        getOpenAI().chat.completions.create(
+          {
+            model: AI_MODEL_HEAVY,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            response_format: { type: "json_object" },
+          },
+          // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
+          { timeout: 60_000, maxRetries: 2 }
+        ),
       {
         feature: "generate_summary",
         route: "/api/instructor/generate-summary",
@@ -228,7 +232,6 @@ JSON 형식으로 응답해주세요:
         }),
       },
       {
-        timeoutMs: 60_000,
         metadataBuilder: (result) =>
           buildAiTextMetadata({
             outputText:

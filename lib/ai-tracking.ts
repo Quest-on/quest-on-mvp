@@ -11,7 +11,7 @@ import {
   resolveModelPricing,
 } from "@/lib/ai-pricing";
 import {
-  OpenAITimeoutError,
+  isOpenAITimeoutError,
   callOpenAIWithTelemetry,
 } from "@/lib/openai";
 
@@ -30,8 +30,10 @@ interface TrackedRequestContext {
 }
 
 interface TrackedRequestOptions<T> {
-  timeoutMs?: number;
-  maxAttempts?: number;
+  // 이슈 #118: `timeoutMs`/`maxAttempts` 는 제거됐다. 이 래퍼는 더 이상 타임아웃과
+  // 재시도를 구현하지 않으므로 여기 남겨 두면 조용히 무시되는 죽은 옵션이 된다.
+  // 타임아웃·재시도는 호출부가 SDK 요청 옵션으로 직접 넘긴다:
+  //   create(params, { timeout, maxRetries, signal })
   metadataBuilder?: (result: T) => JsonRecord | undefined;
 }
 
@@ -203,7 +205,7 @@ export function buildAiTextMetadata(params: {
 }
 
 function getOpenAIErrorCode(error: unknown): string | null {
-  if (error instanceof OpenAITimeoutError) {
+  if (isOpenAITimeoutError(error)) {
     return "timeout";
   }
   if (error instanceof OpenAI.APIError) {
@@ -270,10 +272,7 @@ export async function callTrackedOpenAI<T>(
   options?: TrackedRequestOptions<T>
 ): Promise<TrackedOpenAIResult<T>> {
   try {
-    const { data, attemptCount, latencyMs } = await callOpenAIWithTelemetry(
-      fn,
-      { timeoutMs: options?.timeoutMs, maxAttempts: options?.maxAttempts }
-    );
+    const { data, attemptCount, latencyMs } = await callOpenAIWithTelemetry(fn);
     const usage = extractUsageFromOpenAIResult(context.endpoint, data);
     const requestId = extractRequestId(data);
     const responseId = extractResponseId(data);
@@ -334,7 +333,7 @@ export async function callTrackedOpenAI<T>(
   } catch (error) {
     const failure = buildFailure(error);
     const status =
-      failure.error instanceof OpenAITimeoutError ? "timeout" : "error";
+      isOpenAITimeoutError(failure.error) ? "timeout" : "error";
 
     await persistAiEvent(
       {
