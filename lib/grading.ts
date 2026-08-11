@@ -339,7 +339,12 @@ async function gradeSingleQuestion(params: {
             response_format: { type: "json_object" as const },
           }),
           // 재시도·타임아웃을 SDK 가 소유한다. deadline 이 남은 예산을 정한다.
-          { signal, timeout: attemptTimeoutMs, maxRetries: questionProfile.maxRetries }
+          // 프로필 타임아웃이 상한이다 — 관리자가 낮추면 실제로 낮아져야 한다.
+          {
+            signal,
+            timeout: Math.min(questionProfile.timeoutMs, attemptTimeoutMs),
+            maxRetries: questionProfile.maxRetries,
+          }
         ),
       {
         feature: "auto_grading_question",
@@ -605,7 +610,11 @@ JSON 형식으로 응답해주세요:
             seed: deriveSessionSeed(sessionId),
           }),
           // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
-          { signal, timeout: timeoutMs, maxRetries: qSummaryProfile.maxRetries }
+          {
+            signal,
+            timeout: Math.min(qSummaryProfile.timeoutMs, timeoutMs),
+            maxRetries: qSummaryProfile.maxRetries,
+          }
         ),
       {
         feature: "auto_grading_question_summary",
@@ -1685,7 +1694,10 @@ ${
           }),
           // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
           {
-            timeout: timeBudgetMs ? Math.min(timeBudgetMs - 5_000, 120_000) : 120_000,
+            timeout: Math.min(
+              summaryProfile.timeoutMs,
+              timeBudgetMs ? timeBudgetMs - 5_000 : summaryProfile.timeoutMs,
+            ),
             maxRetries: summaryProfile.maxRetries,
           }
         ),

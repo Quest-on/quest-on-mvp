@@ -11,6 +11,11 @@ import { getTestSupabase } from "../helpers/supabase-test-client";
  * 짝 CHECK 가 실제로는 반쪽 핀을 통과시키는 사고를 잡는 게 목적이다.
  */
 
+// 이 파일은 `production` 라벨이라는 **공유 가변 상태**를 옮긴다. API 프로젝트는
+// 완전 병렬로 돌기 때문에(e2e/playwright.config.ts) 병렬로 두면 발행 테스트끼리
+// 서로의 라벨을 덮어써 위양성·위음성이 모두 난다. 파일 단위 직렬로 고정한다.
+test.describe.configure({ mode: "serial" });
+
 // DB 안전 멈춤 규칙. 세 조건 없이는 아예 붙지 않는다.
 test.beforeAll(() => {
   assertLocalTestEnv();
@@ -115,45 +120,79 @@ test.describe("ai_config 스키마 — live 보안 경계", () => {
 });
 
 test.describe("exam_grading_sessions 런 핀 — live 불변식", () => {
-  test("버전만 있고 스냅샷이 없는 반쪽 핀은 저장할 수 없다", async () => {
+  // 남의 행을 빌려 쓰면 병렬 테스트와 충돌하고, 없으면 skip 으로 조용히 통과한다.
+  // 둘 다 검증을 무의미하게 만들므로 이 파일이 소유하는 행을 직접 만든다.
+  let ownedSessionId: string | null = null;
+  let productionVersionId: string | null = null;
+
+  test.beforeAll(async () => {
     const { data: label } = await supabase
       .from("ai_config_labels")
       .select("version_id")
       .eq("label", "production")
       .single();
+    productionVersionId = (label?.version_id as string) ?? null;
+
+    const { data: exam } = await supabase
+      .from("exams")
+      .insert({ title: "e2e-ai-config-pin", questions: [], instructor_id: "e2e-ai-config" })
+      .select("id")
+      .single();
 
     const { data: session } = await supabase
       .from("exam_grading_sessions")
+      .insert({ exam_id: exam?.id, instructor_id: "e2e-ai-config", status: "draft" })
       .select("id")
-      .limit(1)
-      .maybeSingle();
+      .single();
 
-    test.skip(!session, "채점 세션이 없으면 이 검증은 건너뛴다");
+    ownedSessionId = (session?.id as string) ?? null;
+  });
 
+  test.afterAll(async () => {
+    if (ownedSessionId) {
+      await supabase.from("exam_grading_sessions").delete().eq("id", ownedSessionId);
+    }
+    await supabase.from("exams").delete().eq("instructor_id", "e2e-ai-config");
+  });
+
+  test("픽스처가 실제로 만들어졌다", async () => {
+    // 이게 없으면 아래 두 검증이 조용히 무의미해진다.
+    expect(ownedSessionId).toBeTruthy();
+    expect(productionVersionId).toBeTruthy();
+  });
+
+  test("버전만 있고 스냅샷이 없는 반쪽 핀은 저장할 수 없다", async () => {
     // 짝 CHECK 가 없으면 워커가 "핀이 있다" 고 믿고 잘못된 프로필로 채점한다.
     const { error } = await supabase
       .from("exam_grading_sessions")
-      .update({ ai_config_version_id: label?.version_id, ai_profile_snapshot: null })
-      .eq("id", session?.id as string);
+      .update({ ai_config_version_id: productionVersionId, ai_profile_snapshot: null })
+      .eq("id", ownedSessionId as string);
 
     expect(error).not.toBeNull();
   });
 
   test("스냅샷만 있고 버전이 없는 반대쪽 반쪽 핀도 막힌다", async () => {
-    const { data: session } = await supabase
-      .from("exam_grading_sessions")
-      .select("id")
-      .limit(1)
-      .maybeSingle();
-
-    test.skip(!session, "채점 세션이 없으면 이 검증은 건너뛴다");
-
     const { error } = await supabase
       .from("exam_grading_sessions")
       .update({ ai_config_version_id: null, ai_profile_snapshot: { bulk_grading_worker: {} } })
-      .eq("id", session?.id as string);
+      .eq("id", ownedSessionId as string);
 
     expect(error).not.toBeNull();
+  });
+
+  test("버전과 스냅샷을 함께 쓰면 통과한다", async () => {
+    // 짝 제약이 정상적인 핀까지 막으면 채점을 아예 시작할 수 없다.
+    const { error } = await supabase
+      .from("exam_grading_sessions")
+      .update({
+        ai_config_version_id: productionVersionId,
+        ai_profile_snapshot: {
+          bulk_grading_worker: { model: "gpt-5.6-luna", timeoutMs: 120000, maxRetries: 2 },
+        },
+      })
+      .eq("id", ownedSessionId as string);
+
+    expect(error).toBeNull();
   });
 });
 
