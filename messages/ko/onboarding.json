@@ -28,7 +28,7 @@
     "confirmTitle": "역할을 확인해주세요",
     "confirmDescInstructor": "강사 (시험 출제자)",
     "confirmDescStudent": "학생 (시험 응시자)",
-    "confirmDescSuffix": "{role}(으)로 시작합니다. 역할 선택 후에도 프로필 설정에서 변경할 수 있습니다.",
+    "confirmDescSuffix": "{role}(으)로 시작합니다. 역할은 처음 한 번만 정할 수 있고 나중에 바꿀 수 없습니다.",
     "reSelectBtn": "다시 선택하기",
     "confirmBtn": "확인",
     "intakeTitle": "거의 다 됐습니다",
@@ -44,7 +44,8 @@
     "intakeSubject_general": "그 외",
     "intakeSubmitBtn": "데모 시험 만들기",
     "intakeSkipBtn": "건너뛰기",
-    "intakeCreating": "만드는 중..."
+    "intakeCreating": "만드는 중...",
+    "roleAlreadyDifferent": "이 계정의 역할이 이미 다르게 정해져 있습니다. 페이지를 새로고침해 주세요."
   },
   "profileSetup": {
     "cardTitle": "프로필 설정",

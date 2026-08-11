@@ -227,9 +227,22 @@ export default function OnboardingPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ role }),
         });
-        // 409(ROLE_ALREADY_SET)는 다른 탭·재시도로 이미 정해진 경우다. 역할은
-        // 어차피 바꿀 수 없으니 프로필 저장은 계속 진행한다.
-        if (!roleRes.ok && roleRes.status !== 409) {
+        // 409(ROLE_ALREADY_SET)는 이미 정해진 경우다. 그런데 **어떤 역할로**
+        // 정해졌는지가 중요하다. 다른 탭이 반대 역할을 먼저 확정했는데 여기서
+        // 무조건 삼키면, 화면에서 고른 역할로 하위 프로필을 계속 만들어
+        // profiles.role 과 student_profiles/instructor_profiles 가 갈라진다.
+        //
+        // 서버가 409 에 확정 역할을 details.role 로 실어 준다. 같은 역할일
+        // 때만 멱등 성공으로 보고, 다르면 멈추고 다시 읽게 한다.
+        if (roleRes.status === 409) {
+          const conflict = await roleRes.json().catch(() => null);
+          const settledRole = conflict?.details?.role;
+          if (settledRole && settledRole !== role) {
+            setError(t("roleAlreadyDifferent"));
+            setIsSubmitting(false);
+            return;
+          }
+        } else if (!roleRes.ok) {
           throw new Error("Role claim failed");
         }
       }
