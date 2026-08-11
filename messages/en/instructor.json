@@ -97,7 +97,16 @@
     },
     "exportFail": "Export failed.",
     "exportError": "An error occurred during export.",
-    "bulkGradeLoadFail": "Failed to load bulk grading status."
+    "bulkGradeLoadFail": "Failed to load bulk grading status.",
+    "tryAsStudent": "Try as a student",
+    "demoAiRegenerationLockedTitle": "AI regeneration locked",
+    "demoAiRegenerationLockedDescription": "Answer one question in student view and open the AI grading result to unlock AI regeneration.",
+    "demoAiRegenerationUnlockedTitle": "AI regeneration unlocked",
+    "demoAiRegenerationUnlockedDescription": "You completed the demo, so AI regeneration is unlocked.",
+    "demoAiRegenerationLoading": "Checking AI regeneration access.",
+    "demoAiRegenerationUnavailable": "AI regeneration access is unavailable right now.",
+    "retryAsStudent": "Retake the demo",
+    "retryAsStudentHint": "Retaking clears your previous answers, AI conversations, and grading results."
   },
   "assignmentDetail": {
     "error": "Error",

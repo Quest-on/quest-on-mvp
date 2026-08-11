@@ -9,6 +9,20 @@ interface ExamDetailHeaderProps {
   title: string;
   code: string;
   examId: string;
+  isDemo?: boolean;
+  demoPreviewLabel?: string;
+  /**
+   * 이미 제출한 데모를 다시 풀기 위한 라벨. 있으면 CTA 가 재응시 요청을 실어
+   * 보낸다 — 이게 없으면 제출 후에는 읽기 전용 화면만 떠서 "연습용인데 한 번
+   * 내면 끝"이 된다.
+   */
+  demoRestartLabel?: string;
+  /**
+   * 재응시가 무엇을 지우는지 알리는 문구. 서버는 이전 제출·채점·대화를
+   * 실제로 삭제하므로(UNIQUE(exam_id, student_id) 아래 새 세션을 못 만든다),
+   * 누르기 전에 알려야 한다. 라벨만 있고 이 경고가 없으면 안 된다.
+   */
+  demoRestartHint?: string;
   extraActions?: ReactNode;
 }
 
@@ -19,6 +33,10 @@ export function ExamDetailHeader({
   title,
   code,
   examId,
+  isDemo,
+  demoPreviewLabel,
+  demoRestartLabel,
+  demoRestartHint,
   extraActions,
 }: ExamDetailHeaderProps) {
   const t = useTranslations("authoring");
@@ -32,6 +50,24 @@ export function ExamDetailHeader({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {isDemo && demoPreviewLabel && (
+            <div className="flex flex-col items-start gap-1">
+              <Link
+                href={
+                  demoRestartLabel
+                    ? `/exam/${code}?restartDemo=1`
+                    : `/exam/${code}`
+                }
+              >
+                <Button size="sm">{demoRestartLabel ?? demoPreviewLabel}</Button>
+              </Link>
+              {demoRestartLabel && demoRestartHint && (
+                <span className="text-xs text-muted-foreground">
+                  {demoRestartHint}
+                </span>
+              )}
+            </div>
+          )}
           {extraActions}
           <div className="flex items-center gap-2 flex-wrap">
             <Link href="/instructor">
@@ -41,7 +77,7 @@ export function ExamDetailHeader({
               </Button>
             </Link>
             <Link href={`/instructor/${examId}/edit`}>
-              <Button size="sm">{t("examDetailHeader.buttonEdit")}</Button>
+              <Button variant="outline" size="sm">{t("examDetailHeader.buttonEdit")}</Button>
             </Link>
           </div>
         </div>

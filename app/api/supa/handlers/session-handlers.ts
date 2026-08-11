@@ -294,6 +294,7 @@ export async function initExamSession(data: {
   examCode: string;
   studentId: string;
   deviceFingerprint?: string;
+  restartDemoAttempt?: boolean;
 }) {
   try {
     // Verify current user matches the studentId
@@ -384,40 +385,75 @@ export async function initExamSession(data: {
 
     if (checkError) throw checkError;
 
-    // ✅ 요구사항: 이미 제출된 세션이 있으면 재시험 불가
+    // 일반 학생의 제출본은 계속 읽기 전용으로 돌려준다. 데모 재응시는 CTA가
+    // restartDemoAttempt를 명시하고 isDemoPreviewAttempt가 참일 때만 이전
+    // 제출·채점·채점 대화·응시 대화를 지운다. UNIQUE (exam_id, student_id) 제약
+    // 아래 새 세션을 만들 수 없으므로, 이 확인 없이 자동 초기화하면 새로고침만으로
+    // 과거 결과가 사라진다. 완주 마일스톤은 세션 데이터가 아니므로 유지한다.
     const mostRecentSubmittedSession =
       (existingSessions || []).find((s) => !!s.submitted_at) || null;
+    let resetDemoSession: (typeof existingSessions)[0] | null = null;
 
     if (mostRecentSubmittedSession) {
-      // 제출된 세션이 있으면 재시험 불가 - 제출된 세션만 반환
+      if (isDemoPreviewAttempt && data.restartDemoAttempt === true) {
+        // 초기화를 DB 함수 하나로 맡긴다.
+        //
+        // 여기서 DELETE 를 여러 번 + UPDATE 로 하면 각각이 독립 커밋이라, 중간에
+        // 실패하면 답안은 지워졌는데 세션은 제출 상태로 남는 깨진 상태가
+        // 영구화된다 — 다시 풀 수도, 예전 결과를 볼 수도 없게 된다.
+        //
+        // 함수는 세션 행을 잠그고 데모·소유자 여부를 **다시** 확인한다. 여기서
+        // 이미 판정했더라도 그게 유일한 삭제 경로여야 한다.
+        const { data: restartedId, error: restartRpcError } = await getSupabase().rpc(
+          "restart_demo_attempt",
+          { p_exam_id: exam.id, p_user_id: data.studentId }
+        );
+        if (restartRpcError) throw restartRpcError;
 
-      // Get messages for submitted session (read-only)
-      const { data: sessionMessages } = await getSupabase()
-        .from("messages")
-        .select("id, role, content, q_idx, created_at")
-        .eq("session_id", mostRecentSubmittedSession.id)
-        .order("created_at", { ascending: true });
+        if (restartedId) {
+          const { data: restartedSession, error: reloadError } = await getSupabase()
+            .from("sessions")
+            .update({ device_fingerprint: data.deviceFingerprint || null })
+            .eq("id", restartedId)
+            .eq("student_id", data.studentId)
+            .select()
+            .single();
+          if (reloadError) throw reloadError;
+          resetDemoSession = restartedSession;
+        }
+      }
 
-      const messages = (sessionMessages || []).map((msg) => ({
-        type: msg.role === "user" ? "user" : "assistant",
-        message: msg.content,
-        timestamp: msg.created_at,
-        qIdx: msg.q_idx || 0,
-      }));
+      if (!resetDemoSession) {
+        // 제출된 세션이 있으면 재시험 불가 - 제출된 세션만 반환
 
-      // Fetch submissions for the submitted session
-      const { data: submittedSubmissions } = await getSupabase()
-        .from("submissions")
-        .select("q_idx, answer")
-        .eq("session_id", mostRecentSubmittedSession.id);
+        // Get messages for submitted session (read-only)
+        const { data: sessionMessages } = await getSupabase()
+          .from("messages")
+          .select("id, role, content, q_idx, created_at")
+          .eq("session_id", mostRecentSubmittedSession.id)
+          .order("created_at", { ascending: true });
 
-      return successJson({
-        exam,
-        session: mostRecentSubmittedSession,
-        messages,
-        submissions: submittedSubmissions || [],
-        isRetakeBlocked: true, // 재시험 차단 플래그
-      });
+        const messages = (sessionMessages || []).map((msg) => ({
+          type: msg.role === "user" ? "user" : "assistant",
+          message: msg.content,
+          timestamp: msg.created_at,
+          qIdx: msg.q_idx || 0,
+        }));
+
+        // Fetch submissions for the submitted session
+        const { data: submittedSubmissions } = await getSupabase()
+          .from("submissions")
+          .select("q_idx, answer")
+          .eq("session_id", mostRecentSubmittedSession.id);
+
+        return successJson({
+          exam,
+          session: mostRecentSubmittedSession,
+          messages,
+          submissions: submittedSubmissions || [],
+          isRetakeBlocked: true, // 재시험 차단 플래그
+        });
+      }
     }
 
     // 제출되지 않은 세션만 처리
@@ -457,7 +493,7 @@ export async function initExamSession(data: {
         : unsubmittedSessions.find((s) => !s.device_fingerprint) || null;
 
     let existingSession: (typeof existingSessions)[0] | null =
-      exactDeviceMatch || claimableLegacySession || null;
+      resetDemoSession || exactDeviceMatch || claimableLegacySession || null;
 
     let session = existingSession;
     let sessionReactivated = false;
@@ -573,7 +609,7 @@ export async function initExamSession(data: {
         } else {
           session = updatedSession;
         }
-      } else if (currentStatus === "late_pending") {
+      } else if (currentStatus === "late_pending" && !isDemoPreviewAttempt) {
         // 지각 학생: 강사 승인 대기 중 — heartbeat만 업데이트, 상태 전환 없음
         const { data: updatedSession } = await getSupabase()
           .from("sessions")
@@ -584,8 +620,8 @@ export async function initExamSession(data: {
           .maybeSingle();
         session = updatedSession || existingSession;
       } else if (
-        (examStarted || isNonExamType) &&
-        ["waiting", "joined", "not_joined"].includes(currentStatus)
+        (isDemoPreviewAttempt || examStarted || isNonExamType) &&
+        ["waiting", "joined", "not_joined", "late_pending"].includes(currentStatus)
       ) {
         // 시험이 시작되었거나 비시험 유형이면 바로 in_progress로 전환
         session = await promoteSessionToInProgress(existingSession, now, {
@@ -639,15 +675,12 @@ export async function initExamSession(data: {
         qIdx: msg.q_idx || 0,
       }));
     } else {
-      // ✅ 새 세션 생성: 기본적으로 시작 전에는 waiting 상태
-      // 시험이 이미 시작되었는지 확인 (started_at이 있고 status가 running)
+      // 새 데모 소유자 미리보기는 교수자의 시작·지각 승인 절차를 거치지 않는다.
+      // isDemoPreviewAttempt는 is_demo와 소유자를 함께 확인했으므로 일반 시험의
+      // 지각 입장 승인 구멍으로 넓어지지 않는다.
       const examStarted = isExamStarted(examStatus, exam.started_at, nowTime);
-
-      // 시작 전: waiting 상태 (Join만 가능, 응시 불가)
-      // 시작 후 + 무제한(과제형): in_progress (바로 응시 가능)
-      // 시작 후 + 제한시간 있음: late_pending (강사 승인 필요)
       let initialStatus: string;
-      if (isNonExamType) {
+      if (isDemoPreviewAttempt || isNonExamType) {
         initialStatus = "in_progress";
       } else if (!examStarted) {
         initialStatus = "waiting"; // 시험 미시작: 무제한/유한 모두 대기

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { getDeviceFingerprint } from "@/lib/device-fingerprint";
 import { createSupabaseClient } from "@/lib/supabase-client";
@@ -75,6 +75,9 @@ export function useExamSession({
   saveViaBeacon,
 }: UseExamSessionOptions) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // 데모 재응시 의도. CTA 가 붙인 `?restartDemo=1` 로만 들어온다.
+  const restartDemo = searchParams.get("restartDemo") === "1";
 
   // Session-specific state (not shared with other hooks)
   const [sessionStartTime, setSessionStartTime] = useState<string | null>(null);
@@ -122,7 +125,9 @@ export function useExamSession({
 
   // Session init query (게이트보다 먼저 선언 — 데모 미리보기 판정을 써야 한다)
   const { data: initData, isLoading: initLoading } = useQuery({
-    queryKey: ["exam-session-init", examCode, user?.id],
+    // 재응시 여부를 키에 넣는다. 안 넣으면 같은 캐시를 재사용해 "다시 해보기"가
+    // 앞선 읽기 전용 응답을 그대로 돌려준다.
+    queryKey: ["exam-session-init", examCode, user?.id, restartDemo],
     queryFn: async () => {
       try {
         const deviceFingerprint = getDeviceFingerprint();
@@ -131,7 +136,15 @@ export function useExamSession({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             action: "init_exam_session",
-            data: { examCode, studentId: user!.id, deviceFingerprint },
+            // 데모 재응시는 CTA 가 붙인 쿼리 파라미터로만 요청된다. 서버는 이
+            // 값을 신뢰하지 않고 데모 소유자일 때만 실제로 초기화한다 —
+            // 여기서 안 실어 보내면 "다시 해보기"가 조용히 무시된다.
+            data: {
+              examCode,
+              studentId: user!.id,
+              deviceFingerprint,
+              ...(restartDemo ? { restartDemoAttempt: true } : {}),
+            },
           }),
         });
         if (!response.ok) {
@@ -483,6 +496,11 @@ export function useExamSession({
     setIsSubmitted,
     showPreflight,
     disclosureAcknowledged,
+    // 데모 미리보기 여부와 그 시험 id. 응시를 마친 교수자를 학생 대시보드가
+    // 아니라 데모 상세로 돌려보내는 데 쓴다 — 자기 데모를 연습하고 나서
+    // /student 로 버려지면 다음에 뭘 해야 할지 알 수 없다.
+    demoPreview: initData?.ok === true && initData.demoPreview === true,
+    demoExamId: initData?.ok === true ? (initData.exam?.id ?? null) : null,
     setShowPreflight,
     isInWaitingRoom,
     setIsInWaitingRoom,
