@@ -94,62 +94,27 @@ beforeEach(() => {
   currentUserMock.mockImplementation(async () => ({ id: "student-1" }));
 });
 
-describe("최초 발행 시점 기록 (이슈 #151)", () => {
-  it("첫 세션 생성 뒤 NULL 조건부 업데이트로 최초 발행 시점을 기록한다", async () => {
-    const { publicationUpdate } = queueNewSession({ studentId: "student-1" });
+describe("최초 발행 시점 기록 (이슈 #151 · #84)", () => {
+  const handlers = readFileSync("app/api/supa/handlers/session-handlers.ts", "utf8").replace(/\r\n/g, "\n");
+  const rpc = readFileSync("database/024_admit_exam_session.sql", "utf8").replace(/\r\n/g, "\n");
 
-    const response = await initialize("student-1");
-
-    expect(response.status).toBe(200);
-    expect(publicationUpdate.update).toHaveBeenCalledWith({
-      first_published_at: expect.any(String),
-    });
-    expect(publicationUpdate.is).toHaveBeenCalledWith("first_published_at", null);
+  it("기록이 세션 삽입과 같은 트랜잭션 안에 있다", () => {
+    // 밖에서 하면 세션은 생겼는데 발행이 안 잡혀 한도가 영영 차지 않는다.
+    expect(rpc).toMatch(/first_published_at = COALESCE\(first_published_at, now\(\)\)/);
   });
 
-  it("두 번째 학생의 세션 생성도 NULL 조건을 유지해 기존 최초 시점을 덮어쓰지 못한다", async () => {
-    const first = queueNewSession({ studentId: "student-1" });
-    await initialize("student-1");
-
-    currentUserMock.mockImplementation(async () => ({ id: "student-2" }));
-    const second = queueNewSession({ studentId: "student-2" });
-    const response = await initialize("student-2");
-
-    expect(response.status).toBe(200);
-    expect(first.publicationUpdate.is).toHaveBeenCalledWith("first_published_at", null);
-    expect(second.publicationUpdate.is).toHaveBeenCalledWith("first_published_at", null);
+  it("COALESCE 라 기존 최초 시점을 덮어쓰지 않는다", () => {
+    // 두 번째 학생이 들어와도 최초 발행 시각은 그대로여야 한다.
+    expect(rpc).toMatch(/COALESCE\(first_published_at/);
   });
 
-  it("최초 발행 시점 기록 실패가 세션 생성을 막지 않는다", async () => {
-    queueNewSession({
-      studentId: "student-1",
-      publicationResult: { data: null, error: new Error("write failed") },
-    });
-
-    const response = await initialize("student-1");
-
-    expect(response.status).toBe(200);
-    expect(logErrorMock).toHaveBeenCalledWith(
-      "[initExamSession] Failed to record first publication",
-      expect.any(Error),
-      expect.objectContaining({ additionalData: { examId: exam.id } })
-    );
+  it("데모는 발행으로 세지 않는다", () => {
+    expect(rpc).toMatch(/IF NOT COALESCE\(v_exam\.is_demo, false\) THEN\n\s*UPDATE public\.exams/);
   });
 
-  it("018 미적용 DB의 is_demo 조회 실패도 세션 생성을 막지 않는다", async () => {
-    queueNewSession({
-      studentId: "student-1",
-      demoResult: { data: null, error: new Error("column exams.is_demo does not exist") },
-    });
-
-    const response = await initialize("student-1");
-
-    expect(response.status).toBe(200);
-    expect(logErrorMock).toHaveBeenCalledWith(
-      "[initExamSession] Failed to check whether exam is a demo",
-      expect.any(Error),
-      expect.objectContaining({ additionalData: { examId: exam.id } })
-    );
+  it("앱단에 중복 기록이 남아 있지 않다", () => {
+    // 두 곳에서 쓰면 한쪽만 고쳐졌을 때 발행 카운트가 갈라진다.
+    expect(handlers).not.toMatch(/\.update\(\{ first_published_at/);
   });
 });
 

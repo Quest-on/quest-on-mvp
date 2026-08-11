@@ -81,6 +81,13 @@ async function body(data: Record<string, unknown>) {
 }
 
 beforeEach(() => {
+  // 세션 생성은 admit_exam_session RPC 가 맡는다(이슈 #84). 재응시 케이스만
+  // 별도 값으로 덮어쓴다.
+  supabaseMock.rpc.mockImplementation(async (fn: string) =>
+    fn === "admit_exam_session"
+      ? { data: [{ session_id: NOW_SESSION.id, admitted: true, denial_reason: null, created: true }], error: null }
+      : { data: null, error: null }
+  );
   vi.clearAllMocks();
   currentUserMock.mockResolvedValue({ id: "owner-1" });
 });

@@ -113,7 +113,8 @@
     "toastNoticeCopyFailed": "Could not copy the notice",
     "noticeHeading": "[Quest-On] Exam notice",
     "noticeCodeLabel": "Entry code",
-    "noticeFooter": "Questions? Contact your instructor."
+    "noticeFooter": "Questions? Contact your instructor.",
+    "toastCodeBlocked": "You have reached the publish limit, so this code cannot be copied yet. Verify your account and try again."
   },
   "examInfoForm": {
     "cardTitleAssignment": "Assignment Info",
@@ -405,5 +406,11 @@
     "buttonAIGenerate": "Generate {count, plural, one {# question} other {# questions}} with AI",
     "buttonAddManual": "Add",
     "optional": "Optional"
+  },
+  "examCode": {
+    "copyAria": "Copy exam code",
+    "warning": "Your free plan can admit students to {remaining} more exam(s).",
+    "blockedTitle": "Verify your account before sharing this code",
+    "blockedBody": "You have reached the free plan publish limit. Students cannot enter if you share this code now. The code reappears once your account is verified."
   }
 }

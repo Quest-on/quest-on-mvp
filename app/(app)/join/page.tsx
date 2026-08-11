@@ -43,7 +43,16 @@ export default function ExamCodeEntry() {
       unauthorized: t("unauthorized"),
       server_error: t("serverError"),
       network_error: t("networkError"),
+      // 한도 초과. 학생 잘못이 아니고 코드도 맞다는 걸 먼저 말한다.
+      // 사유와 해제 방법은 교수자 표면에만 있다 — 학생에게 요금제를
+      // 설명하는 건 도움이 안 된다.
+      publish_limit: t("publishLimitReached"),
+      student_limit: t("studentLimitReached"),
     };
+
+    // 코드를 복원한다. 이게 없으면 학생이 코드를 다시 받아야 재시도할 수 있다.
+    const codeParam = params.get("code");
+    if (codeParam) setExamCode(codeParam.toUpperCase());
 
     setError(
       errorMessages[errorParam] ||

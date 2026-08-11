@@ -189,6 +189,40 @@ export async function POST(request: NextRequest) {
             );
           }
 
+          // 이 경로도 같은 원자 연산을 거친다 (이슈 #84).
+          //
+          // 제출 시점에 세션이 없으면 여기서 만드는데, 직접 upsert 하면 학생이
+          // 입장을 건너뛰고 제출만 보내 발행·학생 한도를 우회할 수 있다.
+          // 한도는 한 문(門)으로만 지나가야 한다.
+          const { data: admission, error: admitError } = await getSupabase().rpc(
+            "admit_exam_session",
+            {
+              p_exam_id: exam.id,
+              p_student_id: verifiedStudentId,
+              p_status: "in_progress",
+              p_fingerprint: null,
+            }
+          );
+
+          if (admitError) {
+            // fail-open. 한도 계산 장애로 제출이 막히면 그게 더 큰 사고다.
+            logError("[feedback] quota_fail_open", admitError, {
+              path: "/api/feedback",
+              additionalData: { examId: exam.id, reason: "admit_rpc_failed" },
+            });
+          }
+
+          const verdict = Array.isArray(admission) ? admission[0] : admission;
+          if (verdict && verdict.admitted === false) {
+            return errorJson(
+              verdict.denial_reason === "publish_limit"
+                ? "PUBLISH_LIMIT_REACHED"
+                : "STUDENT_LIMIT_REACHED",
+              "This exam is not accepting new students",
+              403
+            );
+          }
+
           // Race-safe: upsert with ignoreDuplicates prevents duplicate sessions
           const { data: newSession, error: createError } = await getSupabase()
             .from("sessions")

@@ -5,6 +5,7 @@ import { useAppUser } from "@/components/providers/AppAuthProvider";
 import React, { useState, useEffect, use } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { ExamCode } from "@/components/instructor/ExamCode";
 import Link from "next/link";
 import { QuestionsListCard } from "@/components/instructor/QuestionsListCard";
 import {
@@ -338,9 +339,7 @@ export default function AssignmentDashboard({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="min-w-0">
                 <h1 className="text-2xl sm:text-3xl font-bold">{exam.title}</h1>
-                <p className="text-muted-foreground">
-                  {t("assignmentDetail.assignmentCode")} <span className="exam-code">{exam.code}</span>
-                </p>
+                <ExamCode code={exam.code} className="mt-1" />
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 {assignmentStatusBadge}
@@ -391,7 +390,8 @@ export default function AssignmentDashboard({
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigator.clipboard.writeText(exam.code);
+                            // 과제 코드도 같은 게이트를 탄다. 코드 렌더는 ExamCode 가 맡는다.
+                            navigator.clipboard.writeText(exam.code ?? "");
                             setCodeCopied(true);
                             setTimeout(() => setCodeCopied(false), 2000);
                           }}
