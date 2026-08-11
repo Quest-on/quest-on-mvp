@@ -62,6 +62,14 @@ export function ExamDetailsCard({
   // "알아서 공지하세요"라고 하면 대부분 안 하고, 그러면 학생은 AI 질문을
   // 부정행위로 오해한 채 시험을 본다. 대학생 54%가 그렇게 인식한다.
   const handleCopyNotice = async () => {
+    // 공지문에도 시험 코드가 들어간다. 코드 복사만 막고 여기를 열어 두면
+    // 그대로 우회로가 된다.
+    if (codeGateBlocked) {
+      toast.error(t("examDetailsCard.toastCodeBlocked"), {
+        id: "copy-notice-blocked",
+      });
+      return;
+    }
     try {
       const notice = buildStudentNotice({
         heading: t("examDetailsCard.noticeHeading"),
@@ -116,7 +124,9 @@ export function ExamDetailsCard({
           <Label className="font-medium">{t("examDetailsCard.labelExamCode")}</Label>
           <div className="flex items-center gap-2 mt-1">
             <p className="text-sm text-muted-foreground exam-code">
-              {examCode}
+              {/* 차단 상태에서는 코드 자체를 내보내지 않는다. 보여주고
+                  "쓰지 마세요"라고 적는 건 소용없다 — 이미 복사한 뒤다. */}
+              {codeGateBlocked ? t("examCode.blockedTitle") : examCode}
             </p>
             <Button
               variant="outline"

@@ -112,9 +112,13 @@ describe("최초 발행 시점 기록 (이슈 #151 · #84)", () => {
     expect(rpc).toMatch(/IF NOT COALESCE\(v_exam\.is_demo, false\) THEN\n\s*UPDATE public\.exams/);
   });
 
-  it("앱단에 중복 기록이 남아 있지 않다", () => {
-    // 두 곳에서 쓰면 한쪽만 고쳐졌을 때 발행 카운트가 갈라진다.
-    expect(handlers).not.toMatch(/\.update\(\{ first_published_at/);
+  it("앱단 기록은 fail-open 폴백 하나뿐이다", () => {
+    // 정상 경로는 RPC 안에서만 기록한다. 두 곳에서 쓰면 발행 카운트가 갈라진다.
+    // 다만 RPC 가 실패했을 때의 폴백은 기록해야 한다 — 안 하면 그 시험이
+    // 영영 미발행으로 남아 발행 한도가 조용히 샌다.
+    const writes = handlers.match(/first_published_at: now/g) ?? [];
+    expect(writes).toHaveLength(1);
+    expect(handlers).toMatch(/quota_fail_open[\s\S]{0,1600}?first_published_at: now/);
   });
 });
 
