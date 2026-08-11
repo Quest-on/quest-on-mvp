@@ -21,6 +21,8 @@ const DEPLOYED_BASE: Record<string, string> = {
   CONSENT_GATE_MODE: "enforce",
   CONSENT_RETENTION_PURGE_DISABLED: "1",
   CONSENT_RETENTION_PURGE_MODE: "dry-run",
+  INCOMPLETE_ACCOUNT_PURGE_DISABLED: "1",
+  INCOMPLETE_ACCOUNT_PURGE_MODE: "dry-run",
 };
 
 describe("auditEnv", () => {
