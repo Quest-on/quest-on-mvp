@@ -179,8 +179,6 @@ describe("e2e 부트스트랩 배선", () => {
     expect(action).toContain(".env.test");
     expect(action).toContain("DISPOSABLE_LOCAL_DB_CONFIRMED=1");
     expect(action).toMatch(/127\.0\.0\.1:54321/);
-    expect(action).toContain("CONSENT_GATE_MODE=prompt");
-    expect(action).toContain("CONSENT_SUBJECT_HMAC_KEY_V1=");
   });
 
   it("CI 가 actual-auth 동의 flow를 필수 게이트로 실행한다", () => {
@@ -188,12 +186,11 @@ describe("e2e 부트스트랩 배선", () => {
       path.join(REPO_ROOT, ".github", "workflows", "ci.yml"),
       "utf8",
     );
-    const playwrightConfig = fs.readFileSync(
-      path.join(REPO_ROOT, "e2e", "playwright.config.ts"),
-      "utf8",
-    );
-
-    expect(workflow).toContain("--project=consent-flow-ci");
-    expect(playwrightConfig).toContain('testMatch: "consent-onboarding-flow.spec.ts"');
+    expect(workflow).toContain("e2e/browser/flows/consent-onboarding-flow.spec.ts");
+    expect(workflow).toContain("--project=browser-flows");
+    expect(workflow).toContain("CONSENT_GATE_MODE=prompt");
+    // Playwright 두 번째 실행이 기본 test-results 를 지워도 첫 JUnit은 보존한다.
+    expect(workflow).toContain("PLAYWRIGHT_JUNIT_OUTPUT_NAME=junit/browser-results.xml");
+    expect(workflow).toContain("paths: junit/*.xml");
   });
 });

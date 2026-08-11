@@ -101,6 +101,9 @@ jobs:
           TEST_BYPASS_SECRET: e2e-test-bypass-token-2024
           INTERNAL_API_SECRET: test-internal-api-secret-ci
           NEXT_PUBLIC_TEST_BYPASS_ENABLED: "true"
+          CONSENT_GATE_MODE: prompt
+          CONSENT_SUBJECT_HMAC_KEY_V1: ci-only-consent-hmac-key-at-least-32-bytes
+          CRON_SECRET: ci-only-cron-secret-at-least-32-bytes
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
@@ -128,12 +131,16 @@ jobs:
       - uses: ./.github/actions/test-setup
       - name: Run browser E2E tests
         run: |
-          mkdir -p test-results
-          npx playwright test \
-            --project=browser-e2e --project=consent-flow-ci \
-            --config=e2e/playwright.config.ts
+          mkdir -p test-results junit
+          PLAYWRIGHT_JUNIT_OUTPUT_NAME=junit/browser-results.xml \
+            npx playwright test --project=browser-e2e --config=e2e/playwright.config.ts
+          CONSENT_GATE_MODE=prompt \
+            CONSENT_SUBJECT_HMAC_KEY_V1=ci-only-consent-hmac-key-at-least-32-bytes \
+            CRON_SECRET=ci-only-cron-secret-at-least-32-bytes \
+            PLAYWRIGHT_JUNIT_OUTPUT_NAME=junit/consent-flow-results.xml \
+            npx playwright test e2e/browser/flows/consent-onboarding-flow.spec.ts \
+              --project=browser-flows --config=e2e/playwright.config.ts
         env:
-          PLAYWRIGHT_JUNIT_OUTPUT_NAME: test-results/browser-results.xml
           NODE_ENV: test
           NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
           SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
@@ -157,9 +164,10 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            junit/
           retention-days: 7
       - name: Test Summary
         if: always()
         uses: test-summary/action@v2
         with:
-          paths: test-results/browser-results.xml
+          paths: junit/*.xml

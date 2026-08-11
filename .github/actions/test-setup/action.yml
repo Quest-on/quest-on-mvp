@@ -43,11 +43,6 @@ runs:
           echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_KEY}"
           echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres"
           echo "DISPOSABLE_LOCAL_DB_CONFIRMED=1"
-          echo "NEXT_PUBLIC_APP_URL=http://localhost:3000"
-          echo "NEXT_PUBLIC_APP_ENV=test"
-          echo "CONSENT_GATE_MODE=prompt"
-          echo "CONSENT_SUBJECT_HMAC_KEY_V1=ci-only-consent-hmac-key-at-least-32-bytes"
-          echo "CRON_SECRET=ci-only-cron-secret-at-least-32-bytes"
         } > .env.test
         echo "DISPOSABLE_LOCAL_DB_CONFIRMED=1" >> "$GITHUB_ENV"
       shell: bash
