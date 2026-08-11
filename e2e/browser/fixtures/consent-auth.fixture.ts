@@ -1,6 +1,7 @@
 import { test as base, type Page, type APIRequestContext } from "@playwright/test";
 import { assertLocalTestEnv } from "../../helpers/assert-local-test-env";
 import { getTestSupabase } from "../../helpers/supabase-test-client";
+import { createClient } from "@supabase/supabase-js";
 
 /**
  * 동의 흐름 전용 실제 인증 fixture.
@@ -39,17 +40,42 @@ async function latestInbucketBody(
   request: APIRequestContext,
   email: string,
 ): Promise<string> {
-  const mailbox = email.split("@")[0];
-  const listRes = await request.get(`${INBUCKET_URL}/api/v1/mailbox/${mailbox}`);
-  if (!listRes.ok()) throw new Error(`Inbucket mailbox unavailable: ${listRes.status()}`);
+  const deadline = Date.now() + 10_000;
 
-  const messages = (await listRes.json()) as { id: string }[];
-  if (messages.length === 0) throw new Error("no confirmation mail arrived");
+  // Supabase CLI 2.x 는 예전 Inbucket 대신 Mailpit 을 띄운다. API 는
+  // `/api/v1/messages` 와 `/api/v1/message/:id` 이다. 메일 발송과 반영은
+  // 비동기이므로 해당 수신자가 나타날 때까지 짧게 polling 한다.
+  while (Date.now() < deadline) {
+    const listRes = await request.get(`${INBUCKET_URL}/api/v1/messages`);
+    if (!listRes.ok()) {
+      throw new Error(`Mailpit messages unavailable: ${listRes.status()}`);
+    }
 
-  const last = messages[messages.length - 1];
-  const msgRes = await request.get(`${INBUCKET_URL}/api/v1/mailbox/${mailbox}/${last.id}`);
-  const msg = (await msgRes.json()) as { body?: { text?: string; html?: string } };
-  return msg.body?.html ?? msg.body?.text ?? "";
+    const list = (await listRes.json()) as {
+      messages?: Array<{
+        ID: string;
+        To?: Array<{ Address?: string }>;
+      }>;
+    };
+    const message = list.messages?.find((item) =>
+      item.To?.some((recipient) => recipient.Address === email),
+    );
+
+    if (message) {
+      const msgRes = await request.get(`${INBUCKET_URL}/api/v1/message/${message.ID}`);
+      if (!msgRes.ok()) {
+        throw new Error(`Mailpit message unavailable: ${msgRes.status()}`);
+      }
+      const msg = (await msgRes.json()) as { Text?: string; HTML?: string };
+      // Text 본문은 쿼리 구분자가 그대로 `&` 이다. HTML 을 먼저 쓰면
+      // `&amp;` 를 URL 일부로 넘겨 verify 가 token 하나만 읽게 된다.
+      return msg.Text ?? msg.HTML ?? "";
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  throw new Error("no confirmation mail arrived within 10s");
 }
 
 /** 메일 본문에서 확인 링크를 뽑는다. */
@@ -92,13 +118,18 @@ export const test = base.extend<ConsentAuthFixtures>({
     const email = process.env.__CONSENT_E2E_EMAIL!;
 
     await use(async (page: Page) => {
-      const supabase = getTestSupabase();
-      // magiclink 를 발송시키고 Inbucket 에서 실제 링크를 꺼내 소비한다.
-      const { error } = await supabase.auth.admin.generateLink({
-        type: "magiclink",
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { auth: { persistSession: false } },
+      );
+      // admin.generateLink 는 링크만 만들고 메일을 보내지 않는다. 실제
+      // GoTrue → SMTP → Inbucket 경로를 타려면 OTP 요청을 사용해야 한다.
+      const { error } = await supabase.auth.signInWithOtp({
         email,
+        options: { emailRedirectTo: "http://localhost:3000/auth/callback" },
       });
-      if (error) throw new Error(`magiclink generation failed: ${error.message}`);
+      if (error) throw new Error(`magiclink request failed: ${error.message}`);
 
       const body = await latestInbucketBody(request, email);
       await page.goto(extractLink(body), { waitUntil: "networkidle" });

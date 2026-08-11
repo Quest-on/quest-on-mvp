@@ -50,6 +50,12 @@ export async function proxy(request: NextRequest) {
   if (pathname.startsWith("/api/")) {
     if (pathname === "/api/supa") return response;
 
+    // 공개·온보딩 지원·시험 연속성 경로는 게이트 설정을 읽기 전에
+    // 통과시킨다. 그렇지 않으면 CONSENT_GATE_MODE 가 빠진 배포에서
+    // `/api/cron/*`·`/api/health`까지 500으로 막혀 복구 경로가 사라진다.
+    const apiRouteClass = classifyRoute(pathname, request.method);
+    if (apiRouteClass !== "protected") return response;
+
     let apiMode;
     try {
       apiMode = getConsentGateMode();
@@ -65,8 +71,6 @@ export async function proxy(request: NextRequest) {
     // 그래서 proxy 는 `protected` 만 막는다. 연속성 경로는 각 route 가
     // 이미 세션 소유권을 확인하므로, 동의 미완료 사용자가 소유하지 않은
     // 세션에 접근하는 건 그 검사에서 걸린다.
-    const apiRouteClass = classifyRoute(pathname, request.method);
-    if (apiRouteClass !== "protected") return response;
 
     const apiSupabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

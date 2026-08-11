@@ -19,6 +19,15 @@ describe("proxy — 보호 API 게이트 배선", () => {
     expect(proxySource).toMatch(/if \(apiRouteClass !== "protected"\) return response;/);
   });
 
+  it("공개 경로는 mode 설정을 읽기 전에 통과한다", () => {
+    // 복구·cron 경로까지 잘못된 mode 때문에 500이 되면 운영자가
+    // 게이트를 복구할 수 없다.
+    const classifyAt = proxySource.indexOf("const apiRouteClass = classifyRoute");
+    const modeAt = proxySource.indexOf("apiMode = getConsentGateMode()");
+    expect(classifyAt).toBeGreaterThan(-1);
+    expect(modeAt).toBeGreaterThan(classifyAt);
+  });
+
   it("/api/supa 는 route 가 판정하므로 proxy 가 건너뛴다", () => {
     // 양쪽에서 판정하면 같은 요청에 Supabase 왕복이 중복된다.
     expect(proxySource).toMatch(/pathname === "\/api\/supa"\) return response;/);

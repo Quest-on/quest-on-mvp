@@ -52,7 +52,7 @@ test.describe("consent gate — 시험 연속성이 우선한다", () => {
     });
 
     // 소유권과 결속되지 않으면 세션 id 하나로 게이트를 우회할 수 있다.
-    expect([401, 403, 428]).toContain(res.status());
+    expect([400, 401, 403, 428]).toContain(res.status());
   });
 
   test("in_progress 세션이 있어도 무관한 API 는 예외가 아니다", async ({

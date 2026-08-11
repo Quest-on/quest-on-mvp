@@ -40,10 +40,24 @@ function isPortInUse(port: number): Promise<boolean> {
 /** Kill any process listening on the given port */
 function killProcessOnPort(port: number): void {
   try {
-    const pid = execSync(`lsof -ti :${port}`, { encoding: "utf-8" }).trim();
-    if (pid) {
-      console.log(`[global-setup] Killing existing process on port ${port} (PID: ${pid})`);
-      execSync(`kill -9 ${pid}`, { stdio: "pipe" });
+    if (process.platform === "win32") {
+      // lsof 는 Windows 에 없다. netstat + taskkill 로 대체한다.
+      const out = execSync(`netstat -ano | findstr :${port}`, {
+        encoding: "utf-8",
+      }).trim();
+      for (const line of out.split("\n")) {
+        const pid = line.trim().split(/\s+/).pop();
+        if (pid && /^\d+$/.test(pid) && pid !== "0") {
+          console.log(`[global-setup] Killing process on port ${port} (PID: ${pid})`);
+          execSync(`taskkill /F /PID ${pid}`, { stdio: "pipe" });
+        }
+      }
+    } else {
+      const pid = execSync(`lsof -ti :${port}`, { encoding: "utf-8" }).trim();
+      if (pid) {
+        console.log(`[global-setup] Killing process on port ${port} (PID: ${pid})`);
+        execSync(`kill -9 ${pid}`, { stdio: "pipe" });
+      }
     }
   } catch {
     // No process on port — that's fine
@@ -276,11 +290,16 @@ async function globalSetup() {
   }
 
   // Start the OpenAI mock server
-  mockServer = spawn("npx", ["tsx", "scripts/start-mock-server.ts"], {
-    cwd: path.resolve(__dirname, ".."),
-    stdio: "pipe",
-    env: { ...process.env, NODE_ENV: "test" },
-  });
+  mockServer = spawn(
+    process.platform === "win32" ? "npx.cmd" : "npx",
+    ["tsx", "scripts/start-mock-server.ts"],
+    {
+      cwd: path.resolve(__dirname, ".."),
+      stdio: "pipe",
+      env: { ...process.env, NODE_ENV: "test" },
+      shell: process.platform === "win32",
+    },
+  );
 
   // Wait for mock server to be ready
   await new Promise<void>((resolve, reject) => {
