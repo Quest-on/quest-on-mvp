@@ -197,8 +197,8 @@ describe("legal messages — 금지 문구", () => {
 
 describe("legal messages — 수탁자 법인명 (AC-D2)", () => {
   const EXPECTED = [
-    "OpenAI, L.L.C.",
-    "Supabase, Inc.",
+    "OpenAI OpCo, LLC",
+    "Supabase Pte. Ltd",
     "Vercel Inc.",
     "Upstash, Inc.",
   ] as const;
@@ -218,6 +218,17 @@ describe("legal messages — 수탁자 법인명 (AC-D2)", () => {
       for (const name of EXPECTED) {
         expect(recipients).toContain(name);
       }
+    }
+  });
+
+  it("공식 DPA의 이전 국가와 privacy 연락처를 수탁자별로 공개한다", () => {
+    for (const doc of [ko, en]) {
+      expect(doc.privacy.section5.countryValue).toContain("Supabase Pte. Ltd");
+      expect(doc.privacy.section5.countryValue).toMatch(/Singapore|싱가포르/);
+      expect(doc.privacy.section5.countryValue).toContain("OpenAI OpCo, LLC");
+      expect(doc.privacy.section5.countryValue).toMatch(/United States|미국/);
+      expect(doc.privacy.section5.recipientContact).toContain("privacy@upstash.com");
+      expect(doc.privacy.section5.recipientContact).not.toContain("support@upstash.com");
     }
   });
 });

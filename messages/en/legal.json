@@ -211,7 +211,7 @@
         },
         "rows": {
           "cloud": {
-            "name": "Supabase, Inc.",
+            "name": "Supabase Pte. Ltd",
             "task": "Database and authentication infrastructure",
             "retention": "Until the processing agreement ends"
           },
@@ -221,7 +221,7 @@
             "retention": "Until the processing agreement ends"
           },
           "llm": {
-            "name": "OpenAI, L.L.C.",
+            "name": "OpenAI OpCo, LLC",
             "task": "AI authoring, conversation and grading",
             "retention": "Until processing completes"
           },
@@ -237,11 +237,11 @@
       "heading": "5. Cross-border transfer of personal data",
       "body": "We transfer personal data outside the Republic of Korea as follows.",
       "recipientLabel": "Name of the recipient:",
-      "recipientValue": "Supabase, Inc. / Vercel Inc. / OpenAI, L.L.C. / Upstash, Inc.",
+      "recipientValue": "Supabase Pte. Ltd / Vercel Inc. / OpenAI OpCo, LLC / Upstash, Inc.",
       "contactLabel": "Contact details of the recipient:",
-      "contactValue": "Supabase, Inc. privacy@supabase.io / Vercel Inc. privacy@vercel.com / OpenAI, L.L.C. privacy@openai.com / Upstash, Inc. support@upstash.com",
+      "contactValue": "Supabase Pte. Ltd privacy@supabase.io / Vercel Inc. privacy@vercel.com / OpenAI OpCo, LLC privacy@openai.com / Upstash, Inc. privacy@upstash.com",
       "countryLabel": "Country of transfer:",
-      "countryValue": "United States",
+      "countryValue": "Supabase Pte. Ltd: Singapore / Vercel Inc.: United States / OpenAI OpCo, LLC: United States / Upstash, Inc.: United States",
       "timingLabel": "Timing of transfer:",
       "timingValue": "Transferred as needed at the moment the relevant processing occurs during service use.",
       "methodLabel": "Method of transfer:",
@@ -258,8 +258,8 @@
       "optOutValue": "You may notify us of your refusal using the contact below, or close your account.",
       "optOutEffectLabel": "Effect of refusal:",
       "optOutEffectValue": "Processing by these recipients is essential to providing the service, so if you refuse the transfer you will not be able to use the service.",
-      "recipientName": "Supabase, Inc. / Vercel Inc. / OpenAI, L.L.C. / Upstash, Inc.",
-      "recipientContact": "Supabase, Inc. privacy@supabase.io / Vercel Inc. privacy@vercel.com / OpenAI, L.L.C. privacy@openai.com / Upstash, Inc. support@upstash.com",
+      "recipientName": "Supabase Pte. Ltd / Vercel Inc. / OpenAI OpCo, LLC / Upstash, Inc.",
+      "recipientContact": "Supabase Pte. Ltd privacy@supabase.io / Vercel Inc. privacy@vercel.com / OpenAI OpCo, LLC privacy@openai.com / Upstash, Inc. privacy@upstash.com",
       "timing": "Transferred as needed at the moment the relevant processing occurs during service use.",
       "method": "Transmission over an encrypted network connection",
       "legalBasis": "Article 28-8(1)3 of the Personal Information Protection Act. The transfer constitutes entrusted processing and storage necessary to perform a contract, and the matters listed in Article 28-8(2) are disclosed in this policy in lieu of separate consent.",
