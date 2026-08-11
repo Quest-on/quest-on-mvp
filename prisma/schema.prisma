@@ -148,6 +148,47 @@ model grading_chats {
   @@index([session_id, q_idx, created_at], map: "idx_grading_chats_session_q_idx_created")
 }
 
+/// AI 설정 버전 — 불변. 저장할 때마다 새 행이 생기고 기존 행은 수정되지 않는다.
+/// profiles 는 sparse override 만 담는다(코드/env 기본값을 물질화하지 않는다). 이슈 #118.
+model ai_config_versions {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  profiles       Json
+  created_by     String
+  created_at     DateTime           @default(now()) @db.Timestamptz(6)
+  labels         ai_config_labels[]
+  audit_previous ai_config_audit[]  @relation("ai_config_audit_previous_version")
+  audit_new      ai_config_audit[]  @relation("ai_config_audit_new_version")
+
+  @@index([created_at(sort: Desc)], map: "idx_ai_config_versions_created_at")
+}
+
+/// 이동 가능한 라벨. `production` 하나가 현재 적용 버전을 가리킨다.
+/// 롤백 = 라벨을 이전 버전으로 옮기기(버전 행은 그대로 남는다). 이슈 #118.
+model ai_config_labels {
+  label      String             @id
+  version_id String             @db.Uuid
+  updated_at DateTime           @default(now()) @db.Timestamptz(6)
+  version    ai_config_versions @relation(fields: [version_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([version_id], map: "idx_ai_config_labels_version")
+}
+
+/// 설정 변경 감사 로그 — append-only. 누가·언제·무엇을·왜 바꿨는지 남긴다. 이슈 #118.
+model ai_config_audit {
+  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actor               String
+  action              String
+  previous_version_id String?             @db.Uuid
+  new_version_id      String              @db.Uuid
+  reason              String
+  created_at          DateTime            @default(now()) @db.Timestamptz(6)
+  previous_version    ai_config_versions? @relation("ai_config_audit_previous_version", fields: [previous_version_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  new_version         ai_config_versions  @relation("ai_config_audit_new_version", fields: [new_version_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "idx_ai_config_audit_created_at")
+  @@index([new_version_id], map: "idx_ai_config_audit_new_version")
+}
+
 model ai_events {
   id                        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   provider                  String
