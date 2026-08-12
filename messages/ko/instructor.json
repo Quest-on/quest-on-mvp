@@ -411,5 +411,133 @@
   },
   "new": {
     "createExamFailed": "시험 생성에 실패했습니다"
+  },
+  "memory": {
+    "pageTitle": "AI 가 학습한 내 채점 기준",
+    "pageSubtitle": "채점 대화에서 자동으로 관찰된 기록입니다. 무엇이 저장됐는지 확인하고 지울 수 있습니다.",
+    "shadow": {
+      "badge": "관찰 전용",
+      "title": "지금은 관찰만 하고, 모델에 넣지 않습니다",
+      "body": "이번 배포에서 이 기록은 쌓이고 열람·삭제만 가능합니다. 어떤 기록도 AI 프롬프트에 주입되지 않으며, 채점 결과에 영향을 주지 않습니다."
+    },
+    "consent": {
+      "sectionLabel": "별도 동의",
+      "title": "채점 대화 자동 관찰에 대한 동의",
+      "separateFromTerms": "이 동의는 서비스 이용약관·개인정보처리방침과 별개입니다. 약관에 동의했다고 해서 이 항목에 동의한 것이 되지 않습니다.",
+      "optInState": "자동 관찰은 선택 항목입니다. 원하지 않으면 아래 ‘관찰 일시중지’ 로 언제든 끌 수 있습니다.",
+      "itemsTitle": "수집 항목",
+      "items": "채점 대화에서 추출한 채점·피드백 기준 문장, 그 근거가 된 원문 인용과 메시지 식별자, 발화 시각, 입력 경로(직접 입력·붙여넣기 등), 적용 범위(전체·과목·시험).",
+      "purposeTitle": "이용 목적",
+      "purpose": "교수자마다 다른 채점 기준을 AI 가 매번 되묻지 않게 하기 위함입니다. 이번 배포에서는 관찰만 하고 채점에 사용하지 않습니다.",
+      "retentionTitle": "보관 기간",
+      "retention": "삭제하거나 초기화할 때까지 보관합니다. 삭제하면 보관 상태로 바뀌어 더 이상 사용되지 않지만, 이미 산출된 성적의 근거로는 남습니다.",
+      "refusalTitle": "거부할 권리",
+      "refusal": "동의하지 않아도 됩니다. ‘관찰 일시중지’ 는 수집된 기록을 지우지 않고 사용만 멈추며, ‘전체 초기화’ 는 기록 전체를 보관 상태로 돌립니다.",
+      "refusalCostTitle": "거부하면 달라지는 점",
+      "refusalCost": "거부해도 출제·응시·채점·성적 산출은 그대로 쓸 수 있습니다. 다만 AI 가 이전 채점에서 밝힌 기준을 기억하지 못해, 같은 기준을 매번 다시 알려줘야 합니다.",
+      "termsLink": "이용약관 보기",
+      "privacyLink": "개인정보처리방침 보기"
+    },
+    "controls": {
+      "title": "관찰 제어",
+      "distinctionNote": "‘일시중지’ 와 ‘전체 초기화’ 는 다른 동작입니다. 일시중지는 기록을 남긴 채 사용만 멈추고, 초기화는 기록 전체를 보관 상태로 돌립니다.",
+      "pause": {
+        "title": "관찰 일시중지",
+        "description": "기록은 전부 그대로 두고, 사용만 멈춥니다. 언제든 다시 켤 수 있습니다.",
+        "keepsDataBadge": "데이터 유지",
+        "action": "관찰 일시중지",
+        "resumeAction": "관찰 다시 시작",
+        "pending": "적용 중...",
+        "successPaused": "관찰을 일시중지했습니다. 기록은 그대로 남아 있습니다.",
+        "successResumed": "관찰을 다시 시작했습니다."
+      },
+      "reset": {
+        "sectionLabel": "되돌릴 수 없는 작업",
+        "title": "전체 초기화",
+        "description": "학습된 기록 전체를 보관 상태로 돌립니다. 목록에서 사라지고 다시 사용되지 않습니다.",
+        "archivesAllBadge": "전체 보관 처리",
+        "action": "전체 초기화",
+        "pending": "초기화 중...",
+        "success": "기록 전체를 보관 상태로 돌렸습니다.",
+        "confirmTitle": "학습된 기록 전체를 초기화할까요?",
+        "confirmIntro": "실행하기 전에 다음을 확인해 주세요.",
+        "confirmStopsUse": "학습된 기록 전체가 앞으로 사용되지 않습니다.",
+        "confirmLogsRemain": "원본 채점 대화 기록은 그대로 남습니다. 다만 그 대화에서 이 기록을 다시 학습하지는 않습니다.",
+        "confirmEvidenceKept": "이미 산출된 성적의 근거로 쓰인 기록은 분쟁 대응을 위해 보존됩니다.",
+        "confirmNotErasure": "이 작업은 완전 삭제가 아니라 보관 처리입니다.",
+        "confirmCancel": "취소",
+        "confirmAction": "초기화합니다"
+      }
+    },
+    "list": {
+      "title": "학습된 기록",
+      "description": "가장 최근에 관찰된 것부터 보여 줍니다.",
+      "countLabel": "{count}건",
+      "loading": "기록을 불러오는 중입니다"
+    },
+    "record": {
+      "valueLabel": "학습된 내용",
+      "predicateLabel": "항목",
+      "scopeLabel": "적용 범위",
+      "provenanceLabel": "출처",
+      "originLabel": "입력 경로",
+      "messageLabel": "메시지",
+      "messageUnknown": "메시지 식별자 없음",
+      "observedAtLabel": "관찰 시각",
+      "scopeIdUnknown": "대상 미지정",
+      "statusLabel": "상태",
+      "deleteAction": "삭제",
+      "deletePending": "삭제 중..."
+    },
+    "scope": {
+      "global": "전체",
+      "course": "과목",
+      "exam": "시험",
+      "unknown": "범위 불명"
+    },
+    "status": {
+      "active": "사용 중",
+      "quarantined": "일시중지됨",
+      "archived": "보관됨",
+      "unknown": "상태 불명"
+    },
+    "origin": {
+      "typed": "직접 입력",
+      "quick_reply": "빠른 응답 선택",
+      "pasted": "붙여넣기",
+      "imported": "가져오기",
+      "derived": "행동에서 추론",
+      "unknown": "출처 불명"
+    },
+    "source": {
+      "bulk_grading_messages": "일괄 채점 대화",
+      "grading_chats": "사례형 채점 대화",
+      "derived_criteria": "도출된 채점 기준",
+      "unknown": "출처 불명"
+    },
+    "delete": {
+      "confirmTitle": "이 기록을 삭제할까요?",
+      "confirmIntro": "실행하기 전에 다음을 확인해 주세요.",
+      "stopsUse": "이 기록은 앞으로 사용되지 않습니다.",
+      "logsRemain": "원본 채점 대화 기록은 그대로 남습니다. 다만 그 대화에서 이 기록을 다시 학습하지는 않습니다.",
+      "evidenceKept": "이미 산출된 성적의 근거로 쓰인 기록은 분쟁 대응을 위해 보존됩니다.",
+      "notErasure": "이 작업은 완전 삭제가 아니라 보관 처리입니다.",
+      "cancel": "취소",
+      "confirm": "삭제합니다",
+      "success": "삭제했습니다. 이 기록은 더 이상 사용되지 않습니다.",
+      "error": "삭제하지 못했습니다. 잠시 후 다시 시도해 주세요."
+    },
+    "empty": {
+      "title": "아직 학습된 기록이 없습니다",
+      "body": "채점 대화에서 채점·피드백 기준이 드러날 때만 기록이 생깁니다. 아직 그런 대화가 없었거나, 관찰을 일시중지해 둔 상태입니다.",
+      "how": "일괄 채점이나 사례형 채점에서 기준을 말하면 여기에 쌓입니다.",
+      "note": "목록이 비어 있는 것은 오류가 아닙니다."
+    },
+    "error": {
+      "title": "기록을 불러오지 못했습니다",
+      "body": "일시적인 문제일 수 있습니다. 다시 시도해도 같은 화면이 나오면 잠시 후 확인해 주세요.",
+      "retry": "다시 시도",
+      "settingsFailed": "설정을 변경하지 못했습니다. 잠시 후 다시 시도해 주세요."
+    }
   }
 }
