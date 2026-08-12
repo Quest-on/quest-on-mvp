@@ -247,6 +247,52 @@ export type MemoryExtractionRetryPayload = {
   retryAttempt?: number;
 };
 
+export function memoryExtractionInitialDedupId(
+  payload: MemoryExtractionRetryPayload,
+): string {
+  return `memory-extraction-initial-${payload.sourceTable}-${payload.sourceRefId}`;
+}
+
+export async function enqueueMemoryExtraction(
+  payload: MemoryExtractionRetryPayload,
+): Promise<EnqueueGradingPhaseResult> {
+  if (!payload.sourceRefId) {
+    const error = new Error("memory extraction source ref is required");
+    logError("[QSTASH] Memory extraction publish skipped — invalid payload", error, {
+      path: "lib/qstash.ts",
+      additionalData: { payload },
+    });
+    return { ok: false, reason: "publish_failed", error };
+  }
+
+  const qstash = getQStash();
+  if (!qstash) return { ok: false, reason: "qstash_disabled" };
+
+  const baseUrl = getWorkerBaseUrl();
+  if (!baseUrl) return { ok: false, reason: "no_base_url" };
+
+  const dedupId = memoryExtractionInitialDedupId(payload);
+  try {
+    const result = await qstash.publishJSON({
+      url: `${baseUrl}/api/internal/memory-extraction-worker`,
+      body: payload,
+      retries: 3,
+      headers: {
+        "Upstash-Deduplication-Id": dedupId,
+      },
+    });
+    const messageId =
+      (result as { messageId?: string } | undefined)?.messageId ?? null;
+    return { ok: true, dedupId, messageId };
+  } catch (error) {
+    logError("[QSTASH] Memory extraction publish failed", error, {
+      path: "lib/qstash.ts",
+      additionalData: { payload, dedupId },
+    });
+    return { ok: false, reason: "publish_failed", error };
+  }
+}
+
 /**
  * CAS retries intentionally use a different deduplication namespace from the
  * original extraction publish. Reusing the original ID makes QStash return 202

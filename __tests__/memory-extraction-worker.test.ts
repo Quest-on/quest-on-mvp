@@ -30,6 +30,11 @@ import {
   type MemoryExtractionDependencies,
   type MemorySourceMessage,
 } from "@/lib/preferences/extraction";
+import {
+  enqueueMemoryExtraction,
+  memoryExtractionInitialDedupId,
+  memoryExtractionRetryDedupId,
+} from "@/lib/qstash";
 
 type Row = Record<string, unknown>;
 type TableName =
@@ -43,7 +48,7 @@ type QueryResult = {
   error: { code?: string; message: string } | null;
 };
 
-type Filter = { kind: "eq" | "is"; column: string; value: unknown };
+type Filter = { kind: "eq" | "is" | "in"; column: string; value: unknown };
 
 type FakeState = {
   tables: Record<TableName, Row[]>;
@@ -61,7 +66,11 @@ function sameValue(left: unknown, right: unknown): boolean {
 }
 
 function matches(row: Row, filters: Filter[]): boolean {
-  return filters.every((filter) => sameValue(row[filter.column], filter.value));
+  return filters.every((filter) =>
+    filter.kind === "in"
+      ? (filter.value as unknown[]).includes(row[filter.column])
+      : sameValue(row[filter.column], filter.value),
+  );
 }
 
 function activeMemoryConflicts(rows: Row[], candidate: Row, ownId?: unknown): boolean {
@@ -82,6 +91,8 @@ class FakeQuery implements PromiseLike<QueryResult> {
   private payload: Row = {};
   private filters: Filter[] = [];
   private ignoreDuplicates = false;
+  private descendingColumn: string | null = null;
+  private rowLimit: number | null = null;
 
   constructor(
     private readonly state: FakeState,
@@ -126,6 +137,21 @@ class FakeQuery implements PromiseLike<QueryResult> {
     return this;
   }
 
+  in(column: string, value: unknown[]): this {
+    this.filters.push({ kind: "in", column, value });
+    return this;
+  }
+
+  order(column: string, options?: { ascending?: boolean }): this {
+    this.descendingColumn = options?.ascending === false ? column : null;
+    return this;
+  }
+
+  limit(value: number): this {
+    this.rowLimit = value;
+    return this;
+  }
+
   async maybeSingle(): Promise<QueryResult> {
     const result = await this.execute();
     if (result.error) return result;
@@ -155,8 +181,25 @@ class FakeQuery implements PromiseLike<QueryResult> {
     const rows = this.state.tables[this.table];
     this.state.queries.push({ table: this.table, filters: [...this.filters] });
 
+    if (
+      this.operation === "select" &&
+      this.table === "instructor_memory_events" &&
+      rows.some((row) => row.__pauseReadError === true) &&
+      this.filters.some((filter) => filter.column === "reason")
+    ) {
+      return { data: null, error: { message: "mock pause lookup failed" } };
+    }
+
     if (this.operation === "select") {
-      return { data: rows.filter((row) => matches(row, this.filters)), error: null };
+      let selected = rows.filter((row) => matches(row, this.filters));
+      if (this.descendingColumn) {
+        const column = this.descendingColumn;
+        selected = [...selected].sort((left, right) =>
+          String(right[column] ?? "").localeCompare(String(left[column] ?? "")),
+        );
+      }
+      if (this.rowLimit !== null) selected = selected.slice(0, this.rowLimit);
+      return { data: selected, error: null };
     }
 
     if (this.operation === "delete") {
@@ -596,6 +639,76 @@ describe("promotion concurrency, ordering, and idempotency", () => {
     expect(repeated.verdicts[0]).toMatchObject({ verdict: "DUPLICATE" });
   });
 
+  it("blocks an in-flight extraction after the instructor pauses", async () => {
+    const database = createFakeDatabase({
+      bulk_grading_messages: [sourceRow()],
+      instructor_memory_events: [],
+    });
+    const extractCandidates = async () => {
+      database.state.tables.instructor_memory_events.push({
+        id: "pause-event",
+        memory_id: null,
+        instructor_id: INSTRUCTOR_ID,
+        operation: "quarantine",
+        reason: "instructor_paused_memory",
+        occurred_at: "2026-08-12T02:00:00.000Z",
+      });
+      return JSON.stringify([scoreCandidate()]);
+    };
+
+    const result = await processMemoryExtractionJob(
+      { sourceTable: "bulk_grading_messages", sourceRefId: SOURCE_ID },
+      {
+        getClient: () => database.client,
+        extractCandidates,
+        requeue: async () => undefined,
+      },
+    );
+
+    expect(result.promoted).toBe(0);
+    expect(result.verdicts[0]).toMatchObject({
+      verdict: "REJECTED",
+      reason: "instructor_memory_paused",
+    });
+    expect(database.state.tables.instructor_memories).toHaveLength(0);
+  });
+
+  it("fails closed without throwing when the pause-state lookup errors", async () => {
+    const database = createFakeDatabase({
+      bulk_grading_messages: [sourceRow()],
+      instructor_memory_events: [{ __pauseReadError: true }],
+    });
+    const deps = dependencies(database, [scoreCandidate()]);
+
+    const result = await processMemoryExtractionJob(
+      { sourceTable: "bulk_grading_messages", sourceRefId: SOURCE_ID },
+      deps.value,
+    );
+
+    expect(result.promoted).toBe(0);
+    expect(result.verdicts[0]).toMatchObject({
+      verdict: "REJECTED",
+      reason: "instructor_memory_pause_state_unavailable",
+    });
+    expect(database.state.tables.instructor_memories).toHaveLength(0);
+  });
+
+  it("promotes normally when the instructor is not paused", async () => {
+    const database = createFakeDatabase({
+      bulk_grading_messages: [sourceRow()],
+      instructor_memory_events: [],
+    });
+    const deps = dependencies(database, [scoreCandidate()]);
+
+    const result = await processMemoryExtractionJob(
+      { sourceTable: "bulk_grading_messages", sourceRefId: SOURCE_ID },
+      deps.value,
+    );
+
+    expect(result.promoted).toBe(1);
+    expect(database.state.tables.instructor_memories[0]).toMatchObject({ status: "active" });
+  });
+
   it("archives a contradiction, sets superseded_by, and never physically deletes", async () => {
     const database = createFakeDatabase({
       bulk_grading_messages: [sourceRow()],
@@ -660,6 +773,30 @@ describe("malformed extractor output remains handled", () => {
 });
 
 describe("worker integration invariants", () => {
+  it("handles a missing initial source ref without throwing or publishing", async () => {
+    await expect(enqueueMemoryExtraction({
+      sourceTable: "grading_chats",
+      sourceRefId: "",
+    })).resolves.toMatchObject({ ok: false, reason: "publish_failed" });
+  });
+
+  it("uses a distinct, deterministic initial dedup namespace from CAS retries", () => {
+    const payload = {
+      sourceTable: "grading_chats" as const,
+      sourceRefId: SOURCE_ID,
+    };
+
+    expect(memoryExtractionInitialDedupId(payload)).toBe(
+      `memory-extraction-initial-grading_chats-${SOURCE_ID}`,
+    );
+    expect(memoryExtractionInitialDedupId(payload)).toBe(
+      memoryExtractionInitialDedupId({ ...payload }),
+    );
+    expect(memoryExtractionInitialDedupId(payload)).not.toBe(
+      memoryExtractionRetryDedupId(payload),
+    );
+  });
+
   it("tracks the real extractor AI call as memory_extraction", async () => {
     await expect(callMemoryExtractor(sourceMessage())).resolves.toBe("[]");
 

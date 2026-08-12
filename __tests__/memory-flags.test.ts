@@ -12,7 +12,7 @@ const ENV_KEYS = [
 ] as const;
 
 type Row = Record<string, unknown>;
-type Filter = { kind: "eq" | "is" | "neq"; column: string; value: unknown };
+type Filter = { kind: "eq" | "is" | "neq" | "in"; column: string; value: unknown };
 type Call = { operation: string; table: string; filters: Filter[] };
 
 function createMockClient(initial: Record<string, Row[]>) {
@@ -30,6 +30,7 @@ function createMockClient(initial: Record<string, Row[]>) {
 
     select(): this { return this; }
     order(): this { return this; }
+    limit(): this { return this; }
     eq(column: string, value: unknown): this {
       this.filters.push({ kind: "eq", column, value });
       return this;
@@ -40,6 +41,10 @@ function createMockClient(initial: Record<string, Row[]>) {
     }
     neq(column: string, value: unknown): this {
       this.filters.push({ kind: "neq", column, value });
+      return this;
+    }
+    in(column: string, value: unknown[]): this {
+      this.filters.push({ kind: "in", column, value });
       return this;
     }
     insert(payload: Row): this {
@@ -67,7 +72,9 @@ function createMockClient(initial: Record<string, Row[]>) {
         this.filters.every((filter) =>
           filter.kind === "neq"
             ? row[filter.column] !== filter.value
-            : row[filter.column] === filter.value,
+            : filter.kind === "in"
+              ? (filter.value as unknown[]).includes(row[filter.column])
+              : row[filter.column] === filter.value,
         ),
       );
     }

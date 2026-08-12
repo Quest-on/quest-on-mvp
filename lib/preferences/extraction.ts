@@ -441,6 +441,32 @@ async function loadActiveMemorySnapshots(
   return snapshots;
 }
 
+const INSTRUCTOR_PAUSE_REASON = "instructor_paused_memory";
+const MEMORY_SETTING_REASONS = [
+  INSTRUCTOR_PAUSE_REASON,
+  "instructor_resumed_memory",
+  "instructor_reset_memory",
+] as const;
+
+export async function isInstructorMemoryPaused(
+  client: SupabaseClient,
+  instructorId: string,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from("instructor_memory_events")
+    .select("reason,operation,occurred_at")
+    .eq("instructor_id", instructorId)
+    .in("reason", [...MEMORY_SETTING_REASONS])
+    .order("occurred_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`instructor memory pause state read failed: ${error.message}`);
+  }
+  return data?.reason === INSTRUCTOR_PAUSE_REASON && data.operation === "quarantine";
+}
+
 function stableUuid(namespace: string, value: string): string {
   const bytes = Buffer.from(
     createHash("sha256").update(`${namespace}\u0000${value}`).digest().subarray(0, 16),
@@ -665,7 +691,10 @@ export type PromotionResult =
   | { outcome: "promoted"; reason: string; memoryId: string }
   | { outcome: "duplicate"; reason: string; memoryId: string }
   | { outcome: "requeue"; reason: string }
-  | { outcome: "storage_disabled" | "stale" | "unchanged"; reason: string };
+  | {
+      outcome: "storage_disabled" | "paused" | "stale" | "unchanged";
+      reason: string;
+    };
 
 /**
  * Applies one already-verified candidate as an idempotent visibility unit.
@@ -695,6 +724,16 @@ export async function promoteMemoryCandidate(params: {
 
   const instructorId = source.createdBy;
   if (!instructorId) throw new Error("typed memory source is missing created_by");
+
+  try {
+    if (await isInstructorMemoryPaused(client, instructorId)) {
+      return { outcome: "paused", reason: "instructor_memory_paused" };
+    }
+  } catch {
+    // Pause state is fail-closed: an unavailable control-state read must never
+    // make a new memory visible.
+    return { outcome: "paused", reason: "instructor_memory_pause_state_unavailable" };
+  }
 
   const identity = `${instructorId}:${idempotencyKey}`;
   const memoryId = stableUuid("instructor-memory", identity);

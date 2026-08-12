@@ -1,10 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { currentUserMock, rateLimitMock, auditLogMock, logErrorMock } = vi.hoisted(() => ({
+const {
+  currentUserMock,
+  rateLimitMock,
+  auditLogMock,
+  logErrorMock,
+  enqueueMemoryExtractionMock,
+  requireCaseGradeAccessMock,
+} = vi.hoisted(() => ({
   currentUserMock: vi.fn(),
   rateLimitMock: vi.fn(),
   auditLogMock: vi.fn(),
   logErrorMock: vi.fn(),
+  enqueueMemoryExtractionMock: vi.fn(),
+  requireCaseGradeAccessMock: vi.fn(),
 }));
 
 vi.mock("@/lib/get-current-user", () => ({ currentUser: currentUserMock }));
@@ -14,6 +23,15 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 vi.mock("@/lib/audit", () => ({ auditLog: auditLogMock }));
 vi.mock("@/lib/logger", () => ({ logError: logErrorMock }));
+vi.mock("@/lib/qstash", () => ({
+  enqueueMemoryExtraction: enqueueMemoryExtractionMock,
+}));
+vi.mock("@/lib/case-grade-access", () => ({
+  requireCaseGradeAccess: requireCaseGradeAccessMock,
+}));
+vi.mock("@/lib/grades-upsert", () => ({
+  upsertGradesBySessionQuestion: vi.fn(async () => [0]),
+}));
 
 type Row = Record<string, unknown>;
 type Filter = { kind: "eq" | "in"; column: string; value: unknown };
@@ -56,6 +74,10 @@ class MockQuery implements PromiseLike<{ data: Row[] | null; error: null }> {
   }
 
   order(_column: string, _options?: unknown) {
+    return this;
+  }
+
+  limit(_count: number) {
     return this;
   }
 
@@ -122,6 +144,7 @@ vi.mock("@/lib/supabase-server", () => ({
 import { GET } from "@/app/api/instructor/memory/route";
 import { DELETE } from "@/app/api/instructor/memory/[memoryId]/route";
 import { PATCH } from "@/app/api/instructor/memory/settings/route";
+import { POST as caseGradeCommit } from "@/app/api/session/[sessionId]/case-grade/commit/route";
 
 const MEMORY_ID = "550e8400-e29b-41d4-a716-446655440000";
 const INSTRUCTOR = {
@@ -145,6 +168,10 @@ function deleteMemory(memoryId = MEMORY_ID) {
   return DELETE(new Request(`http://localhost/api/instructor/memory/${memoryId}`), {
     params: Promise.resolve({ memoryId }),
   });
+}
+
+function caseCommitRequest(body: unknown): Parameters<typeof caseGradeCommit>[0] {
+  return request(body) as Parameters<typeof caseGradeCommit>[0];
 }
 
 function memory(overrides: Row = {}): Row {
@@ -174,6 +201,16 @@ describe("instructor memory API", () => {
     currentUserMock.mockResolvedValue(INSTRUCTOR);
     rateLimitMock.mockResolvedValue({ allowed: true, remaining: 99, resetAt: Date.now() + 60_000 });
     auditLogMock.mockResolvedValue(true);
+    enqueueMemoryExtractionMock.mockResolvedValue({
+      ok: true,
+      dedupId: "memory-extraction-initial-grading_chats-source-message",
+      messageId: "message-1",
+    });
+    requireCaseGradeAccessMock.mockImplementation(async () => ({
+      ok: true,
+      ctx: { user: INSTRUCTOR, supabase: database.client },
+    }));
+    delete process.env.MEMORY_EXTRACTION_DISABLED;
   });
 
   it("returns 401 without authentication and never accesses the database", async () => {
@@ -255,8 +292,11 @@ describe("instructor memory API", () => {
     expect(database.tables.instructor_memories[0].status).toBe("archived");
     expect(database.tables.instructor_memory_events.map((event) => event.reason)).toEqual([
       "instructor_paused_memory",
+      "instructor_paused_memory",
+      "instructor_reset_memory",
       "instructor_reset_memory",
     ]);
+    expect(database.tables.instructor_memory_events.filter((event) => event.memory_id === null)).toHaveLength(2);
   });
 
   it("resume restores only rows whose latest event is an instructor pause", async () => {
@@ -276,6 +316,87 @@ describe("instructor memory API", () => {
     expect(response.status).toBe(200);
     expect(database.tables.instructor_memories[0].status).toBe("active");
     expect(database.tables.instructor_memories[1].status).toBe("quarantined");
+    expect(database.tables.instructor_memory_events).toContainEqual(
+      expect.objectContaining({
+        memory_id: null,
+        operation: "restore",
+        reason: "instructor_resumed_memory",
+      }),
+    );
+    expect(database.tables.instructor_memory_events).not.toContainEqual(
+      expect.objectContaining({
+        memory_id: "750e8400-e29b-41d4-a716-446655440000",
+        reason: "instructor_resumed_memory",
+      }),
+    );
+  });
+
+  it("case-grade commit enqueues exactly one initial extraction for the latest typed message", async () => {
+    database = new MockDatabase({
+      grading_chats: [{
+        id: "source-message",
+        session_id: MEMORY_ID,
+        q_idx: 0,
+        role: "user",
+        input_origin: "typed",
+        created_at: "2026-08-12T00:00:00Z",
+      }],
+    });
+
+    const response = await caseGradeCommit(caseCommitRequest({ qIdx: 0, score: 88, comment: "done" }), {
+      params: Promise.resolve({ sessionId: MEMORY_ID }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ ok: true });
+    expect(enqueueMemoryExtractionMock).toHaveBeenCalledOnce();
+    expect(enqueueMemoryExtractionMock).toHaveBeenCalledWith({
+      sourceTable: "grading_chats",
+      sourceRefId: "source-message",
+    });
+  });
+
+  it("keeps case-grade commit successful and logs when QStash publish fails", async () => {
+    database = new MockDatabase({
+      grading_chats: [{
+        id: "source-message",
+        session_id: MEMORY_ID,
+        q_idx: 0,
+        role: "user",
+        input_origin: "typed",
+        created_at: "2026-08-12T00:00:00Z",
+      }],
+    });
+    enqueueMemoryExtractionMock.mockResolvedValue({
+      ok: false,
+      reason: "publish_failed",
+      error: new Error("QStash unavailable"),
+    });
+
+    const response = await caseGradeCommit(caseCommitRequest({ qIdx: 0, score: 88 }), {
+      params: Promise.resolve({ sessionId: MEMORY_ID }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ ok: true });
+    expect(logErrorMock).toHaveBeenCalledWith(
+      "[case-grade commit] Memory extraction was not queued",
+      expect.any(Error),
+      expect.any(Object),
+    );
+  });
+
+  it("does not look up or enqueue extraction when the extraction kill switch is off", async () => {
+    process.env.MEMORY_EXTRACTION_DISABLED = "1";
+    database = new MockDatabase({ grading_chats: [] });
+
+    const response = await caseGradeCommit(caseCommitRequest({ qIdx: 0, score: 88 }), {
+      params: Promise.resolve({ sessionId: MEMORY_ID }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(enqueueMemoryExtractionMock).not.toHaveBeenCalled();
+    expect(database.queries.some((query) => query.table === "grading_chats")).toBe(false);
   });
 
   it("GET carries the instructor_id tenant filter and returns provenance without raw text", async () => {

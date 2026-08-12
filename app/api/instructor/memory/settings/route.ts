@@ -139,6 +139,21 @@ export async function PATCH(request: Request) {
       auditAction = "memory_reset";
     }
 
+    const { error: stateEventError } = await supabase
+      .from("instructor_memory_events")
+      .insert({
+        memory_id: null,
+        instructor_id: user.id,
+        operation,
+        reason,
+        before_value: null,
+        after_value: { status },
+        actor_kind: "instructor",
+        actor_id: user.id,
+        occurred_at: now,
+      });
+    if (stateEventError) throw stateEventError;
+
     if (rows.length > 0) {
       const ids = rows.map((row) => row.id);
       const { data: updated, error: updateError } = await supabase
