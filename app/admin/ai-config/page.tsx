@@ -154,20 +154,29 @@ export default function AdminAiConfigPage() {
               {EDITABLE_FIELDS.map((field) => {
                 const effective = data.effectiveProfiles[task]?.[field];
                 const drafted = draft[task]?.[field];
-                const value =
-                  drafted !== undefined
-                    ? drafted === null
-                      ? ""
-                      : String(drafted)
-                    : effective === undefined
-                      ? ""
-                      : String(effective);
-
                 // optional 필드는 3상태다: 상속 / 값 / 명시적 없음(null).
                 // 입력창만 두면 "없음" 을 표현할 방법이 없어 한 번 상속된 optional
                 // 값을 끌 수 없다. required 필드는 null 이 될 수 없으므로 제외한다.
                 const nullable = NULLABLE_FIELDS.has(field);
-                const isExplicitNull = drafted === null;
+
+                // 초안이 이 필드를 건드렸으면 초안이 진실이고, 아니면 저장된 값이
+                // 진실이다. 저장 후 초안이 비워지므로 초안만 보면 이미 저장된
+                // 명시적 null 이 "상속" 으로 보이고, 그러면 체크가 이미 풀려 있어
+                // 사용자가 상속을 되돌릴 수 없다.
+                const draftTouched =
+                  draft[task] !== undefined &&
+                  Object.prototype.hasOwnProperty.call(draft[task], field);
+                const isExplicitNull = draftTouched
+                  ? drafted === null
+                  : data.overrides[task]?.[field] === null;
+
+                const value = isExplicitNull
+                  ? ""
+                  : drafted !== undefined && drafted !== null
+                    ? String(drafted)
+                    : effective === undefined
+                      ? ""
+                      : String(effective);
 
                 return (
                   <div key={field} className="space-y-1">
@@ -184,8 +193,10 @@ export default function AdminAiConfigPage() {
                         }))
                       }
                     />
+                    {/* label 로 감싸면 클릭이 컨트롤과 label 양쪽에서 발생해
+                        두 번 토글되어 순 변화가 0 이 된다. 그래서 분리한다. */}
                     {nullable && (
-                      <label className="text-muted-foreground flex items-center gap-2 text-xs">
+                      <div className="text-muted-foreground flex items-center gap-2 text-xs">
                         <Checkbox
                           id={`${task}-${field}-none`}
                           checked={isExplicitNull}
@@ -199,8 +210,10 @@ export default function AdminAiConfigPage() {
                             }))
                           }
                         />
-                        {t("none")}
-                      </label>
+                        <Label htmlFor={`${task}-${field}-none`} className="text-xs font-normal">
+                          {t("none")}
+                        </Label>
+                      </div>
                     )}
                   </div>
                 );

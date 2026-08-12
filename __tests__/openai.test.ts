@@ -167,6 +167,9 @@ describe("semantic retry loops never wrap transport failures", () => {
       readFileSync(path.join(process.cwd(), file), "utf8")
     );
     // 파싱 재시도 루프가 전송 실패까지 잡으면 SDK maxRetries 와 곱해진다.
-    expect(code).toMatch(/OpenAICallTelemetryError/);
+    // 래퍼 타입이 아니라 **실제로 전파되는** SDK 오류로 판별해야 한다.
+    // callTrackedOpenAI 는 래퍼를 벗겨 원본을 다시 던지므로 래퍼 검사는 무효다.
+    expect(code).toMatch(/isOpenAITransportError/);
+    expect(code).not.toMatch(/instanceof OpenAICallTelemetryError/);
   });
 });

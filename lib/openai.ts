@@ -93,6 +93,22 @@ export class OpenAICallTelemetryError extends Error {
   }
 }
 
+/**
+ * 전송 계층 실패인지 판별한다 (이슈 #118).
+ *
+ * 주의: tracked 래퍼는 실패를 `OpenAICallTelemetryError` 로 감싸지만 최종적으로는
+ * 원본 오류(`failure.error`)를 다시 던진다. 따라서 호출부에서 래퍼 타입을 검사하면
+ * 절대 매치되지 않는다. 실제로 전파되는 것은 SDK 의 `APIError` 계열이다.
+ *
+ * 파싱/의미 실패는 여기 걸리지 않으므로, 의미 재시도 루프가 전송 실패까지
+ * 다시 시도해 SDK 재시도와 곱해지는 것을 막는 데 쓴다.
+ */
+export function isOpenAITransportError(error: unknown): boolean {
+  if (error instanceof OpenAI.APIError) return true;
+  if (error instanceof Error && /^API(Error|ConnectionError|ConnectionTimeoutError|UserAbortError)$/.test(error.name)) return true;
+  return isOpenAITimeoutError(error);
+}
+
 /** SDK 가 던지는 타임아웃(APIConnectionTimeoutError)을 이름으로 식별한다. */
 export function isOpenAITimeoutError(error: unknown): boolean {
   if (error instanceof OpenAI.APIConnectionTimeoutError) return true;
