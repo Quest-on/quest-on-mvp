@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import type { Question } from "@/components/instructor/QuestionEditor";
 import { QuestionEditor } from "@/components/instructor/QuestionEditor";
+import { CourseSelectField } from "@/components/instructor/CourseSelectField";
 import {
   buildDefaultScoreWeightsForQuestionTypes,
   scoreBucketForQuestionType,
@@ -65,6 +66,10 @@ interface SimpleExamAuthoringFormProps {
   onTitleChange: (value: string) => void;
   onDurationChange: (value: number) => void;
   onLanguageChange: (value: "ko" | "en") => void;
+  /** 선택된 과목 id. null 이 기본값이고 "과목 없음"을 뜻한다 — 출제를 막지 않는다. */
+  courseId?: string | null;
+  /** 넘기지 않으면 과목 선택기를 렌더링하지 않는다(기존 호출부 무영향). */
+  onCourseChange?: (courseId: string | null) => void;
   files: File[];
   disabledFiles: Set<number>;
   canAddMoreFiles: boolean;
@@ -311,6 +316,8 @@ export function SimpleExamAuthoringForm({
   onTitleChange,
   onDurationChange,
   onLanguageChange,
+  courseId,
+  onCourseChange,
   files,
   disabledFiles,
   canAddMoreFiles,
@@ -731,6 +738,15 @@ export function SimpleExamAuthoringForm({
             required
           />
         </Field>
+
+        {/* 과목 — 선택 사항. 제목 바로 아래에 둬야 "무엇을/어디에" 순서로 읽힌다. */}
+        {onCourseChange && (
+          <CourseSelectField
+            value={courseId ?? null}
+            onChange={onCourseChange}
+            variant="section"
+          />
+        )}
 
         {/* 시험 코드 — 편집 모드에서만 표시 */}
         {examCode != null && (

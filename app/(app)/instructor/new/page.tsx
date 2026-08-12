@@ -92,6 +92,8 @@ export default function CreateExam() {
     materials: [] as File[],
     language: "ko" as "ko" | "en",
   });
+  // 과목은 선택 사항이다. null 이 기본값이며 출제를 막지 않는다.
+  const [courseId, setCourseId] = useState<string | null>(null);
   const [disabledFiles, setDisabledFiles] = useState<Set<number>>(new Set());
   const [canAddMoreFiles, setCanAddMoreFiles] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -845,6 +847,8 @@ export default function CreateExam() {
                 onLanguageChange={(value) =>
                   setExamData((prev) => ({ ...prev, language: value }))
                 }
+                courseId={courseId}
+                onCourseChange={setCourseId}
                 files={examData.materials}
                 disabledFiles={disabledFiles}
                 canAddMoreFiles={canAddMoreFiles}

@@ -40,6 +40,8 @@ export default function EditAssignment({
     deadline: "",
     language: "ko" as "ko" | "en",
   });
+  // 과목은 선택 사항이다. null 이 기본값이며 저장을 막지 않는다.
+  const [courseId, setCourseId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [highlightedQuestionIds, setHighlightedQuestionIds] = useState<Set<string>>(new Set());
   const [fieldErrors, setFieldErrors] = useState<{
@@ -310,6 +312,8 @@ export default function EditAssignment({
               onLanguageChange={(value) =>
                 setExamData((prev) => ({ ...prev, language: value }))
               }
+              courseId={courseId}
+              onCourseChange={setCourseId}
             />
           </div>
 

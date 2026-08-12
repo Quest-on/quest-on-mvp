@@ -51,6 +51,8 @@ export default function EditExam({
     materials: [] as File[],
     language: "ko" as "ko" | "en",
   });
+  // 과목은 선택 사항이다. null 이 기본값이며 저장을 막지 않는다.
+  const [courseId, setCourseId] = useState<string | null>(null);
   const [disabledFiles, setDisabledFiles] = useState<Set<number>>(new Set());
   const [canAddMoreFiles, setCanAddMoreFiles] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -412,6 +414,9 @@ export default function EditExam({
               setExamData((p) => ({ ...p, duration: v === 0 ? 0 : v || prevDurationRef.current }));
             }}
             onLanguageChange={(v) => setExamData((p) => ({ ...p, language: v }))}
+            // ── 과목 (선택) ─────────────────────────────────────────────────
+            courseId={courseId}
+            onCourseChange={setCourseId}
             // ── 파일 업로드 ─────────────────────────────────────────────────
             files={examData.materials}
             disabledFiles={disabledFiles}

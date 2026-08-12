@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CourseSelectField } from "@/components/instructor/CourseSelectField";
 import { HelpCircle, AlertTriangle, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { ko, enUS } from "date-fns/locale";
@@ -53,6 +54,10 @@ interface ExamInfoFormProps {
   deadlineError?: string;
   language?: "ko" | "en";
   onLanguageChange?: (value: "ko" | "en") => void;
+  /** 선택된 과목 id. null 이 기본값이고 "과목 없음"을 뜻한다 — 출제를 막지 않는다. */
+  courseId?: string | null;
+  /** 넘기지 않으면 과목 선택기를 렌더링하지 않는다(기존 호출부 무영향). */
+  onCourseChange?: (courseId: string | null) => void;
   /** AI 에이전트 체화 애니메이션이 가리킬 제목 입력 DOM 요소 ref. */
   titleRef?: React.Ref<HTMLInputElement>;
   /**
@@ -77,6 +82,8 @@ export function ExamInfoForm({
   deadlineError,
   language = "ko",
   onLanguageChange,
+  courseId,
+  onCourseChange,
   titleRef,
   codeReadOnly = false,
 }: ExamInfoFormProps) {
@@ -229,6 +236,15 @@ export function ExamInfoForm({
             </div>
           </div>
         </div>
+
+        {/* 과목 — 선택 사항. 제목·코드 바로 아래가 "무엇을/어디에" 순서다. */}
+        {onCourseChange && (
+          <CourseSelectField
+            value={courseId ?? null}
+            onChange={onCourseChange}
+            variant="compact"
+          />
+        )}
 
         {onLanguageChange && (
           <div className="space-y-2">

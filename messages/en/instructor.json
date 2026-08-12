@@ -40,6 +40,27 @@
     "loading": "Loading...",
     "noFolders": "No folders"
   },
+  "course": {
+    "label": "Course",
+    "optional": "Optional",
+    "helper": "Groups the exams and assignments that belong to the same course. Leaving it unset is fine.",
+    "placeholder": "Select a course",
+    "none": "No course",
+    "itemWithTerm": "{name} · {term}",
+    "loading": "Loading courses",
+    "loadError": "Couldn't load your courses. You can continue without one.",
+    "emptyTitle": "You haven't created any courses yet",
+    "emptyDescription": "You can continue without one. Create a course now if you want.",
+    "addButton": "Create course",
+    "nameLabel": "Course name",
+    "namePlaceholder": "e.g. Data Structures",
+    "termLabel": "Term",
+    "termPlaceholder": "e.g. 2026-1",
+    "createSubmit": "Add course",
+    "creating": "Adding...",
+    "cancel": "Cancel",
+    "createError": "Couldn't create the course. Please try again."
+  },
   "examDetail": {
     "error": "Error",
     "loadFail": "Unable to load exam data.",
