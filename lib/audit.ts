@@ -6,6 +6,7 @@ export type AuditAction =
   | "exam_status_change"
   | "exam_delete"
   | "session_submit"
+  | "memory_snapshot_failure"
   | "admin_login_success"
   | "admin_login_failure";
 
