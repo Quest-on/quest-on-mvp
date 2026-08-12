@@ -383,34 +383,32 @@ export function hasGradesForEveryExpectedQuestion(
 
 // ─── estimateTokenCount ───────────────────────────────────────────────────────
 
-/** 
+/**
  * Language-aware token estimate. Used to detect context overflow risk.
- * Handles both Hangul (Korean) and Latin (English) text with different character densities.
- * - Hangul: ~0.6 tokens per character (measured via FLORES-200 + o200k_base tokenizer)
- * - Non-Hangul: ~0.25 tokens per character (ASCII/punctuation is less dense)
- * - Whitespace is ignored
- * - Result includes 20% safety margin to err HIGH, never low
+ * Accounts for differing character densities: Hangul is ~0.6 tokens/char,
+ * while non-Hangul (ASCII, punctuation, whitespace, emoji) is ~0.25 tokens/char.
+ * Based on FLORES-200 parallel corpus measurements with o200k_base tokenizer.
+ * Result includes 20% safety margin to err HIGH, never low.
  */
 export function estimateTokenCount(text: string): number {
   if (!text || text.length === 0) return 0;
 
   let hangulChars = 0;
-  let nonHangulChars = 0;
+  let otherChars = 0;
 
   for (const char of text) {
     const code = char.codePointAt(0) || 0;
     // Hangul Syllables: U+AC00 to U+D7A3 (covers 11,172 precomposed Korean syllables)
     if (code >= 0xac00 && code <= 0xd7a3) {
       hangulChars++;
-    } else if (!/\s/.test(char)) {
-      // Non-whitespace, non-Hangul characters (ASCII, punctuation, emoji, etc.)
-      nonHangulChars++;
+    } else {
+      // All non-Hangul: ASCII, punctuation, whitespace, emoji, etc.
+      otherChars++;
     }
-    // Whitespace is skipped entirely
   }
 
-  // Hangul: 0.6 tokens/char, Non-Hangul: 0.25 tokens/char, 20% safety margin
-  const estimate = (hangulChars * 0.6 + nonHangulChars * 0.25) * 1.2;
+  // Hangul: 0.6 tokens/char, Other: 0.25 tokens/char, 20% safety margin
+  const estimate = (hangulChars * 0.6 + otherChars * 0.25) * 1.2;
   return Math.ceil(estimate);
 }
 

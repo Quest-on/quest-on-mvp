@@ -42,7 +42,8 @@ describe("estimateTokenCount with language awareness", () => {
   });
 
   it("handles whitespace-only string without throwing", () => {
-    expect(estimateTokenCount("   \n\t  ")).toBe(0);
+    // Whitespace is now counted as non-Hangul at 0.25 tokens/char with 20% margin
+    expect(estimateTokenCount("   \n\t  ")).toBeGreaterThan(0);
   });
 
   it("handles emoji without throwing", () => {
