@@ -21,6 +21,7 @@ export type AiFeature =
   | "bulk_grading_chat_options"
   | "bulk_grading_criteria_extract"
   | "bulk_grading_execute"
+  | "memory_extraction"
   | "embedding";
 
 export const AI_FEATURES: AiFeature[] = [
@@ -42,6 +43,7 @@ export const AI_FEATURES: AiFeature[] = [
   "bulk_grading_chat_options",
   "bulk_grading_criteria_extract",
   "bulk_grading_execute",
+  "memory_extraction",
   "embedding",
 ];
 
