@@ -13,7 +13,7 @@ import {
   buildCaseQuestionGenerationPrompt,
   buildObjectiveQuestionGenerationPrompt,
 } from "@/lib/prompts";
-import { getOpenAI, AI_MODEL_HEAVY } from "@/lib/openai";
+import { getOpenAI, AI_MODEL_HEAVY, OpenAICallTelemetryError } from "@/lib/openai";
 import { logError } from "@/lib/logger";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import {
@@ -166,6 +166,12 @@ export async function POST(request: NextRequest) {
     try {
       parsedResponse = await attemptGeneration();
     } catch (firstError) {
+      // 이슈 #118: 재시도는 **파싱 실패**에만 준다. 전송 실패까지 여기서 다시
+      // 시도하면 SDK 요청 옵션의 maxRetries 와 곱해져 최대 6회 전송된다.
+      if (firstError instanceof OpenAICallTelemetryError) {
+        const msg = firstError.message || "AI 응답 생성 실패";
+        return errorJson("AI_GENERATION_FAILED", msg, 500);
+      }
       if (hasMockHeaders) {
         const msg =
           firstError instanceof Error ? firstError.message : "AI 응답 생성 실패";

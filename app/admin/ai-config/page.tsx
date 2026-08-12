@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { qk } from "@/lib/query-keys";
 
@@ -34,6 +35,10 @@ const EDITABLE_FIELDS = [
 ] as const;
 
 type EditableField = (typeof EDITABLE_FIELDS)[number];
+
+// optional 필드만 명시적 null(제거)을 가질 수 있다.
+// required 필드에 null 을 보내면 서버가 거부한다.
+const NULLABLE_FIELDS = new Set<string>(["maxTokens", "temperature", "reasoningEffort"]);
 type OverrideValue = string | number | null | undefined;
 type TaskOverride = Partial<Record<EditableField, OverrideValue>>;
 
@@ -158,13 +163,20 @@ export default function AdminAiConfigPage() {
                       ? ""
                       : String(effective);
 
+                // optional 필드는 3상태다: 상속 / 값 / 명시적 없음(null).
+                // 입력창만 두면 "없음" 을 표현할 방법이 없어 한 번 상속된 optional
+                // 값을 끌 수 없다. required 필드는 null 이 될 수 없으므로 제외한다.
+                const nullable = NULLABLE_FIELDS.has(field);
+                const isExplicitNull = drafted === null;
+
                 return (
                   <div key={field} className="space-y-1">
                     <Label htmlFor={`${task}-${field}`}>{t(`fields.${field}`)}</Label>
                     <Input
                       id={`${task}-${field}`}
                       value={value}
-                      placeholder={t("inherit")}
+                      placeholder={isExplicitNull ? t("none") : t("inherit")}
+                      disabled={isExplicitNull}
                       onChange={(event) =>
                         setDraft((prev) => ({
                           ...prev,
@@ -172,6 +184,24 @@ export default function AdminAiConfigPage() {
                         }))
                       }
                     />
+                    {nullable && (
+                      <label className="text-muted-foreground flex items-center gap-2 text-xs">
+                        <Checkbox
+                          id={`${task}-${field}-none`}
+                          checked={isExplicitNull}
+                          onCheckedChange={(checked) =>
+                            setDraft((prev) => ({
+                              ...prev,
+                              [task]: {
+                                ...prev[task],
+                                [field]: checked === true ? null : undefined,
+                              },
+                            }))
+                          }
+                        />
+                        {t("none")}
+                      </label>
+                    )}
                   </div>
                 );
               })}
@@ -220,6 +250,11 @@ function mergeDraft(
     const target: TaskOverride = { ...out[task] };
     for (const [field, raw] of Object.entries(fields)) {
       const key = field as EditableField;
+      if (raw === null) {
+        // 명시적 없음 — 상위 값을 끈다. 키를 지우면 상속으로 되돌아가 의미가 다르다.
+        target[key] = null;
+        continue;
+      }
       if (raw === undefined || raw === "") {
         delete target[key];
         continue;

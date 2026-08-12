@@ -155,3 +155,18 @@ describe("timeout classification", () => {
     expect(isOpenAITimeoutError(null)).toBe(false);
   });
 });
+
+describe("semantic retry loops never wrap transport failures", () => {
+  const FILES = [
+    "app/api/ai/generate-questions-stream/route.ts",
+    "app/api/ai/generate-questions/route.ts",
+  ];
+
+  it.each(FILES)("%s rethrows transport errors instead of retrying them", (file) => {
+    const code = stripComments(
+      readFileSync(path.join(process.cwd(), file), "utf8")
+    );
+    // 파싱 재시도 루프가 전송 실패까지 잡으면 SDK maxRetries 와 곱해진다.
+    expect(code).toMatch(/OpenAICallTelemetryError/);
+  });
+});

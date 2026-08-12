@@ -95,6 +95,19 @@ describe("page wiring", () => {
     expect(PAGE_SOURCE).toMatch(/isLoading/);
   });
 
+  it("offers an explicit-none control so an inherited optional value can be removed", () => {
+    // 입력창만 있으면 상속과 값 두 상태뿐이라 optional 을 끌 방법이 없다.
+    expect(PAGE_SOURCE).toMatch(/NULLABLE_FIELDS/);
+    expect(PAGE_SOURCE).toMatch(/-none`/);
+    expect(PAGE_SOURCE).toMatch(/<Checkbox/);
+    expect(PAGE_SOURCE).toMatch(/isExplicitNull/);
+  });
+
+  it("preserves an explicit null instead of collapsing it to inheritance", () => {
+    expect(PAGE_SOURCE).toMatch(/if \(raw === null\)/);
+    expect(PAGE_SOURCE).toMatch(/target\[key\] = null/);
+  });
+
   it("treats an empty input as inheritance rather than a written value", () => {
     // 이 규칙이 깨지면 첫 저장에 env/코드 기본값이 영구히 물질화된다.
     expect(PAGE_SOURCE).toMatch(/raw === undefined \|\| raw === ""/);

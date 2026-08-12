@@ -13,7 +13,7 @@ import {
   buildSingleCaseQuestionPrompt,
   buildObjectiveQuestionGenerationPrompt,
 } from "@/lib/prompts";
-import { getOpenAI, AI_MODEL_HEAVY } from "@/lib/openai";
+import { getOpenAI, AI_MODEL_HEAVY, OpenAICallTelemetryError } from "@/lib/openai";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import {
   buildAiTextMetadata,
@@ -102,6 +102,10 @@ async function runGeneration(
       return JSON.parse(content);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      // 이슈 #118: 이 루프는 **파싱/의미 실패**만 다시 시도한다.
+      // 전송 실패까지 여기서 잡으면 SDK 요청 옵션의 재시도(maxRetries)와 곱해져
+      // 한 번의 논리적 호출이 최대 6회 전송된다 — 이 이슈가 없앤 바로 그 결함이다.
+      if (err instanceof OpenAICallTelemetryError) throw lastError;
       if (attempt < MAX_ATTEMPTS - 1) continue;
     }
   }
