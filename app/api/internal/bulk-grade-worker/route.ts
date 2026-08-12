@@ -140,6 +140,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
 
     const systemPrompt = [
       buildPerStudentGradingSystemPrompt({
+      preferences: null,
         criteria,
         studentSessionId,
         answers: enrichedAnswers,

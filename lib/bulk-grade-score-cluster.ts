@@ -109,6 +109,7 @@ export function analyzeScoreClustering(scores: number[]): ClusterAnalysis {
 }
 
 function buildRecalibrationPrompt(params: {
+  preferences /* required */: string | null;
   criteria: ExtractedCriteria;
   caseQuestions: Array<{ qIdx: number; questionPrompt: string }>;
   students: Array<{
@@ -122,7 +123,7 @@ function buildRecalibrationPrompt(params: {
   language: PromptLanguage;
   isAssignment: boolean;
 }): string {
-  const { criteria, caseQuestions, students, qIdx, language, isAssignment } = params;
+  const { preferences, criteria, caseQuestions, students, qIdx, language, isAssignment } = params;
   const question = caseQuestions.find((q) => q.qIdx === qIdx);
   const scoreGuidance = formatScoreRangeGuidance(criteria.score_range, language);
 
@@ -153,7 +154,9 @@ ${studentBlocks}
 Re-score ALL students comparatively. Spread scores across the instructor's range — do NOT keep everyone at 85.
 Output ONLY JSON:
 {"grades":[{"session_id":"...","q_idx":${qIdx},"score":0,"comment":"..."}, ...]}
-Include every session_id listed above exactly once.`.trim();
+Include every session_id listed above exactly once.${preferences === null || preferences.trim().length === 0 ? "" : `
+
+${preferences}`}`.trim();
   }
 
   return `
@@ -170,7 +173,9 @@ ${studentBlocks}
 전원 85점대로 두지 말고, 강사 Range 안에서 **차등**을 주세요.
 JSON만 출력:
 {"grades":[{"session_id":"...","q_idx":${qIdx},"score":0,"comment":"..."}, ...]}
-위 session_id를 빠짐없이 1회씩 포함하세요.`.trim();
+위 session_id를 빠짐없이 1회씩 포함하세요.${preferences === null || preferences.trim().length === 0 ? "" : `
+
+${preferences}`}`.trim();
 }
 
 /**
@@ -236,6 +241,7 @@ export async function recalibrateBulkGradesIfClustered(
     );
 
     const prompt = buildRecalibrationPrompt({
+      preferences: null,
       criteria,
       caseQuestions,
       students,

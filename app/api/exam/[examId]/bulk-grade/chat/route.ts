@@ -607,6 +607,7 @@ export async function POST(
     // Build criteria discussion prompt with fixed sample student data.
     const systemPrompt = [
       buildCriteriaDiscussionSystemPrompt({
+      preferences: null,
         examTitle: examMeta.examTitle,
         examDescription: examMeta.examDescription,
         caseQuestions: examMeta.caseQuestions,

@@ -288,6 +288,7 @@ export async function POST(
     const questionPrompt = questionPromptByQIdx(exam.questions, qIdx);
 
     const systemPrompt = buildCaseGradingChatSystemPrompt({
+      preferences: null,
       questionPrompt,
       studentAnswer,
       studentChatSummary,

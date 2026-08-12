@@ -118,8 +118,8 @@ export async function POST(request: NextRequest) {
 
     const isAssignment = exam.type && exam.type !== "exam";
     const systemPrompt = isAssignment
-      ? buildAssignmentResearchSummarySystemPrompt()
-      : buildSummaryGenerationSystemPrompt();
+      ? buildAssignmentResearchSummarySystemPrompt({ preferences: null })
+      : buildSummaryGenerationSystemPrompt({ preferences: null });
 
     const questionsText = (exam.questions as Record<string, unknown>[])
       .map((q: Record<string, unknown>, i: number) => {

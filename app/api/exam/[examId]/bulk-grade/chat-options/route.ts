@@ -69,7 +69,7 @@ export async function POST(
 
     // Call AI to generate quick reply options
     try {
-      const systemPrompt = buildQuickReplyOptionsPrompt(questionText);
+      const systemPrompt = buildQuickReplyOptionsPrompt({ questionText, preferences: null });
 
       const tracked = await callTrackedChatCompletion(
         () =>

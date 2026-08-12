@@ -195,6 +195,7 @@ export async function POST(request: NextRequest) {
           try {
             const { system, user: userPrompt } =
               buildObjectiveQuestionGenerationPrompt({
+      preferences: null,
                 examTitle: data.examTitle,
                 questionType: questionType === "mcq" ? "mcq" : "true-false",
                 questionCount,
@@ -248,6 +249,7 @@ export async function POST(request: NextRequest) {
           // ── 사례형: 문항별 병렬 생성, 완료 순서대로 stream ──
           const prompts = Array.from({ length: questionCount }, (_, i) =>
             buildSingleCaseQuestionPrompt({
+      preferences: null,
               examTitle: data.examTitle,
               difficulty,
               questionIndex: i,
