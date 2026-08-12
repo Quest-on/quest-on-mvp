@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
     const isObjective = questionType === "mcq" || questionType === "true-false";
     const { system, user: userPrompt } = isObjective
       ? buildObjectiveQuestionGenerationPrompt({
+      preferences: null,
           examTitle: data.examTitle,
           questionType: questionType === "mcq" ? "mcq" : "true-false",
           questionCount,
@@ -98,6 +99,7 @@ export async function POST(request: NextRequest) {
           language: data.language,
         })
       : buildCaseQuestionGenerationPrompt({
+      preferences: null,
           examTitle: data.examTitle,
           difficulty: data.difficulty ?? "intermediate",
           questionCount,

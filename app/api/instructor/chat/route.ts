@@ -127,6 +127,7 @@ export async function POST(request: NextRequest) {
 
     // 교수용 프롬프트 생성
     const systemPrompt = buildInstructorChatSystemPrompt({
+      preferences: null,
       context,
       scopeDescription,
     });

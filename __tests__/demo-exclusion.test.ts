@@ -81,6 +81,7 @@ const REGISTRY: Record<string, { kind: Classification; why: string }> = {
   "lib/case-grade-access.ts": { kind: "single-exam", why: "단건 접근 검증" },
   "lib/grading.ts": { kind: "single-exam", why: "단건 채점" },
   "lib/objective-grade-view.ts": { kind: "single-exam", why: "단건 채점 뷰" },
+  "lib/preferences/owner.ts": { kind: "single-exam", why: "단건 exam id 로 메모리 소유자 조회" },
 
   // ── 데모 여부가 의미 없는 지점 ─────────────────────────────────
   "app/api/health/route.ts": { kind: "demo-neutral", why: "DB 헬스 프로브. 사용자 데이터를 안 돌려준다" },

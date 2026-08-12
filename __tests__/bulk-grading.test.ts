@@ -210,9 +210,12 @@ describe("hasGradesForEveryExpectedQuestion", () => {
 // ─── estimateTokenCount ───────────────────────────────────────────────────────
 
 describe("estimateTokenCount", () => {
-  it("estimates tokens as chars / 4", () => {
-    expect(estimateTokenCount("aaaa")).toBe(1);
-    expect(estimateTokenCount("a".repeat(400))).toBe(100);
+  it("applies language-aware estimates (non-Hangul: 0.25 tokens/char with 20% margin)", () => {
+    // Old heuristic: chars / 4. New approach: Hangul 0.6 tokens/char, other 0.25 tokens/char, 20% safety margin.
+    // For pure English: "aaaa" (4 chars) → 4 * 0.25 * 1.2 = 1.2 → ceil = 2
+    // For pure English: 400 chars → 400 * 0.25 * 1.2 = 120
+    expect(estimateTokenCount("aaaa")).toBe(2);
+    expect(estimateTokenCount("a".repeat(400))).toBe(120);
   });
 
   it("returns 0 for empty string", () => {

@@ -265,6 +265,7 @@ async function generateQuizQuestions(params: {
   chatTranscript: string;
 }): Promise<AssignmentQuizQuestion[]> {
   const prompt = buildAssignmentQuizGenerationPrompt({
+      preferences: null,
     examTitle: params.exam.title,
     assignmentPrompt: params.exam.assignment_prompt,
     questions: params.exam.questions || undefined,

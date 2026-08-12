@@ -411,5 +411,133 @@
   },
   "new": {
     "createExamFailed": "Failed to create exam"
+  },
+  "memory": {
+    "pageTitle": "What the AI has learned about my grading",
+    "pageSubtitle": "Records observed automatically from your grading conversations. Review what was stored and delete it.",
+    "shadow": {
+      "badge": "Observation only",
+      "title": "Currently observing only — nothing is sent to the model",
+      "body": "In this release these records only accumulate so you can review and delete them. No record is injected into an AI prompt, and none of them affects grading results."
+    },
+    "consent": {
+      "sectionLabel": "Separate consent",
+      "title": "Consent to automatic observation of grading conversations",
+      "separateFromTerms": "This consent is separate from the Terms of Service and the Privacy Policy. Agreeing to the terms does not mean you agreed to this.",
+      "optInState": "Automatic observation is optional. If you do not want it, turn it off at any time with ‘Pause observation’ below.",
+      "itemsTitle": "What is collected",
+      "items": "Grading and feedback criteria sentences extracted from grading conversations, the verbatim quote and message identifier they came from, the time it was said, the input origin (typed, pasted, and so on), and the scope it applies to (global, course, exam).",
+      "purposeTitle": "Why it is collected",
+      "purpose": "So the AI does not ask you for the same grading criteria over and over. In this release it is only observed and is not used for grading.",
+      "retentionTitle": "How long it is kept",
+      "retention": "Kept until you delete or reset it. Deleting moves a record to archived so it stops being used, but it remains as evidence for grades that were already issued.",
+      "refusalTitle": "Your right to refuse",
+      "refusal": "You do not have to agree. ‘Pause observation’ stops the records from being used without deleting them, and ‘Reset everything’ archives all of them.",
+      "refusalCostTitle": "What refusing costs you",
+      "refusalCost": "Authoring, taking, grading, and issuing scores all keep working if you refuse. The AI simply will not remember criteria you stated in earlier grading, so you have to restate them each time.",
+      "termsLink": "Read the Terms of Service",
+      "privacyLink": "Read the Privacy Policy"
+    },
+    "controls": {
+      "title": "Observation controls",
+      "distinctionNote": "‘Pause’ and ‘Reset everything’ are different actions. Pausing keeps every record and only stops it from being used; resetting moves every record to archived.",
+      "pause": {
+        "title": "Pause observation",
+        "description": "Keeps every record exactly as it is and only stops them from being used. You can turn it back on at any time.",
+        "keepsDataBadge": "Keeps your data",
+        "action": "Pause observation",
+        "resumeAction": "Resume observation",
+        "pending": "Applying...",
+        "successPaused": "Observation paused. Your records are still here.",
+        "successResumed": "Observation resumed."
+      },
+      "reset": {
+        "sectionLabel": "Cannot be undone",
+        "title": "Reset everything",
+        "description": "Moves every learned record to archived. They disappear from this list and are never used again.",
+        "archivesAllBadge": "Archives everything",
+        "action": "Reset everything",
+        "pending": "Resetting...",
+        "success": "Every record has been moved to archived.",
+        "confirmTitle": "Reset every learned record?",
+        "confirmIntro": "Please read this before you continue.",
+        "confirmStopsUse": "Every learned record stops being used from now on.",
+        "confirmLogsRemain": "The original grading conversation logs remain untouched, and these records are not learned from them again.",
+        "confirmEvidenceKept": "Records used as evidence behind a grade that was already issued are preserved for dispute handling.",
+        "confirmNotErasure": "This archives your records; it is not a complete erasure.",
+        "confirmCancel": "Cancel",
+        "confirmAction": "Reset everything"
+      }
+    },
+    "list": {
+      "title": "Learned records",
+      "description": "Most recently observed first.",
+      "countLabel": "{count} records",
+      "loading": "Loading your records"
+    },
+    "record": {
+      "valueLabel": "What was learned",
+      "predicateLabel": "Item",
+      "scopeLabel": "Applies to",
+      "provenanceLabel": "Where it came from",
+      "originLabel": "Input origin",
+      "messageLabel": "Message",
+      "messageUnknown": "No message identifier",
+      "observedAtLabel": "Observed at",
+      "scopeIdUnknown": "No target specified",
+      "statusLabel": "Status",
+      "deleteAction": "Delete",
+      "deletePending": "Deleting..."
+    },
+    "scope": {
+      "global": "Everything",
+      "course": "Course",
+      "exam": "Exam",
+      "unknown": "Scope unknown"
+    },
+    "status": {
+      "active": "In use",
+      "quarantined": "Paused",
+      "archived": "Archived",
+      "unknown": "Status unknown"
+    },
+    "origin": {
+      "typed": "Typed",
+      "quick_reply": "Quick reply",
+      "pasted": "Pasted",
+      "imported": "Imported",
+      "derived": "Inferred from behaviour",
+      "unknown": "Origin unknown"
+    },
+    "source": {
+      "bulk_grading_messages": "Bulk grading conversation",
+      "grading_chats": "Case grading conversation",
+      "derived_criteria": "Derived grading criteria",
+      "unknown": "Origin unknown"
+    },
+    "delete": {
+      "confirmTitle": "Delete this record?",
+      "confirmIntro": "Please read this before you continue.",
+      "stopsUse": "This record stops being used from now on.",
+      "logsRemain": "The original grading conversation logs remain untouched, and this record is not learned from them again.",
+      "evidenceKept": "Records used as evidence behind a grade that was already issued are preserved for dispute handling.",
+      "notErasure": "This archives the record; it is not a complete erasure.",
+      "cancel": "Cancel",
+      "confirm": "Delete it",
+      "success": "Deleted. This record will not be used again.",
+      "error": "Could not delete it. Please try again in a moment."
+    },
+    "empty": {
+      "title": "Nothing has been learned yet",
+      "body": "A record only appears when a grading or feedback criterion shows up in a grading conversation. Either no such conversation has happened yet, or you have observation paused.",
+      "how": "State a criterion during bulk grading or case grading and it will show up here.",
+      "note": "An empty list is not an error."
+    },
+    "error": {
+      "title": "Could not load your records",
+      "body": "This may be temporary. If retrying shows the same screen, please check back in a little while.",
+      "retry": "Retry",
+      "settingsFailed": "Could not change the setting. Please try again in a moment."
+    }
   }
 }

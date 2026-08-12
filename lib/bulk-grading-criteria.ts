@@ -159,10 +159,11 @@ export async function extractGradingCriteriaFromChat(params: {
 
   if (!transcript.trim()) return null;
 
-  const systemPrompt = buildCriteriaExtractionSystemPrompt(
-    params.language,
-    params.isAssignment,
-  );
+  const systemPrompt = buildCriteriaExtractionSystemPrompt({
+    language: params.language,
+    isAssignment: params.isAssignment,
+    preferences: null,
+  });
 
   const tracked = await callTrackedChatCompletion(
     () =>

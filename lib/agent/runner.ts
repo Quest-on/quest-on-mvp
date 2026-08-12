@@ -56,8 +56,8 @@ export interface AgentTurnContinuation {
 }
 
 // ── 시스템 프롬프트 ──────────────────────────────────────────
-function buildSystemPrompt(): string {
-  return [
+function buildSystemPrompt(params: { preferences /* required */: string | null }): string {
+  const prompt = [
     "너는 강사의 시험 편집기를 직접 운전하는 Quest-On 에이전트다.",
     "너는 DOM 을 직접 조작하지 않는다. 대신 UI 액션(function call)을 emit 하면",
     "클라이언트가 실제 편집기 컨트롤로 그 액션을 실행하고 결과를 보고한다.",
@@ -85,6 +85,9 @@ function buildSystemPrompt(): string {
     "- 모든 작업이 끝났다고 판단되면 반드시 finish 를 호출해 루프를 종료하라.",
     "- 더 emit 할 액션이 없는데 작업이 끝나지 않았다면 그래도 finish 를 호출하라.",
   ].join("\n");
+
+  if (params.preferences === null || params.preferences.trim().length === 0) return prompt;
+  return `${prompt}\n\n${params.preferences}`;
 }
 
 // ── pageState 직렬화 ─────────────────────────────────────────
@@ -179,7 +182,7 @@ async function callModel(
     () =>
       getOpenAI().responses.create({
         model: AI_MODEL,
-        instructions: buildSystemPrompt(),
+        instructions: buildSystemPrompt({ preferences: null }),
         input: params.input,
         tools: getOpenAIToolDefinitions(),
         store: true,

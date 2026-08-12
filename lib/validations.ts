@@ -205,10 +205,17 @@ export const singleGradeUpdateSchema = z.object({
   expected_updated_at: z.string().optional(),
 });
 
+// 입력 출처는 클라이언트가 보고하는 힌트다. 위조 값 때문에 메시지 전송 자체가
+// 400으로 죽으면 안 되므로 여기서는 형태를 강제하지 않고 통과시킨다.
+// 어휘 검증은 저장 직전 normalizeInputOrigin 이 단독으로 책임진다(unknown 타입이라
+// 정규화 없이는 행에 실을 수조차 없다).
+const reportedInputOrigin = z.unknown().optional();
+
 export const caseGradeChatPostSchema = z.object({
   qIdx: z.number().int().min(0),
   message: sanitizedString(z.string().min(1, "Message is required").max(10000)),
   clientMessageId: z.string().uuid("Invalid clientMessageId"),
+  inputOrigin: reportedInputOrigin,
 });
 
 export const caseGradeCommitSchema = z.object({
@@ -232,6 +239,7 @@ export const bulkGradeChatPostSchema = z.union([
     completeInterview: z.undefined().optional(),
     message: sanitizedString(z.string().min(1, "Message is required").max(10000)),
     clientMessageId: z.string().uuid("Invalid clientMessageId"),
+    inputOrigin: reportedInputOrigin,
   }),
 ]);
 

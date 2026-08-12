@@ -6,6 +6,11 @@ export type AuditAction =
   | "exam_status_change"
   | "exam_delete"
   | "session_submit"
+  | "memory_snapshot_failure"
+  | "memory_archive"
+  | "memory_pause"
+  | "memory_resume"
+  | "memory_reset"
   | "admin_login_success"
   | "admin_login_failure";
 

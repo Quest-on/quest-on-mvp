@@ -11,6 +11,9 @@ import {
 } from "@/lib/validations";
 import { upsertGradesBySessionQuestion } from "@/lib/grades-upsert";
 import { requireCaseGradeAccess } from "@/lib/case-grade-access";
+import { readMemoryFlags } from "@/lib/preferences/flags";
+import { findLatestExtractionSource } from "@/lib/preferences/extraction-source";
+import { enqueueMemoryExtraction } from "@/lib/qstash";
 
 export async function POST(
   request: NextRequest,
@@ -76,6 +79,33 @@ export async function POST(
       logError("[case-grade commit] Audit log failed", auditError, {
         path: `/api/session/${sessionId}/case-grade/commit`,
       });
+    }
+
+    if (readMemoryFlags().extractionEnabled) {
+      try {
+        const { data: source, error: sourceError } = await findLatestExtractionSource(
+          access.ctx.supabase,
+          { table: "grading_chats", sessionId, qIdx },
+        );
+
+        if (sourceError) throw sourceError;
+        if (source?.id) {
+          const queued = await enqueueMemoryExtraction({
+            sourceTable: "grading_chats",
+            sourceRefId: source.id,
+          });
+          if (!queued.ok) {
+            logError("[case-grade commit] Memory extraction was not queued", queued.error ?? null, {
+              path: `/api/session/${sessionId}/case-grade/commit`,
+              additionalData: { sourceRefId: source.id, reason: queued.reason },
+            });
+          }
+        }
+      } catch (enqueueError) {
+        logError("[case-grade commit] Memory extraction enqueue failed", enqueueError, {
+          path: `/api/session/${sessionId}/case-grade/commit`,
+        });
+      }
     }
 
     return successJson({ ok: true, qIdx, score });

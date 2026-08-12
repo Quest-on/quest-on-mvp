@@ -27,6 +27,7 @@ import {
 } from "@/lib/case-grade-access";
 import { isAssignmentType } from "@/lib/grading-helpers";
 import { stripEmoji } from "@/lib/sanitize";
+import { withInputOrigin } from "@/lib/input-origin";
 
 type GradingChatRow = {
   id: string;
@@ -208,7 +209,8 @@ export async function POST(
       return errorJson("VALIDATION_ERROR", validation.error, 400);
     }
 
-    const { qIdx, message, clientMessageId } = validation.data;
+    // inputOrigin 은 검증 전 unknown 이다. withInputOrigin 만이 어휘를 판정한다.
+    const { qIdx, message, clientMessageId, inputOrigin } = validation.data;
 
     const access = await requireCaseGradeAccess(sessionId, user, qIdx, {
       requireGradable: true,
@@ -225,14 +227,18 @@ export async function POST(
 
     const { supabase, session, exam } = access.ctx;
 
-    const userMessagePayload: Record<string, unknown> = {
-      session_id: sessionId,
-      q_idx: qIdx,
-      role: "user",
-      content: message,
-      created_by: access.ctx.user.id,
-      client_message_id: clientMessageId,
-    };
+    // input_origin: 교수가 직접 쓴 문장인지 여부를 행에 남긴다. 어휘 밖 값·누락은 NULL.
+    const userMessagePayload: Record<string, unknown> = withInputOrigin(
+      {
+        session_id: sessionId,
+        q_idx: qIdx,
+        role: "user",
+        content: message,
+        created_by: access.ctx.user.id,
+        client_message_id: clientMessageId,
+      },
+      inputOrigin,
+    );
 
     const { error: insertUserError } = await supabase
       .from("grading_chats")
@@ -282,6 +288,7 @@ export async function POST(
     const questionPrompt = questionPromptByQIdx(exam.questions, qIdx);
 
     const systemPrompt = buildCaseGradingChatSystemPrompt({
+      preferences: null,
       questionPrompt,
       studentAnswer,
       studentChatSummary,

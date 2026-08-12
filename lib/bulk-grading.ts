@@ -383,9 +383,33 @@ export function hasGradesForEveryExpectedQuestion(
 
 // ─── estimateTokenCount ───────────────────────────────────────────────────────
 
-/** Rough token estimate (chars / 4). Used to detect context overflow risk. */
+/**
+ * Language-aware token estimate. Used to detect context overflow risk.
+ * Accounts for differing character densities: Hangul is ~0.6 tokens/char,
+ * while non-Hangul (ASCII, punctuation, whitespace, emoji) is ~0.25 tokens/char.
+ * Based on FLORES-200 parallel corpus measurements with o200k_base tokenizer.
+ * Result includes 20% safety margin to err HIGH, never low.
+ */
 export function estimateTokenCount(text: string): number {
-  return Math.ceil(text.length / 4);
+  if (!text || text.length === 0) return 0;
+
+  let hangulChars = 0;
+  let otherChars = 0;
+
+  for (const char of text) {
+    const code = char.codePointAt(0) || 0;
+    // Hangul Syllables: U+AC00 to U+D7A3 (covers 11,172 precomposed Korean syllables)
+    if (code >= 0xac00 && code <= 0xd7a3) {
+      hangulChars++;
+    } else {
+      // All non-Hangul: ASCII, punctuation, whitespace, emoji, etc.
+      otherChars++;
+    }
+  }
+
+  // Hangul: 0.6 tokens/char, Other: 0.25 tokens/char, 20% safety margin
+  const estimate = (hangulChars * 0.6 + otherChars * 0.25) * 1.2;
+  return Math.ceil(estimate);
 }
 
 // ─── loadExamMetaOnly ─────────────────────────────────────────────────────────

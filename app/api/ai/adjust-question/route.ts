@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
     // 4. Build prompt — branch on questionType.
     const { system, user: userPrompt } = isObjective
       ? buildObjectiveQuestionGenerationPrompt({
+      preferences: null,
           examTitle: data.examTitle ?? "",
           questionType: data.questionType === "multiple-choice" ? "mcq" : "true-false",
           questionCount: 1,
@@ -101,6 +102,7 @@ export async function POST(request: NextRequest) {
           },
         })
       : buildCaseQuestionAdjustmentPrompt({
+      preferences: null,
           currentQuestionText: data.questionText,
           instruction: data.instruction,
           conversationHistory: data.conversationHistory,

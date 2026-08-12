@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { extractErrorMessage } from "@/lib/error-messages";
 import { createClientMessageId } from "@/lib/client-message-id";
+import type { InputOrigin } from "@/lib/input-origin";
 import type { ProposedGradesMap } from "@/lib/bulk-grading";
 import {
   dashboardStatus,
@@ -195,6 +196,14 @@ export function BulkGradingPanel({
   /** Q&A pairs accumulated via quick-reply chip selection. */
   const [pickedQA, setPickedQA] = useState<{ q: string; a: string }[]>([]);
 
+  /**
+   * 현재 초안에 클립보드에서 붙여넣은 텍스트가 섞였는지.
+   * 붙여넣은 문장은 교수가 "쓴" 문장이 아닐 수 있다(학생 답안이나 AI 출력을 그대로
+   * 옮겼을 수 있다). onPaste 는 실제 붙여넣기에서만 발화하므로 타이핑과 구분된다.
+   * 초안이 프로그램적으로 교체되거나 비워지면 함께 리셋한다.
+   */
+  const draftHasPasteRef = useRef(false);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const wasNearBottomRef = useRef(true);
@@ -299,14 +308,17 @@ export function BulkGradingPanel({
     mutationFn: async ({
       message,
       clientMessageId,
+      inputOrigin,
     }: {
       message: string;
       clientMessageId: string;
+      /** 이 문장이 어디서 왔는지의 신고값. 서버가 어휘를 재검증하고 아니면 NULL 로 저장한다. */
+      inputOrigin: InputOrigin;
     }) => {
       const res = await fetch(`/api/exam/${examId}/bulk-grade/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, clientMessageId }),
+        body: JSON.stringify({ message, clientMessageId, inputOrigin }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -316,6 +328,7 @@ export function BulkGradingPanel({
     },
     onSuccess: (result) => {
       setDraft("");
+      draftHasPasteRef.current = false;
       queryClient.setQueryData(qk.instructor.bulkGradeChat(examId), result);
       queryClient.invalidateQueries({ queryKey: qk.instructor.bulkGradeSession(examId) });
 
@@ -478,6 +491,7 @@ export function BulkGradingPanel({
       setEditedGrades(null);
       setRegradeArmed(false);
       setDraft("");
+      draftHasPasteRef.current = false;
       setPickedQA([]);
       setChatOptions([]);
       queryClient.invalidateQueries({ queryKey: qk.instructor.bulkGradeSession(examId) });
@@ -621,6 +635,7 @@ export function BulkGradingPanel({
     const lastCriteria =
       data?.session?.criteriaSummary ?? lastSubmittedCriteria?.text ?? "";
     setDraft(lastCriteria);
+    draftHasPasteRef.current = false;
     if (criteriaMode === "ai_default") setCriteriaMode("custom");
     focusComposer();
   };
@@ -628,6 +643,7 @@ export function BulkGradingPanel({
   const cancelRegrade = () => {
     setRegradeArmed(false);
     setDraft("");
+    draftHasPasteRef.current = false;
   };
 
   // ─── Quick-reply chip logic (phase-agnostic) ────────────────────────────────
@@ -650,7 +666,13 @@ export function BulkGradingPanel({
       [...msgs].reverse().find((m) => m.role === "assistant")?.content ?? "";
     setPickedQA((prev) => [...prev, { q: latestQ, a: label }]);
     setChatOptions([]);
-    chatMutation.mutate({ message: label, clientMessageId: createClientMessageId() });
+    // 이 문장의 저자는 교수가 아니라 모델이다. label 은 chat-options 라우트가
+    // buildQuickReplyOptionsPrompt 로 생성한 문구이고, 교수는 클릭만 했다.
+    chatMutation.mutate({
+      message: label,
+      clientMessageId: createClientMessageId(),
+      inputOrigin: "quick_reply",
+    });
   };
 
   // ─── Send routing ──────────────────────────────────────────────────────────
@@ -688,7 +710,12 @@ export function BulkGradingPanel({
         releaseSendLock();
         return;
       }
-      chatMutation.mutate({ message, clientMessageId: createClientMessageId() });
+      chatMutation.mutate({
+        message,
+        clientMessageId: createClientMessageId(),
+        // 작성기에서 나온 문장. 초안에 붙여넣기가 섞였으면 보수적으로 pasted 로 신고한다.
+        inputOrigin: draftHasPasteRef.current ? "pasted" : "typed",
+      });
     }
   };
 
@@ -1419,8 +1446,18 @@ export function BulkGradingPanel({
             value={draft}
             onChange={(e) => {
               setDraft(e.target.value);
+              // 초안이 비면 붙여넣기 이력도 사라진다.
+              if (!e.target.value) draftHasPasteRef.current = false;
               if (e.target.value.trim() && criteriaMode === "ai_default") {
                 setCriteriaMode("custom");
+              }
+            }}
+            onPaste={(e) => {
+              // 붙여넣은 텍스트는 교수가 작성한 문장이 아닐 수 있다(학생 답안·AI 출력을
+              // 그대로 옮긴 경우). 초안 전체를 pasted 로 표시한다 — 일부만 붙여넣었어도
+              // "전부 교수가 썼다"고 신고하는 것보다 과소 주장하는 쪽이 안전하다.
+              if (e.clipboardData?.getData("text")) {
+                draftHasPasteRef.current = true;
               }
             }}
             onKeyDown={handleComposerKeyDown}

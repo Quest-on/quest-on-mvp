@@ -267,6 +267,7 @@ async function gradeSingleQuestion(params: {
   const hasWorkspace = !!(wsCode.trim() || (wsErd?.nodes?.length ?? 0) > 0);
 
   const systemPrompt = buildAssignmentGradingPrompt({
+      preferences: null,
     examTitle: exam.title,
     assignmentPrompt: question.prompt || null,
     rubricText,
@@ -545,8 +546,8 @@ async function generateQuestionSummary(params: {
       .join("\n");
 
     const systemPrompt = isAssignment
-      ? buildAssignmentResearchSummarySystemPrompt()
-      : buildSummaryGenerationSystemPrompt();
+      ? buildAssignmentResearchSummarySystemPrompt({ preferences: null })
+      : buildSummaryGenerationSystemPrompt({ preferences: null });
     const assignmentLabel = isAssignment ? scoreToAssignmentLabel(grade.score) : null;
 
     const userPrompt = isAssignment
@@ -1609,8 +1610,8 @@ ${
       .join("\n---\n\n");
 
     const systemPrompt = isAssignment
-      ? buildAssignmentResearchSummarySystemPrompt()
-      : buildSummaryEvaluationSystemPrompt();
+      ? buildAssignmentResearchSummarySystemPrompt({ preferences: null })
+      : buildSummaryEvaluationSystemPrompt({ preferences: null });
 
     const userPrompt = isAssignment
       ? `
