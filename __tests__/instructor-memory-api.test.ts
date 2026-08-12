@@ -49,7 +49,7 @@ class MockQuery implements PromiseLike<{ data: Row[] | null; error: { message: s
   private operation = "select";
   private filters: Filter[] = [];
   private values: unknown;
-  private orderBy: { column: string; ascending: boolean } | null = null;
+  private orderClauses: Array<{ column: string; ascending: boolean }> = [];
   private rowLimit: number | null = null;
 
   constructor(
@@ -84,7 +84,7 @@ class MockQuery implements PromiseLike<{ data: Row[] | null; error: { message: s
   }
 
   order(column: string, options?: { ascending?: boolean }) {
-    this.orderBy = { column, ascending: options?.ascending !== false };
+    this.orderClauses.push({ column, ascending: options?.ascending !== false });
     return this;
   }
 
@@ -135,11 +135,16 @@ class MockQuery implements PromiseLike<{ data: Row[] | null; error: { message: s
     }
 
     let matched = table.filter((row) => this.matches(row));
-    if (this.orderBy) {
-      const { column, ascending } = this.orderBy;
-      matched = [...matched].sort((left, right) =>
-        String(left[column]).localeCompare(String(right[column])) * (ascending ? 1 : -1),
-      );
+    if (this.orderClauses.length > 0) {
+      matched = [...matched].sort((left, right) => {
+        for (const { column, ascending } of this.orderClauses) {
+          const leftVal = String(left[column]);
+          const rightVal = String(right[column]);
+          const cmp = leftVal.localeCompare(rightVal);
+          if (cmp !== 0) return ascending ? cmp : -cmp;
+        }
+        return 0;
+      });
     }
     if (this.rowLimit !== null) matched = matched.slice(0, this.rowLimit);
     if (this.operation === "update") {

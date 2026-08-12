@@ -92,7 +92,7 @@ class FakeQuery implements PromiseLike<QueryResult> {
   private payload: Row = {};
   private filters: Filter[] = [];
   private ignoreDuplicates = false;
-  private descendingColumn: string | null = null;
+  private orderClauses: Array<{ column: string; descending: boolean }> = [];
   private rowLimit: number | null = null;
 
   constructor(
@@ -144,7 +144,8 @@ class FakeQuery implements PromiseLike<QueryResult> {
   }
 
   order(column: string, options?: { ascending?: boolean }): this {
-    this.descendingColumn = options?.ascending === false ? column : null;
+    const descending = options?.ascending === false;
+    this.orderClauses.push({ column, descending });
     return this;
   }
 
@@ -193,11 +194,16 @@ class FakeQuery implements PromiseLike<QueryResult> {
 
     if (this.operation === "select") {
       let selected = rows.filter((row) => matches(row, this.filters));
-      if (this.descendingColumn) {
-        const column = this.descendingColumn;
-        selected = [...selected].sort((left, right) =>
-          String(right[column] ?? "").localeCompare(String(left[column] ?? "")),
-        );
+      if (this.orderClauses.length > 0) {
+        selected = [...selected].sort((left, right) => {
+          for (const { column, descending } of this.orderClauses) {
+            const leftVal = String(left[column] ?? "");
+            const rightVal = String(right[column] ?? "");
+            const cmp = leftVal.localeCompare(rightVal);
+            if (cmp !== 0) return descending ? -cmp : cmp;
+          }
+          return 0;
+        });
       }
       if (this.rowLimit !== null) selected = selected.slice(0, this.rowLimit);
       return { data: selected, error: null };
@@ -786,6 +792,108 @@ describe("malformed extractor output remains handled", () => {
       ok: false,
       reason: "too_many_candidates",
     });
+  });
+});
+
+describe("source selection tie-break for idempotency", () => {
+  it("selects the same row consistently when two qualifying typed messages share identical created_at", async () => {
+    const sessionId = "11111111-1111-4111-8111-111111111111";
+    const sharedTime = "2026-08-12T01:00:00.000Z";
+    const id1 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const id2 = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+    const database = createFakeDatabase({
+      bulk_grading_messages: [
+        sourceRow({ id: id1, session_id: sessionId, created_at: sharedTime }),
+        sourceRow({ id: id2, session_id: sessionId, created_at: sharedTime }),
+      ],
+    });
+
+    const selectedIds: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const { data: source } = await database.client
+        .from("bulk_grading_messages")
+        .select("id")
+        .eq("session_id", sessionId)
+        .eq("role", "user")
+        .eq("input_origin", "typed")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      selectedIds.push(source?.id);
+    }
+
+    // All selections must be identical when created_at is the same
+    expect(new Set(selectedIds)).toHaveLength(1);
+    expect(selectedIds[0]).toBe(id2); // id2 > id1 lexicographically, descending order picks it
+  });
+
+  it("produces stable dedup ids across repeated selections with identical created_at", async () => {
+    const sessionId = "11111111-1111-4111-8111-111111111111";
+    const sharedTime = "2026-08-12T01:00:00.000Z";
+    const id1 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const id2 = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+    const database = createFakeDatabase({
+      bulk_grading_messages: [
+        sourceRow({ id: id1, session_id: sessionId, created_at: sharedTime }),
+        sourceRow({ id: id2, session_id: sessionId, created_at: sharedTime }),
+      ],
+    });
+
+    const dedupIds: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const { data: source } = await database.client
+        .from("bulk_grading_messages")
+        .select("id")
+        .eq("session_id", sessionId)
+        .eq("role", "user")
+        .eq("input_origin", "typed")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (source?.id) {
+        dedupIds.push(memoryExtractionInitialDedupId({
+          sourceTable: "bulk_grading_messages",
+          sourceRefId: source.id,
+        }));
+      }
+    }
+
+    // All dedup ids must be identical
+    expect(new Set(dedupIds)).toHaveLength(1);
+    expect(dedupIds[0]).toBe(`memory-extraction-initial-bulk_grading_messages-${id2}`);
+  });
+
+  it("maintains newest-message-wins when timestamps differ", async () => {
+    const sessionId = "11111111-1111-4111-8111-111111111111";
+    const olderTime = "2026-08-12T00:00:00.000Z";
+    const newerTime = "2026-08-12T02:00:00.000Z";
+    const olderId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const newerId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
+    const database = createFakeDatabase({
+      bulk_grading_messages: [
+        sourceRow({ id: olderId, session_id: sessionId, created_at: olderTime }),
+        sourceRow({ id: newerId, session_id: sessionId, created_at: newerTime }),
+      ],
+    });
+
+    const { data: source } = await database.client
+      .from("bulk_grading_messages")
+      .select("id")
+      .eq("session_id", sessionId)
+      .eq("role", "user")
+      .eq("input_origin", "typed")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    expect(source?.id).toBe(newerId);
   });
 });
 
