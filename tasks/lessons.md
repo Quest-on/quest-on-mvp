@@ -82,3 +82,6 @@
 - **리뷰 에이전트에 라이브 DB 권한 금지**(read-only라도). CI에 DB 크레덴셜=PII 유출 위험 + 6/03 DB 성역 위반. 데이터모델 영향은 `database/NNN_*.sql`·`prisma/schema.prisma`를 *파일로 read*해서 판단한다.
 - coding 구독(GLM/Kimi) 모델 id는 빨리 낡는다(glm-4.7→5.1→5.2). opencode.json `model` + workflow env 한 줄로 스왑 가능하게 유지.
 - **[실측] AI 리뷰 레인은 *미묘한 실제 회귀*를 놓친다.** 실제 사고(commit e4ae062: 채점 페이지 q_idx 매핑)를 되돌린 diff를 GLM-5.2 2레인에 라이브로 먹였더니 "0 findings"로 통과시킴(뻔한 합성 케이스는 잡음). diff만 보면 `submissions?.[qIdx]`가 멀쩡해 보이고 "저장은 배열위치 키잉" 맥락을 알아야만 버그라서. → **사고 낸 적 있는 핵심 불변식은 AI에 맡기지 말고 결정적 Vitest 회귀 테스트로 박는다**(`__tests__/qidx-grade-mapping.test.ts`: 채점 페이지가 resolveByQIdx 폴백 쓰는지 검사). 정규식 룰은 빼되(오탐), 그 자리에 *정밀 테스트*를 넣어야지 AI-only로 두면 커버리지 회귀. AI 레인은 *미지/신규* 이슈 보조용.
+## 2026-08-12 — staging DB rollout
+
+- 사용자가 “staging에 반영”과 migration 실행을 명시하면 코드·Vercel 배포만 완료로 보고하지 않는다. staging 대상과 승인 파일을 검증해 DDL → dry-run → rollout mode → 기존 사용자 user-flow QA까지 닫고, 불가능한 단계만 즉시 구체적으로 보고한다.
