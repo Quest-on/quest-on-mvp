@@ -88,6 +88,13 @@ export const qk = {
 
     bulkGradeChat: (examId: string) =>
       ["instructor-bulk-grade-chat", examId] as const,
+
+    memory: (userId?: string) => {
+      if (userId) {
+        return ["instructor-memory", userId] as const;
+      }
+      return ["instructor-memory"] as const;
+    },
   },
 
   student: {
