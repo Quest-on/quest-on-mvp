@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { readMemoryFlags } from "@/lib/preferences/flags";
 import type { OwnerId } from "@/lib/preferences/owner";
 import { PREDICATE_SET, type Predicate } from "@/lib/preferences/vocabulary";
 
@@ -85,6 +86,11 @@ async function loadScope(
 
   query = scope === "global" ? query.is("scope_id", null) : query.eq("scope_id", scopeId as string);
 
+  const quarantinedVersion = readMemoryFlags().quarantinedExtractorVersion;
+  if (quarantinedVersion) {
+    query = query.neq("extractor_version", quarantinedVersion);
+  }
+
   const { data, error } = await query
     .order("affects_score", { ascending: false })
     .order("is_explicit", { ascending: false })
@@ -109,6 +115,8 @@ export async function select(
   input: SelectMemoryInput,
   supabase: SupabaseClient = getSupabaseServer()
 ): Promise<SelectedMemory[]> {
+  if (!readMemoryFlags().selectionEnabled) return [];
+
   const scopes: QueryScope[] = [{ scope: "global", scopeId: null }];
   if (input.courseId) scopes.push({ scope: "course", scopeId: input.courseId });
   if (input.examId) scopes.push({ scope: "exam", scopeId: input.examId });

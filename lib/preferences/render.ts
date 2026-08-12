@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { estimateTokenCount } from "@/lib/bulk-grading";
+import { readMemoryFlags } from "@/lib/preferences/flags";
 import { PREDICATE_TABLE, type Predicate } from "@/lib/preferences/vocabulary";
 
 /**
@@ -128,6 +129,17 @@ export function render(
   records: readonly RenderableMemoryRecord[],
   budgetTokens: number = DEFAULT_MEMORY_BUDGET_TOKENS
 ): RenderedMemoryBlock {
+  if (!readMemoryFlags().renderingEnabled) {
+    return {
+      text: "",
+      hash: digest(""),
+      usedIds: [],
+      usedVersions: [],
+      droppedIds: records.map((record) => record.id),
+      estimatedTokens: 0,
+    };
+  }
+
   if (!Number.isFinite(budgetTokens)) {
     throw new MemoryRenderError(`budgetTokens must be a finite number (got ${String(budgetTokens)})`);
   }

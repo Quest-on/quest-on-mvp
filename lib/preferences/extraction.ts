@@ -5,6 +5,7 @@ import {
   callTrackedChatCompletion,
 } from "@/lib/ai-tracking";
 import { getOpenAI, AI_MODEL } from "@/lib/openai";
+import { readMemoryFlags } from "@/lib/preferences/flags";
 import { buildMemoryExtractionSystemPrompt } from "@/lib/prompts";
 import {
   candidateRecordSchema,
@@ -94,6 +95,7 @@ export interface MemoryExtractionJobResult {
   ok: boolean;
   reason:
     | "processed"
+    | "extraction_disabled"
     | "source_not_eligible"
     | "malformed_llm_json"
     | "invalid_llm_shape"
@@ -663,7 +665,7 @@ export type PromotionResult =
   | { outcome: "promoted"; reason: string; memoryId: string }
   | { outcome: "duplicate"; reason: string; memoryId: string }
   | { outcome: "requeue"; reason: string }
-  | { outcome: "stale" | "unchanged"; reason: string };
+  | { outcome: "storage_disabled" | "stale" | "unchanged"; reason: string };
 
 /**
  * Applies one already-verified candidate as an idempotent visibility unit.
@@ -687,6 +689,10 @@ export async function promoteMemoryCandidate(params: {
     expected,
     idempotencyKey,
   } = params;
+  if (!readMemoryFlags().storageEnabled) {
+    return { outcome: "storage_disabled", reason: "memory_storage_disabled" };
+  }
+
   const instructorId = source.createdBy;
   if (!instructorId) throw new Error("typed memory source is missing created_by");
 
@@ -812,6 +818,10 @@ export async function processMemoryExtractionJob(
   payload: MemoryExtractionJobPayload,
   dependencies: MemoryExtractionDependencies,
 ): Promise<MemoryExtractionJobResult> {
+  if (!readMemoryFlags().extractionEnabled) {
+    return emptyJobResult("extraction_disabled");
+  }
+
   const readClient = dependencies.getClient();
   const source = await loadEligibleSource(readClient, payload);
   if (!source) return emptyJobResult("source_not_eligible");
@@ -857,6 +867,16 @@ export async function processMemoryExtractionJob(
       continue;
     }
     seenPredicates.add(candidate.predicate);
+
+    if (!readMemoryFlags().storageEnabled) {
+      verdicts.push({
+        index,
+        predicate: candidate.predicate,
+        verdict: "REJECTED",
+        reason: "memory_storage_disabled",
+      });
+      continue;
+    }
 
     // A fresh fetch-based Supabase client is created only after the model call;
     // no transaction or database connection spans the external AI request.

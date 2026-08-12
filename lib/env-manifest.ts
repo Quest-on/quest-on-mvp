@@ -140,6 +140,41 @@ export const ENV_MANIFEST: readonly EnvSpec[] = [
     levels: { staging: "required", production: "optional" },
   },
   {
+    name: "MEMORY_EXTRACTION_DISABLED",
+    purpose: "교수 메모리 추출 워커 긴급 중지. 정확히 1일 때만 추출을 중지한다.",
+    levels: {},
+  },
+  {
+    name: "MEMORY_STORAGE_DISABLED",
+    purpose: "교수 메모리 후보 저장 긴급 중지. 정확히 1일 때만 쓰기를 중지한다.",
+    levels: {},
+  },
+  {
+    name: "MEMORY_SELECTION_DISABLED",
+    purpose: "교수 메모리 선택 긴급 중지. 정확히 1일 때 읽기를 중지한다.",
+    levels: {},
+  },
+  {
+    name: "MEMORY_RENDERING_DISABLED",
+    purpose: "선택된 교수 메모리 블록 렌더링 긴급 중지. 정확히 1일 때만 중지한다.",
+    levels: {},
+  },
+  {
+    name: "MEMORY_INJECTION_ENABLED",
+    purpose: "교수 메모리 프롬프트 주입 허용. shadow 기본값을 유지하며 정확히 1일 때만 켠다.",
+    levels: {},
+  },
+  {
+    name: "MEMORY_SCORE_PATH_INJECTION_ENABLED",
+    purpose: "점수 생성 프롬프트의 교수 메모리 주입 추가 허용. 일반 주입도 함께 켜져야 한다.",
+    levels: {},
+  },
+  {
+    name: "MEMORY_QUARANTINED_EXTRACTOR_VERSION",
+    purpose: "선택에서 제외할 교수 메모리 extractor_version. 저장 행은 변경하지 않는다.",
+    levels: {},
+  },
+  {
     name: "TEST_BYPASS_SECRET",
     purpose:
       "E2E 인증 바이패스. 배포 환경(프로덕션·스테이징)에 존재하면 인증이 무력화되므로 금지 (코드도 throw 한다).",

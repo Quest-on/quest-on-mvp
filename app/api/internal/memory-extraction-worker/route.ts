@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { logError } from "@/lib/logger";
+import { readMemoryFlags } from "@/lib/preferences/flags";
 import {
   callMemoryExtractor,
   processMemoryExtractionJob,
@@ -22,6 +23,13 @@ const payloadSchema = z
   .strict();
 
 async function handler(request: NextRequest): Promise<NextResponse> {
+  if (!readMemoryFlags().extractionEnabled) {
+    return NextResponse.json(
+      { ok: false, reason: "extraction_disabled" },
+      { status: 200 },
+    );
+  }
+
   let rawPayload: unknown;
   try {
     rawPayload = await request.json();

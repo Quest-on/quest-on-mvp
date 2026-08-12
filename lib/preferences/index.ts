@@ -1,5 +1,6 @@
 import { auditLog } from "@/lib/audit";
 import { logError } from "@/lib/logger";
+import { memoryInjectionEnabled } from "@/lib/preferences/flags";
 import type { OwnerId } from "@/lib/preferences/owner";
 import {
   DEFAULT_MEMORY_BUDGET_TOKENS,
@@ -34,7 +35,11 @@ type ModelCallRef = {
   promptHash?: string | null;
 };
 
-export async function preparePreferences(owner: OwnerId, scope: PreferenceScope) {
+export async function preparePreferences(
+  owner: OwnerId,
+  scope: PreferenceScope,
+  options: { scorePath?: boolean } = {},
+) {
   const selected = await select({ instructorId: owner, ...scope });
   const rendered = render(
     selected.map((record) => ({
@@ -47,19 +52,24 @@ export async function preparePreferences(owner: OwnerId, scope: PreferenceScope)
     DEFAULT_MEMORY_BUDGET_TOKENS
   );
 
+  const inject = memoryInjectionEnabled(options.scorePath === true);
+  const applied = inject
+    ? rendered
+    : render([], DEFAULT_MEMORY_BUDGET_TOKENS);
+
   const snapshotDraft: SnapshotDraft = Object.freeze({
     instructorId: owner,
     examId: scope.examId ?? null,
-    appliedMemoryIds: Object.freeze([...rendered.usedIds]),
-    appliedVersions: Object.freeze([...rendered.usedVersions]),
-    renderedBlock: rendered.text,
-    renderedHash: rendered.hash,
+    appliedMemoryIds: Object.freeze([...applied.usedIds]),
+    appliedVersions: Object.freeze([...applied.usedVersions]),
+    renderedBlock: applied.text,
+    renderedHash: applied.hash,
     rendererVersion: MEMORY_RENDERER_VERSION,
     selectorVersion: MEMORY_SELECTOR_VERSION,
-    estimatedTokens: rendered.estimatedTokens,
+    estimatedTokens: applied.estimatedTokens,
   });
 
-  return { text: rendered.text, snapshotDraft };
+  return { text: applied.text, snapshotDraft };
 }
 
 /**
