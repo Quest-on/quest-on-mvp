@@ -1,4 +1,4 @@
-import { getAppEnv, type AppEnv } from "@/lib/app-env";
+import { getAppEnv, type AppEnv } from "./app-env";
 
 export const CONSENT_GATE_MODES = ["off", "shadow", "prompt", "enforce"] as const;
 export type ConsentGateMode = (typeof CONSENT_GATE_MODES)[number];

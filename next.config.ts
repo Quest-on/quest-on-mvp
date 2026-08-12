@@ -1,12 +1,19 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
-import { invalidAppEnvDeclaration } from "./lib/app-env";
+import { getAppEnv, invalidAppEnvDeclaration } from "./lib/app-env";
+import { parseConsentGateMode } from "./lib/consent-gate-mode";
 
 // 오타난 NEXT_PUBLIC_APP_ENV 로 배포하면 스테이징이 프로덕션으로 오인된다(색인 허용,
 // 프로덕션 오리진 기본값 적용). 조용히 폴백하지 말고 빌드를 깬다.
 const appEnvError = invalidAppEnvDeclaration(process.env.NEXT_PUBLIC_APP_ENV);
 if (appEnvError) {
   throw new Error(appEnvError);
+}
+
+// Runtime fail-closed alone is too late: a missing mode would let Vercel mark the
+// deployment READY and only crash authenticated routes. Reject it during build.
+if (process.env.VERCEL === "1") {
+  parseConsentGateMode(process.env.CONSENT_GATE_MODE, getAppEnv());
 }
 
 const withNextIntl = createNextIntlPlugin("./lib/i18n/request.ts");
