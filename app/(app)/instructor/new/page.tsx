@@ -869,12 +869,9 @@ export default function CreateExam() {
                     onQuestionsAccepted={(newQuestions) => {
                       const newIds = newQuestions.map((q) => q.id);
                       setQuestions((prev) => {
-                        const nonEmpty = prev.filter((q) => {
-                          const stripped = q.text
-                            .replace(/<[^>]*>/g, "")
-                            .trim();
-                          return stripped !== "";
-                        });
+                        const nonEmpty = prev.filter(
+                          (q) => !isQuestionContentEmpty(q.text),
+                        );
                         return [
                           ...nonEmpty,
                           ...newQuestions.map((q) => ({
