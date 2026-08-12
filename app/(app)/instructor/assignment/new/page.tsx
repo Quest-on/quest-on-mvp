@@ -157,6 +157,7 @@ export default function CreateAssignment() {
         rubric: [],
         rubric_public: false,
         chat_weight: null,
+        ...(courseId !== null ? { course_id: courseId } : {}),
         materials: [],
         materials_text: [],
         language: examData.language,

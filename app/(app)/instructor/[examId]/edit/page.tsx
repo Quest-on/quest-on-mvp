@@ -63,6 +63,7 @@ export default function EditExam({
   const fileUpload = useFileUpload();
   const isSubmittingRef = useRef(false);
   const initialScoreWeightsRef = useRef<ScoreWeights | null>(null);
+  const initialCourseIdRef = useRef<string | null>(null);
   // 무제한 토글 OFF 시 이전 duration 복원
   const prevDurationRef = useRef<number>(60);
 
@@ -91,6 +92,9 @@ export default function EditExam({
           language: (exam.language === "en" ? "en" : "ko") as "ko" | "en",
         });
         setQuestions(exam.questions || []);
+        const loadedCourseId = exam.course_id ?? null;
+        initialCourseIdRef.current = loadedCourseId;
+        setCourseId(loadedCourseId);
         const loadedWeight = exam.chat_weight ?? null;
         setChatWeight(loadedWeight);
         const loadedScoreWeights = exam.score_weights ?? null;
@@ -299,6 +303,7 @@ export default function EditExam({
         questions: Question[];
         chat_weight: number | null;
         score_weights?: ScoreWeights | null;
+        course_id?: string | null;
         materials: string[];
         materials_text: Array<{ url: string; text: string; fileName: string }>;
         language: "ko" | "en";
@@ -316,6 +321,9 @@ export default function EditExam({
       };
       if (!shouldOmitAutoDefaultScoreWeights) {
         updateData.score_weights = scoreWeights;
+      }
+      if (courseId !== initialCourseIdRef.current) {
+        updateData.course_id = courseId;
       }
       const response = await fetch("/api/supa", {
         method: "POST",
@@ -336,7 +344,7 @@ export default function EditExam({
       setIsLoading(false);
       isSubmittingRef.current = false;
     }
-  }, [examData, questions, chatWeight, scoreWeights, hasSessions, fileUpload, resolvedParams.examId]);
+  }, [examData, questions, chatWeight, scoreWeights, courseId, hasSessions, fileUpload, resolvedParams.examId]);
 
   // ── 제출 사유 ─────────────────────────────────────────────────────────────
   const submitReasons = useMemo(() => {
