@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
+import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import {
@@ -12,12 +14,30 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ChangePasswordForm } from "@/components/settings/ChangePasswordForm";
-import { KeyRound } from "lucide-react";
+import { KeyRound, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { qk } from "@/lib/query-keys";
 
 export default function SettingsPage() {
   const t = useTranslations("auth.settings");
   const { user, isLoaded } = useAppUser();
   const router = useRouter();
+
+  const consentQuery = useQuery({
+    queryKey: qk.consent.status(user?.id ?? "anonymous"),
+    enabled: Boolean(user?.id),
+    queryFn: async () => {
+      const response = await fetch("/api/consents/onboarding");
+      if (!response.ok) throw new Error("Consent status unavailable");
+      return (await response.json()) as {
+        collecting: boolean;
+        complete: boolean;
+        policyVersion?: string;
+      };
+    },
+  });
 
   useEffect(() => {
     if (isLoaded && !user) {
@@ -61,6 +81,55 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <ChangePasswordForm />
+            </CardContent>
+          </Card>
+
+          <Card id="privacy">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-primary" />
+                {t("privacySectionTitle")}
+              </CardTitle>
+              <CardDescription>{t("privacySectionDesc")}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {consentQuery.isPending ? (
+                <div aria-busy="true" className="space-y-2">
+                  <Skeleton className="h-6 w-28" />
+                  <Skeleton className="h-5 w-56" />
+                </div>
+              ) : consentQuery.isError ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {t("consentStatusError")}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <Badge variant={consentQuery.data.complete ? "secondary" : "destructive"}>
+                    {consentQuery.data.complete
+                      ? t("consentComplete")
+                      : t("consentRequired")}
+                  </Badge>
+                  {consentQuery.data.policyVersion && (
+                    <p className="text-sm text-muted-foreground">
+                      {t("policyVersion", { version: consentQuery.data.policyVersion })}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                {!consentQuery.data?.complete && (
+                  <Button asChild>
+                    <Link href="/onboarding?redirect=/settings">{t("reviewConsent")}</Link>
+                  </Button>
+                )}
+                <Button variant="outline" asChild>
+                  <Link href="/legal/privacy">{t("privacyPolicy")}</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/legal/terms">{t("terms")}</Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
