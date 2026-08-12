@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { createSupabaseClient } from "@/lib/supabase-client";
 import { buildRoleCookie } from "@/lib/onboarding-role";
 import { getAuthCallbackUrl } from "@/lib/auth-redirect";
+import { authEmailErrorKey } from "@/lib/auth-email-error";
 import { useTranslations } from "next-intl";
 
 type Step = "start" | "verify";
@@ -71,7 +72,7 @@ export function CustomSignUp() {
     });
 
     if (signUpError) {
-      setError(signUpError.message);
+      setError(t(authEmailErrorKey(signUpError)));
       setLoading(false);
       return;
     }
