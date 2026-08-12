@@ -28,6 +28,10 @@ function localSupabaseConnectSources(): string {
 
 const localSupabaseSources = localSupabaseConnectSources();
 
+function developmentEvalSource(): string {
+  return process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'";
+}
+
 const nextConfig: NextConfig = {
   // Legacy route redirects.
   // /exam/[code]/answer was consolidated into /exam/[code] (PR #12). 308 keeps
@@ -71,7 +75,7 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://va.vercel-scripts.com",
+              `script-src 'self' 'unsafe-inline'${developmentEvalSource()} https://challenges.cloudflare.com https://va.vercel-scripts.com`,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://*.supabase.co",
               "font-src 'self' data:",
