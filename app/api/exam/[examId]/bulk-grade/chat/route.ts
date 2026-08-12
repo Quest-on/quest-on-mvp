@@ -36,6 +36,7 @@ import {
   MIN_BULK_GRADE_INTERVIEW_QUESTIONS,
 } from "@/lib/bulk-grade-thread";
 import { stripEmoji } from "@/lib/sanitize";
+import { withInputOrigin } from "@/lib/input-origin";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 const BULK_GRADE_CHAT_RATE_LIMIT = { limit: 10, windowSec: 60 };
@@ -330,6 +331,12 @@ export async function POST(
       !isInit && !isCompleteInterview && "clientMessageId" in validation.data
         ? validation.data.clientMessageId
         : undefined;
+    // 클라이언트가 신고한 출처. 여기서는 아직 검증되지 않은 unknown 이며,
+    // withInputOrigin 을 통과해야만 행에 실린다.
+    const reportedInputOrigin =
+      !isInit && !isCompleteInterview && "inputOrigin" in validation.data
+        ? validation.data.inputOrigin
+        : undefined;
     const completeScoreMin =
       isCompleteInterview && "scoreMin" in validation.data
         ? validation.data.scoreMin
@@ -521,13 +528,18 @@ export async function POST(
 
     // init/completeInterview 모드가 아닐 때만 강사 메시지 저장
     if (!isInit && !isCompleteInterview) {
-      const userMessagePayload: Record<string, unknown> = {
-        session_id: gradingSessionId,
-        role: "user",
-        content: message,
-        created_by: access.ctx.user.id,
-        client_message_id: clientMessageId,
-      };
+      // input_origin: 이 문장을 교수가 직접 썼는지(typed/pasted), 아니면 AI가 만든
+      // 보기를 클릭만 했는지(quick_reply)를 행에 남긴다. 어휘 밖 값·누락은 전부 NULL.
+      const userMessagePayload: Record<string, unknown> = withInputOrigin(
+        {
+          session_id: gradingSessionId,
+          role: "user",
+          content: message,
+          created_by: access.ctx.user.id,
+          client_message_id: clientMessageId,
+        },
+        reportedInputOrigin,
+      );
 
       const { error: userMsgError } = await supabase
         .from("bulk_grading_messages")
