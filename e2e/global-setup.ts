@@ -251,6 +251,35 @@ async function applyMigrations() {
     console.warn("[global-setup] create_exam_with_node migration check failed:", err);
   }
 
+  // Migration: ensure counter RPCs exist (database/032_counter_rpcs.sql).
+  // increment_used_clarifications was never captured in a migration (운영 DB 에만
+  // 수작업으로 존재) and increment_student_count lives in sql/002 which CI never
+  // applies, so /api/chat·/api/feedback fail with "function ... in the schema
+  // cache" on any DB that lacks them (#199).
+  try {
+    const { error: counterRpcErr } = await supabase.rpc("increment_used_clarifications", {
+      p_session_id: "00000000-0000-0000-0000-000000000000",
+      p_amount: 1,
+    });
+
+    // 0행 UPDATE 는 오류 없이 성공하므로, 오류가 "does not exist" 계열일 때만 적용한다
+    if (counterRpcErr && counterRpcErr.message.includes("schema cache")) {
+      console.log("[global-setup] Applying counter RPCs (database/032)...");
+      if (!process.env.CI) {
+        execSync(
+          `docker exec -i supabase_db_quest-on-mvp psql -U postgres -d postgres < ${path.resolve(__dirname, "../database/032_counter_rpcs.sql")}`,
+          { stdio: "pipe" }
+        );
+        reloadPostgrestSchema();
+        console.log("[global-setup] counter RPCs applied.");
+      } else {
+        console.log("[global-setup] CI: counter RPCs are applied by the test setup action.");
+      }
+    }
+  } catch (err) {
+    console.warn("[global-setup] counter RPC migration check failed:", err);
+  }
+
   // Ensure exam-materials storage bucket exists (for upload tests)
   try {
     const { data: buckets } = await supabase.storage.listBuckets();

@@ -245,6 +245,13 @@ runs:
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -v ON_ERROR_STOP=1 \
           -f database/027_seed_consent_policy_release.sql
+        # 032 는 운영 DB 에만 있고 마이그레이션으로 잡히지 않던 카운터 RPC 2개
+        # (increment_used_clarifications, increment_student_count)를 회수한다.
+        # 적용하지 않으면 /api/chat·/api/feedback 경로가 CI 에서만
+        # "function ... in the schema cache" 오류로 실패한다 (#199).
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
+          -f database/032_counter_rpcs.sql
         # Reload PostgREST schema cache so new functions are immediately callable
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -c "NOTIFY pgrst, 'reload schema';"
@@ -276,6 +283,11 @@ runs:
           -- CI 만 운영과 다른 보안 상태가 되어 검증이 무의미해진다.
           REVOKE ALL ON FUNCTION public.admit_exam_session(uuid, text, text, text) FROM anon, authenticated;
           REVOKE ALL ON FUNCTION public.restart_demo_attempt(uuid, text) FROM anon, authenticated;
+          -- 032 의 카운터 RPC 2개도 같은 이유로 회수한다 — 열린 채 두면 인증된
+          -- 학생이 임의 세션의 used_clarifications 나 임의 시험의 student_count 를
+          -- 부풀릴 수 있어 CI 가 운영과 다른 보안 상태가 된다.
+          REVOKE ALL ON FUNCTION public.increment_used_clarifications(uuid, int) FROM anon, authenticated;
+          REVOKE ALL ON FUNCTION public.increment_student_count(uuid) FROM anon, authenticated;
           -- 동의 원장 등 다른 SECURITY DEFINER 함수도 blanket GRANT 에 함께 열린다.
           -- 다시 회수하지 않으면 CI 에서만 임의 매핑 선점·purge 호출이 열려,
           -- 운영과 다른 보안 상태로 검증이 무의미해진다.
