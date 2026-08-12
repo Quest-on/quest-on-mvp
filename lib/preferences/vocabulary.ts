@@ -89,24 +89,6 @@ export const PREDICATE_TABLE: Record<Predicate, PredicateMetadata> = {
 };
 
 /**
- * Value type schemas for each predicate.
- * Maps predicate to its Zod validator.
- */
-const createValueSchema = (predicate: Predicate): z.ZodType => {
-  const meta = PREDICATE_TABLE[predicate];
-
-  if (meta.valueType === "enum" && meta.allowedValues) {
-    return z.enum(meta.allowedValues as [string, ...string[]]);
-  } else if (meta.valueType === "number") {
-    return z.number();
-  } else if (meta.valueType === "text") {
-    return z.string();
-  }
-
-  throw new Error(`Unknown value type for predicate ${predicate}`);
-};
-
-/**
  * Evidence object schema: sourceTable, refId, span, quote.
  */
 export const evidenceSchema = z.object({

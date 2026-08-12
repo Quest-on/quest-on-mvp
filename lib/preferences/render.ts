@@ -6,8 +6,11 @@ import { PREDICATE_TABLE, type Predicate } from "@/lib/preferences/vocabulary";
 /**
  * 교수 메모리 렌더러 — 선택된 원자 레코드를 프롬프트에 끼울 자연문 블록으로 조립한다.
  *
- * 이 모듈은 **순수 함수**다. DB·네트워크·시각(`Date.now()`)·난수를 쓰지 않는다.
- * 같은 입력이면 언제나 같은 `text`와 같은 `hash`가 나온다. 시각이 필요하면 호출자가 넘긴다.
+ * 명시 인자가 같으면 언제나 같은 `text`와 같은 `hash`가 나온다. DB·네트워크·
+ * 시각(`Date.now()`)·난수를 쓰지 않는다. 시각이 필요하면 호출자가 넘긴다.
+ * 유일한 주변(ambient) 입력은 비상 스위치 `MEMORY_RENDERING_DISABLED=1` 이다 —
+ * `readMemoryFlags().renderingEnabled` 로 읽으며, 꺼져 있으면 입력과 무관하게
+ * 빈 블록을 반환한다. 그 외에는 순수하다.
  *
  * 예산은 프롬프트 지시가 아니라 **코드에서** 강제한다.
  * 초과 시: 낮은 순위부터 제거 → 한 레코드가 남은 예산을 넘으면 잘라내지 않고 통째로 건너뜀
@@ -119,6 +122,8 @@ function digest(text: string): string {
 
 /**
  * 선택된 레코드를 자연문 불릿 블록으로 렌더링한다. JSON 이 아니다.
+ * 비상 스위치 `MEMORY_RENDERING_DISABLED=1` 이 켜져 있으면 모든 레코드를
+ * dropped 로 두고 빈 블록을 반환한다(인자와 무관한 유일한 예외 경로).
  *
  * @param records 순위순 레코드 (앞이 높은 순위)
  * @param budgetTokens 토큰 상한 (기본 1200). 결과 `estimatedTokens`는 이 값을 절대 넘지 않는다.

@@ -13,6 +13,7 @@ import {
   type ProposedGradesMap,
 } from "@/lib/bulk-grading";
 import { readMemoryFlags } from "@/lib/preferences/flags";
+import { findLatestExtractionSource } from "@/lib/preferences/extraction-source";
 import { enqueueMemoryExtraction } from "@/lib/qstash";
 
 const COMMITTING_STALE_MS = 2 * 60 * 1000;
@@ -231,16 +232,13 @@ export async function POST(
 
     if (readMemoryFlags().extractionEnabled && committedGradingSessionId) {
       try {
-        const { data: source, error: sourceError } = await supabase
-          .from("bulk_grading_messages")
-          .select("id")
-          .eq("session_id", committedGradingSessionId)
-          .eq("role", "user")
-          .eq("input_origin", "typed")
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const { data: source, error: sourceError } = await findLatestExtractionSource(
+          supabase,
+          {
+            table: "bulk_grading_messages",
+            sessionId: committedGradingSessionId,
+          },
+        );
 
         if (sourceError) throw sourceError;
         if (source?.id) {

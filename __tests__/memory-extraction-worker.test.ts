@@ -31,6 +31,7 @@ import {
   type MemoryExtractionDependencies,
   type MemorySourceMessage,
 } from "@/lib/preferences/extraction";
+import { findLatestExtractionSource } from "@/lib/preferences/extraction-source";
 import {
   enqueueMemoryExtraction,
   memoryExtractionInitialDedupId,
@@ -811,16 +812,10 @@ describe("source selection tie-break for idempotency", () => {
 
     const selectedIds: string[] = [];
     for (let i = 0; i < 5; i++) {
-      const { data: source } = await database.client
-        .from("bulk_grading_messages")
-        .select("id")
-        .eq("session_id", sessionId)
-        .eq("role", "user")
-        .eq("input_origin", "typed")
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const { data: source } = await findLatestExtractionSource(database.client, {
+        table: "bulk_grading_messages",
+        sessionId,
+      });
       selectedIds.push(source?.id);
     }
 
@@ -844,16 +839,10 @@ describe("source selection tie-break for idempotency", () => {
 
     const dedupIds: string[] = [];
     for (let i = 0; i < 3; i++) {
-      const { data: source } = await database.client
-        .from("bulk_grading_messages")
-        .select("id")
-        .eq("session_id", sessionId)
-        .eq("role", "user")
-        .eq("input_origin", "typed")
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const { data: source } = await findLatestExtractionSource(database.client, {
+        table: "bulk_grading_messages",
+        sessionId,
+      });
 
       if (source?.id) {
         dedupIds.push(memoryExtractionInitialDedupId({
@@ -882,16 +871,10 @@ describe("source selection tie-break for idempotency", () => {
       ],
     });
 
-    const { data: source } = await database.client
-      .from("bulk_grading_messages")
-      .select("id")
-      .eq("session_id", sessionId)
-      .eq("role", "user")
-      .eq("input_origin", "typed")
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const { data: source } = await findLatestExtractionSource(database.client, {
+      table: "bulk_grading_messages",
+      sessionId,
+    });
 
     expect(source?.id).toBe(newerId);
   });

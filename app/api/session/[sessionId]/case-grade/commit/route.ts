@@ -12,6 +12,7 @@ import {
 import { upsertGradesBySessionQuestion } from "@/lib/grades-upsert";
 import { requireCaseGradeAccess } from "@/lib/case-grade-access";
 import { readMemoryFlags } from "@/lib/preferences/flags";
+import { findLatestExtractionSource } from "@/lib/preferences/extraction-source";
 import { enqueueMemoryExtraction } from "@/lib/qstash";
 
 export async function POST(
@@ -82,17 +83,10 @@ export async function POST(
 
     if (readMemoryFlags().extractionEnabled) {
       try {
-        const { data: source, error: sourceError } = await access.ctx.supabase
-          .from("grading_chats")
-          .select("id")
-          .eq("session_id", sessionId)
-          .eq("q_idx", qIdx)
-          .eq("role", "user")
-          .eq("input_origin", "typed")
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const { data: source, error: sourceError } = await findLatestExtractionSource(
+          access.ctx.supabase,
+          { table: "grading_chats", sessionId, qIdx },
+        );
 
         if (sourceError) throw sourceError;
         if (source?.id) {
