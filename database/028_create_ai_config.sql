@@ -92,6 +92,43 @@ CREATE INDEX IF NOT EXISTS idx_ai_config_audit_new_version
   ON public.ai_config_audit (new_version_id);
 
 -- ─────────────────────────────────────────────────────────────
+-- 3-b. 외래 키를 조건부로 보강한다
+-- ─────────────────────────────────────────────────────────────
+-- 위 CREATE TABLE 들은 FK 를 인라인으로 선언하지만, 테이블이 **이미 있으면**
+-- `IF NOT EXISTS` 때문에 CREATE 자체가 통째로 건너뛰어져 FK 가 생기지 않는다.
+-- CI 순서가 정확히 그 경로다: `prisma db push` 로 테이블이 먼저 생기고 그 다음
+-- 이 파일이 적용된다. FK 가 없으면 PostgREST 가 두 테이블의 관계를 인식하지
+-- 못해 `ai_config_labels?select=...,ai_config_versions(...)` 임베드 조회가
+-- "Could not find a relationship" 로 실패하고, 관리자 설정 화면 전체가 500 이 된다.
+-- 실제 로컬 스택에서 재현한 결함이다.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'ai_config_labels_version_id_fkey'
+  ) THEN
+    ALTER TABLE public.ai_config_labels
+      ADD CONSTRAINT ai_config_labels_version_id_fkey
+      FOREIGN KEY (version_id) REFERENCES public.ai_config_versions(id) ON DELETE RESTRICT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'ai_config_audit_previous_version_id_fkey'
+  ) THEN
+    ALTER TABLE public.ai_config_audit
+      ADD CONSTRAINT ai_config_audit_previous_version_id_fkey
+      FOREIGN KEY (previous_version_id) REFERENCES public.ai_config_versions(id) ON DELETE RESTRICT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'ai_config_audit_new_version_id_fkey'
+  ) THEN
+    ALTER TABLE public.ai_config_audit
+      ADD CONSTRAINT ai_config_audit_new_version_id_fkey
+      FOREIGN KEY (new_version_id) REFERENCES public.ai_config_versions(id) ON DELETE RESTRICT;
+  END IF;
+END $$;
+
+-- ─────────────────────────────────────────────────────────────
 -- 4. RLS + 테이블 권한
 -- ─────────────────────────────────────────────────────────────
 -- RLS 를 켜되 정책을 만들지 않는다 = anon/authenticated 는 행을 볼 수 없다.

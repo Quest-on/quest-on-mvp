@@ -90,32 +90,52 @@ function safeJsonParse(value: string): unknown {
   }
 }
 
-/** DB 에서 production 라벨이 가리키는 버전을 읽는다. */
+/**
+ * DB 에서 production 라벨이 가리키는 버전을 읽는다.
+ *
+ * 임베드 조회(`select("version_id, ai_config_versions(...)")`)를 쓰지 않고 두 번
+ * 나눠 읽는다. 임베드는 PostgREST 가 두 테이블 사이의 FK 관계를 스키마 캐시에서
+ * 찾아낼 수 있을 때만 동작하는데, 이 테이블들은 보안상 anon/authenticated 권한을
+ * 전부 회수해 둔 상태라 관계 탐지가 되지 않는다. 실제 로컬 스택에서
+ * `PGRST200: Could not find a relationship` 으로 관리자 화면 전체가 500 이 되는 것을
+ * 확인했다. 두 번 읽어도 이 경로는 Redis 로 45초 캐시되므로 비용이 무시할 만하고,
+ * 대신 PostgREST 의 관계 추론에 의존하지 않아 훨씬 견고하다.
+ */
 export async function readCurrentVersionFromDb(): Promise<AiConfigVersionSnapshot> {
   const supabase = getSupabaseServer();
 
-  const { data, error } = await supabase
+  const { data: label, error: labelError } = await supabase
     .from("ai_config_labels")
-    .select("version_id, ai_config_versions(id, profiles)")
+    .select("version_id")
     .eq("label", "production")
     .single();
 
-  if (error || !data) {
+  if (labelError || !label) {
     throw new Error(
-      `AI_CONFIG_READ_FAILED: production label is unavailable (${error?.message ?? "no row"})`
+      `AI_CONFIG_READ_FAILED: production label is unavailable (${labelError?.message ?? "no row"})`
     );
   }
 
-  const version = (data as { ai_config_versions?: { id?: string; profiles?: unknown } })
-    .ai_config_versions;
-  const versionId = version?.id ?? (data as { version_id?: string }).version_id;
+  const versionId = (label as { version_id?: string }).version_id;
   if (!versionId) {
     throw new Error("AI_CONFIG_READ_FAILED: production label has no version id");
   }
 
+  const { data: version, error: versionError } = await supabase
+    .from("ai_config_versions")
+    .select("id, profiles")
+    .eq("id", versionId)
+    .single();
+
+  if (versionError || !version) {
+    throw new Error(
+      `AI_CONFIG_READ_FAILED: version ${versionId} is unavailable (${versionError?.message ?? "no row"})`
+    );
+  }
+
   return {
     versionId,
-    overrides: parseSparseOverrides(version?.profiles ?? {}),
+    overrides: parseSparseOverrides((version as { profiles?: unknown }).profiles ?? {}),
   };
 }
 

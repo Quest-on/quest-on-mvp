@@ -19,18 +19,24 @@ import {
 const VERSION_A = "11111111-1111-4111-8111-111111111111";
 const VERSION_B = "22222222-2222-4222-8222-222222222222";
 
-/** production 라벨 조회를 흉내낸다. */
+/**
+ * production 라벨 조회를 흉내낸다.
+ *
+ * 저장소는 임베드 조회를 쓰지 않고 라벨 → 버전 순으로 **두 번** 읽는다.
+ * PostgREST 가 권한을 회수한 테이블 사이의 FK 관계를 스키마 캐시에서 찾지 못해
+ * 임베드가 PGRST200 으로 실패하기 때문이다(로컬 스택에서 재현했다).
+ */
 function mockLabelRow(versionId: string, profiles: unknown) {
-  from.mockReturnValue({
+  from.mockImplementation((table: string) => ({
     select: () => ({
       eq: () => ({
-        single: async () => ({
-          data: { version_id: versionId, ai_config_versions: { id: versionId, profiles } },
-          error: null,
-        }),
+        single: async () =>
+          table === "ai_config_labels"
+            ? { data: { version_id: versionId }, error: null }
+            : { data: { id: versionId, profiles }, error: null },
       }),
     }),
-  });
+  }));
 }
 
 type RedisCall = { op: string; key: string; value?: string; opts?: unknown };
