@@ -37,21 +37,22 @@ test.describe("ai_config 스키마 — live 보안 경계", () => {
   });
 
   test("부트스트랩 버전은 sparse 라서 아무 기본값도 물질화하지 않는다", async () => {
-    const { data: label } = await supabase
-      .from("ai_config_labels")
-      .select("version_id")
-      .eq("label", "production")
-      .single();
-
-    const { data: version } = await supabase
+    // 현재 production 라벨을 보면 안 된다. 이 파일이든 앱이든 한 번이라도 발행하면
+    // 라벨이 옮겨가서, 재실행하는 순간 실패한다(신선한 DB 에서만 통과하는 테스트).
+    // 부트스트랩은 "가장 처음 만들어진 버전" 이므로 그걸 직접 집는다.
+    const { data: versions, error } = await supabase
       .from("ai_config_versions")
-      .select("profiles, created_by")
-      .eq("id", label?.version_id as string)
-      .single();
+      .select("profiles, created_by, created_at")
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    expect(error).toBeNull();
+    const bootstrap = versions?.[0];
+    expect(bootstrap).toBeTruthy();
 
     // 여기에 값이 박혀 있으면 우선순위 의미가 첫 배포에 굳어 버린다.
-    expect(version?.profiles).toEqual({});
-    expect(version?.created_by).toBe("system:migration");
+    expect(bootstrap?.profiles).toEqual({});
+    expect(bootstrap?.created_by).toBe("system:migration");
   });
 
   test("service_role 도 설정 테이블을 직접 쓸 수 없다 — RPC 만이 쓰기 경로다", async () => {
