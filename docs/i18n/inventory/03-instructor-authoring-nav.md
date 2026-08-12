@@ -931,6 +931,10 @@
 ### components/instructor/SimpleExamAuthoringForm.tsx
 파일 요약: 시험 저작 폼 (주요 UI) — 섹션 라벨, 유형 선택, 채점 설정
 
+> 2026-08-12 (#197 / PR #202): 평문 Field 나열이 4개 Card 그룹(시험 정보/수업 자료/문제/채점)으로 재구성됐다.
+> 아래 표의 Line 번호와 "Field label/helper" 비고는 재구성 이전 기준이고, 문자열 자체는 그대로 유효하다
+> (helper 문구는 SubField 의 HelpCircle 툴팁 또는 CardDescription 으로 이동).
+
 | Line | 문자열(원문 그대로) | 카테고리 | 비고 |
 |------|------|------|------|
 | 121 | 업로드 중 | label | getStatusText "uploading" |
