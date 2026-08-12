@@ -20,6 +20,17 @@ export const qk = {
     },
 
     /**
+     * 강사가 개설한 과목 목록
+     * @param userId - 강사 사용자 ID (optional, 부분 매칭 가능)
+     */
+    courses: (userId?: string) => {
+      if (userId) {
+        return ["instructor-courses", userId] as const;
+      }
+      return ["instructor-courses"] as const;
+    },
+
+    /**
      * 시험 상세 데이터 (exam + sessions 병렬 로드)
      * @param examId - 시험 ID
      */
