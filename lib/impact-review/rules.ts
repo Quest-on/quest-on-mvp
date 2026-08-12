@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { load as yamlLoad } from "js-yaml";
-import type { Rule, RuleCatalog, MirrorRule, PatternRule } from "./types";
+import type { Rule, RuleCatalog, MirrorRule } from "./types";
 
 const DEFAULT_RULES_PATH = ".github/impact-review/rules.md";
 
@@ -62,19 +62,6 @@ function validateRule(raw: unknown): Rule {
         : [],
     };
     return mirror;
-  }
-  if (r.kind === "pattern") {
-    if (!Array.isArray(r.signals) || r.signals.length === 0)
-      throw new Error(`rule ${r.id}: pattern needs non-empty signals[]`);
-    const pattern: PatternRule = {
-      id: r.id,
-      kind: "pattern",
-      severity: (r.severity as PatternRule["severity"]) ?? "Warning",
-      anyPath: asStringArray(r.anyPath),
-      signals: r.signals as string[],
-      message: String(r.message ?? r.id),
-    };
-    return pattern;
   }
   throw new Error(`rule ${r.id}: unknown kind ${String(r.kind)}`);
 }
