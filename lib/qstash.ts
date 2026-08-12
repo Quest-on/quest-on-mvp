@@ -237,3 +237,54 @@ export async function enqueueGradingPhase(
     return { ok: false, reason: "publish_failed", error: err };
   }
 }
+
+// ─── Instructor Memory Extraction Retries ────────────────────────────────────
+
+export type MemoryExtractionRetryPayload = {
+  sourceTable: "bulk_grading_messages" | "grading_chats";
+  sourceRefId: string;
+  idempotencyKey?: string;
+  retryAttempt?: number;
+};
+
+/**
+ * CAS retries intentionally use a different deduplication namespace from the
+ * original extraction publish. Reusing the original ID makes QStash return 202
+ * while dropping the retry as a duplicate.
+ */
+export function memoryExtractionRetryDedupId(
+  payload: MemoryExtractionRetryPayload,
+): string {
+  return `memory-extraction-retry-${payload.retryAttempt ?? 1}-${payload.sourceTable}-${payload.sourceRefId}`;
+}
+
+export async function enqueueMemoryExtractionRetry(
+  payload: MemoryExtractionRetryPayload,
+): Promise<EnqueueGradingPhaseResult> {
+  const qstash = getQStash();
+  if (!qstash) return { ok: false, reason: "qstash_disabled" };
+
+  const baseUrl = getWorkerBaseUrl();
+  if (!baseUrl) return { ok: false, reason: "no_base_url" };
+
+  const dedupId = memoryExtractionRetryDedupId(payload);
+  try {
+    const result = await qstash.publishJSON({
+      url: `${baseUrl}/api/internal/memory-extraction-worker`,
+      body: payload,
+      retries: 3,
+      headers: {
+        "Upstash-Deduplication-Id": dedupId,
+      },
+    });
+    const messageId =
+      (result as { messageId?: string } | undefined)?.messageId ?? null;
+    return { ok: true, dedupId, messageId };
+  } catch (error) {
+    logError("[QSTASH] Memory extraction retry publish failed", error, {
+      path: "lib/qstash.ts",
+      additionalData: { payload, dedupId },
+    });
+    return { ok: false, reason: "publish_failed", error };
+  }
+}
