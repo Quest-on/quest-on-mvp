@@ -1782,7 +1782,10 @@ export default function InstructorHome() {
                     <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button size="sm" className="gap-1.5 shrink-0">
+                          <Button
+                            size="sm"
+                            className="gap-1.5 shrink-0 bg-pink-700 text-white hover:bg-pink-800 focus-visible:ring-pink-700 dark:bg-pink-600 dark:hover:bg-pink-700 dark:focus-visible:ring-pink-400"
+                          >
                             <Plus className="w-4 h-4" />
                             <span className="hidden sm:inline">{t("drive.newItem")}</span>
                           </Button>
