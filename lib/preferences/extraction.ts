@@ -456,6 +456,7 @@ export async function isInstructorMemoryPaused(
     .from("instructor_memory_events")
     .select("reason,operation,occurred_at")
     .eq("instructor_id", instructorId)
+    .is("memory_id", null)
     .in("reason", [...MEMORY_SETTING_REASONS])
     .order("occurred_at", { ascending: false })
     .limit(1)

@@ -7,6 +7,7 @@ const {
   logErrorMock,
   enqueueMemoryExtractionMock,
   requireCaseGradeAccessMock,
+  requireBulkGradeAccessMock,
 } = vi.hoisted(() => ({
   currentUserMock: vi.fn(),
   rateLimitMock: vi.fn(),
@@ -14,6 +15,7 @@ const {
   logErrorMock: vi.fn(),
   enqueueMemoryExtractionMock: vi.fn(),
   requireCaseGradeAccessMock: vi.fn(),
+  requireBulkGradeAccessMock: vi.fn(),
 }));
 
 vi.mock("@/lib/get-current-user", () => ({ currentUser: currentUserMock }));
@@ -29,6 +31,12 @@ vi.mock("@/lib/qstash", () => ({
 vi.mock("@/lib/case-grade-access", () => ({
   requireCaseGradeAccess: requireCaseGradeAccessMock,
 }));
+vi.mock("@/lib/bulk-grade-access", () => ({
+  requireBulkGradeAccess: requireBulkGradeAccessMock,
+}));
+vi.mock("@/lib/bulk-grading", () => ({
+  getBulkGradableQuestions: () => [{ qIdx: 0 }],
+}));
 vi.mock("@/lib/grades-upsert", () => ({
   upsertGradesBySessionQuestion: vi.fn(async () => [0]),
 }));
@@ -37,10 +45,12 @@ type Row = Record<string, unknown>;
 type Filter = { kind: "eq" | "in"; column: string; value: unknown };
 type QueryLog = { table: string; operation: string; filters: Filter[]; values?: unknown };
 
-class MockQuery implements PromiseLike<{ data: Row[] | null; error: null }> {
+class MockQuery implements PromiseLike<{ data: Row[] | null; error: { message: string } | null }> {
   private operation = "select";
   private filters: Filter[] = [];
   private values: unknown;
+  private orderBy: { column: string; ascending: boolean } | null = null;
+  private rowLimit: number | null = null;
 
   constructor(
     private readonly database: MockDatabase,
@@ -73,11 +83,13 @@ class MockQuery implements PromiseLike<{ data: Row[] | null; error: null }> {
     return this;
   }
 
-  order(_column: string, _options?: unknown) {
+  order(column: string, options?: { ascending?: boolean }) {
+    this.orderBy = { column, ascending: options?.ascending !== false };
     return this;
   }
 
-  limit(_count: number) {
+  limit(count: number) {
+    this.rowLimit = count;
     return this;
   }
 
@@ -86,8 +98,8 @@ class MockQuery implements PromiseLike<{ data: Row[] | null; error: null }> {
     return { data: result.data?.[0] ?? null, error: result.error };
   }
 
-  then<TResult1 = { data: Row[] | null; error: null }, TResult2 = never>(
-    onfulfilled?: ((value: { data: Row[] | null; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
+  then<TResult1 = { data: Row[] | null; error: { message: string } | null }, TResult2 = never>(
+    onfulfilled?: ((value: { data: Row[] | null; error: { message: string } | null }) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ): PromiseLike<TResult1 | TResult2> {
     return Promise.resolve(this.execute()).then(onfulfilled, onrejected);
@@ -107,6 +119,13 @@ class MockQuery implements PromiseLike<{ data: Row[] | null; error: null }> {
       filters: [...this.filters],
       values: this.values,
     });
+    const failure = this.database.failures.find(
+      (candidate) => candidate.table === this.table &&
+        candidate.operation === this.operation &&
+        (!candidate.stateEventOnly || (this.values as Row)?.memory_id === null),
+    );
+    if (failure) return { data: null, error: { message: failure.message } };
+
     const table = this.database.tables[this.table] ?? (this.database.tables[this.table] = []);
 
     if (this.operation === "insert") {
@@ -115,7 +134,14 @@ class MockQuery implements PromiseLike<{ data: Row[] | null; error: null }> {
       return { data: inserted as Row[], error: null };
     }
 
-    const matched = table.filter((row) => this.matches(row));
+    let matched = table.filter((row) => this.matches(row));
+    if (this.orderBy) {
+      const { column, ascending } = this.orderBy;
+      matched = [...matched].sort((left, right) =>
+        String(left[column]).localeCompare(String(right[column])) * (ascending ? 1 : -1),
+      );
+    }
+    if (this.rowLimit !== null) matched = matched.slice(0, this.rowLimit);
     if (this.operation === "update") {
       for (const row of matched) Object.assign(row, this.values);
     }
@@ -125,6 +151,7 @@ class MockQuery implements PromiseLike<{ data: Row[] | null; error: null }> {
 
 class MockDatabase {
   queries: QueryLog[] = [];
+  failures: Array<{ table: string; operation: string; message: string; stateEventOnly?: boolean }> = [];
   tables: Record<string, Row[]>;
   client = { from: (table: string) => new MockQuery(this, table) };
 
@@ -145,8 +172,11 @@ import { GET } from "@/app/api/instructor/memory/route";
 import { DELETE } from "@/app/api/instructor/memory/[memoryId]/route";
 import { PATCH } from "@/app/api/instructor/memory/settings/route";
 import { POST as caseGradeCommit } from "@/app/api/session/[sessionId]/case-grade/commit/route";
+import { POST as bulkGradeCommit } from "@/app/api/exam/[examId]/bulk-grade/commit/route";
 
 const MEMORY_ID = "550e8400-e29b-41d4-a716-446655440000";
+const EXAM_ID = "850e8400-e29b-41d4-a716-446655440000";
+const GRADING_SESSION_ID = "950e8400-e29b-41d4-a716-446655440000";
 const INSTRUCTOR = {
   id: "instructor-a",
   role: "instructor",
@@ -172,6 +202,46 @@ function deleteMemory(memoryId = MEMORY_ID) {
 
 function caseCommitRequest(body: unknown): Parameters<typeof caseGradeCommit>[0] {
   return request(body) as Parameters<typeof caseGradeCommit>[0];
+}
+
+function bulkCommitRequest(): Parameters<typeof bulkGradeCommit>[0] {
+  return new Request(`http://localhost/api/exam/${EXAM_ID}/bulk-grade/commit`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      grades: [{ session_id: MEMORY_ID, q_idx: 0, score: 88, comment: "done" }],
+    }),
+  }) as Parameters<typeof bulkGradeCommit>[0];
+}
+
+function bulkCommit() {
+  return bulkGradeCommit(bulkCommitRequest(), {
+    params: Promise.resolve({ examId: EXAM_ID }),
+  });
+}
+
+function bulkDatabase(messages: Row[] = []) {
+  return new MockDatabase({
+    sessions: [{ id: MEMORY_ID, exam_id: EXAM_ID }],
+    exam_grading_sessions: [{
+      id: GRADING_SESSION_ID,
+      exam_id: EXAM_ID,
+      instructor_id: INSTRUCTOR.id,
+      status: "grading_done",
+      calibration_status: "complete",
+      grading_scope: "full",
+      proposed_grades: {},
+      updated_at: "2026-08-12T00:00:00Z",
+    }],
+    bulk_grading_messages: messages,
+  });
+}
+
+function effectivePaused(db: MockDatabase) {
+  const latest = [...(db.tables.instructor_memory_events ?? [])]
+    .filter((event) => event.memory_id === null)
+    .at(-1);
+  return latest?.operation === "quarantine" && latest.reason === "instructor_paused_memory";
 }
 
 function memory(overrides: Row = {}): Row {
@@ -209,6 +279,10 @@ describe("instructor memory API", () => {
     requireCaseGradeAccessMock.mockImplementation(async () => ({
       ok: true,
       ctx: { user: INSTRUCTOR, supabase: database.client },
+    }));
+    requireBulkGradeAccessMock.mockImplementation(async () => ({
+      ok: true,
+      ctx: { user: INSTRUCTOR, exam: { questions: [] }, supabase: database.client },
     }));
     delete process.env.MEMORY_EXTRACTION_DISABLED;
   });
@@ -329,6 +403,149 @@ describe("instructor memory API", () => {
         reason: "instructor_resumed_memory",
       }),
     );
+  });
+
+  it.each([
+    {
+      action: "pause" as const,
+      initialStatus: "active",
+      events: [],
+      expectedPaused: false,
+    },
+    {
+      action: "resume" as const,
+      initialStatus: "quarantined",
+      events: [
+        { memory_id: MEMORY_ID, instructor_id: INSTRUCTOR.id, operation: "quarantine", reason: "instructor_paused_memory", occurred_at: "2026-08-11T00:00:00Z" },
+        { memory_id: null, instructor_id: INSTRUCTOR.id, operation: "quarantine", reason: "instructor_paused_memory", occurred_at: "2026-08-11T00:00:01Z" },
+      ],
+      expectedPaused: true,
+    },
+  ])("failed $action row update leaves effective pause state unchanged", async ({ action, initialStatus, events, expectedPaused }) => {
+    database = new MockDatabase({
+      instructor_memories: [memory({ status: initialStatus })],
+      instructor_memory_events: events,
+    });
+    database.failures.push({
+      table: "instructor_memories",
+      operation: "update",
+      message: "row update failed",
+    });
+    expect(effectivePaused(database)).toBe(expectedPaused);
+
+    const response = await PATCH(request({ action }));
+
+    expect(response.status).toBe(500);
+    expect(effectivePaused(database)).toBe(expectedPaused);
+    expect(database.tables.instructor_memory_events.filter((event) => event.memory_id === null)).toHaveLength(
+      expectedPaused ? 1 : 0,
+    );
+  });
+
+  it("contains a state-event insert failure without changing effective pause state", async () => {
+    database = new MockDatabase({
+      instructor_memories: [memory()],
+      instructor_memory_events: [],
+    });
+    database.failures.push({
+      table: "instructor_memory_events",
+      operation: "insert",
+      message: "state event unavailable",
+      stateEventOnly: true,
+    });
+
+    const response = await PATCH(request({ action: "pause" }));
+
+    expect(response.status).toBe(500);
+    expect(effectivePaused(database)).toBe(false);
+    expect(database.tables.instructor_memory_events).toContainEqual(
+      expect.objectContaining({ memory_id: MEMORY_ID, reason: "instructor_paused_memory" }),
+    );
+    expect(database.tables.instructor_memory_events).not.toContainEqual(
+      expect.objectContaining({ memory_id: null }),
+    );
+    expect(logErrorMock).toHaveBeenCalledWith(
+      "Failed to update instructor memory settings",
+      expect.anything(),
+      expect.any(Object),
+    );
+  });
+
+  it("bulk-grade commit enqueues one initial extraction for the latest typed instructor message", async () => {
+    database = bulkDatabase([
+      { id: "older-typed", session_id: GRADING_SESSION_ID, role: "user", input_origin: "typed", created_at: "2026-08-12T00:00:00Z" },
+      { id: "newest-pasted", session_id: GRADING_SESSION_ID, role: "user", input_origin: "pasted", created_at: "2026-08-12T03:00:00Z" },
+      { id: "latest-typed", session_id: GRADING_SESSION_ID, role: "user", input_origin: "typed", created_at: "2026-08-12T02:00:00Z" },
+      { id: "other-session", session_id: "other", role: "user", input_origin: "typed", created_at: "2026-08-12T04:00:00Z" },
+    ]);
+
+    const response = await bulkCommit();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ ok: true });
+    expect(enqueueMemoryExtractionMock).toHaveBeenCalledOnce();
+    expect(enqueueMemoryExtractionMock).toHaveBeenCalledWith({
+      sourceTable: "bulk_grading_messages",
+      sourceRefId: "latest-typed",
+    });
+  });
+
+  it("bulk-grade commit succeeds without enqueueing when the grading session has no messages", async () => {
+    database = bulkDatabase();
+
+    const response = await bulkCommit();
+
+    expect(response.status).toBe(200);
+    expect(enqueueMemoryExtractionMock).not.toHaveBeenCalled();
+    expect(logErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps bulk-grade commit successful and logs when QStash publish fails", async () => {
+    database = bulkDatabase([
+      { id: "typed-message", session_id: GRADING_SESSION_ID, role: "user", input_origin: "typed", created_at: "2026-08-12T00:00:00Z" },
+    ]);
+    enqueueMemoryExtractionMock.mockResolvedValue({
+      ok: false,
+      reason: "publish_failed",
+      error: new Error("QStash unavailable"),
+    });
+
+    const response = await bulkCommit();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ ok: true });
+    expect(logErrorMock).toHaveBeenCalledWith(
+      "[bulk-grade commit] Memory extraction was not queued",
+      expect.any(Error),
+      expect.any(Object),
+    );
+  });
+
+  it("does not look up or enqueue bulk extraction when the extraction kill switch is off", async () => {
+    process.env.MEMORY_EXTRACTION_DISABLED = "1";
+    database = bulkDatabase([
+      { id: "typed-message", session_id: GRADING_SESSION_ID, role: "user", input_origin: "typed", created_at: "2026-08-12T00:00:00Z" },
+    ]);
+
+    const response = await bulkCommit();
+
+    expect(response.status).toBe(200);
+    expect(enqueueMemoryExtractionMock).not.toHaveBeenCalled();
+    expect(database.queries.some((query) => query.table === "bulk_grading_messages")).toBe(false);
+  });
+
+  it("does not enqueue a second extraction when the same bulk commit is delivered twice", async () => {
+    database = bulkDatabase([
+      { id: "typed-message", session_id: GRADING_SESSION_ID, role: "user", input_origin: "typed", created_at: "2026-08-12T00:00:00Z" },
+    ]);
+
+    const first = await bulkCommit();
+    const repeated = await bulkCommit();
+
+    expect(first.status).toBe(200);
+    expect(repeated.status).toBe(200);
+    await expect(repeated.json()).resolves.toMatchObject({ alreadyCommitted: true });
+    expect(enqueueMemoryExtractionMock).toHaveBeenCalledOnce();
   });
 
   it("case-grade commit enqueues exactly one initial extraction for the latest typed message", async () => {

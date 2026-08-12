@@ -23,6 +23,7 @@ vi.mock("@/lib/ai-tracking", () => ({
 import {
   MAX_EXTRACTION_CANDIDATES,
   callMemoryExtractor,
+  isInstructorMemoryPaused,
   parseMemoryExtractionResponse,
   processMemoryExtractionJob,
   verifyMemoryCandidate,
@@ -693,6 +694,22 @@ describe("promotion concurrency, ordering, and idempotency", () => {
     expect(database.state.tables.instructor_memories).toHaveLength(0);
   });
 
+  it("ignores uncommitted per-row settings events when reading effective pause state", async () => {
+    const database = createFakeDatabase({
+      instructor_memory_events: [{
+        memory_id: "memory-1",
+        instructor_id: INSTRUCTOR_ID,
+        operation: "quarantine",
+        reason: "instructor_paused_memory",
+        occurred_at: "2026-08-12T02:00:00.000Z",
+      }],
+    });
+
+    await expect(
+      isInstructorMemoryPaused(database.client as never, INSTRUCTOR_ID),
+    ).resolves.toBe(false);
+  });
+
   it("promotes normally when the instructor is not paused", async () => {
     const database = createFakeDatabase({
       bulk_grading_messages: [sourceRow()],
@@ -782,12 +799,12 @@ describe("worker integration invariants", () => {
 
   it("uses a distinct, deterministic initial dedup namespace from CAS retries", () => {
     const payload = {
-      sourceTable: "grading_chats" as const,
+      sourceTable: "bulk_grading_messages" as const,
       sourceRefId: SOURCE_ID,
     };
 
     expect(memoryExtractionInitialDedupId(payload)).toBe(
-      `memory-extraction-initial-grading_chats-${SOURCE_ID}`,
+      `memory-extraction-initial-bulk_grading_messages-${SOURCE_ID}`,
     );
     expect(memoryExtractionInitialDedupId(payload)).toBe(
       memoryExtractionInitialDedupId({ ...payload }),

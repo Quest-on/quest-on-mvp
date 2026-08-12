@@ -12,6 +12,8 @@ import {
   getBulkGradableQuestions,
   type ProposedGradesMap,
 } from "@/lib/bulk-grading";
+import { readMemoryFlags } from "@/lib/preferences/flags";
+import { enqueueMemoryExtraction } from "@/lib/qstash";
 
 const COMMITTING_STALE_MS = 2 * 60 * 1000;
 
@@ -83,11 +85,14 @@ export async function POST(
     // [HIGH-1] Block commit while grading is in progress
     const { data: currentSession } = await supabase
       .from("exam_grading_sessions")
-      .select("status, calibration_status, grading_scope, proposed_grades")
+      .select("id, status, calibration_status, grading_scope, proposed_grades")
       .eq("exam_id", examId)
       .eq("instructor_id", access.ctx.user.id)
       .maybeSingle();
 
+    if (currentSession?.status === "committed") {
+      return successJson({ ok: true, gradedCount: grades.length, alreadyCommitted: true });
+    }
     if (currentSession?.status === "grading") {
       return errorJson("CONFLICT", "채점이 진행 중입니다. 완료 후 확정하세요.", 409);
     }
@@ -116,6 +121,7 @@ export async function POST(
       return errorJson("INTERNAL_ERROR", "Failed to update grading session", 500);
     }
 
+    let committedGradingSessionId = claimedSession?.id;
     if (!claimedSession) {
       const { data: existingSession, error: existingError } = await supabase
         .from("exam_grading_sessions")
@@ -160,6 +166,7 @@ export async function POST(
           });
           return errorJson("COMMIT_IN_PROGRESS", "Bulk grade commit is already in progress", 409);
         }
+        committedGradingSessionId = reclaimedSession.id;
       }
     }
 
@@ -220,6 +227,38 @@ export async function POST(
         path: `/api/exam/${examId}/bulk-grade/commit`,
       });
       return errorJson("INTERNAL_ERROR", "Failed to finalize grading session", 500);
+    }
+
+    if (readMemoryFlags().extractionEnabled && committedGradingSessionId) {
+      try {
+        const { data: source, error: sourceError } = await supabase
+          .from("bulk_grading_messages")
+          .select("id")
+          .eq("session_id", committedGradingSessionId)
+          .eq("role", "user")
+          .eq("input_origin", "typed")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (sourceError) throw sourceError;
+        if (source?.id) {
+          const queued = await enqueueMemoryExtraction({
+            sourceTable: "bulk_grading_messages",
+            sourceRefId: source.id,
+          });
+          if (!queued.ok) {
+            logError("[bulk-grade commit] Memory extraction was not queued", queued.error ?? null, {
+              path: `/api/exam/${examId}/bulk-grade/commit`,
+              additionalData: { sourceRefId: source.id, reason: queued.reason },
+            });
+          }
+        }
+      } catch (enqueueError) {
+        logError("[bulk-grade commit] Memory extraction enqueue failed", enqueueError, {
+          path: `/api/exam/${examId}/bulk-grade/commit`,
+        });
+      }
     }
 
     try {
