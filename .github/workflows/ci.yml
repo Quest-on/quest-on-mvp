@@ -7,10 +7,28 @@ on:
   # main 도 아니라서, 목록으로 제한하면 그 PR 들만 CI 없이 머지되는 구멍이 생긴다.
   pull_request:
 
+# 같은 커밋에 대한 CI 를 두 벌 **동시에** 돌리지 않는다.
+#
+# staging 에 푸시하면 (1) push 이벤트와 (2) 상시 열려 있는 staging -> main PR 의
+# pull_request: synchronize 가 각각 CI 를 띄운다. 둘이 같은 러너 자원(Supabase
+# 컨테이너·Next 서버·목 서버·포트)을 두고 경쟁하면서 Browser E2E 가
+# page.waitForLoadState 타임아웃으로 죽었다. 재현율 2/2 로 매번 push 런만 죽었다.
+#
+# cancel-in-progress 를 false 로 두는 이유: deploy.yml 이 CI 런의 conclusion 이
+# success 일 때만 배포한다. 먼저 시작한 런을 취소하면 그 런의 결론이 cancelled 이
+# 되어 배포가 건너뛰어진다. 뒤에 온 쪽이 기다리는 편이 맞다.
+concurrency:
+  group: ci-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
 jobs:
   quality:
     name: Lint & Type Check
     runs-on: ubuntu-latest
+    # staging/main 이 head 인 PR(상시 열린 staging -> main PR)은 건너뛴다.
+    # 그 커밋은 push 트리거가 이미 같은 SHA 로 검증하므로 커버리지 손실이 없고,
+    # 두 벌이 동시에 도는 것이 Browser E2E 를 죽이던 원인이었다.
+    if: github.event_name != 'pull_request' || !contains(fromJSON('["main","staging"]'), github.event.pull_request.head.ref)
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +45,10 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    # staging/main 이 head 인 PR(상시 열린 staging -> main PR)은 건너뛴다.
+    # 그 커밋은 push 트리거가 이미 같은 SHA 로 검증하므로 커버리지 손실이 없고,
+    # 두 벌이 동시에 도는 것이 Browser E2E 를 죽이던 원인이었다.
+    if: github.event_name != 'pull_request' || !contains(fromJSON('["main","staging"]'), github.event.pull_request.head.ref)
     timeout-minutes: 12
     needs: [quality]
     steps:
@@ -61,6 +83,10 @@ jobs:
   unit-test:
     name: Unit Tests
     runs-on: ubuntu-latest
+    # staging/main 이 head 인 PR(상시 열린 staging -> main PR)은 건너뛴다.
+    # 그 커밋은 push 트리거가 이미 같은 SHA 로 검증하므로 커버리지 손실이 없고,
+    # 두 벌이 동시에 도는 것이 Browser E2E 를 죽이던 원인이었다.
+    if: github.event_name != 'pull_request' || !contains(fromJSON('["main","staging"]'), github.event.pull_request.head.ref)
     timeout-minutes: 10
     needs: [quality]
     steps:
@@ -75,6 +101,10 @@ jobs:
   api-integration-test:
     name: API Integration Tests
     runs-on: ubuntu-latest
+    # staging/main 이 head 인 PR(상시 열린 staging -> main PR)은 건너뛴다.
+    # 그 커밋은 push 트리거가 이미 같은 SHA 로 검증하므로 커버리지 손실이 없고,
+    # 두 벌이 동시에 도는 것이 Browser E2E 를 죽이던 원인이었다.
+    if: github.event_name != 'pull_request' || !contains(fromJSON('["main","staging"]'), github.event.pull_request.head.ref)
     timeout-minutes: 20
     needs: [quality]
     steps:
@@ -124,6 +154,8 @@ jobs:
     # 필수 게이트로 둔다. 나머지 browser-flows는 UI 변경 민감도가 높아 로컬 전용이다.
     name: Browser E2E Tests
     runs-on: ubuntu-latest
+    # 위 잡들과 같은 이유로 중복 실행을 건너뛴다.
+    if: github.event_name != 'pull_request' || !contains(fromJSON('["main","staging"]'), github.event.pull_request.head.ref)
     timeout-minutes: 20
     needs: [quality]
     steps:
