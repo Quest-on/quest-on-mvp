@@ -27,7 +27,7 @@ vi.mock("@supabase/ssr", () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          single: async () => ({ data: authProfile }),
+          maybeSingle: async () => ({ data: authProfile }),
         }),
       }),
     }),
