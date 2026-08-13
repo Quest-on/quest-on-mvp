@@ -477,16 +477,13 @@ export default function OnboardingPage() {
           </CardContent>
         </Card>
       ) : step === "intake" ? (
-        /* ── Step 3: JTBD 2문항 (교수자 전용, AC-4) ── */
+        /* ── Step 3: JTBD 1문항 — 과목 (교수자 전용, AC-4) ── */
         <Card className="w-full shadow-xl border-0">
           <CardHeader className="text-center space-y-4">
             <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto">
               <GraduationCap className="w-8 h-8 text-primary-foreground" />
             </div>
             <CardTitle className="text-2xl font-bold">{t("intakeTitle")}</CardTitle>
-            <CardDescription className="text-base">
-              {t("intakeDesc")}
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {error && <ErrorAlert message={error} />}
@@ -504,9 +501,6 @@ export default function OnboardingPage() {
                 assessTarget 을 옵셔널로 받으므로 안 보내면 기본 템플릿이 된다. */}
 
             <div className="space-y-3">
-              <Label className="text-sm font-semibold">
-                {t("intakeSubjectLabel")}
-              </Label>
               <RadioGroup
                 value={subject}
                 onValueChange={(value) =>
