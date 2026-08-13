@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Shield, Bot } from "lucide-react";
+import { Shield, Bot, SlidersHorizontal } from "lucide-react";
 
 export interface AdminNavigationItem {
   /** i18n key under the "admin" namespace, e.g. "nav.dashboard". */
@@ -18,5 +18,10 @@ export const ADMIN_NAVIGATION_ITEMS: AdminNavigationItem[] = [
     titleKey: "nav.aiUsage",
     href: "/admin/ai-usage",
     icon: Bot,
+  },
+  {
+    titleKey: "nav.aiConfig",
+    href: "/admin/ai-config",
+    icon: SlidersHorizontal,
   },
 ];

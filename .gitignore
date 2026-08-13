@@ -75,3 +75,6 @@ next-env.d.ts
 
 # Local isolated worktrees
 .worktrees/
+
+# 에이전트 툴 스크래치 — 저장소에 들어가면 안 된다
+.omo/

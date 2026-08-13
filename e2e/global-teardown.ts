@@ -15,10 +15,29 @@ async function globalTeardown() {
 
   // Fallback: kill any process still listening on the mock server port
   try {
-    const portPid = execSync(`lsof -ti :${MOCK_SERVER_PORT}`, { encoding: "utf-8" }).trim();
-    if (portPid) {
-      console.log(`[global-teardown] Killing leftover process on port ${MOCK_SERVER_PORT} (PID: ${portPid})`);
-      execSync(`kill -9 ${portPid}`, { stdio: "pipe" });
+    if (process.platform === "win32") {
+      const out = execSync(`netstat -ano | findstr :${MOCK_SERVER_PORT}`, {
+        encoding: "utf-8",
+      }).trim();
+      for (const line of out.split("\n")) {
+        const portPid = line.trim().split(/\s+/).pop();
+        if (portPid && /^\d+$/.test(portPid) && portPid !== "0") {
+          console.log(
+            `[global-teardown] Killing leftover process on port ${MOCK_SERVER_PORT} (PID: ${portPid})`,
+          );
+          execSync(`taskkill /F /PID ${portPid}`, { stdio: "pipe" });
+        }
+      }
+    } else {
+      const portPid = execSync(`lsof -ti :${MOCK_SERVER_PORT}`, {
+        encoding: "utf-8",
+      }).trim();
+      if (portPid) {
+        console.log(
+          `[global-teardown] Killing leftover process on port ${MOCK_SERVER_PORT} (PID: ${portPid})`,
+        );
+        execSync(`kill -9 ${portPid}`, { stdio: "pipe" });
+      }
     }
   } catch {
     // No process on port — clean

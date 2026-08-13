@@ -13,7 +13,7 @@ import {
   buildSingleCaseQuestionPrompt,
   buildObjectiveQuestionGenerationPrompt,
 } from "@/lib/prompts";
-import { getOpenAI, AI_MODEL_HEAVY } from "@/lib/openai";
+import { getOpenAI, AI_MODEL_HEAVY, isOpenAITransportError } from "@/lib/openai";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import {
   buildAiTextMetadata,
@@ -59,14 +59,19 @@ async function runGeneration(
     try {
       const tracked = await callTrackedChatCompletion(
         () =>
-          getOpenAI().chat.completions.create({
-            model: AI_MODEL_HEAVY,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: userPrompt },
-            ],
-            response_format: { type: "json_object" },
-          }),
+          getOpenAI().chat.completions.create(
+            {
+              model: AI_MODEL_HEAVY,
+              messages: [
+                { role: "system", content: system },
+                { role: "user", content: userPrompt },
+              ],
+              response_format: { type: "json_object" },
+            },
+            // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
+            // 클라이언트 기본 maxRetries 가 0 이므로 여기서 명시해야 재시도가 산다.
+            { timeout: 120_000, maxRetries: 2 }
+          ),
         {
           feature: "generate_questions_stream",
           route: "/api/ai/generate-questions-stream",
@@ -81,7 +86,6 @@ async function runGeneration(
           }),
         },
         {
-          timeoutMs: 120_000,
           metadataBuilder: (result) =>
             buildAiTextMetadata({
               outputText:
@@ -98,6 +102,10 @@ async function runGeneration(
       return JSON.parse(content);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      // 이슈 #118: 이 루프는 **파싱/의미 실패**만 다시 시도한다.
+      // 전송 실패까지 여기서 잡으면 SDK 요청 옵션의 재시도(maxRetries)와 곱해져
+      // 한 번의 논리적 호출이 최대 6회 전송된다 — 이 이슈가 없앤 바로 그 결함이다.
+      if (isOpenAITransportError(err)) throw lastError;
       if (attempt < MAX_ATTEMPTS - 1) continue;
     }
   }

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { createSupabaseClient } from "@/lib/supabase-client";
+import { getAuthCallbackUrl } from "@/lib/auth-redirect";
 import { useTranslations } from "next-intl";
 
 export function CustomSignIn() {
@@ -49,7 +50,7 @@ export function CustomSignIn() {
     await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: getAuthCallbackUrl(window.location.origin),
       },
     });
   };

@@ -173,7 +173,8 @@
   },
   "nav": {
     "dashboard": "대시보드",
-    "aiUsage": "AI 사용량"
+    "aiUsage": "AI 사용량",
+    "aiConfig": "AI 설정"
   },
   "agent": {
     "errors": {
@@ -240,6 +241,35 @@
       },
       "pending": "에이전트가 작업 중…",
       "noSteps": "아직 단계가 없습니다."
+    }
+  },
+  "aiConfig": {
+    "title": "AI 설정",
+    "description": "태스크별 모델과 호출 파라미터를 관리합니다. 저장하면 새 버전이 만들어지고 production 라벨이 옮겨집니다.",
+    "currentVersion": "현재 버전",
+    "source": "출처",
+    "inherit": "상속",
+    "none": "없음",
+    "reason": "변경 사유",
+    "reasonPlaceholder": "무엇을 왜 바꾸는지 적으세요",
+    "save": "저장",
+    "saving": "저장 중…",
+    "saved": "저장됐습니다",
+    "loadError": "설정을 불러오지 못했습니다",
+    "saveError": "저장하지 못했습니다",
+    "fields": {
+      "model": "모델",
+      "timeoutMs": "타임아웃(ms)",
+      "maxRetries": "재시도",
+      "maxTokens": "토큰 상한",
+      "temperature": "temperature",
+      "reasoningEffort": "추론 강도"
+    },
+    "sources": {
+      "code": "코드 기본값",
+      "global_env": "전역 환경변수",
+      "task_env": "태스크 환경변수",
+      "admin": "관리자 설정"
     }
   }
 }

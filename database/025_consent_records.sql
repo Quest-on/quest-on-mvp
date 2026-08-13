@@ -42,6 +42,14 @@ CREATE TABLE IF NOT EXISTS public.consent_records (
     CHECK (controller_type = 'platform')
 );
 
+-- Prisma db push 가 테이블을 먼저 만들면 CREATE TABLE IF NOT EXISTS 안의 CHECK 는
+-- 적용되지 않는다. 어느 실행 순서에서도 DB 불변식이 같도록 명시적으로 재설치한다.
+ALTER TABLE public.consent_records
+  DROP CONSTRAINT IF EXISTS consent_records_controller_type_check;
+ALTER TABLE public.consent_records
+  ADD CONSTRAINT consent_records_controller_type_check
+  CHECK (controller_type = 'platform');
+
 -- 게이트는 (subject_ref, consent_key) 별 최신 결정을 읽는다.
 CREATE INDEX IF NOT EXISTS idx_consent_records_subject_key_recorded
   ON public.consent_records (subject_ref, consent_key, recorded_at DESC);
@@ -108,6 +116,12 @@ CREATE TABLE IF NOT EXISTS public.consent_retention_index (
     CHECK (destroy_after = deleted_at + interval '3 years')
 );
 
+ALTER TABLE public.consent_retention_index
+  DROP CONSTRAINT IF EXISTS consent_retention_index_destroy_after_check;
+ALTER TABLE public.consent_retention_index
+  ADD CONSTRAINT consent_retention_index_destroy_after_check
+  CHECK (destroy_after = deleted_at + interval '3 years');
+
 CREATE INDEX IF NOT EXISTS idx_consent_retention_index_destroy_after
   ON public.consent_retention_index (destroy_after);
 
@@ -133,6 +147,17 @@ CREATE TABLE IF NOT EXISTS public.consent_purge_runs (
   CONSTRAINT consent_purge_runs_status_check
     CHECK (status IN ('dry-run', 'success', 'partial', 'failed'))
 );
+
+ALTER TABLE public.consent_purge_runs
+  DROP CONSTRAINT IF EXISTS consent_purge_runs_job_check;
+ALTER TABLE public.consent_purge_runs
+  DROP CONSTRAINT IF EXISTS consent_purge_runs_status_check;
+ALTER TABLE public.consent_purge_runs
+  ADD CONSTRAINT consent_purge_runs_job_check
+  CHECK (job IN ('consent-retention', 'incomplete-accounts'));
+ALTER TABLE public.consent_purge_runs
+  ADD CONSTRAINT consent_purge_runs_status_check
+  CHECK (status IN ('dry-run', 'success', 'partial', 'failed'));
 
 COMMENT ON TABLE public.consent_purge_runs IS
   '파기 배치 실행 로그. 원·가명 user_id 를 기록하지 않는다. counts 만 남긴다.';

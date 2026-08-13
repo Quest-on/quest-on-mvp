@@ -59,6 +59,14 @@
     {
       "path": "/api/cron/assignment-deadline-sweep",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/consent-retention",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/purge-incomplete-accounts",
+      "schedule": "0 4 * * *"
     }
   ]
 }

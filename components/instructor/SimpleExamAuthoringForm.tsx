@@ -24,12 +24,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
   CheckCircle2,
   FileText,
   FolderOpen,
+  HelpCircle,
   Loader2,
   Plus,
   Sparkles,
@@ -131,17 +144,17 @@ function getStatusTextKey(status?: ExtractionStatus): StatusTextKey {
 }
 
 /**
- * "한 줄 한 박스" 필드 블록.
- * 라벨과 안내문은 입력 위에 평문으로 두고, 경계(테두리)는 실제 입력
- * 컨트롤에만 둔다 — 섹션 전체를 카드로 감싸지 않는다.
+ * Card 안에 들어가는 서브 필드 블록.
+ * 과제 출제 폼(ExamInfoForm)과 같은 톤: 라벨 행에 HelpCircle 툴팁을 두고,
+ * 상세 설명은 툴팁 안으로 옮겨 평문 helper 행을 없앤다.
  */
-function Field({
+function SubField({
   label,
   htmlFor,
   required,
   optional,
   optionalLabel = "선택",
-  helper,
+  tooltip,
   action,
   children,
 }: {
@@ -150,36 +163,40 @@ function Field({
   required?: boolean;
   optional?: boolean;
   optionalLabel?: string;
-  helper?: ReactNode;
+  tooltip?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <Label
-            htmlFor={htmlFor}
-            className="flex items-center gap-1.5 text-base font-semibold"
-          >
-            {label}
-            {required && (
-              <span className="text-destructive" aria-hidden>
-                *
-              </span>
-            )}
-            {optional && (
-              <span className="text-xs font-normal text-muted-foreground">
-                {optionalLabel}
-              </span>
-            )}
-          </Label>
-          {helper && <p className="text-sm text-muted-foreground">{helper}</p>}
-        </div>
-        {action && <div className="shrink-0">{action}</div>}
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Label htmlFor={htmlFor} className="flex items-center gap-1.5">
+          {label}
+          {required && (
+            <span className="text-destructive" aria-hidden>
+              *
+            </span>
+          )}
+          {optional && (
+            <span className="text-xs font-normal text-muted-foreground">
+              {optionalLabel}
+            </span>
+          )}
+        </Label>
+        {tooltip && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <HelpCircle className="h-4 w-4 cursor-help text-muted-foreground" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="max-w-xs">{tooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {action && <div className="ml-auto">{action}</div>}
       </div>
       {children}
-    </section>
+    </div>
   );
 }
 
@@ -711,61 +728,69 @@ export function SimpleExamAuthoringForm({
   );
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-10">
-        {/* 시험 제목 */}
-        <Field
-          label={t("simpleExamAuthoringForm.fieldTitleLabel")}
-          htmlFor="simple-title"
-          required
-          helper={t("simpleExamAuthoringForm.fieldTitleHelper")}
-        >
-          <Input
-            ref={titleRef}
-            id="simple-title"
-            aria-label={t("simpleExamAuthoringForm.fieldTitleAria")}
-            value={title}
-            onChange={(e) => onTitleChange(e.target.value)}
-            placeholder={t("simpleExamAuthoringForm.fieldTitlePlaceholder")}
-            className="h-12 text-base bg-white"
+    <div className="space-y-6">
+      {/* 기본 정보 — 제목·코드·시간·언어 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("examInfoForm.cardTitleExam")}</CardTitle>
+          <CardDescription>
+            {t("examInfoForm.cardDescriptionExam")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* 시험 제목 */}
+          <SubField
+            label={t("simpleExamAuthoringForm.fieldTitleLabel")}
+            htmlFor="simple-title"
             required
-          />
-        </Field>
-
-        {/* 시험 코드 — 편집 모드에서만 표시 */}
-        {examCode != null && (
-          <Field
-            label={t("simpleExamAuthoringForm.fieldCodeLabel")}
-            required
-            helper={t("simpleExamAuthoringForm.fieldCodeHelper")}
+            tooltip={t("simpleExamAuthoringForm.fieldTitleHelper")}
           >
-            <div className="flex items-center gap-2">
-              <Input
-                value={examCode}
-                readOnly
-                className="h-11 w-40 font-mono text-base tracking-widest bg-white"
-                aria-label={t("simpleExamAuthoringForm.fieldCodeAria")}
-              />
-              {onCodeRegenerate && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={onCodeRegenerate}
-                >
-                  {t("simpleExamAuthoringForm.buttonRegenerate")}
-                </Button>
-              )}
-            </div>
-          </Field>
-        )}
+            <Input
+              ref={titleRef}
+              id="simple-title"
+              aria-label={t("simpleExamAuthoringForm.fieldTitleAria")}
+              value={title}
+              onChange={(e) => onTitleChange(e.target.value)}
+              placeholder={t("simpleExamAuthoringForm.fieldTitlePlaceholder")}
+              className="h-12 text-base"
+              required
+            />
+          </SubField>
 
-        {/* 시험 시간 */}
-        <Field
-          label={t("simpleExamAuthoringForm.fieldDurationLabel")}
-          htmlFor="simple-duration"
-          helper={t("simpleExamAuthoringForm.fieldDurationHelper")}
-        >
+          {/* 시험 코드 — 편집 모드에서만 표시 */}
+          {examCode != null && (
+            <SubField
+              label={t("simpleExamAuthoringForm.fieldCodeLabel")}
+              required
+              tooltip={t("simpleExamAuthoringForm.fieldCodeHelper")}
+            >
+              <div className="flex items-center gap-2">
+                <Input
+                  value={examCode}
+                  readOnly
+                  className="h-11 w-40 font-mono text-base tracking-widest"
+                  aria-label={t("simpleExamAuthoringForm.fieldCodeAria")}
+                />
+                {onCodeRegenerate && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onCodeRegenerate}
+                  >
+                    {t("simpleExamAuthoringForm.buttonRegenerate")}
+                  </Button>
+                )}
+              </div>
+            </SubField>
+          )}
+
+          {/* 시험 시간 */}
+          <SubField
+            label={t("simpleExamAuthoringForm.fieldDurationLabel")}
+            htmlFor="simple-duration"
+            tooltip={t("simpleExamAuthoringForm.fieldDurationHelper")}
+          >
           <div className="flex flex-wrap items-center gap-2">
             <Input
               id="simple-duration"
@@ -777,7 +802,7 @@ export function SimpleExamAuthoringForm({
               onChange={handleDurationInputChange}
               onBlur={handleDurationInputBlur}
               placeholder={isUnlimited ? t("simpleExamAuthoringForm.placeholderUnlimited") : t("simpleExamAuthoringForm.placeholderDuration")}
-              className="h-11 w-28 text-center bg-white"
+              className="h-11 w-28 text-center"
             />
             <span className="text-sm text-muted-foreground">{t("simpleExamAuthoringForm.unitMinutes")}</span>
             {[30, 60, 90, 120].map((value) => (
@@ -825,15 +850,43 @@ export function SimpleExamAuthoringForm({
               </p>
             )}
           </div>
-        </Field>
+          </SubField>
 
-        {/* 수업 자료 */}
-        <Field
-          label={t("simpleExamAuthoringForm.fieldMaterialsLabel")}
-          optional
-          optionalLabel={t("simpleExamAuthoringForm.optional")}
-          helper={t("simpleExamAuthoringForm.fieldMaterialsHelper")}
-        >
+          {/* AI 응답 언어 */}
+          <SubField
+            label={t("simpleExamAuthoringForm.fieldLanguageLabel")}
+            tooltip={t("simpleExamAuthoringForm.fieldLanguageHelper")}
+          >
+            <Select
+              value={language}
+              onValueChange={(value) => onLanguageChange(value as "ko" | "en")}
+            >
+              <SelectTrigger className="h-11 w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ko">{t("simpleExamAuthoringForm.languageKo")}</SelectItem>
+                <SelectItem value="en">{t("simpleExamAuthoringForm.languageEn")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </SubField>
+        </CardContent>
+      </Card>
+
+      {/* 수업 자료 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-1.5">
+            {t("simpleExamAuthoringForm.fieldMaterialsLabel")}
+            <span className="text-xs font-normal text-muted-foreground">
+              {t("simpleExamAuthoringForm.optional")}
+            </span>
+          </CardTitle>
+          <CardDescription>
+            {t("simpleExamAuthoringForm.fieldMaterialsHelper")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
           <div className="space-y-3">
             <Input
               id="materials"
@@ -945,38 +998,29 @@ export function SimpleExamAuthoringForm({
               </div>
             )}
           </div>
-        </Field>
+        </CardContent>
+      </Card>
 
-        {/* AI 응답 언어 */}
-        <Field
-          label={t("simpleExamAuthoringForm.fieldLanguageLabel")}
-          helper={t("simpleExamAuthoringForm.fieldLanguageHelper")}
-        >
-          <Select
-            value={language}
-            onValueChange={(value) => onLanguageChange(value as "ko" | "en")}
-          >
-            <SelectTrigger className="h-11 w-44 bg-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ko">{t("simpleExamAuthoringForm.languageKo")}</SelectItem>
-              <SelectItem value="en">{t("simpleExamAuthoringForm.languageEn")}</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-
-        {/* 문제 — "+" 버튼이 문제 추가 Dialog(유형/개수/AI 프롬프트)를 연다. */}
-        <Field
-          label={t("simpleExamAuthoringForm.fieldQuestionsLabel")}
-          required
-          helper={
-            questions.length > 0
+      {/* 문제 — "+" 버튼이 문제 추가 Dialog(유형/개수/AI 프롬프트)를 연다. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {t("simpleExamAuthoringForm.fieldQuestionsLabel")}
+            <span className="text-destructive" aria-hidden>
+              *
+            </span>
+            <Badge variant="secondary">
+              {t("questionsList.countBadge", { count: questions.length })}
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            {questions.length > 0
               ? t("simpleExamAuthoringForm.fieldQuestionsHelperHas", { count: questions.length })
-              : t("simpleExamAuthoringForm.fieldQuestionsHelperEmpty")
-          }
-        >
-          <div className="space-y-8" data-testid="manual-questions-section">
+              : t("simpleExamAuthoringForm.fieldQuestionsHelperEmpty")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6" data-testid="manual-questions-section">
             {questions.map((question, index) => (
               <div
                 key={question.id}
@@ -1046,14 +1090,23 @@ export function SimpleExamAuthoringForm({
               </span>
             </button>
           </div>
-        </Field>
+        </CardContent>
+      </Card>
 
-        {/* 최종 점수 비중 */}
-        <Field
-          label={t("simpleExamAuthoringForm.fieldScoreWeightsLabel")}
-          required
-          helper={t("simpleExamAuthoringForm.fieldScoreWeightsHelper")}
-        >
+      {/* 채점 — 최종 점수 비중 + 대화/최종답안 비중 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-1.5">
+            {t("simpleExamAuthoringForm.fieldScoreWeightsLabel")}
+            <span className="text-destructive" aria-hidden>
+              *
+            </span>
+          </CardTitle>
+          <CardDescription>
+            {t("simpleExamAuthoringForm.fieldScoreWeightsHelper")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
           <div className="rounded-md border bg-muted/20 p-3">
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm text-muted-foreground">
@@ -1165,7 +1218,7 @@ export function SimpleExamAuthoringForm({
                                 Number.parseInt(e.target.value, 10) || 1
                               )
                             }
-                            className="h-9 w-20 bg-white text-center"
+                            className="h-9 w-20 text-center"
                             aria-label={t("simpleExamAuthoringForm.ariaInputBucket", { bucket: t(SCORE_BUCKET_LABEL_KEYS[bucket]) })}
                           />
                           <span className="text-sm text-muted-foreground">{t("simpleExamAuthoringForm.unitPercent")}</span>
@@ -1200,16 +1253,15 @@ export function SimpleExamAuthoringForm({
               </div>
             )}
           </div>
-        </Field>
-
-        {/* 채점 비중 */}
-        <Field
-          label={t("simpleExamAuthoringForm.fieldChatWeightLabel")}
-          optional
-          optionalLabel={t("simpleExamAuthoringForm.optional")}
-          helper={t("simpleExamAuthoringForm.fieldChatWeightHelper")}
-        >
-          <div className="rounded-md border bg-muted/20 p-3">
+          {/* 대화/최종답안 비중 */}
+          <div className="border-t pt-5">
+            <SubField
+              label={t("simpleExamAuthoringForm.fieldChatWeightLabel")}
+              optional
+              optionalLabel={t("simpleExamAuthoringForm.optional")}
+              tooltip={t("simpleExamAuthoringForm.fieldChatWeightHelper")}
+            >
+              <div className="rounded-md border bg-muted/20 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <FileText className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">
@@ -1250,9 +1302,11 @@ export function SimpleExamAuthoringForm({
                 )}
               </div>
             )}
+              </div>
+            </SubField>
           </div>
-        </Field>
-      </div>
+        </CardContent>
+      </Card>
 
       <div className="sticky bottom-4 z-20 rounded-lg border bg-background/95 p-3 shadow-lg backdrop-blur">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">

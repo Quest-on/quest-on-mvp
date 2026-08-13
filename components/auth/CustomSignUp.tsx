@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { createSupabaseClient } from "@/lib/supabase-client";
 import { buildRoleCookie } from "@/lib/onboarding-role";
+import { getAuthCallbackUrl } from "@/lib/auth-redirect";
+import { authEmailErrorKey } from "@/lib/auth-email-error";
 import { useTranslations } from "next-intl";
 
 type Step = "start" | "verify";
@@ -49,7 +51,7 @@ export function CustomSignUp() {
     await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: getAuthCallbackUrl(window.location.origin),
       },
     });
   };
@@ -65,12 +67,12 @@ export function CustomSignUp() {
       password,
       options: {
         data: { role },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: getAuthCallbackUrl(window.location.origin),
       },
     });
 
     if (signUpError) {
-      setError(signUpError.message);
+      setError(t(authEmailErrorKey(signUpError)));
       setLoading(false);
       return;
     }
