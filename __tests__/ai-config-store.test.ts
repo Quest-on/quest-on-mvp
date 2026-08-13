@@ -10,6 +10,7 @@ vi.mock("@/lib/logger", () => ({
 
 import {
   AI_CONFIG_CACHE_TTL_SECONDS,
+  __clearMemoryCacheForTests,
   __setRedisClientForTests,
   loadCurrentVersion,
   publishVersion,
@@ -71,6 +72,7 @@ beforeEach(() => {
   rpc.mockReset();
   from.mockReset();
   __setRedisClientForTests(null);
+  __clearMemoryCacheForTests();
 });
 
 describe("readCurrentVersionFromDb", () => {
@@ -249,5 +251,49 @@ describe("publishVersion", () => {
     await expect(
       publishVersion({ overrides: {}, actor: "anon", reason: "x" })
     ).rejects.toThrow(/AI_CONFIG_PUBLISH_FAILED/);
+  });
+});
+
+describe("Redis 가 없을 때의 프로세스 폴백 캐시", () => {
+  it("두 번째 호출은 DB 를 다시 치지 않는다", async () => {
+    // 이게 없으면 채점 경로가 문항마다 PostgREST 왕복 2회를 낸다.
+    // 실제로 CI Browser E2E 가 4분대에서 12분대로 늘어나 타임아웃했다.
+    __setRedisClientForTests(null);
+    mockLabelRow(VERSION_A, {});
+
+    await loadCurrentVersion();
+    const afterFirst = from.mock.calls.length;
+    await loadCurrentVersion();
+
+    expect(afterFirst).toBeGreaterThan(0);
+    expect(from.mock.calls.length).toBe(afterFirst);
+  });
+
+  it("발행하면 프로세스 캐시가 즉시 새 버전을 돌려준다", async () => {
+    __setRedisClientForTests(null);
+    mockLabelRow(VERSION_A, {});
+    expect((await loadCurrentVersion()).versionId).toBe(VERSION_A);
+
+    rpc.mockResolvedValue({
+      data: [{ previous_version_id: VERSION_A, new_version_id: VERSION_B }],
+      error: null,
+    });
+    await publishVersion({ overrides: {}, actor: "admin:a", reason: "r" });
+
+    // 갱신하지 않으면 관리자가 방금 바꾼 값을 최대 45초 동안 못 본다.
+    expect((await loadCurrentVersion()).versionId).toBe(VERSION_B);
+  });
+
+  it("Redis 가 있으면 프로세스 캐시를 쓰지 않는다 (즉시 무효화 계약 보존)", async () => {
+    const redis = makeRedis(null);
+    __setRedisClientForTests(redis.client);
+    mockLabelRow(VERSION_A, {});
+
+    await loadCurrentVersion();
+    await loadCurrentVersion();
+
+    // 두 번 다 Redis 를 조회해야 한다. 프로세스 캐시가 끼면 라벨 이동이
+    // 다른 인스턴스에 즉시 전파되지 않는다.
+    expect(redis.calls.filter((c) => c.op === "get").length).toBe(2);
   });
 });

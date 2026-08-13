@@ -140,6 +140,25 @@ export async function readCurrentVersionFromDb(): Promise<AiConfigVersionSnapsho
 }
 
 /**
+ * Redis 가 없는 환경(CI, 로컬 개발, Upstash 장애)을 위한 프로세스 내 폴백 캐시.
+ *
+ * 왜 필요한가: 이 로더는 채점 경로에서 문항마다 불린다. 캐시가 없으면 한 번 호출에
+ * PostgREST 왕복 2회(라벨 → 버전)가 붙어서, 5문항 시험 하나에 20회 넘는 왕복이
+ * 생긴다. 실제로 CI Browser E2E 가 4분대에서 12분대로 늘어나 타임아웃했다.
+ *
+ * 왜 Redis 가 있을 때는 쓰지 않는가: 관리자가 라벨을 옮기면 Redis DEL 로 **즉시**
+ * 무효화되는 것이 이 설계의 계약이다. 프로세스 캐시를 함께 쓰면 DEL 이 다른
+ * 인스턴스의 사본까지 지우지 못해 그 즉시성이 깨진다. 그래서 Redis 가 없을 때만
+ * 켜고, 그때의 최대 지연은 어차피 같은 TTL(45초)로 묶는다.
+ */
+let memoryCache: { at: number; snapshot: AiConfigVersionSnapshot } | null = null;
+
+/** 테스트 전용 — 프로세스 캐시를 비운다. */
+export function __clearMemoryCacheForTests(): void {
+  memoryCache = null;
+}
+
+/**
  * 상시 경로가 쓰는 로더. 캐시 히트면 그대로, 미스면 DB 를 읽고 `SET NX` 로 채운다.
  * `NX` 라서 발행 직후 뒤늦게 끝난 stale 로더가 새 값을 덮어쓰지 못한다.
  */
@@ -156,6 +175,9 @@ export async function loadCurrentVersion(): Promise<AiConfigVersionSnapshot> {
         payload: { message: String(error) },
       });
     }
+  } else if (memoryCache && Date.now() - memoryCache.at < AI_CONFIG_CACHE_TTL_SECONDS * 1000) {
+    // Redis 가 없을 때만. 있으면 즉시 무효화 계약을 지키기 위해 건너뛴다.
+    return memoryCache.snapshot;
   }
 
   const snapshot = await readCurrentVersionFromDb();
@@ -173,6 +195,8 @@ export async function loadCurrentVersion(): Promise<AiConfigVersionSnapshot> {
       });
     }
   }
+
+  if (!redis) memoryCache = { at: Date.now(), snapshot };
 
   return snapshot;
 }
@@ -231,6 +255,10 @@ export async function publishVersion(params: {
 
 /** 무효화 후 최신값을 심는다. 실패하면 TTL 이 안전망이 된다. */
 async function primeCache(snapshot: AiConfigVersionSnapshot): Promise<string | null> {
+  // 발행 직후에는 프로세스 캐시부터 갱신한다. 이걸 빼면 Redis 없는 환경에서
+  // 관리자가 저장해도 최대 45초 동안 자기가 방금 바꾼 값이 안 보인다.
+  memoryCache = { at: Date.now(), snapshot };
+
   const redis = await getRedis();
   if (!redis) return null;
 

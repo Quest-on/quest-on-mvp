@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getOpenAI } from "@/lib/openai";
 import { applyProfileToChatBody, resolveAiTaskProfile } from "@/lib/ai-task-profile";
 import { loadCurrentVersion } from "@/lib/ai-config-store";
+import type { AiConfigVersionSnapshot } from "@/lib/ai-execution-context";
 import { clampTimeoutToProfile } from "@/lib/ai-deadline";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import {
@@ -191,6 +192,8 @@ ${rubricItems
  * 단일 문제 채점 (기존 pLimit 내부 closure 로직 추출)
  */
 async function gradeSingleQuestion(params: {
+  /** 진입점이 한 번 읽어 내려주는 설정 버전 (이슈 #118). 문항마다 다시 읽지 않는다. */
+  aiVersion?: AiConfigVersionSnapshot;
   question: { idx: number; prompt?: string; ai_context?: string };
   submission: { answer: string; workspace_state?: unknown } | undefined;
   questionMessages: Array<{ role: string; content: string }>;
@@ -294,7 +297,8 @@ async function gradeSingleQuestion(params: {
   const userPrompt = `[학생의 채팅 기반 과제 수행 기록]\n${submission.answer || "(기록 없음)"}${finalAnswerSection}${aiSummaryText}`;
 
   // 관리자 설정이 이 경로에도 닿아야 한다. 라벨은 Redis 캐시(TTL 45초)를 통해 읽는다.
-  const aiVersion = await loadCurrentVersion();
+  // 진입점에서 내려온 버전을 쓴다. 없으면(구 호출부) 여기서 한 번 읽는다.
+  const aiVersion = params.aiVersion ?? (await loadCurrentVersion());
   const { profile: questionProfile } = resolveAiTaskProfile({
     task: "auto_grading_question",
     overrides: aiVersion.overrides,
@@ -468,6 +472,8 @@ async function gradeSingleQuestion(params: {
  * 기존 buildSummaryEvaluationSystemPrompt를 재활용하되, 단일 문제로 스코프 좁힘.
  */
 async function generateQuestionSummary(params: {
+  /** 진입점이 한 번 읽어 내려주는 설정 버전 (이슈 #118). */
+  aiVersion?: AiConfigVersionSnapshot;
   question: { idx: number; prompt?: string; ai_context?: string };
   submission: { answer: string } | undefined;
   questionMessages: Array<{ role: string; content: string }>;
@@ -592,7 +598,7 @@ JSON 형식으로 응답해주세요:
 }
 `;
 
-  const aiVersion = await loadCurrentVersion();
+  const aiVersion = params.aiVersion ?? (await loadCurrentVersion());
   const { profile: qSummaryProfile } = resolveAiTaskProfile({
     task: "auto_grading_question_summary",
     overrides: aiVersion.overrides,
@@ -892,7 +898,9 @@ export async function listGradedQuestionsForSummary(
  */
 export async function gradeOneQuestion(
   sessionId: string,
-  qIdx: number
+  qIdx: number,
+  /** 상위(autoGradeSession)가 한 번 읽어 넘긴 설정 버전. 없으면 여기서 읽는다. */
+  aiVersion?: AiConfigVersionSnapshot
 ): Promise<{ skipped: boolean; graded: boolean; failureReason?: string }> {
   const supabase = getSupabaseServer();
 
@@ -999,6 +1007,7 @@ export async function gradeOneQuestion(
   const abortController = new AbortController();
   const deadline = Date.now() + 180_000;
   const outcome = await gradeSingleQuestion({
+    aiVersion,
     question,
     submission,
     questionMessages,
@@ -1067,7 +1076,8 @@ export async function gradeOneQuestion(
  */
 export async function generateOneQuestionSummary(
   sessionId: string,
-  qIdx: number
+  qIdx: number,
+  aiVersion?: AiConfigVersionSnapshot
 ): Promise<{ skipped: boolean; generated: boolean }> {
   const supabase = getSupabaseServer();
 
@@ -1134,6 +1144,7 @@ export async function generateOneQuestionSummary(
   };
 
   const summary = await generateQuestionSummary({
+    aiVersion,
     question,
     submission,
     questionMessages,
@@ -1356,9 +1367,14 @@ export async function autoGradeSession(
   const grades: GradeResult[] = [];
   const failedQuestions: number[] = [];
 
+  // 이슈 #118: 런 전체가 같은 설정 버전으로 채점돼야 한다. 문항마다 다시 읽으면
+  // 도중에 관리자가 발행했을 때 앞뒤 문항이 다른 설정으로 채점되고, 그건 벌크 런에
+  // 핀을 박은 이유와 똑같은 공정성 문제다. 왕복도 문항 수만큼 줄어든다.
+  const runAiVersion = await loadCurrentVersion();
+
   for (const qIdx of questionIdxs) {
     try {
-      const res = await gradeOneQuestion(sessionId, qIdx);
+      const res = await gradeOneQuestion(sessionId, qIdx, runAiVersion);
       if (res.graded) {
         const { data } = await supabase
           .from("grades")
@@ -1530,7 +1546,8 @@ async function generateSummary(
   messagesByQuestion: Record<number, Array<{ role: string; content: string }>>,
   grades: GradeResult[],
   timeBudgetMs?: number,
-  isAssignment = false
+  isAssignment = false,
+  aiVersionParam?: AiConfigVersionSnapshot
 ): Promise<SummaryData | null> {
   const supabase = getSupabaseServer();
   try {
@@ -1677,7 +1694,7 @@ ${
         "keyQuotes": ["인용구1", "인용구2"]
       }`;
 
-  const aiVersion = await loadCurrentVersion();
+  const aiVersion = aiVersionParam ?? (await loadCurrentVersion());
   const { profile: summaryProfile } = resolveAiTaskProfile({
     task: "auto_grading_summary",
     overrides: aiVersion.overrides,
