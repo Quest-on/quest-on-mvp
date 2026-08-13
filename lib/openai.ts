@@ -20,6 +20,10 @@ import { logError } from "@/lib/logger";
 // Routes should still handle OpenAI errors at call time.
 export const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY ?? "MISSING_OPENAI_API_KEY",
+  // 이슈 #118: SDK 기본값은 maxRetries 2 다. 설정한 적이 없어서 모든 호출이
+  // 조용히 3회까지 전송되고 있었고, 래퍼 루프·QStash 재시도와 곱해졌다.
+  // 재시도는 요청 옵션(태스크 프로필)만 소유한다.
+  maxRetries: 0,
   ...(process.env.OPENAI_BASE_URL && { baseURL: process.env.OPENAI_BASE_URL }),
 });
 
@@ -33,30 +37,18 @@ export function getOpenAI(): OpenAI {
   if (!_openai) {
     _openai = new OpenAI({
       apiKey,
+      // 위와 같은 이유로 숨은 재시도를 닫는다.
+      maxRetries: 0,
       ...(process.env.OPENAI_BASE_URL && { baseURL: process.env.OPENAI_BASE_URL }),
     });
   }
   return _openai;
 }
 
-// AI 모델 상수 - 여기서 변경하면 전체 코드에 적용됨.
-//
-// 2026-08 GPT-5.6 계열로 교체. 근거:
-//   - `gpt-5.3-chat-latest` 는 OpenAI 공식 문서에서 deprecated 로 표시됐다.
-//     ("This model has been deprecated. We recommend GPT-5.6 for most API usage.")
-//     컨텍스트 128K·지식컷 2025-08 로 세대가 뒤처져 있었고, 학생 채팅 트래픽 대부분이 여기 물려 있었다.
-//   - `gpt-4o-mini` 는 4o 세대 잔재라 채점 워커만 다른 세대를 쓰고 있었다.
-//
-// 실측(교수 실채점 24건 골든셋, 답안 20~85점 분포)에서 Luna 가 현행 대비 전 지표 우위:
-//   MAE 19.3→17.9 · 교수점수 상관 0.310→0.405 · 지연 2.3s→1.4s · 비용 13배 절감.
-//   Sol 은 MAE 17.8 로 근소 우위지만 37배 비싸고 3배 느려 채택하지 않았다.
-//
-// HEAVY 만 Terra 로 한 단계 올려 둔다. 문항 생성·자동 채점은 호출량이 적어 비용 영향이 작고,
-// 툴 호출·다단계 추론이 섞이는 경로라 아직 측정되지 않은 위험이 남아 있다.
-export const AI_MODEL = process.env.AI_MODEL || "gpt-5.6-luna";
-export const AI_MODEL_HEAVY = process.env.AI_MODEL_HEAVY || "gpt-5.6-terra";
-export const AI_MODEL_BULK_GRADING_WORKER =
-  process.env.AI_MODEL_BULK_GRADING_WORKER || "gpt-5.6-luna";
+// AI 모델 상수는 `lib/ai-models.ts` 에 있다 — SDK 를 로드하지 않고 모델 이름만 읽어야 하는
+// 순수 해석 계층(`lib/ai-task-profile.ts`)을 위해 분리했다. 기존 import 경로 호환을 위해
+// 여기서 그대로 재수출한다.
+export { AI_MODEL, AI_MODEL_HEAVY, AI_MODEL_BULK_GRADING_WORKER } from "@/lib/ai-models";
 
 // ============================================================
 // Global concurrency limiter for OpenAI API calls
@@ -64,14 +56,24 @@ export const AI_MODEL_BULK_GRADING_WORKER =
 // ============================================================
 const openaiLimiter = pLimit(100);
 
-const OPENAI_TIMEOUT_MS = 120_000;
-
-export class OpenAITimeoutError extends Error {
-  constructor(timeoutMs: number) {
-    super(`OpenAI call timed out after ${timeoutMs}ms`);
-    this.name = "OpenAITimeoutError";
-  }
-}
+/**
+ * 재시도·타임아웃은 이 계층이 소유하지 않는다 (이슈 #118).
+ *
+ * 예전에는 여기서 `Promise.race` 타임아웃 + 수동 지수 백오프 3회를 돌렸다. 문제:
+ *   1. SDK 기본 `maxRetries`(2회)와 곱해지고 QStash 재시도(3회)와 다시 곱해져
+ *      한 번의 논리적 호출이 최악 27회 전송으로 번졌다.
+ *   2. `Promise.race` 는 진 쪽을 취소하지 않는다. 120초 타임아웃이 떠도 밑의
+ *      fetch 는 계속 살아 있어 좀비 요청이 남았다.
+ *   3. 그 120초는 애초에 도달 불가능했다 — 호출 라우트 대부분이 maxDuration=60 이라
+ *      Vercel 이 먼저 죽였다. 즉 선언된 예산이 실행될 수 없는 설정이었다.
+ *
+ * 지금은 전송 재시도와 시도별 타임아웃을 **SDK 요청 옵션 한 층**이 소유한다.
+ * 값은 태스크 프로필이 정하고, 남은 deadline 예산으로 `lib/ai-deadline.ts` 가 조인다.
+ * 클라이언트 기본 `maxRetries: 0` 은 프로필을 안 거치는 경로에서 숨은 재시도가
+ * 되살아나지 않게 막는다.
+ *
+ * 이 래퍼에 남은 책임은 두 가지뿐이다: 전역 동시성 제한과 지연 측정.
+ */
 
 export class OpenAICallTelemetryError extends Error {
   error: unknown;
@@ -91,74 +93,54 @@ export class OpenAICallTelemetryError extends Error {
   }
 }
 
-export async function callOpenAIWithTelemetry<T>(
-  fn: () => Promise<T>,
-  options?: { timeoutMs?: number; maxAttempts?: number }
-): Promise<{ data: T; attemptCount: number; latencyMs: number }> {
-  const timeout = options?.timeoutMs ?? OPENAI_TIMEOUT_MS;
-  const maxAttempts = Math.max(1, options?.maxAttempts ?? 3);
+/**
+ * 전송 계층 실패인지 판별한다 (이슈 #118).
+ *
+ * 주의: tracked 래퍼는 실패를 `OpenAICallTelemetryError` 로 감싸지만 최종적으로는
+ * 원본 오류(`failure.error`)를 다시 던진다. 따라서 호출부에서 래퍼 타입을 검사하면
+ * 절대 매치되지 않는다. 실제로 전파되는 것은 SDK 의 `APIError` 계열이다.
+ *
+ * 파싱/의미 실패는 여기 걸리지 않으므로, 의미 재시도 루프가 전송 실패까지
+ * 다시 시도해 SDK 재시도와 곱해지는 것을 막는 데 쓴다.
+ */
+export function isOpenAITransportError(error: unknown): boolean {
+  if (error instanceof OpenAI.APIError) return true;
+  if (error instanceof Error && /^API(Error|ConnectionError|ConnectionTimeoutError|UserAbortError)$/.test(error.name)) return true;
+  return isOpenAITimeoutError(error);
+}
 
-  return openaiLimiter(async () => {
-    const startedAt = Date.now();
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      try {
-        const data = await Promise.race([
-          fn(),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new OpenAITimeoutError(timeout)), timeout)
-          ),
-        ]);
-
-        return {
-          data,
-          attemptCount: attempt + 1,
-          latencyMs: Date.now() - startedAt,
-        };
-      } catch (error) {
-        const RETRYABLE_STATUS = [408, 429, 500, 502, 503, 504];
-        const isRetryable =
-          error instanceof OpenAI.APIError &&
-          RETRYABLE_STATUS.includes(error.status);
-        const isLastAttempt = attempt === maxAttempts - 1;
-
-        if (!isRetryable || isLastAttempt) {
-          throw new OpenAICallTelemetryError({
-            error,
-            attemptCount: attempt + 1,
-            latencyMs: Date.now() - startedAt,
-          });
-        }
-
-        // Exponential backoff with jitter: 1-2s, 2-3s, 4-5s
-        const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
-        const statusCode = error instanceof OpenAI.APIError ? error.status : "unknown";
-        logError(
-          `[callOpenAI] ${statusCode} error, retrying in ${delay}ms (attempt ${attempt + 1}/${maxAttempts})`,
-          error
-        );
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-
-    throw new OpenAICallTelemetryError({
-      error: new Error("callOpenAI: unexpected retry loop exit"),
-      attemptCount: maxAttempts,
-      latencyMs: Date.now() - startedAt,
-    });
-  });
+/** SDK 가 던지는 타임아웃(APIConnectionTimeoutError)을 이름으로 식별한다. */
+export function isOpenAITimeoutError(error: unknown): boolean {
+  if (error instanceof OpenAI.APIConnectionTimeoutError) return true;
+  return error instanceof Error && error.name === "APIConnectionTimeoutError";
 }
 
 /**
- * Wraps an OpenAI API call with:
- * 1. Global concurrency limit (max 100 simultaneous calls)
- * 2. Exponential backoff retry on 429 errors (max 3 attempts)
- * 3. Configurable timeout (default 25s) to prevent connection pool exhaustion
+ * 동시성 제한 + 지연 측정만 하는 얇은 래퍼.
+ *
+ * `attemptCount` 는 **논리적 SDK 호출 수**다(성공하면 1). 실제 전송 시도 횟수가
+ * 아니다 — SDK 내부 재시도 횟수는 노출되지 않으므로, 그 상한은 이벤트
+ * 메타데이터의 `transport_attempts_upper_bound` 로 따로 기록한다.
  */
-export async function callOpenAI<T>(
-  fn: () => Promise<T>,
-  options?: { timeoutMs?: number; maxAttempts?: number }
-): Promise<T> {
-  const { data } = await callOpenAIWithTelemetry(fn, options);
+export async function callOpenAIWithTelemetry<T>(
+  fn: () => Promise<T>
+): Promise<{ data: T; attemptCount: number; latencyMs: number }> {
+  return openaiLimiter(async () => {
+    const startedAt = Date.now();
+    try {
+      const data = await fn();
+      return { data, attemptCount: 1, latencyMs: Date.now() - startedAt };
+    } catch (error) {
+      throw new OpenAICallTelemetryError({
+        error,
+        attemptCount: 1,
+        latencyMs: Date.now() - startedAt,
+      });
+    }
+  });
+}
+
+export async function callOpenAI<T>(fn: () => Promise<T>): Promise<T> {
+  const { data } = await callOpenAIWithTelemetry(fn);
   return data;
 }

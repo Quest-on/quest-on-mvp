@@ -187,6 +187,8 @@ export const qk = {
   },
 
   admin: {
+    /** 관리자 AI 설정 (이슈 #118). 발행 성공 시 이 키를 무효화한다. */
+    aiConfig: () => ["admin-ai-config"] as const,
     aiUsageSummary: (options?: {
       range?: "7d" | "30d" | "90d";
       feature?: string;

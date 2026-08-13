@@ -245,6 +245,18 @@ runs:
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -v ON_ERROR_STOP=1 \
           -f database/027_seed_consent_policy_release.sql
+        # 028 은 AI 설정 버전/라벨/감사와 발행 RPC 를 만든다. Prisma 는 RLS·함수·ACL 을
+        # 표현하지 못하므로 prisma db push 로는 생기지 않는다. 적용하지 않으면 CI 에서만
+        # 설정 저장소가 없어 관리자 라우트 테스트가 전부 실패한다.
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
+          -f database/028_create_ai_config.sql
+        # 029/030 은 런 핀 컬럼과 ai_events.config_version 을 만든다. 028 뒤에 와야 한다
+        # (둘 다 ai_config_versions 를 FK 로 참조한다).
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
+          -f database/029_pin_ai_config_to_grading_runs.sql \
+          -f database/030_stamp_ai_config_version.sql
         # 032 는 운영 DB 에만 있고 마이그레이션으로 잡히지 않던 카운터 RPC 2개
         # (increment_used_clarifications, increment_student_count)를 회수한다.
         # 적용하지 않으면 /api/chat·/api/feedback 경로가 CI 에서만
@@ -310,6 +322,13 @@ runs:
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -v ON_ERROR_STOP=1 \
           -f database/026_close_quota_gaps.sql
+        # 028 도 같은 이유로 재적용한다. blanket GRANT 가 ai_config_* 테이블의 쓰기와
+        # publish_ai_config_version 의 EXECUTE 를 anon/authenticated 에게 다시 열어 버리는데,
+        # 회수하지 않으면 CI 에서만 감사 없이 설정을 바꿀 수 있게 되어 이 이슈의 보안 경계
+        # 자체가 검증되지 않는다. 028 은 멱등이라 재적용이 안전하다.
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
+          -f database/028_create_ai_config.sql
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -c "NOTIFY pgrst, 'reload schema';"
       shell: bash
