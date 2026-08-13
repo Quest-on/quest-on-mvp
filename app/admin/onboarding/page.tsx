@@ -145,7 +145,9 @@ export default function AdminOnboardingPage() {
                         </div>
                         <div className="w-24">
                           {step.stepRate === null ? (
-                            <p className="text-muted-foreground text-xs">시작</p>
+                            <p className="text-muted-foreground text-xs">
+                              {i === 0 ? "시작" : "직전 없음"}
+                            </p>
                           ) : (
                             <>
                               <p className="text-sm">직전 {pct(step.stepRate)}</p>

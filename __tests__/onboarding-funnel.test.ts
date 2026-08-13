@@ -173,3 +173,41 @@ describe("퍼널 정의", () => {
     );
   });
 });
+
+describe("buildOnboardingFunnel — 직전 단계가 0명일 때", () => {
+  it("비율을 0 이 아니라 null 로 낸다", () => {
+    // 실제 QA 에서 잡힌 결함: 직전 0명인데 이 단계 1명이면
+    // "1명 도달" 옆에 "직전 0%" 가 붙어 한 줄에 모순된 값이 놓였다.
+    // 단계를 건너뛴 사용자를 세기로 한 이상 비율도 정의되지 않음으로 둬야 한다.
+    const rows = [
+      row("skipper", ONBOARDING_EVENTS.FIRST_STUDENT_SUBMISSION, 10),
+      row("a", ONBOARDING_EVENTS.DEMO_CREATED, 0),
+    ];
+
+    const funnel = buildOnboardingFunnel(rows);
+    const firstPublish = funnel.steps.find((s) => s.event === ONBOARDING_EVENTS.FIRST_PUBLISH);
+    const submission = funnel.steps.find(
+      (s) => s.event === ONBOARDING_EVENTS.FIRST_STUDENT_SUBMISSION
+    );
+
+    expect(firstPublish?.users).toBe(0);
+    expect(submission?.users).toBe(1);
+    expect(submission?.stepRate).toBeNull();
+  });
+
+  it("직전 0명이고 이 단계도 0명이면 역시 null 이다", () => {
+    const funnel = buildOnboardingFunnel([row("a", ONBOARDING_EVENTS.DEMO_CREATED, 0)]);
+    const last = funnel.steps[funnel.steps.length - 1];
+    expect(last.users).toBe(0);
+    expect(last.stepRate).toBeNull();
+  });
+
+  it("직전이 0명이 아니면 비율을 정상 계산한다", () => {
+    const rows = [
+      row("a", ONBOARDING_EVENTS.DEMO_CREATED, 0),
+      row("b", ONBOARDING_EVENTS.DEMO_CREATED, 0),
+      row("a", ONBOARDING_EVENTS.DEMO_ANSWERED, 5),
+    ];
+    expect(buildOnboardingFunnel(rows).steps[1].stepRate).toBe(0.5);
+  });
+});
