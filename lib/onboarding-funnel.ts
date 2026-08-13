@@ -130,7 +130,10 @@ export function buildOnboardingFunnel(
       kind: meta.kind,
       users,
       overallRate: first === 0 ? 0 : users / first,
-      stepRate: prev === null ? null : prev === 0 ? 0 : users / prev,
+      // 직전 단계가 0명이면 비율이 정의되지 않는다. 이걸 0 으로 접으면
+      // "1명 도달"인데 "직전 0%" 로 보여 한 줄에 모순된 값이 놓인다.
+      // 단계를 건너뛴 사용자를 세기로 한 이상(위 주석) 비율도 같이 처리해야 한다.
+      stepRate: prev === null || prev === 0 ? null : users / prev,
       droppedFromPrev: prev === null ? null : Math.max(0, prev - users),
     };
   });
