@@ -264,6 +264,11 @@ runs:
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -v ON_ERROR_STOP=1 \
           -f database/032_counter_rpcs.sql
+        # 033 은 이 브랜치가 추가하는 AI 제안 보존 컬럼이다. 적용하지 않으면
+        # 채점 커밋 경로 테스트가 ci 에서만 column does not exist 로 실패한다.
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
+          -f database/033_grade_provenance.sql
         # Reload PostgREST schema cache so new functions are immediately callable
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -c "NOTIFY pgrst, 'reload schema';"

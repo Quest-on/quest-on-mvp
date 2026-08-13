@@ -3,6 +3,7 @@ import { currentUser } from "@/lib/get-current-user";
 import { successJson, errorJson } from "@/lib/api-response";
 import { logError } from "@/lib/logger";
 import { sanitizeUserInput } from "@/lib/sanitize";
+import { buildAiDraftPreservation } from "@/app/api/supa/handlers/exam-handlers";
 
 const FINAL_ANSWER_MAX_LEN = 50_000;
 const STATUS_BLOCKING_FINAL_ANSWER_EDIT = new Set([
@@ -263,7 +264,7 @@ export async function updateAssignment(data: {
     // Ownership + type check
     const { data: examRow, error: fetchError } = await getSupabase()
       .from("exams")
-      .select("id, instructor_id, type")
+      .select("id, instructor_id, type, questions, ai_draft_questions")
       .eq("id", data.id)
       .maybeSingle();
 
@@ -302,6 +303,12 @@ export async function updateAssignment(data: {
     if (language !== undefined) updatePayload.language = language;
     if (deadline !== undefined) updatePayload.deadline = deadline;
     if (close_at !== undefined) updatePayload.close_at = close_at;
+
+    // AI 초안 보존: 문항이 처음 채워지는 순간에만 두 컬럼을 덧붙인다.
+    if (questions !== undefined) {
+      const aiDraft = buildAiDraftPreservation(examRow, questions);
+      if (aiDraft) Object.assign(updatePayload, aiDraft);
+    }
 
     const { error: updateError } = await getSupabase()
       .from("exams")
