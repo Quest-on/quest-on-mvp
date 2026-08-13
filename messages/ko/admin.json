@@ -174,7 +174,8 @@
   "nav": {
     "dashboard": "대시보드",
     "aiUsage": "AI 사용량",
-    "aiConfig": "AI 설정"
+    "aiConfig": "AI 설정",
+    "onboarding": "온보딩 퍼널"
   },
   "agent": {
     "errors": {

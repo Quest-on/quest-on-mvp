@@ -174,7 +174,8 @@
   "nav": {
     "dashboard": "Dashboard",
     "aiUsage": "AI Usage",
-    "aiConfig": "AI config"
+    "aiConfig": "AI config",
+    "onboarding": "Onboarding funnel"
   },
   "agent": {
     "errors": {
