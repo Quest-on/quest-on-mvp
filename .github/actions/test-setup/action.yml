@@ -110,41 +110,11 @@ runs:
           ALTER TABLE profiles ADD COLUMN IF NOT EXISTS school TEXT;
           ALTER TABLE profiles ADD COLUMN IF NOT EXISTS student_id TEXT;
 
-          -- 실제 email/OAuth 가입이 auth.users 만 만들고 public.profiles 를
-          -- 만들지 않으면 currentUser() 가 null이 되어 onboarding API가 401이다.
-          -- 이메일은 metadata role을 사용하고, OAuth는 role을 NULL로 남겨
-          -- /api/user/role 이 단 한 번 claim하게 한다.
-          CREATE OR REPLACE FUNCTION public.handle_new_auth_user_profile()
-          RETURNS trigger
-          LANGUAGE plpgsql
-          SECURITY DEFINER
-          SET search_path = public
-          AS \$\$
-          DECLARE
-            signup_role text;
-          BEGIN
-            signup_role := CASE
-              WHEN NEW.raw_user_meta_data ->> 'role' IN ('student', 'instructor')
-                THEN NEW.raw_user_meta_data ->> 'role'
-              ELSE NULL
-            END;
-
-            INSERT INTO public.profiles (id, role, status, display_name)
-            VALUES (
-              NEW.id::text,
-              signup_role,
-              CASE WHEN signup_role = 'instructor' THEN 'pending' ELSE 'approved' END,
-              COALESCE(NEW.raw_user_meta_data ->> 'full_name', NEW.raw_user_meta_data ->> 'name')
-            )
-            ON CONFLICT (id) DO NOTHING;
-            RETURN NEW;
-          END;
-          \$\$;
-
-          DROP TRIGGER IF EXISTS on_auth_user_created_profile ON auth.users;
-          CREATE TRIGGER on_auth_user_created_profile
-            AFTER INSERT ON auth.users
-            FOR EACH ROW EXECUTE FUNCTION public.handle_new_auth_user_profile();
+          -- 가입 직후 public.profiles 행은 앱(lib/supabase-auth.ts 의
+          -- provisionProfile)이 만든다. 예전에는 CI 에만 auth.users 트리거를 두고
+          -- 스테이징·프로덕션에는 아무 것도 없어서, CI 는 초록인데 실제 배포에서는
+          -- 신규 가입자가 currentUser() null → 온보딩 API 전부 401 이었다.
+          -- 여기에 트리거를 다시 두면 CI 가 다시 그 경로를 검증하지 못한다.
 
           CREATE TABLE IF NOT EXISTS error_logs (
             id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
