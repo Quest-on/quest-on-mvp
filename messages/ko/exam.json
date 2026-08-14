@@ -62,7 +62,11 @@
     "charCount": "{count}자",
     "sendAriaLabel": "메시지 전송",
     "sendSrOnly": "전송",
-    "openChatAriaLabel": "AI 채팅 열기"
+    "openChatAriaLabel": "AI 채팅 열기",
+    "promptsTitle": "이렇게 물어볼 수 있어요",
+    "prompt1": "이 문제에서 먼저 정해야 할 게 뭔가요?",
+    "prompt2": "제 주장에 대한 반론은 뭐가 있을까요?",
+    "prompt3": "근거가 약한 부분을 짚어주세요"
   },
   "chatLoading": {
     "analyzing": "AI가 질문을 분석하고 있습니다...",
