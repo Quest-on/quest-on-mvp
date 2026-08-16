@@ -166,7 +166,7 @@ export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
                   ? "bg-green-500 text-white animate-pulse"
                   : isMonitoring && !isPageVisible
                   ? "bg-yellow-500 text-white"
-                  : "bg-gray-500"
+                  : "bg-muted0"
               }
             >
               {isMonitoring

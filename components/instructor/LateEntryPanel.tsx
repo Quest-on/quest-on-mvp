@@ -133,7 +133,7 @@ export function LateEntryPanel({ examId, examStatus }: LateEntryPanelProps) {
               return (
                 <div
                   key={student.id}
-                  className="flex items-center justify-between gap-3 p-3 rounded-lg bg-white dark:bg-slate-900 border border-amber-100 dark:border-amber-900"
+                  className="flex items-center justify-between gap-3 p-3 rounded-lg bg-white border border-amber-100 dark:border-amber-900"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm truncate">{student.student_name}</p>

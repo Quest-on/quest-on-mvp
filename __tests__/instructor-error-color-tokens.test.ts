@@ -83,3 +83,51 @@ describe("destructive 토큰이 라이트·다크 양쪽에 정의돼 있다", (
     expect(defs.length).toBeGreaterThanOrEqual(2);
   });
 });
+
+/**
+ * 중립색도 토큰만 쓴다 (#203 T2-d 일부)
+ *
+ * gray/slate 계열은 success/warning/info 와 달리 **토큰이 이미 있다** —
+ * muted, muted-foreground, border, secondary, secondary-foreground.
+ * 그래서 색값 결정 없이 바로 옮길 수 있었다.
+ *
+ * 매핑 규칙:
+ *   bg-gray-50        -> bg-muted            (면 배경)
+ *   bg-gray-100/200   -> bg-secondary        (중립 배지)
+ *   border-gray-*     -> border-border
+ *   text-gray-400~600 -> text-muted-foreground
+ *   text-gray-700~900 -> text-foreground
+ */
+describe("instructor 영역은 중립색에 원색을 쓰지 않는다", () => {
+  it("gray/slate/zinc/neutral/stone 원색 클래스가 없다", () => {
+    const NEUTRAL =
+      /(bg|text|border|ring|divide|from|to|via|outline)-(gray|slate|zinc|neutral|stone)-(50|[1-9]00|950)/g;
+    const offenders: string[] = [];
+
+    for (const file of targetFiles()) {
+      let source: string;
+      try {
+        source = readFileSync(file, "utf8");
+      } catch {
+        continue;
+      }
+      source.split("\n").forEach((line, i) => {
+        const found = line.match(NEUTRAL);
+        if (found) offenders.push(`${file}:${i + 1} — ${found.join(", ")}`);
+      });
+    }
+
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("중립 토큰이 실제로 쓰이고 있다", () => {
+    const used = targetFiles().some((file) => {
+      try {
+        return /-(muted|secondary|border)(-foreground)?\b/.test(readFileSync(file, "utf8"));
+      } catch {
+        return false;
+      }
+    });
+    expect(used).toBe(true);
+  });
+});
