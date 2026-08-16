@@ -226,7 +226,7 @@ export default function EditExam({
     const ext = fileName.split(".").pop()?.toLowerCase();
     const cls = "w-4 h-4 shrink-0";
     switch (ext) {
-      case "pdf": return <FileText className={`${cls} text-destructive`} />;
+      case "pdf": return <FileText className={`${cls} text-red-500`} />;
       case "ppt": case "pptx": return <Presentation className={`${cls} text-orange-500`} />;
       case "doc": case "docx": return <FileText className={`${cls} text-blue-500`} />;
       case "xls": case "xlsx": case "csv": return <FileSpreadsheet className={`${cls} text-green-500`} />;
