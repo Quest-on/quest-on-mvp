@@ -545,7 +545,7 @@ export function CaseQuestionGenerator({
                               ) : status === "failed" ? (
                                 <AlertCircle className="w-3 h-3 text-destructive" />
                               ) : (
-                                <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                                <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                               )}
                               <span
                                 className={

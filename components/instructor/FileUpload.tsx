@@ -43,7 +43,7 @@ function getStatusConfig(status: ExtractionStatus, labels: Record<ExtractionStat
       return {
         label: labels.extracting,
         barWidth: "w-3/4",
-        barColor: "bg-blue-500",
+        barColor: "bg-primary",
         textColor: "text-blue-600 dark:text-blue-400",
         pulse: true,
       };
