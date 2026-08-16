@@ -51,6 +51,8 @@ export default function EditExam({
     materials: [] as File[],
     language: "ko" as "ko" | "en",
   });
+  // 과목은 선택 사항이다. null 이 기본값이며 저장을 막지 않는다.
+  const [courseId, setCourseId] = useState<string | null>(null);
   const [disabledFiles, setDisabledFiles] = useState<Set<number>>(new Set());
   const [canAddMoreFiles, setCanAddMoreFiles] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -61,6 +63,7 @@ export default function EditExam({
   const fileUpload = useFileUpload();
   const isSubmittingRef = useRef(false);
   const initialScoreWeightsRef = useRef<ScoreWeights | null>(null);
+  const initialCourseIdRef = useRef<string | null>(null);
   // 무제한 토글 OFF 시 이전 duration 복원
   const prevDurationRef = useRef<number>(60);
 
@@ -89,6 +92,9 @@ export default function EditExam({
           language: (exam.language === "en" ? "en" : "ko") as "ko" | "en",
         });
         setQuestions(exam.questions || []);
+        const loadedCourseId = exam.course_id ?? null;
+        initialCourseIdRef.current = loadedCourseId;
+        setCourseId(loadedCourseId);
         const loadedWeight = exam.chat_weight ?? null;
         setChatWeight(loadedWeight);
         const loadedScoreWeights = exam.score_weights ?? null;
@@ -297,6 +303,7 @@ export default function EditExam({
         questions: Question[];
         chat_weight: number | null;
         score_weights?: ScoreWeights | null;
+        course_id?: string | null;
         materials: string[];
         materials_text: Array<{ url: string; text: string; fileName: string }>;
         language: "ko" | "en";
@@ -314,6 +321,9 @@ export default function EditExam({
       };
       if (!shouldOmitAutoDefaultScoreWeights) {
         updateData.score_weights = scoreWeights;
+      }
+      if (courseId !== initialCourseIdRef.current) {
+        updateData.course_id = courseId;
       }
       const response = await fetch("/api/supa", {
         method: "POST",
@@ -334,7 +344,7 @@ export default function EditExam({
       setIsLoading(false);
       isSubmittingRef.current = false;
     }
-  }, [examData, questions, chatWeight, scoreWeights, hasSessions, fileUpload, resolvedParams.examId]);
+  }, [examData, questions, chatWeight, scoreWeights, courseId, hasSessions, fileUpload, resolvedParams.examId]);
 
   // ── 제출 사유 ─────────────────────────────────────────────────────────────
   const submitReasons = useMemo(() => {
@@ -412,6 +422,9 @@ export default function EditExam({
               setExamData((p) => ({ ...p, duration: v === 0 ? 0 : v || prevDurationRef.current }));
             }}
             onLanguageChange={(v) => setExamData((p) => ({ ...p, language: v }))}
+            // ── 과목 (선택) ─────────────────────────────────────────────────
+            courseId={courseId}
+            onCourseChange={setCourseId}
             // ── 파일 업로드 ─────────────────────────────────────────────────
             files={examData.materials}
             disabledFiles={disabledFiles}

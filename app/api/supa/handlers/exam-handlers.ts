@@ -88,6 +88,7 @@ export async function createExam(data: {
   }>;
   chat_weight?: number | null;
   score_weights?: ScoreWeights | null;
+  course_id?: string | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -209,6 +210,7 @@ export async function createExam(data: {
       ...(data.type ? { type: data.type } : {}),
       ...(data.assignment_prompt ? { assignment_prompt: data.assignment_prompt } : {}),
       ...(data.rubric ? { rubric: data.rubric } : {}),
+      ...(data.course_id !== undefined ? { course_id: data.course_id } : {}),
       ...(data.is_demo ? { is_demo: true } : {}),
     };
 
@@ -656,7 +658,7 @@ export async function getExamById(data: { id: string }) {
     const { data: exam, error } = await getSupabase()
       .from("exams")
       .select(
-        "id, title, code, description, duration, questions, materials, materials_text, rubric, rubric_public, chat_weight, score_weights, status, instructor_id, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, type, deadline, assignment_prompt, grades_released, language, is_demo, first_published_at"
+        "id, title, code, description, duration, questions, materials, materials_text, rubric, rubric_public, chat_weight, score_weights, course_id, status, instructor_id, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, type, deadline, assignment_prompt, grades_released, language, is_demo, first_published_at"
       )
       .eq("id", data.id)
       .eq("instructor_id", user.id) // Only allow instructors to view their own exams

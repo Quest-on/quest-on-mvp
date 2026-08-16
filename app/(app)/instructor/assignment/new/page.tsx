@@ -56,6 +56,8 @@ export default function CreateAssignment() {
     deadline: "",
     language: "ko" as "ko" | "en",
   });
+  // 과목은 선택 사항이다. null 이 기본값이며 과제 생성을 막지 않는다.
+  const [courseId, setCourseId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const questionsListRef = useRef<HTMLDivElement>(null);
   const examInfoRef = useRef<HTMLDivElement>(null);
@@ -155,6 +157,7 @@ export default function CreateAssignment() {
         rubric: [],
         rubric_public: false,
         chat_weight: null,
+        ...(courseId !== null ? { course_id: courseId } : {}),
         materials: [],
         materials_text: [],
         language: examData.language,
@@ -216,6 +219,8 @@ export default function CreateAssignment() {
                 deadlineError={fieldErrors.deadline}
                 language={examData.language}
                 onLanguageChange={(value) => setExamData((prev) => ({ ...prev, language: value }))}
+                courseId={courseId}
+                onCourseChange={setCourseId}
               />
             </div>
 

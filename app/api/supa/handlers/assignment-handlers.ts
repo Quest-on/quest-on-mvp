@@ -48,6 +48,7 @@ export async function createAssignment(data: {
   rubric?: Array<{ evaluationArea: string; detailedCriteria: string }>;
   rubric_public?: boolean;
   chat_weight?: number | null;
+  course_id?: string | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -205,6 +206,9 @@ export async function createAssignment(data: {
     if (data.language === "en") {
       updatePayload.language = "en";
     }
+    if (data.course_id !== undefined) {
+      updatePayload.course_id = data.course_id;
+    }
     await getSupabase()
       .from("exams")
       .update(updatePayload)
@@ -245,6 +249,7 @@ export async function updateAssignment(data: {
     title?: string;
     questions?: unknown;
     language?: "ko" | "en";
+    course_id?: string | null;
     deadline?: string | null;
     close_at?: string | null;
     updated_at?: string;
@@ -294,13 +299,14 @@ export async function updateAssignment(data: {
     }
 
     // Whitelist — never touch code, type, score_weights
-    const { title, questions, language, deadline, close_at, updated_at } = data.update;
+    const { title, questions, language, course_id, deadline, close_at, updated_at } = data.update;
     const updatePayload: Record<string, unknown> = {
       updated_at: updated_at ?? new Date().toISOString(),
     };
     if (title !== undefined) updatePayload.title = title;
     if (questions !== undefined) updatePayload.questions = questions;
     if (language !== undefined) updatePayload.language = language;
+    if (course_id !== undefined) updatePayload.course_id = course_id;
     if (deadline !== undefined) updatePayload.deadline = deadline;
     if (close_at !== undefined) updatePayload.close_at = close_at;
 

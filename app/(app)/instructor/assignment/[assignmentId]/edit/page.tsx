@@ -40,6 +40,8 @@ export default function EditAssignment({
     deadline: "",
     language: "ko" as "ko" | "en",
   });
+  // 과목은 선택 사항이다. null 이 기본값이며 저장을 막지 않는다.
+  const [courseId, setCourseId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [highlightedQuestionIds, setHighlightedQuestionIds] = useState<Set<string>>(new Set());
   const [fieldErrors, setFieldErrors] = useState<{
@@ -49,6 +51,7 @@ export default function EditAssignment({
   }>({});
 
   const isSubmittingRef = useRef(false);
+  const initialCourseIdRef = useRef<string | null>(null);
   const questionsListRef = useRef<HTMLDivElement>(null);
   const examInfoRef = useRef<HTMLDivElement>(null);
 
@@ -89,6 +92,9 @@ export default function EditAssignment({
           language: exam.language === "en" ? "en" : "ko",
         });
         setQuestions(exam.questions ?? []);
+        const loadedCourseId = exam.course_id ?? null;
+        initialCourseIdRef.current = loadedCourseId;
+        setCourseId(loadedCourseId);
       } catch {
         toast.error(t("editAssignment.toastLoadError"));
         router.push(`/instructor/assignment/${assignmentId}`);
@@ -179,6 +185,8 @@ export default function EditAssignment({
     setIsSaving(true);
     try {
       const deadlineISO = new Date(examData.deadline + "T23:59:00+09:00").toISOString();
+      const courseUpdate =
+        courseId !== initialCourseIdRef.current ? { course_id: courseId } : {};
 
       const response = await fetch("/api/supa", {
         method: "POST",
@@ -191,6 +199,7 @@ export default function EditAssignment({
               title: examData.title,
               questions,
               language: examData.language,
+              ...courseUpdate,
               deadline: deadlineISO,
               close_at: deadlineISO,
               updated_at: new Date().toISOString(),
@@ -310,6 +319,8 @@ export default function EditAssignment({
               onLanguageChange={(value) =>
                 setExamData((prev) => ({ ...prev, language: value }))
               }
+              courseId={courseId}
+              onCourseChange={setCourseId}
             />
           </div>
 

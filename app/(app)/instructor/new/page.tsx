@@ -92,6 +92,8 @@ export default function CreateExam() {
     materials: [] as File[],
     language: "ko" as "ko" | "en",
   });
+  // 과목은 선택 사항이다. null 이 기본값이며 출제를 막지 않는다.
+  const [courseId, setCourseId] = useState<string | null>(null);
   const [disabledFiles, setDisabledFiles] = useState<Set<number>>(new Set());
   const [canAddMoreFiles, setCanAddMoreFiles] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -699,6 +701,7 @@ export default function CreateExam() {
         questions: questions,
         chat_weight: chatWeight, // 채점 가중치 (null = 기본값 50)
         score_weights: scoreWeights,
+        ...(courseId !== null ? { course_id: courseId } : {}),
         materials: materialUrls, // Array of file URLs
         materials_text: materialsText, // 추출된 텍스트 배열
         language: examData.language, // AI 시스템 프롬프트 언어 (ko | en)
@@ -845,6 +848,8 @@ export default function CreateExam() {
                 onLanguageChange={(value) =>
                   setExamData((prev) => ({ ...prev, language: value }))
                 }
+                courseId={courseId}
+                onCourseChange={setCourseId}
                 files={examData.materials}
                 disabledFiles={disabledFiles}
                 canAddMoreFiles={canAddMoreFiles}
