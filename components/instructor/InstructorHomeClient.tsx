@@ -34,6 +34,7 @@ import {
   ChevronDown,
   ChevronUp,
   Palette,
+  AlertCircle,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1402,7 +1403,12 @@ export default function InstructorHome() {
       onFileClick: (examId: string) => void;
       level?: number;
     }) => {
-      const { data: children = [], isLoading } = useQuery({
+      const {
+        data: children = [],
+        isLoading,
+        isError,
+        refetch,
+      } = useQuery({
         queryKey: qk.drive.folderContents(folder.id, userId),
         queryFn: async ({ signal }) => {
           const response = await fetch("/api/supa", {
@@ -1464,6 +1470,17 @@ export default function InstructorHome() {
                 <div className="py-1 text-xs text-muted-foreground">
                   {t("sidebar.folderLoading")}
                 </div>
+              ) : isError ? (
+                /* 오류일 때 빈 트리를 조용히 그리면 자료가 없는 것처럼 보인다. (#241) */
+                <button
+                  type="button"
+                  onClick={() => refetch()}
+                  className="flex w-full items-center gap-1.5 py-1 text-xs text-destructive"
+                >
+                  <AlertCircle className="size-3.5" />
+                  <span>{t("fileTree.loadError")}</span>
+                  <span className="ml-auto underline">{t("sidebar.folderRetry")}</span>
+                </button>
               ) : (
                 <>
                   {level === 0
@@ -1539,7 +1556,12 @@ export default function InstructorHome() {
       onFolderClick: (folderId: string) => void;
       onFileClick: (examId: string) => void;
     }) => {
-      const { data: children = [], isLoading } = useQuery({
+      const {
+        data: children = [],
+        isLoading,
+        isError,
+        refetch,
+      } = useQuery({
         queryKey: qk.drive.folderContents(folderId, userId),
         queryFn: async ({ signal }) => {
           const response = await fetch("/api/supa", {
@@ -1570,6 +1592,21 @@ export default function InstructorHome() {
           <div className="pl-12 py-2 text-xs text-muted-foreground">
             {t("sidebar.folderLoading")}
           </div>
+        );
+      }
+
+      // 오류를 빈 상태로 보여주면 안 된다. (#241)
+      if (isError) {
+        return (
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="flex w-full items-center gap-1.5 pl-12 py-2 text-xs text-destructive"
+          >
+            <AlertCircle className="size-3.5" />
+            <span>{t("fileTree.loadError")}</span>
+            <span className="ml-auto underline">{t("sidebar.folderRetry")}</span>
+          </button>
         );
       }
 

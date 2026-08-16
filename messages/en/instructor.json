@@ -40,7 +40,8 @@
   },
   "fileTree": {
     "loading": "Loading...",
-    "noFolders": "No folders"
+    "noFolders": "No folders",
+    "loadError": "Could not load"
   },
   "course": {
     "label": "Course",
