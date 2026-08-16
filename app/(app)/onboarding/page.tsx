@@ -411,7 +411,10 @@ export default function OnboardingPage() {
     // 목록·통계·발행 카운트 어디에도 나타나지 않는다)과 정면으로 부딪힌다 —
     // 목록에서 숨기는 순간 데모가 도달 불가능해지기 때문이다. 링크로 보내면
     // 둘 다 성립한다.
-    window.location.href = examId ? `/instructor/${examId}` : "/instructor";
+    // 라우터로 이동한다. window.location.href 는 전체 페이지를 다시 띄워서
+    // 흰 화면을 거치고, 방금 만든 데모와 도착 화면 사이의 연결이 시각적으로
+    // 끊긴다. 여기는 역할 변경처럼 세션을 새로 읽어야 하는 경우가 아니다.
+    router.push(examId ? `/instructor/${examId}` : "/instructor");
   };
 
   if (!isLoaded || !user) {

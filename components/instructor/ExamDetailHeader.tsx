@@ -63,7 +63,9 @@ export function ExamDetailHeader({
                     : `/exam/${code}`
                 }
               >
-                <Button size="sm">{demoRestartLabel ?? demoPreviewLabel}</Button>
+                {/* 데모의 주 행동이다. 방금 온보딩을 마친 사람에게 이게 "다음 할 일"
+                    로 읽혀야 하는데 size="sm" 이면 헤더 버튼 무리에 묻힌다. */}
+                <Button>{demoRestartLabel ?? demoPreviewLabel}</Button>
               </Link>
               {demoRestartLabel && demoRestartHint && (
                 <span className="text-xs text-muted-foreground">
