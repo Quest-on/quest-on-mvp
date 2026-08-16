@@ -87,7 +87,8 @@
       "startFirst": "첫 번째 시험 시작하기",
       "noResults": "검색 결과가 없습니다",
       "noResultsHint": "다른 검색어나 필터를 시도해보세요.",
-      "resetSearch": "검색 초기화"
+      "resetSearch": "검색 초기화",
+      "loadError": "목록을 불러오지 못했습니다."
     },
     "session": {
       "statusAria": "상태: {status}",
