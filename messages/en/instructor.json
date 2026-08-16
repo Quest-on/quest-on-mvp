@@ -189,7 +189,6 @@
   },
   "newExam": {
     "pageTitle": "Create a New Exam",
-    "pageDesc": "Set up questions and settings for your new exam",
     "backToDashboard": "Dashboard",
     "backToDemo": "Back to demo",
     "backLabel": "Back to dashboard",
@@ -272,7 +271,6 @@
   },
   "newAssignment": {
     "pageTitle": "Create a New Assignment",
-    "pageDesc": "Set up an AI research chat-based assignment",
     "backToDashboard": "Dashboard",
     "cancel": "Cancel",
     "submit": "Publish assignment",

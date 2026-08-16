@@ -752,9 +752,6 @@ export function SimpleExamAuthoringForm({
       <Card>
         <CardHeader>
           <CardTitle>{t("examInfoForm.cardTitleExam")}</CardTitle>
-          <CardDescription>
-            {t("examInfoForm.cardDescriptionExam")}
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           {/* 시험 제목 */}

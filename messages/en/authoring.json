@@ -119,8 +119,6 @@
   "examInfoForm": {
     "cardTitleAssignment": "Assignment Info",
     "cardTitleExam": "Exam Info",
-    "cardDescriptionAssignment": "Basic details for this assignment",
-    "cardDescriptionExam": "Basic details for this exam",
     "labelTitleAssignment": "Assignment Title",
     "labelTitleExam": "Exam Title",
     "tooltipTitle": "Enter the exam title. Including the course name and exam details — e.g., \"International Business Management 25-1 Midterm\" — is recommended.",

@@ -189,7 +189,6 @@
   },
   "newExam": {
     "pageTitle": "새로운 시험 만들기",
-    "pageDesc": "문제와 설정으로 새로운 시험을 구성하세요",
     "backToDashboard": "대시보드",
     "backToDemo": "데모로 돌아가기",
     "backLabel": "대시보드로 돌아가기",
@@ -272,7 +271,6 @@
   },
   "newAssignment": {
     "pageTitle": "새로운 과제 만들기",
-    "pageDesc": "AI 리서치 채팅 기반 과제를 구성하세요",
     "backToDashboard": "대시보드",
     "cancel": "취소",
     "submit": "과제 출제하기",
