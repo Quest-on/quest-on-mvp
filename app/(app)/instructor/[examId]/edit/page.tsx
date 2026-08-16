@@ -1,20 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback, use, useRef, useMemo } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  use,
+  useRef,
+  useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { extractErrorMessage, getErrorMessage } from "@/lib/error-messages";
+import { extractErrorMessage,
+  getErrorMessage } from "@/lib/error-messages";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import {
   ArrowLeft,
-  FileText,
-  Presentation,
-  FileSpreadsheet,
-  FileImage,
-  File,
-  ClipboardList,
 } from "lucide-react";
+import { FileTypeIcon } from "@/components/instructor/FileTypeIcon";
 import { SimpleExamAuthoringForm } from "@/components/instructor/SimpleExamAuthoringForm";
 import { useTranslations } from "next-intl";
 import type { Question } from "@/components/instructor/QuestionEditor";
@@ -222,20 +224,9 @@ export default function EditExam({
   };
   const removeExistingFile = (index: number) => fileUpload.removeExistingUrl(index);
 
-  const getFileIcon = (fileName: string) => {
-    const ext = fileName.split(".").pop()?.toLowerCase();
-    const cls = "w-4 h-4 shrink-0";
-    switch (ext) {
-      case "pdf": return <FileText className={`${cls} text-red-500`} />;
-      case "ppt": case "pptx": return <Presentation className={`${cls} text-orange-500`} />;
-      case "doc": case "docx": return <FileText className={`${cls} text-blue-500`} />;
-      case "xls": case "xlsx": case "csv": return <FileSpreadsheet className={`${cls} text-green-500`} />;
-      case "hwp": case "hwpx": return <ClipboardList className={`${cls} text-sky-500`} />;
-      case "jpg": case "jpeg": case "png": case "gif": case "webp":
-        return <FileImage className={`${cls} text-purple-500`} />;
-      default: return <File className={`${cls} text-muted-foreground`} />;
-    }
-  };
+  const getFileIcon = (fileName: string) => (
+    <FileTypeIcon fileName={fileName} />
+  );;
 
   const getFileNameFromUrl = (url: string) => {
     try { return decodeURIComponent(new URL(url).pathname.split("/").pop() || t("editExam.filenameFallback")); }

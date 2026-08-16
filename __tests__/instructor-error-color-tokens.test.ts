@@ -20,16 +20,19 @@ import { describe, expect, it } from "vitest";
 const TARGET_DIRS = ["components/instructor", "app/(app)/instructor"];
 
 /**
- * 파일 타입 아이콘 줄.
+ * 파일 타입 아이콘 팔레트 파일.
  *
  * 확장자별 관례색(PDF=빨강, PPT=주황, XLS=초록 …)이라 상태색이 아니다.
- * 토큰으로 바꾸면 PDF 가 오류와 같은 색이 된다.
+ * 토큰으로 바꾸면 PDF 가 '오류'로, XLS 가 '성공'으로 읽힌다.
  *
- * 변수명(iconClass / cls)으로 판별하면 한쪽을 놓친다 — 실제로 #228 이
- * edit 화면만 잘못 바꿔 두 화면의 PDF 색이 갈렸다. 확장자 case 로 판별한다.
+ * 예전에는 줄 단위로 판별했다(변수명 iconClass / case pdf). 팔레트가 이
+ * 파일 하나로 모이면서 그 방식이 무의미해졌고, 실제로 CI 에서 걸렸다 —
+ * `pdf: { Icon: FileText, className: text-red-500 }` 줄에는 case 문이 없다.
+ *
+ * 파일 단위로 제외하고, 그 안의 색은 아래 전용 describe 가 따로 지킨다.
+ * 즉 이 파일만 원색을 쓸 수 있고, 그 값이 맞는지는 별도로 검증된다.
  */
-const FILE_TYPE_ICON_LINE =
-  /case "(pdf|ppt|pptx|doc|docx|xls|xlsx|csv|hwp|hwpx|jpg|jpeg|png|gif|webp)"|getFileIcon|iconClass/;
+const FILE_TYPE_ICON_MODULE = "components/instructor/FileTypeIcon.tsx";
 
 /** 원색 오류 클래스. Tailwind 의 red/rose 계열 전부. */
 const RAW_ERROR_COLOR =
@@ -51,6 +54,10 @@ describe("instructor 영역은 오류색에 원색을 쓰지 않는다", () => {
     const offenders: string[] = [];
 
     for (const file of targetFiles()) {
+      // 파일 타입 아이콘 팔레트만 예외다. 그 안의 색은 아래 전용 describe 가
+      // 따로 지키므로 여기서 빠져도 무방비가 되지 않는다.
+      if (file === FILE_TYPE_ICON_MODULE) continue;
+
       let source: string;
       try {
         source = readFileSync(file, "utf8");
@@ -59,9 +66,6 @@ describe("instructor 영역은 오류색에 원색을 쓰지 않는다", () => {
       }
 
       source.split("\n").forEach((line, i) => {
-        // 파일 타입 아이콘 색은 오류가 아니다 — PDF=빨강, PPT=주황처럼
-        // 확장자를 구분하는 관례색이라 destructive 로 바꾸면 의미가 왜곡된다.
-        if (FILE_TYPE_ICON_LINE.test(line)) return;
         const found = line.match(RAW_ERROR_COLOR);
         if (found) offenders.push(`${file}:${i + 1} — ${found.join(", ")}`);
       });
@@ -154,46 +158,47 @@ describe("instructor 영역은 중립색에 원색을 쓰지 않는다", () => {
  * 가드가 변수명(iconClass)에만 의존해서 cls 를 쓰는 쪽을 놓쳤다.
  */
 describe("파일 타입 아이콘은 관례색을 유지한다", () => {
-  const ICON_FILES = [
-    "app/(app)/instructor/new/page.tsx",
-    "app/(app)/instructor/[examId]/edit/page.tsx",
-  ];
+  // 팔레트가 components/instructor/FileTypeIcon.tsx 한 곳으로 모였다.
+  // 예전에는 new/edit 두 화면이 각자 구현을 들고 있어서, #228 이 한쪽만
+  // 잘못 바꿔 같은 PDF 가 화면마다 다른 색이 됐다. 이제 구조적으로 갈릴 수 없다.
+  const SOURCE_PATH = "components/instructor/FileTypeIcon.tsx";
 
-  it("두 화면이 같은 확장자에 같은 색을 쓴다", () => {
-    const palettes = ICON_FILES.map((file) => {
-      const src = readFileSync(file, "utf8");
-      const start = src.indexOf("getFileIcon");
-      expect(start, `${file} 에 getFileIcon 이 없다`).toBeGreaterThan(-1);
-      const block = src.slice(start, start + 1400);
-
-      const map: Record<string, string> = {};
-      for (const m of block.matchAll(
-        /case "(pdf|ppt|doc|xls|hwp|jpg)[a-z]*"[\s\S]{0,220}?text-([a-z]+)-\d00/g
-      )) {
-        map[m[1]] ??= m[2];
-      }
-      return map;
-    });
-
-    // 같은 확장자는 두 화면에서 같은 색이어야 한다.
-    for (const ext of Object.keys(palettes[0])) {
-      if (!(ext in palettes[1])) continue;
-      expect(palettes[1][ext], `${ext} 색이 두 화면에서 다르다`).toBe(palettes[0][ext]);
+  it("팔레트가 한 곳에만 정의된다", () => {
+    // 페이지가 자기 팔레트를 되살리면 다시 갈린다.
+    for (const page of [
+      "app/(app)/instructor/new/page.tsx",
+      "app/(app)/instructor/[examId]/edit/page.tsx",
+    ]) {
+      const src = readFileSync(page, "utf8");
+      expect(src, `${page} 가 자체 팔레트를 갖고 있다`).not.toMatch(
+        /case "(pdf|ppt|xls|hwp)"/
+      );
+      expect(src).toMatch(/FileTypeIcon/);
     }
   });
 
-  it("PDF 아이콘이 상태색 토큰으로 바뀌지 않았다", () => {
-    // destructive 로 바꾸면 파일 종류가 아니라 오류로 읽힌다.
-    for (const file of ICON_FILES) {
-      const src = readFileSync(file, "utf8");
-      const start = src.indexOf("getFileIcon");
-      const block = src.slice(start, start + 1400);
-      const pdf = block.match(/case "pdf"[\s\S]{0,220}?(text-[a-z-]+(?:-\d00)?)/);
+  it("파일 종류 색이 상태색 토큰으로 바뀌지 않았다", () => {
+    // PDF 를 destructive 로 바꾸면 '오류', XLS 를 success 로 바꾸면 '성공'으로
+    // 읽힌다. 확장자를 구분하는 관례색이지 상태가 아니다.
+    const src = readFileSync(SOURCE_PATH, "utf8");
 
-      expect(pdf, `${file} 에서 pdf case 를 못 찾았다`).toBeTruthy();
-      expect(pdf![1], `${file} 의 PDF 아이콘`).not.toMatch(
-        /destructive|primary|muted|secondary/
-      );
+    for (const [ext, expected] of [
+      ["pdf", "text-red-500"],
+      ["ppt", "text-orange-500"],
+      ["doc", "text-blue-500"],
+      ["xls", "text-green-500"],
+      ["hwp", "text-sky-500"],
+      ["jpg", "text-purple-500"],
+    ] as const) {
+      const m = src.match(new RegExp(`\\b${ext}: \\{[^}]*className: "([^"]+)"`));
+      expect(m, `${ext} 항목을 못 찾았다`).toBeTruthy();
+      expect(m![1], `${ext} 아이콘 색`).toBe(expected);
     }
+  });
+
+  it("알 수 없는 확장자만 시맨틱 토큰을 쓴다", () => {
+    // '종류 없음'은 중립 상태라 muted 가 맞다.
+    const src = readFileSync(SOURCE_PATH, "utf8");
+    expect(src).toMatch(/UNKNOWN[\s\S]{0,120}text-muted-foreground/);
   });
 });
