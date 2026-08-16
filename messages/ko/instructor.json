@@ -40,7 +40,8 @@
   },
   "fileTree": {
     "loading": "로딩 중...",
-    "noFolders": "폴더가 없습니다"
+    "noFolders": "폴더가 없습니다",
+    "loadError": "불러오지 못했습니다"
   },
   "course": {
     "label": "과목",
