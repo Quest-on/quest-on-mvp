@@ -35,8 +35,8 @@ function getStatusConfig(status: ExtractionStatus, labels: Record<ExtractionStat
       return {
         label: labels.uploading,
         barWidth: "w-2/5",
-        barColor: "bg-amber-400",
-        textColor: "text-amber-600 dark:text-amber-400",
+        barColor: "bg-warning-solid",
+        textColor: "text-warning-text",
         pulse: true,
       };
     case "extracting":
@@ -44,15 +44,15 @@ function getStatusConfig(status: ExtractionStatus, labels: Record<ExtractionStat
         label: labels.extracting,
         barWidth: "w-3/4",
         barColor: "bg-primary",
-        textColor: "text-blue-600 dark:text-blue-400",
+        textColor: "text-info-text",
         pulse: true,
       };
     case "done":
       return {
         label: labels.done,
         barWidth: "w-full",
-        barColor: "bg-emerald-500",
-        textColor: "text-emerald-600 dark:text-emerald-400",
+        barColor: "bg-success-solid",
+        textColor: "text-success-text",
         pulse: false,
       };
     case "failed":
@@ -143,7 +143,7 @@ export function FileUpload({
           <div
             className={`text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg transition-all duration-200 ${
               isDragOver
-                ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400"
+                ? "border-info-border bg-info-surface text-info-text"
                 : canAddMoreFiles
                 ? "border-border cursor-pointer hover:border-muted-foreground hover:bg-muted/50"
                 : "border-muted cursor-not-allowed bg-muted/50 text-muted-foreground"
@@ -155,7 +155,7 @@ export function FileUpload({
           >
             <div className="flex flex-col items-center gap-2">
               {isDragOver ? (
-                <FolderOpen className="w-8 h-8 text-blue-500" />
+                <FolderOpen className="w-8 h-8 text-info-solid" />
               ) : (
                 <Upload className="w-8 h-8 text-muted-foreground" />
               )}
@@ -181,7 +181,7 @@ export function FileUpload({
               {existingFiles.map((file) => (
                 <div
                   key={file.index}
-                  className="flex items-center justify-between p-2 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800"
+                  className="flex items-center justify-between p-2 rounded-md bg-info-surface border border-info-border"
                 >
                   <div className="flex items-center gap-2">
                     {getFileIcon(file.name)}
@@ -217,7 +217,7 @@ export function FileUpload({
                       isDisabled
                         ? "bg-destructive/10 border-destructive"
                         : status === "done"
-                        ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800"
+                        ? "bg-success-surface border-success-border"
                         : status === "failed"
                         ? "bg-destructive/10 border-destructive"
                         : isInProgress
@@ -233,7 +233,7 @@ export function FileUpload({
                           {isInProgress ? (
                             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                           ) : status === "done" ? (
-                            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                            <CheckCircle2 className="w-5 h-5 text-success-solid" />
                           ) : status === "failed" ? (
                             <XCircle className="w-5 h-5 text-destructive" />
                           ) : (

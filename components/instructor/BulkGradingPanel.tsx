@@ -834,7 +834,7 @@ export function BulkGradingPanel({
         render: () => (
           <p
             key="status-failure"
-            className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-300"
+            className="flex items-start gap-1.5 text-xs text-warning-text"
           >
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>
@@ -998,11 +998,11 @@ export function BulkGradingPanel({
             {/* (a) Missing students first — no-silent-drop behavior preserved. */}
             {missingStudents.length > 0 && (
               <div
-                className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30"
+                className="space-y-2 rounded-md border border-warning-border bg-warning-surface p-3"
                 data-testid="bulk-grade-missing-students"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-200">
+                  <div className="flex items-center gap-2 text-sm font-medium text-warning-text">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     <span>
                       {isGrading
@@ -1058,7 +1058,7 @@ export function BulkGradingPanel({
                   ))}
                 </ul>
                 {!isGrading && !committed && (
-                  <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                  <p className="text-[11px] text-warning-text">
                     {t("bulkGrading.regradeWarning")}
                   </p>
                 )}
@@ -1180,7 +1180,7 @@ export function BulkGradingPanel({
                           rel="noopener noreferrer"
                           aria-label={t("bulkGrading.individualGradeAriaLabel", { studentName: row.studentName, number: row.qIdx + 1 })}
                           data-testid={`bulk-grade-row-link-${row.sessionId}-${row.qIdx}`}
-                          className="inline-flex items-center gap-0.5 whitespace-nowrap text-blue-600 hover:underline"
+                          className="inline-flex items-center gap-0.5 whitespace-nowrap text-info-text hover:underline"
                         >
                           {t("bulkGrading.individualGradeLink")}
                           <ExternalLink className="h-3 w-3" aria-hidden="true" />
@@ -1289,7 +1289,7 @@ export function BulkGradingPanel({
                 <div key={item.key}>{item.render()}</div>
               ))}
               {data?.warning && (
-                <p className="text-xs text-amber-600">{data.warning}</p>
+                <p className="text-xs text-warning-text">{data.warning}</p>
               )}
             </div>
           )}
@@ -1327,7 +1327,7 @@ export function BulkGradingPanel({
         )}
 
         {regradeArmed && (
-          <div className="mb-2 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="mb-2 flex items-center gap-2 rounded-md border border-warning-border bg-warning-surface px-3 py-1.5 text-xs text-warning-text">
             <span className="flex-1">
               {t("bulkGrading.regradeArmedNotice")}
             </span>

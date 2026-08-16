@@ -872,7 +872,7 @@ export function SimpleExamAuthoringForm({
               </Label>
             </div>
             {showDurationWarning && (
-              <p className="flex basis-full items-center gap-1.5 text-sm text-amber-600 dark:text-amber-400">
+              <p className="flex basis-full items-center gap-1.5 text-sm text-warning-text">
                 <AlertTriangle className="h-4 w-4" />
                 {t("simpleExamAuthoringForm.durationWarning")}
               </p>
@@ -960,7 +960,7 @@ export function SimpleExamAuthoringForm({
                 {existingFiles.map(({ url, name, index }) => (
                   <span
                     key={url}
-                    className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-success-border bg-success-surface px-2 py-1 text-sm text-success-text"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">{name}</span>
@@ -992,7 +992,7 @@ export function SimpleExamAuthoringForm({
                         disabled || status === "failed"
                           ? "border-destructive bg-destructive/10 text-destructive"
                           : status === "done"
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
+                            ? "border-success-border bg-success-surface text-success-text"
                             : "bg-muted/40"
                       }`}
                     >
@@ -1267,7 +1267,7 @@ export function SimpleExamAuthoringForm({
                 </div>
 
                 {scoreWeightErrors.length > 0 && (
-                  <div className="flex flex-wrap items-start justify-between gap-2 text-sm text-amber-600 dark:text-amber-400">
+                  <div className="flex flex-wrap items-start justify-between gap-2 text-sm text-warning-text">
                     <div className="space-y-1">
                       {scoreWeightErrors.map((error) => (
                         <p key={error} className="flex items-center gap-1.5">
