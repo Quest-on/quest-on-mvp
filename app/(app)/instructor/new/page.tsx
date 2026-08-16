@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,13 +13,8 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Info,
-  FileText,
-  Presentation,
-  FileSpreadsheet,
-  FileImage,
-  File,
-  ClipboardList,
 } from "lucide-react";
+import { FileTypeIcon } from "@/components/instructor/FileTypeIcon";
 import toast from "react-hot-toast";
 import { extractErrorMessage } from "@/lib/error-messages";
 import { useTranslations, useLocale } from "next-intl";
@@ -404,35 +403,9 @@ export default function CreateExam() {
 
   // 파일 업로드 + 텍스트 추출은 useFileUpload hook이 처리
 
-  const getFileIcon = (fileName: string) => {
-    const extension = fileName.split(".").pop()?.toLowerCase();
-    const iconClass = "w-4 h-4 shrink-0";
-    switch (extension) {
-      case "pdf":
-        return <FileText className={`${iconClass} text-red-500`} />;
-      case "ppt":
-      case "pptx":
-        return <Presentation className={`${iconClass} text-orange-500`} />;
-      case "doc":
-      case "docx":
-        return <FileText className={`${iconClass} text-blue-500`} />;
-      case "xls":
-      case "xlsx":
-      case "csv":
-        return <FileSpreadsheet className={`${iconClass} text-green-500`} />;
-      case "hwp":
-      case "hwpx":
-        return <ClipboardList className={`${iconClass} text-sky-500`} />;
-      case "jpg":
-      case "jpeg":
-      case "png":
-      case "gif":
-      case "webp":
-        return <FileImage className={`${iconClass} text-purple-500`} />;
-      default:
-        return <File className={`${iconClass} text-muted-foreground`} />;
-    }
-  };
+  const getFileIcon = (fileName: string) => (
+    <FileTypeIcon fileName={fileName} />
+  );;
 
   const updateQuestion = (
     id: string,
