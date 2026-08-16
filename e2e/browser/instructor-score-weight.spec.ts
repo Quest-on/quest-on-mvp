@@ -10,8 +10,12 @@ import { TIMEOUTS } from "../constants";
  * 때문이다. 그래서 컴포넌트의 `getPerQuestionScore` 를 되돌려도 그 테스트는
  * 모른다.
  *
- * 이 파일이 그 구멍을 메운다. 실제로 렌더된 숫자를 읽어서, 화면이 채점과 같은
- * 분모를 쓰는지 확인한다.
+ * 이 파일이 그 구멍을 일부 메운다. 실제로 렌더된 화면 상태를 읽는다.
+ *
+ * 주의: 배점 버킷은 객관식/참거짓/사례 셋뿐이다(lib/grade-utils.ts
+ * scoreBucketForQuestionType). 서술형만 있는 시험에는 유형별 배점 UI 가
+ * 나타나지 않는다. 유형별 숫자 검증은 객관식 문항을 실제로 만들어야 하는데,
+ * 그 시딩은 이 스펙의 범위를 넘어 별도 픽스처가 필요하다.
  *
  * `e2e/browser/flows/` 가 아니라 여기 있는 이유: `browser-flows` 는 CI 에서
  * 동의 온보딩 스펙 하나만 돈다. flows 에 두면 실행되지 않는다.
@@ -34,28 +38,4 @@ test.describe("시험 생성 — 문항 유형별 배점 표시", () => {
     await expect(instructorPage.getByText(/최종 점수의 \d/)).toHaveCount(0);
   });
 
-  test("유형이 하나뿐이면 그 유형이 최종 점수의 100%를 가진다", async ({
-    instructorPage,
-  }) => {
-    await instructorPage.goto("/instructor/new");
-    await expect(
-      instructorPage.getByText(/최종 점수 비중/)
-    ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
-
-    // 수동 문항 추가로 서술형 하나를 만든다.
-    const manualToggle = instructorPage.getByTestId("manual-questions-toggle");
-    if (await manualToggle.isVisible()) {
-      await manualToggle.click();
-    }
-    const addBtn = instructorPage
-      .locator('[data-testid="add-question-btn"], [data-testid="empty-add-question-btn"]')
-      .first();
-    await expect(addBtn).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
-    await addBtn.click();
-
-    // 유형이 하나면 슬라이더 값과 무관하게 항상 100% 다. 이게 정규화의 핵심이다.
-    await expect(instructorPage.getByText(/최종 점수의 100%/)).toBeVisible({
-      timeout: TIMEOUTS.PAGE_LOAD,
-    });
-  });
 });
