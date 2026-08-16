@@ -53,7 +53,16 @@ test.describe("시험 생성 — 문항 유형별 배점 표시", () => {
     });
   });
 
-  test("두 유형이면 비율의 합이 100%가 된다", async ({ instructorPage }) => {
+  test("합계가 100이 아닌 가중치에서도 문항당 점수가 정규화된다", async ({
+    instructorPage,
+  }) => {
+    // 이 테스트가 이 파일의 핵심이다.
+    //
+    // 기본 가중치는 합이 100 이라 옛 산식(weight / count)과 새 산식이 같은
+    // 값을 낸다. 그래서 기본값만 쓰면 회귀를 구분할 수 없다. 30/20(합 50)으로
+    // 바꾸면 갈린다:
+    //   옛 산식: 문항당 30점 / 20점
+    //   새 산식: 문항당 60점 / 40점  (30/50 = 60%, 20/50 = 40%)
     const createExam = new InstructorCreateExamPage(instructorPage);
     await createExam.goto();
     await expect(createExam.pageHeading).toBeVisible({
@@ -63,18 +72,25 @@ test.describe("시험 생성 — 문항 유형별 배점 표시", () => {
     await createExam.addQuestion("multiple-choice");
     await createExam.addQuestion("true-false");
 
-    // 기본 가중치가 균등하므로 각각 50% 다. 두 줄이 보여야 한다.
-    const shares = instructorPage.getByText(/최종 점수의 약 \d+(\.\d+)?%/);
-    await expect(shares).toHaveCount(2, { timeout: TIMEOUTS.PAGE_LOAD });
+    const mcqInput = instructorPage.getByLabel(/사지선다 비중/);
+    const oxInput = instructorPage.getByLabel(/O\/X 비중/);
+    await expect(mcqInput).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
 
-    const texts = await shares.allTextContents();
-    const values = texts.map((t) =>
-      Number(t.replace(/[^\d.]/g, ""))
-    );
-    const sum = values.reduce((a, b) => a + b, 0);
+    await mcqInput.fill("30");
+    await oxInput.fill("20");
 
-    // 반올림 때문에 정확히 100 이 아닐 수 있어 여유를 둔다.
-    expect(sum).toBeGreaterThan(99);
-    expect(sum).toBeLessThan(101);
+    // 정규화된 비율
+    await expect(instructorPage.getByText(/최종 점수의 약 60%/)).toBeVisible({
+      timeout: TIMEOUTS.PAGE_LOAD,
+    });
+    await expect(instructorPage.getByText(/최종 점수의 약 40%/)).toBeVisible();
+
+    // 문항당 점수 — 여기가 wrapper 배선을 지키는 지점이다.
+    // 옛 산식이면 30점/20점이 보인다.
+    await expect(
+      instructorPage.getByText(/문항당 약 60점/)
+    ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
+    await expect(instructorPage.getByText(/문항당 약 40점/)).toBeVisible();
+    await expect(instructorPage.getByText(/문항당 약 30점/)).toHaveCount(0);
   });
 });

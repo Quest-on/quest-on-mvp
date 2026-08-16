@@ -381,7 +381,6 @@
     "scoreWeightsCount": "{count}문항",
     "ariaSliderBucket": "{bucket} 비중",
     "ariaInputBucket": "{bucket} 비중",
-    "unitPercent": "%",
     "scoreWeightsError": "저장된 비중이 현재 문제 구성과 맞지 않습니다. {error}",
     "buttonRestoreWeights": "현재 문제 기준으로 복구",
     "fieldChatWeightLabel": "채점 비중",
