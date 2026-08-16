@@ -202,3 +202,52 @@ describe("파일 타입 아이콘은 관례색을 유지한다", () => {
     expect(src).toMatch(/UNKNOWN[\s\S]{0,120}text-muted-foreground/);
   });
 });
+
+/**
+ * 상태색 전 범위 가드 (#203 완결)
+ *
+ * red(#228) / gray·slate(#229) / blue 액션(#230) 에 이어 상태색까지 옮겼다.
+ * 이제 instructor 영역에 남은 원색은 파일 타입 아이콘 팔레트뿐이고, 그건
+ * 확장자를 구분하는 관례색이라 상태색 토큰으로 바꾸면 안 된다.
+ */
+describe("instructor 영역에 상태색 원색이 없다", () => {
+  it("emerald/green/amber/yellow/blue/sky/indigo 원색이 남아 있지 않다", () => {
+    const offenders: string[] = [];
+
+    for (const file of targetFiles()) {
+      // 파일 타입 아이콘 팔레트는 관례색이라 예외다(전용 describe 가 지킨다).
+      if (file === FILE_TYPE_ICON_MODULE) continue;
+
+      let source: string;
+      try {
+        source = readFileSync(file, "utf8");
+      } catch {
+        continue;
+      }
+
+      source.split("\n").forEach((line, i) => {
+        const found = line.match(
+          /(bg|text|border|ring|divide)-(emerald|green|amber|yellow|blue|sky|indigo)-(50|[1-9]00|950)/g
+        );
+        if (found) offenders.push(`${file}:${i + 1} — ${found.join(", ")}`);
+      });
+    }
+
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("상태색 토큰이 실제로 쓰이고 있다", () => {
+    // 위 가드만 있으면 색을 통째로 지워도 통과한다. 반대편 증거를 함께 둔다.
+    const used = targetFiles().filter((file) => {
+      try {
+        return /-(success|warning|info)-(surface|subtle|border|solid|text)/.test(
+          readFileSync(file, "utf8")
+        );
+      } catch {
+        return false;
+      }
+    });
+
+    expect(used.length).toBeGreaterThan(10);
+  });
+});

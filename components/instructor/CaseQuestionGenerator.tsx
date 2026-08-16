@@ -335,10 +335,10 @@ export function CaseQuestionGenerator({
                     key={fileName}
                     className={
                       status === "done"
-                        ? "text-emerald-600 dark:text-emerald-400"
+                        ? "text-success-text"
                         : status === "failed"
                         ? "text-destructive"
-                        : "text-blue-600 dark:text-blue-400"
+                        : "text-info-text"
                     }
                   >
                     {fileName}
@@ -541,7 +541,7 @@ export function CaseQuestionGenerator({
                               className="flex items-center gap-1.5 text-xs"
                             >
                               {status === "done" ? (
-                                <CheckCircle2 className="w-3 h-3 text-green-600 dark:text-green-400" />
+                                <CheckCircle2 className="w-3 h-3 text-success-text" />
                               ) : status === "failed" ? (
                                 <AlertCircle className="w-3 h-3 text-destructive" />
                               ) : (
@@ -570,7 +570,7 @@ export function CaseQuestionGenerator({
                               key={fileName}
                               className="flex items-center gap-1.5 text-xs"
                             >
-                              <CheckCircle2 className="w-3 h-3 text-green-600 dark:text-green-400" />
+                              <CheckCircle2 className="w-3 h-3 text-success-text" />
                               <span className="text-muted-foreground">
                                 {fileName}
                               </span>

@@ -111,7 +111,7 @@ export default function RegradePage() {
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
             )}
             {status === "success" && (
-              <CheckCircle2 className="w-16 h-16 text-green-600" />
+              <CheckCircle2 className="w-16 h-16 text-success-text" />
             )}
             {(status === "error" || status === "no-session") && (
               <AlertCircle className="w-16 h-16 text-destructive" />

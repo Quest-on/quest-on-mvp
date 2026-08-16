@@ -408,7 +408,7 @@ export function ExamInfoForm({
               ))}
             </div>
             {showDurationWarning && (
-              <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+              <div className="flex items-center gap-1.5 text-warning-text">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 <span className="text-sm">{t("examInfoForm.durationWarning")}</span>
               </div>

@@ -32,7 +32,7 @@ export function QuestionPromptCard({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <FileText className="w-5 h-5 text-blue-600" />
+          <FileText className="w-5 h-5 text-info-text" />
           {t("questionPromptCard.cardTitle", { number: questionNumber })}
         </CardTitle>
       </CardHeader>
