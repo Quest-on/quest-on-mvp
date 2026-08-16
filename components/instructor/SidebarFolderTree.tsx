@@ -3,7 +3,13 @@
 import { useState, memo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, Folder, FolderOpen, FileText } from "lucide-react";
+import {
+  ChevronRight,
+  Folder,
+  FolderOpen,
+  FileText,
+  AlertCircle,
+} from "lucide-react";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -60,7 +66,12 @@ const SidebarFolderNode = memo(function SidebarFolderNode({
   const [isOpen, setIsOpen] = useState(false);
   const t = useTranslations("instructor");
 
-  const { data: children = [], isLoading } = useQuery({
+  const {
+    data: children = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: qk.drive.sidebarTree(folder.id, userId),
     queryFn: ({ signal }) => fetchFolderContents(folder.id, signal),
     enabled: isOpen,
@@ -106,8 +117,24 @@ const SidebarFolderNode = memo(function SidebarFolderNode({
                 </span>
               </SidebarMenuSubItem>
             )}
+            {isError && (
+              <SidebarMenuSubItem>
+                <button
+                  type="button"
+                  onClick={() => refetch()}
+                  className="flex w-full items-center gap-1.5 px-2 py-1 text-xs text-destructive"
+                >
+                  <AlertCircle className="size-3.5" />
+                  <span>{t("sidebar.folderError")}</span>
+                  <span className="ml-auto underline">
+                    {t("sidebar.folderRetry")}
+                  </span>
+                </button>
+              </SidebarMenuSubItem>
+            )}
             {isOpen &&
               !isLoading &&
+              !isError &&
               subFiles.length === 0 &&
               subFolders.length === 0 && (
                 <SidebarMenuSubItem>
@@ -144,7 +171,12 @@ const SidebarFolderNode = memo(function SidebarFolderNode({
 
 export function SidebarFolderTree({ userId }: { userId?: string }) {
   const t = useTranslations("instructor");
-  const { data: rootItems = [], isLoading } = useQuery({
+  const {
+    data: rootItems = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: qk.drive.sidebarTree(null, userId),
     queryFn: ({ signal }) => fetchFolderContents(null, signal),
     enabled: !!userId,
@@ -168,7 +200,26 @@ export function SidebarFolderTree({ userId }: { userId?: string }) {
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
-          {!isLoading && rootFolders.length === 0 && (
+          {/*
+            오류를 빈 상태로 보여주면 안 된다. 예전에는 isError 를 안 봐서 요청이
+            실패해도 "폴더 없음" 이 떴다 — 폴더로 시험을 관리하는 교수자에게는
+            "내 데이터가 사라졌다" 로 읽힌다.
+          */}
+          {isError && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => refetch()}
+                className="text-destructive text-xs"
+              >
+                <AlertCircle className="size-3.5" />
+                <span>{t("sidebar.folderError")}</span>
+                <span className="ml-auto underline">
+                  {t("sidebar.folderRetry")}
+                </span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {!isLoading && !isError && rootFolders.length === 0 && (
             <SidebarMenuItem>
               <SidebarMenuButton
                 disabled
