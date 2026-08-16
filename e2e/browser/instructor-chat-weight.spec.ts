@@ -84,4 +84,21 @@ test.describe("시험 생성 — 대화 비중 슬라이더", () => {
     await expect(slider).toHaveAttribute("aria-valuenow", "50");
   });
 
+  test("기본값으로 되돌린 뒤 포커스가 슬라이더로 돌아온다", async ({
+    instructorPage,
+  }) => {
+    // Reset 은 클릭 즉시 자기 자신을 화면에서 지운다. 포커스를 넘기지 않으면
+    // 키보드/스크린리더 사용자가 문서 끝으로 튕긴다.
+    await instructorPage.goto("/instructor/new");
+
+    const slider = instructorPage.getByRole("slider", SLIDER);
+    await expect(slider).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
+
+    await slider.focus();
+    await instructorPage.keyboard.press("ArrowRight");
+    await instructorPage.getByRole("button", RESET).click();
+
+    await expect(slider).toBeFocused();
+  });
+
 });

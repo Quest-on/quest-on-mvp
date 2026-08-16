@@ -1,7 +1,7 @@
 "use client";
 
 import type { KeyboardEvent, ReactNode, Ref } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CourseSelectField } from "@/components/instructor/CourseSelectField";
 import { Input } from "@/components/ui/input";
@@ -467,6 +467,9 @@ export function SimpleExamAuthoringForm({
   const isUnlimited = duration === 0;
   const effectiveWeight = chatWeight ?? 50;
   const isCustomWeight = chatWeight !== null;
+  // Reset 은 클릭 즉시 자기 자신을 화면에서 지운다. 포커스를 넘기지 않으면
+  // 키보드/스크린리더 사용자가 문서 끝으로 튕긴다. 슬라이더로 돌려준다.
+  const chatWeightSliderRef = useRef<HTMLSpanElement | null>(null);
   const presentScoreBuckets = useMemo(
     () => getPresentScoreBuckets(questions),
     [questions]
@@ -1299,13 +1302,19 @@ export function SimpleExamAuthoringForm({
                       variant="ghost"
                       size="sm"
                       className="ml-auto"
-                      onClick={() => onChatWeightChange(null)}
+                      onClick={() => {
+                        onChatWeightChange(null);
+                        chatWeightSliderRef.current
+                          ?.querySelector<HTMLElement>('[role="slider"]')
+                          ?.focus();
+                      }}
                     >
                       {t("simpleExamAuthoringForm.buttonResetWeight")}
                     </Button>
                   )}
                 </div>
                 <Slider
+                  ref={chatWeightSliderRef}
                   className="mt-3"
                   value={[effectiveWeight]}
                   onValueChange={([value]) => onChatWeightChange(value)}

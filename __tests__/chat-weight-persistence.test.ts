@@ -10,7 +10,7 @@ vi.mock("@/lib/supabase-server", () => ({ getSupabaseServer: () => supabaseMock 
 vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ auditLog: vi.fn() }));
 
-import { createExam } from "@/app/api/supa/handlers/exam-handlers";
+import { createExam, updateExam } from "@/app/api/supa/handlers/exam-handlers";
 
 /**
  * chat_weight 의 null 이 저장까지 살아남는가 (#222)
@@ -139,5 +139,39 @@ describe("createExam 은 chat_weight 의 null 을 보존한다", () => {
 
     expect(res.status).toBe(200);
     expect(exams.inserted[0]).toMatchObject({ chat_weight: 100 });
+  });
+});
+
+/** 편집 저장 경로. create 만 고쳤으므로 update 가 다시 접지 않는지 고정한다. */
+function mockExamUpdate() {
+  const exams = createChain({ data: { id: EXAM_ID, instructor_id: INSTRUCTOR_ID }, error: null });
+  const updated: Array<Record<string, unknown>> = [];
+  exams.update = vi.fn((payload: unknown) => {
+    updated.push(payload as Record<string, unknown>);
+    return exams;
+  });
+  (exams as unknown as { updated: unknown[] }).updated = updated;
+  supabaseMock.from.mockImplementation((table: string) => {
+    if (table === "exams") return exams;
+    throw new Error(`Unexpected table: ${table}`);
+  });
+  return exams as typeof exams & { updated: Array<Record<string, unknown>> };
+}
+
+describe("updateExam 도 chat_weight 를 접지 않는다", () => {
+  it.each([
+    ["null", null],
+    ["0", 0],
+    ["50", 50],
+    ["100", 100],
+  ])("%s 을 그대로 저장한다", async (_label, value) => {
+    const exams = mockExamUpdate();
+
+    await updateExam({
+      id: EXAM_ID,
+      update: { chat_weight: value as number | null },
+    });
+
+    expect(exams.updated[0]).toMatchObject({ chat_weight: value });
   });
 });
