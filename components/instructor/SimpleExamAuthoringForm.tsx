@@ -53,6 +53,10 @@ import {
 import type { Question } from "@/components/instructor/QuestionEditor";
 import { QuestionEditor } from "@/components/instructor/QuestionEditor";
 import {
+  perQuestionScore as computePerQuestionScore,
+  scoreShare as computeScoreShare,
+} from "@/lib/score-weight-display";
+import {
   buildDefaultScoreWeightsForQuestionTypes,
   scoreBucketForQuestionType,
   syncScoreWeightsForBuckets,
@@ -512,11 +516,17 @@ export function SimpleExamAuthoringForm({
     0,
   );
 
-  const getPerQuestionScore = (bucket: ScoreWeightBucket) => {
-    const count = scoreBucketCounts[bucket];
-    if (count === 0) return null;
-    return getScoreWeightValue(bucket) / count;
-  };
+  // 산식은 lib/score-weight-display.ts 에 있다. 여기 두면 테스트가 복제하게
+  // 되고, 그러면 이 파일을 되돌려도 테스트가 통과한다.
+  const getScoreShare = (bucket: ScoreWeightBucket) =>
+    computeScoreShare(getScoreWeightValue(bucket), totalScoreWeight);
+
+  const getPerQuestionScore = (bucket: ScoreWeightBucket) =>
+    computePerQuestionScore(
+      getScoreWeightValue(bucket),
+      totalScoreWeight,
+      scoreBucketCounts[bucket]
+    );
 
   const setScoreWeight = (bucket: ScoreWeightBucket, value: number) => {
     const current = scoreWeights ?? buildDefaultScoreWeights(questions);
@@ -1159,7 +1169,7 @@ export function SimpleExamAuthoringForm({
                           style={{
                             width: `${totalScoreWeight > 0 ? (weight / totalScoreWeight) * 100 : 0}%`,
                           }}
-                          title={`${t(SCORE_BUCKET_LABEL_KEYS[bucket])} ${weight}%`}
+                          title={`${t(SCORE_BUCKET_LABEL_KEYS[bucket])} ${formatScoreValue(getScoreShare(bucket) * 100)}%`}
                         />
                       );
                     })}
@@ -1175,7 +1185,7 @@ export function SimpleExamAuthoringForm({
                           <span
                             className={`h-2 w-2 rounded-full ${SCORE_BUCKET_COLORS[bucket]}`}
                           />
-                          {t(SCORE_BUCKET_LABEL_KEYS[bucket])} {weight}%
+                          {t(SCORE_BUCKET_LABEL_KEYS[bucket])} {weight}
                         </span>
                       );
                     })}
@@ -1213,6 +1223,16 @@ export function SimpleExamAuthoringForm({
                               ? t("simpleExamAuthoringForm.scoreWeightsPerQuestion", { count: scoreBucketCounts[bucket], score: formatScoreValue(perQuestionScore) })
                               : t("simpleExamAuthoringForm.scoreWeightsCount", { count: scoreBucketCounts[bucket] })}
                           </p>
+                          {/*
+                            채점이 실제로 쓰는 값은 이 비율이다. 슬라이더 눈금만
+                            보면 60/40 과 100/100 이 달라 보이지만 둘 다 60:40,
+                            50:50 이라는 사실이 여기서 드러난다.
+                          */}
+                          <p className="mt-0.5 text-xs font-medium">
+                            {t("simpleExamAuthoringForm.scoreWeightsShare", {
+                              share: formatScoreValue(getScoreShare(bucket) * 100),
+                            })}
+                          </p>
                         </div>
                         <Slider
                           value={[weight]}
@@ -1239,7 +1259,7 @@ export function SimpleExamAuthoringForm({
                             className="h-9 w-20 text-center"
                             aria-label={t("simpleExamAuthoringForm.ariaInputBucket", { bucket: t(SCORE_BUCKET_LABEL_KEYS[bucket]) })}
                           />
-                          <span className="text-sm text-muted-foreground">{t("simpleExamAuthoringForm.unitPercent")}</span>
+                          <span className="text-sm text-muted-foreground">{t("simpleExamAuthoringForm.unitWeight")}</span>
                         </div>
                       </div>
                     );

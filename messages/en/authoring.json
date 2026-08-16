@@ -378,10 +378,9 @@
     "buttonRedistribute": "Distribute Equally",
     "scoreWeightsCount": "{count, plural, one {# question} other {# questions}}",
     "scoreWeightsSingleType": "Only one question type is present — all points are assigned to this type.",
-    "scoreWeightsPerQuestion": "{count, plural, one {# question} other {# questions}} · {score} pts each",
-    "ariaSliderBucket": "{bucket} weight",
-    "ariaInputBucket": "{bucket} weight",
-    "unitPercent": "%",
+    "scoreWeightsPerQuestion": "{count, plural, one {# question · about {score} pt} other {# questions · about {score} pts each}}",
+    "ariaSliderBucket": "{bucket} weight slider",
+    "ariaInputBucket": "{bucket} weight value",
     "scoreWeightsError": "Saved weights do not match the current question configuration. {error}",
     "buttonRestoreWeights": "Restore based on current questions",
     "fieldChatWeightLabel": "Grading Weight",
@@ -404,7 +403,9 @@
     "buttonAIGenerate": "Generate {count, plural, one {# question} other {# questions}} with AI",
     "buttonAddManual": "Add",
     "optional": "Optional",
-    "buttonResetWeight": "Reset"
+    "buttonResetWeight": "Reset",
+    "scoreWeightsShare": "About {share}% of the final score",
+    "unitWeight": "weight"
   },
   "examCode": {
     "copyAria": "Copy exam code",

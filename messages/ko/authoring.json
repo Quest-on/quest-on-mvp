@@ -377,11 +377,10 @@
     "scoreWeightsHintEmpty": "문항을 추가하면 문제 유형별 점수 배분이 자동으로 설정됩니다.",
     "buttonRedistribute": "균등 재분배",
     "scoreWeightsSingleType": "현재 문제 유형이 하나뿐이라 전체 점수를 이 유형에 배정합니다.",
-    "scoreWeightsPerQuestion": "{count}문항 · 문항당 {score}점",
+    "scoreWeightsPerQuestion": "{count}문항 · 문항당 약 {score}점",
     "scoreWeightsCount": "{count}문항",
-    "ariaSliderBucket": "{bucket} 비중",
-    "ariaInputBucket": "{bucket} 비중",
-    "unitPercent": "%",
+    "ariaSliderBucket": "{bucket} 비중 슬라이더",
+    "ariaInputBucket": "{bucket} 비중 값",
     "scoreWeightsError": "저장된 비중이 현재 문제 구성과 맞지 않습니다. {error}",
     "buttonRestoreWeights": "현재 문제 기준으로 복구",
     "fieldChatWeightLabel": "채점 비중",
@@ -404,7 +403,9 @@
     "buttonAIGenerate": "AI로 {count}개 생성",
     "buttonAddManual": "추가",
     "optional": "선택",
-    "buttonResetWeight": "기본값"
+    "buttonResetWeight": "기본값",
+    "scoreWeightsShare": "최종 점수의 약 {share}%",
+    "unitWeight": "가중치"
   },
   "examCode": {
     "copyAria": "시험 코드 복사",
