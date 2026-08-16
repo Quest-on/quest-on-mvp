@@ -46,6 +46,26 @@
   --accent-foreground: hsl(240 6% 10%);
   --destructive: hsl(0 84.2365% 60.1961%);
   --destructive-foreground: hsl(0 0% 100%);
+  /* 상태색 — 현재 화면이 쓰던 Tailwind 명도를 그대로 토큰화한다.
+     한 토큰으로 여러 명도를 접으면 화면이 바뀌므로 역할별로 나눈다.
+       surface  연한 배경(50)      subtle   보조 배경(100)
+       border   테두리(200)        solid    아이콘·강조(500/600)
+       text     본문 텍스트(700/800) */
+  --success-surface: hsl(152 81% 96%);
+  --success-subtle: hsl(149 80% 90%);
+  --success-border: hsl(152.4 76.0% 80.4%);
+  --success-solid: hsl(160.1 84.1% 39.4%);
+  --success-text: hsl(163 88.1% 19.8%);
+  --warning-surface: hsl(48 100% 96%);
+  --warning-subtle: hsl(48 97% 89%);
+  --warning-border: hsl(48 97% 77%);
+  --warning-solid: hsl(38 92% 50%);
+  --warning-text: hsl(22 77.8% 26.5%);
+  --info-surface: hsl(214 100% 97%);
+  --info-subtle: hsl(214 95% 93%);
+  --info-border: hsl(213 97% 87%);
+  --info-solid: hsl(217 91% 60%);
+  --info-text: hsl(226 71% 40%);
   --border: hsl(220 13.0435% 90.9804%);
   --input: hsl(220 13.0435% 90.9804%);
   --ring: hsl(222 56% 49%);
@@ -107,6 +127,22 @@
   --accent-foreground: hsl(213.3333 96.9231% 87.2549%);
   --destructive: hsl(0 84.2365% 60.1961%);
   --destructive-foreground: hsl(0 0% 100%);
+  /* 다크 모드 — 같은 역할, 명도 반전. 라이트의 950/900/800/400/300 대역을 쓴다. */
+  --success-surface: hsl(166 91% 9%);
+  --success-subtle: hsl(163 94% 15%);
+  --success-border: hsl(163 88% 20%);
+  --success-solid: hsl(158 64% 52%);
+  --success-text: hsl(152 76% 80%);
+  --warning-surface: hsl(23 83% 12%);
+  --warning-subtle: hsl(28 73% 18%);
+  --warning-border: hsl(26 90% 24%);
+  --warning-solid: hsl(43 96% 56%);
+  --warning-text: hsl(48 97% 77%);
+  --info-surface: hsl(226 57% 12%);
+  --info-subtle: hsl(226 71% 20%);
+  --info-border: hsl(224 64% 33%);
+  --info-solid: hsl(213 94% 68%);
+  --info-text: hsl(213 97% 87%);
   --border: hsl(0 0% 25.098%);
   --input: hsl(0 0% 25.098%);
   --ring: hsl(222 56% 49%);
@@ -163,6 +199,22 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  /* 상태색 역할 토큰 — surface/subtle/border/solid/text */
+  --color-success-surface: var(--success-surface);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-border: var(--success-border);
+  --color-success-solid: var(--success-solid);
+  --color-success-text: var(--success-text);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-border: var(--warning-border);
+  --color-warning-solid: var(--warning-solid);
+  --color-warning-text: var(--warning-text);
+  --color-info-surface: var(--info-surface);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-border: var(--info-border);
+  --color-info-solid: var(--info-solid);
+  --color-info-text: var(--info-text);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
