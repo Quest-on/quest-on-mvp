@@ -72,8 +72,8 @@ test.describe("시험 생성 — 문항 유형별 배점 표시", () => {
     await createExam.addQuestion("multiple-choice");
     await createExam.addQuestion("true-false");
 
-    const mcqInput = instructorPage.getByLabel(/사지선다 비중/);
-    const oxInput = instructorPage.getByLabel(/O\/X 비중/);
+    const mcqInput = instructorPage.getByLabel(/사지선다 비중 값/);
+    const oxInput = instructorPage.getByLabel(/O\/X 비중 값/);
     await expect(mcqInput).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
 
     await mcqInput.fill("30");
