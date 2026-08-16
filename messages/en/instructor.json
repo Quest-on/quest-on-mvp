@@ -405,7 +405,8 @@
     "colorPurple": "Purple",
     "colorPink": "Pink",
     "colorGray": "Gray",
-    "toastExamCodeBlocked": "You have reached the publish limit, so this code cannot be copied yet. Verify your account and try again."
+    "toastExamCodeBlocked": "You have reached the publish limit, so this code cannot be copied yet. Verify your account and try again.",
+    "loadError": "Could not load your exams."
   },
   "new": {
     "createExamFailed": "Failed to create exam"

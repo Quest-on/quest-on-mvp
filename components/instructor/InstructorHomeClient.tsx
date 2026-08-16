@@ -39,6 +39,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import {
   Dialog,
   DialogContent,
@@ -190,6 +191,8 @@ export default function InstructorHome() {
     hasNextPage,
     isFetchingNextPage,
     isLoading,
+    isError: isExamListError,
+    refetch: refetchExamList,
   } = useInfiniteQuery({
     queryKey: qk.drive.folderContents(currentFolderId, user?.id),
     queryFn: async ({ pageParam, signal }: { pageParam: number; signal: AbortSignal }) => {
@@ -2085,7 +2088,17 @@ export default function InstructorHome() {
                                 );
                               })}
                             </div>
-                            {filteredExamNodes.length > 0 ? (
+                            {/*
+                              오류를 빈 상태로 보여주면 안 된다. 예전에는 isError 를 안 봐서
+                              목록 조회가 실패해도 "시험이 없습니다" 가 떴다. 교수자에게
+                              이건 출제한 시험이 사라졌다는 뜻으로 읽힌다. (#241)
+                            */}
+                            {isExamListError ? (
+                              <ErrorAlert
+                                message={t("drive.loadError")}
+                                onRetry={() => refetchExamList()}
+                              />
+                            ) : filteredExamNodes.length > 0 ? (
                               viewMode === "grid" ? (
                                 <>
                                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
