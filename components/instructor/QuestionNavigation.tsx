@@ -167,7 +167,7 @@ export function QuestionNavigation({
               {grade && !hideScores && (
                 <Badge
                   variant="secondary"
-                  className="ml-2 bg-green-100 text-green-800"
+                  className="ml-2 bg-success-subtle text-success-text"
                 >
                   {t("questionNavigation.scorePoints", { score: grade.score || 0 })}
                 </Badge>

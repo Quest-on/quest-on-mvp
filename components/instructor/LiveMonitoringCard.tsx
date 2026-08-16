@@ -163,9 +163,9 @@ export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
               variant={isMonitoring && isPageVisible ? "default" : "secondary"}
               className={
                 isMonitoring && isPageVisible
-                  ? "bg-green-500 text-white animate-pulse"
+                  ? "bg-success-solid text-white animate-pulse"
                   : isMonitoring && !isPageVisible
-                  ? "bg-yellow-500 text-white"
+                  ? "bg-warning-solid text-white"
                   : "bg-muted0"
               }
             >
@@ -222,7 +222,7 @@ export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
                 <div
                   key={message.id}
                   className={`border rounded-lg p-4 hover:bg-muted/50 transition-colors ${
-                    message.role === "ai" ? "bg-blue-50/50 dark:bg-blue-950/20" : ""
+                    message.role === "ai" ? "bg-info-surface/50" : ""
                   }`}
                 >
                   <div className="flex items-start justify-between mb-2">
@@ -240,7 +240,7 @@ export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
                           variant={message.role === "ai" ? "default" : "outline"}
                           className={`text-xs ${
                             message.role === "ai"
-                              ? "bg-blue-500 text-white"
+                              ? "bg-info-solid text-white"
                               : ""
                           }`}
                         >
@@ -266,7 +266,7 @@ export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
                   <div
                     className={`rounded-md p-3 ${
                       message.role === "ai"
-                        ? "bg-blue-100/50 dark:bg-blue-900/30"
+                        ? "bg-info-subtle/50"
                         : "bg-muted/50"
                     }`}
                   >

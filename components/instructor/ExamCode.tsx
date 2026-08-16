@@ -92,7 +92,7 @@ export function ExamCode({ code, quota, className, copyable = true }: ExamCodePr
         )}
       </div>
       {gate === "warning" && (
-        <p className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-500">
+        <p className="flex items-center gap-1.5 text-xs text-warning-solid dark:text-warning-solid">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
           {t("warning", { remaining: quota?.publishesRemaining ?? 0 })}
         </p>
