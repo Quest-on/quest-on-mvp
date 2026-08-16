@@ -405,7 +405,7 @@
     "buttonAddManual": "Add",
     "optional": "Optional",
     "buttonResetWeight": "Reset",
-    "scoreWeightsShare": "{share}% of the final score"
+    "scoreWeightsShare": "About {share}% of the final score"
   },
   "examCode": {
     "copyAria": "Copy exam code",

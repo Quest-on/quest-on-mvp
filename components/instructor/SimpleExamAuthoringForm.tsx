@@ -53,6 +53,10 @@ import {
 import type { Question } from "@/components/instructor/QuestionEditor";
 import { QuestionEditor } from "@/components/instructor/QuestionEditor";
 import {
+  perQuestionScore as computePerQuestionScore,
+  scoreShare as computeScoreShare,
+} from "@/lib/score-weight-display";
+import {
   buildDefaultScoreWeightsForQuestionTypes,
   scoreBucketForQuestionType,
   syncScoreWeightsForBuckets,
@@ -512,29 +516,17 @@ export function SimpleExamAuthoringForm({
     0,
   );
 
-  /**
-   * 이 유형이 최종 점수에서 차지하는 비율(0~1).
-   *
-   * 채점은 weight 를 절대 배점이 아니라 **상대 비중**으로 쓴다
-   * (lib/grade-utils.ts: 유형평균 x weight / totalConfiguredWeight).
-   * 그래서 화면도 같은 분모를 써야 한다.
-   */
+  // 산식은 lib/score-weight-display.ts 에 있다. 여기 두면 테스트가 복제하게
+  // 되고, 그러면 이 파일을 되돌려도 테스트가 통과한다.
   const getScoreShare = (bucket: ScoreWeightBucket) =>
-    totalScoreWeight > 0 ? getScoreWeightValue(bucket) / totalScoreWeight : 0;
+    computeScoreShare(getScoreWeightValue(bucket), totalScoreWeight);
 
-  /**
-   * 100점 만점 기준 문항당 점수.
-   *
-   * 예전에는 weight / count 였다. 그건 weight 를 절대 배점으로 본 것이라
-   * 채점과 분모가 달랐다. 총합이 100 일 때만 우연히 맞고, 예를 들어 30/20
-   * (합 50)이면 화면은 10점인데 실제 기여는 20점이었고, 100/100(합 200)이면
-   * 화면 33.3점에 실제 16.7점이었다.
-   */
-  const getPerQuestionScore = (bucket: ScoreWeightBucket) => {
-    const count = scoreBucketCounts[bucket];
-    if (count === 0) return null;
-    return (getScoreShare(bucket) * 100) / count;
-  };
+  const getPerQuestionScore = (bucket: ScoreWeightBucket) =>
+    computePerQuestionScore(
+      getScoreWeightValue(bucket),
+      totalScoreWeight,
+      scoreBucketCounts[bucket]
+    );
 
   const setScoreWeight = (bucket: ScoreWeightBucket, value: number) => {
     const current = scoreWeights ?? buildDefaultScoreWeights(questions);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateWeightedOverallScore, type ScoreWeights } from "@/lib/grade-utils";
+import { perQuestionScore, scoreShare } from "@/lib/score-weight-display";
 
 /**
  * 배점 비중: 화면과 채점이 같은 분모를 쓴다 (#224)
@@ -17,16 +18,6 @@ import { calculateWeightedOverallScore, type ScoreWeights } from "@/lib/grade-ut
  * 함께 고정한다.
  */
 
-/** 화면 산식 (components/instructor/SimpleExamAuthoringForm.tsx) */
-function share(weight: number, total: number): number {
-  return total > 0 ? weight / total : 0;
-}
-
-function perQuestionScore(weight: number, total: number, count: number): number | null {
-  if (count === 0) return null;
-  return (share(weight, total) * 100) / count;
-}
-
 describe("화면의 문항당 점수가 채점 기여와 일치한다", () => {
   it.each([
     ["총합 100 (예전에도 맞던 경우)", 60, 3, 40, 2],
@@ -40,8 +31,8 @@ describe("화면의 문항당 점수가 채점 기여와 일치한다", () => {
     const bucketA = perQuestionScore(wA, total, cA)! * cA;
     const bucketB = perQuestionScore(wB, total, cB)! * cB;
 
-    expect(bucketA).toBeCloseTo(share(wA, total) * 100, 6);
-    expect(bucketB).toBeCloseTo(share(wB, total) * 100, 6);
+    expect(bucketA).toBeCloseTo(scoreShare(wA, total) * 100, 6);
+    expect(bucketB).toBeCloseTo(scoreShare(wB, total) * 100, 6);
 
     // 두 유형을 합치면 언제나 100 점이다. 슬라이더 눈금 총합과 무관하다.
     expect(bucketA + bucketB).toBeCloseTo(100, 6);
@@ -58,7 +49,7 @@ describe("화면의 문항당 점수가 채점 기여와 일치한다", () => {
   it("모든 유형을 같은 값으로 올리면 균등해진다", () => {
     // 이게 예전에 가장 헷갈리던 지점이다. 100/100 으로 올리면 "점수가 커졌다"고
     // 보였지만 실제로는 60:40 이 50:50 으로 바뀐 것이었다.
-    expect(share(100, 200)).toBe(0.5);
+    expect(scoreShare(100, 200)).toBe(0.5);
     expect(perQuestionScore(100, 200, 3)).toBeCloseTo(50 / 3, 6);
   });
 
@@ -68,7 +59,7 @@ describe("화면의 문항당 점수가 채점 기여와 일치한다", () => {
 
   it("총합이 0 이면 0 으로 떨어진다", () => {
     // 0 으로 나누기를 만들면 안 된다.
-    expect(share(0, 0)).toBe(0);
+    expect(scoreShare(0, 0)).toBe(0);
     expect(perQuestionScore(0, 0, 3)).toBe(0);
   });
 });
@@ -117,5 +108,30 @@ describe("채점 산출값은 이 변경으로 바뀌지 않는다 (실제 함�
   it("정규화 분모가 슬라이더 눈금 총합이다", () => {
     expect(score(weights(60, 40)).totalConfiguredWeight).toBe(100);
     expect(score(weights(600, 400)).totalConfiguredWeight).toBe(1000);
+  });
+});
+
+describe("반올림 한계를 인지하고 있다", () => {
+  const fmt = (v: number) =>
+    Number.isInteger(v) ? String(v) : v.toFixed(1).replace(/\.0$/, "");
+
+  it("균등 3유형은 표시 합이 99.9% 가 된다", () => {
+    // 1/3 을 소수 1자리로 세 번 반올림하면 100 이 안 된다. 화면 문구가
+    // '약 N%' 인 이유다. 채점에는 영향이 없다 - 표시만의 문제다.
+    const shown = [1, 1, 1].map((w) => Number(fmt(scoreShare(w, 3) * 100)));
+    expect(shown).toEqual([33.3, 33.3, 33.3]);
+    expect(shown.reduce((a, b) => a + b, 0)).toBeCloseTo(99.9, 6);
+  });
+
+  it("문항당 점수 x 문항 수가 표시된 share 와 어긋날 수 있다", () => {
+    // 레드팀이 찾은 케이스: weights 1/1/6, 첫 유형 10문항.
+    // 정확한 값은 일치하지만 각각 반올림하면 0.5 차이가 보인다.
+    const exactShare = scoreShare(1, 8) * 100;
+    const exactPer = perQuestionScore(1, 8, 10)!;
+    expect(exactPer * 10).toBeCloseTo(exactShare, 10);
+
+    // 표시 단계에서만 갈린다.
+    expect(Number(fmt(exactShare))).toBe(12.5);
+    expect(Number(fmt(exactPer)) * 10).toBeCloseTo(13, 6);
   });
 });

@@ -405,7 +405,7 @@
     "buttonAddManual": "추가",
     "optional": "선택",
     "buttonResetWeight": "기본값",
-    "scoreWeightsShare": "최종 점수의 {share}%"
+    "scoreWeightsShare": "최종 점수의 약 {share}%"
   },
   "examCode": {
     "copyAria": "시험 코드 복사",
