@@ -36,9 +36,9 @@ interface StudentProgressCardProps {
 const getStudentStatusColor = (status: string) => {
   switch (status) {
     case "completed":
-      return "bg-green-100 text-green-800";
+      return "bg-success-subtle text-success-text";
     case "in-progress":
-      return "bg-yellow-100 text-yellow-800";
+      return "bg-warning-subtle text-warning-text";
     case "not-started":
       return "bg-secondary text-secondary-foreground";
     default:
@@ -169,8 +169,8 @@ export function StudentProgressCard({
                       >
                         {student.status === "in-progress" && (
                           <span className="relative flex h-2 w-2 mr-1.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-600 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-600"></span>
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning-solid opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-warning-solid"></span>
                           </span>
                         )}
                         {student.status === "completed"
@@ -232,7 +232,7 @@ export function StudentProgressCard({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-green-600 border-green-600 hover:bg-green-50 h-8"
+                        className="text-primary border-primary hover:bg-primary/10 h-8"
                         onClick={() => handleLiveMonitoring(student)}
                       >
                         <Activity className="w-3.5 h-3.5 mr-1" />
@@ -243,7 +243,7 @@ export function StudentProgressCard({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-blue-600 border-blue-600 hover:bg-blue-50 h-8"
+                        className="text-info-text border-info-border hover:bg-info-surface h-8"
                         onClick={() =>
                           (window.location.href = `/instructor/${examId}/grade/${student.id}`)
                         }

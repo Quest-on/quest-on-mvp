@@ -39,12 +39,25 @@ describe("장식용 원색을 쓰지 않는다", () => {
   });
 });
 
-describe("의미 있는 상태색은 남긴다", () => {
-  it("발행·대기 배지의 emerald·yellow 는 유지된다", () => {
-    // 규칙상 녹=성공, 황=경고. 이건 의미가 있으므로 지우면 안 된다.
-    // (#203 에서 시맨틱 토큰으로 옮길 대상이지 이 이슈의 대상이 아니다)
-    expect(SOURCE).toMatch(/emerald/);
-    expect(SOURCE).toMatch(/yellow/);
+describe("의미 있는 상태색은 토큰으로 표현된다", () => {
+  it("발행·대기 배지가 success/warning 토큰을 쓴다", () => {
+    // 이 테스트는 원래 'emerald·yellow 원색이 유지되는지' 를 봤다. 당시엔
+    // success/warning 토큰이 없어서 원색이 유일한 표현 수단이었고, 주석에도
+    // '#203 에서 시맨틱 토큰으로 옮길 대상' 이라고 적어뒀다.
+    //
+    // #233 이 토큰을 만들었고 이제 옮겼다. 의미가 사라진 게 아니라 표현이
+    // 바뀐 것이므로, 원색 대신 토큰 사용을 확인한다.
+    expect(SOURCE).toMatch(/-(success|warning)-(surface|subtle|border|solid|text)/);
+  });
+
+  it("상태색 원색이 남아 있지 않다", () => {
+    // 토큰으로 옮긴 뒤 원색이 다시 들어오면 다크모드 대비를 각 사용처가
+    // 따로 책임지게 되고, 같은 의미가 두 방식으로 갈린다.
+    const raw =
+      withoutFolderPalette.match(
+        /(bg|text|border|ring)-(emerald|green|amber|yellow|blue|sky|indigo)-(50|[1-9]00|950)/g
+      ) ?? [];
+    expect(raw).toEqual([]);
   });
 });
 

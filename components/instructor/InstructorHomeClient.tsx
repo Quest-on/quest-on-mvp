@@ -554,13 +554,13 @@ export default function InstructorHome() {
       }
       if (!openAt || now >= openAt) {
         return (
-          <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+          <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-success-subtle text-success-text dark:text-success-solid">
             {t("drive.statusActive")}
           </span>
         );
       }
       return (
-        <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+        <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-warning-subtle text-warning-text dark:text-warning-solid">
           {t("drive.statusScheduled")}
         </span>
       );
@@ -580,7 +580,7 @@ export default function InstructorHome() {
 
     const badgeClasses =
       node.exams.status === "active"
-        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+        ? "bg-success-subtle text-success-text dark:text-success-solid"
         : "bg-secondary text-secondary-foreground";
 
     return (

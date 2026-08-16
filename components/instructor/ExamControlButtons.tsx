@@ -195,7 +195,7 @@ export function ExamControlButtons({
       case "scheduled":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+            <Badge variant="secondary" className="bg-warning-subtle text-warning-text">
               {t("examControlButtons.statusScheduled")}
             </Badge>
           ),
@@ -203,7 +203,7 @@ export function ExamControlButtons({
             <Button
               onClick={() => setShowStartDialog(true)}
               disabled={isStarting}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-primary hover:bg-primary/90"
             >
               <Play className="h-4 w-4 mr-2" />
               {t("examControlButtons.buttonStart")}
@@ -222,7 +222,7 @@ export function ExamControlButtons({
             <Button
               onClick={() => setShowStartDialog(true)}
               disabled={isStarting}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-primary hover:bg-primary/90"
             >
               <Play className="h-4 w-4 mr-2" />
               {t("examControlButtons.buttonStart")}
@@ -232,7 +232,7 @@ export function ExamControlButtons({
       case "joinable":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+            <Badge variant="secondary" className="bg-info-subtle text-info-text">
               {t("examControlButtons.statusJoinable")}
             </Badge>
           ),
@@ -240,7 +240,7 @@ export function ExamControlButtons({
             <Button
               onClick={() => setShowStartDialog(true)}
               disabled={isStarting}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-primary hover:bg-primary/90"
             >
               <Play className="h-4 w-4 mr-2" />
               {t("examControlButtons.buttonStart")}
@@ -250,7 +250,7 @@ export function ExamControlButtons({
       case "running":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-green-100 text-green-800">
+            <Badge variant="secondary" className="bg-success-subtle text-success-text">
               {t("examControlButtons.statusRunning")}
             </Badge>
           ),
@@ -422,7 +422,7 @@ export function ExamControlButtons({
             <AlertDialogAction
               onClick={handleStartExam}
               disabled={isStarting}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {isStarting ? (
                 <>
