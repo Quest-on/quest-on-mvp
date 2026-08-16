@@ -517,7 +517,7 @@ export default function GradeStudentPage({
                     <Card key={question.id || `${question.type}-${globalIndex}`}>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                          <FileText className="h-5 w-5 text-blue-600" />
+                          <FileText className="h-5 w-5 text-info-text" />
                           {t("gradePage.questionTitle", { number: displayIndex + 1 })}
                         </CardTitle>
                       </CardHeader>
@@ -555,13 +555,13 @@ export default function GradeStudentPage({
 
           {/* 강제 종료 자동 제출 안내 배너 */}
           {sessionData.session.auto_submitted && (
-            <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <div className="mb-6 p-4 bg-warning-surface border border-warning-border rounded-lg flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-warning-text shrink-0" />
               <div>
-                <p className="font-medium text-amber-800 dark:text-amber-200">
+                <p className="font-medium text-warning-text">
                   {t("gradePage.autoSubmittedBannerTitle")}
                 </p>
-                <p className="text-sm text-amber-600 dark:text-amber-400">
+                <p className="text-sm text-warning-text">
                   {t("gradePage.autoSubmittedBannerDesc")}
                 </p>
               </div>
@@ -590,14 +590,14 @@ export default function GradeStudentPage({
             // In-progress state — show progress bar, no retry button
             if (inProgress) {
               return (
-                <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg space-y-3">
+                <div className="mb-6 p-4 bg-info-surface border border-info-border rounded-lg space-y-3">
                   <div className="flex items-center gap-3">
-                    <Loader2 className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 animate-spin" />
+                    <Loader2 className="h-5 w-5 text-info-text shrink-0 animate-spin" />
                     <div>
-                      <p className="font-medium text-blue-800 dark:text-blue-200">
+                      <p className="font-medium text-info-text">
                         {t("gradePage.gradingInProgressTitle")}
                       </p>
-                      <p className="text-sm text-blue-600 dark:text-blue-400">
+                      <p className="text-sm text-info-text">
                         {total > 0 ? t("gradePage.gradingProgress", { done, total }) : t("gradePage.gradingWaiting")}
                         {gp && gp.failed > 0 && (
                           <span className="ml-2 text-destructive">
@@ -608,9 +608,9 @@ export default function GradeStudentPage({
                     </div>
                   </div>
                   {total > 0 && (
-                    <div className="h-2 w-full rounded-full bg-blue-100 dark:bg-blue-900/40 overflow-hidden">
+                    <div className="h-2 w-full rounded-full bg-info-subtle overflow-hidden">
                       <div
-                        className="h-full bg-blue-500 transition-all"
+                        className="h-full bg-primary transition-all"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -629,14 +629,14 @@ export default function GradeStudentPage({
               : t("gradePage.gradingAbsentDesc");
 
             return (
-              <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg flex items-center justify-between gap-4">
+              <div className="mb-6 p-4 bg-warning-surface border border-warning-border rounded-lg flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <AlertTriangle className="h-5 w-5 text-warning-text shrink-0" />
                   <div>
-                    <p className="font-medium text-amber-800 dark:text-amber-200">
+                    <p className="font-medium text-warning-text">
                       {title}
                     </p>
-                    <p className="text-sm text-amber-600 dark:text-amber-400">
+                    <p className="text-sm text-warning-text">
                       {desc}
                     </p>
                   </div>
@@ -645,7 +645,7 @@ export default function GradeStudentPage({
                   onClick={handleRegrade}
                   disabled={isRegrading}
                   variant="outline"
-                  className="border-amber-300 dark:border-amber-700 shrink-0"
+                  className="border-warning-border shrink-0"
                 >
                   {isRegrading ? (
                     <>
