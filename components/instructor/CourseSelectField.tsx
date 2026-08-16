@@ -146,7 +146,6 @@ export function CourseSelectField({
             {t("course.optional")}
           </span>
         </Label>
-        <p className="text-sm text-muted-foreground">{t("course.helper")}</p>
       </div>
 
       {showSkeleton ? (
@@ -161,15 +160,9 @@ export function CourseSelectField({
         />
       ) : courses.length === 0 && !isCreating ? (
         <div
-          className="space-y-3 rounded-lg border border-dashed border-border bg-muted/20 p-4"
+          className="space-y-3"
           data-testid="course-select-empty"
         >
-          <div className="space-y-1">
-            <p className="text-sm font-medium">{t("course.emptyTitle")}</p>
-            <p className="text-sm text-muted-foreground">
-              {t("course.emptyDescription")}
-            </p>
-          </div>
           <Button
             type="button"
             variant="outline"
