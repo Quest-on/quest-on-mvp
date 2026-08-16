@@ -240,9 +240,9 @@ export default function CreateAssignment() {
               }}
             />
 
-            <div ref={questionsListRef} className={fieldErrors.questions ? "rounded-lg ring-2 ring-red-500 ring-offset-2" : ""}>
+            <div ref={questionsListRef} className={fieldErrors.questions ? "rounded-lg ring-2 ring-destructive ring-offset-2" : ""}>
               {fieldErrors.questions && (
-                <p className="text-xs text-red-500 mb-2 px-1">{fieldErrors.questions}</p>
+                <p className="text-xs text-destructive mb-2 px-1">{fieldErrors.questions}</p>
               )}
               <QuestionsList
                 questions={questions}

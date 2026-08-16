@@ -337,7 +337,7 @@ export function CaseQuestionGenerator({
                       status === "done"
                         ? "text-emerald-600 dark:text-emerald-400"
                         : status === "failed"
-                        ? "text-red-500"
+                        ? "text-destructive"
                         : "text-blue-600 dark:text-blue-400"
                     }
                   >
@@ -543,21 +543,21 @@ export function CaseQuestionGenerator({
                               {status === "done" ? (
                                 <CheckCircle2 className="w-3 h-3 text-green-600 dark:text-green-400" />
                               ) : status === "failed" ? (
-                                <AlertCircle className="w-3 h-3 text-red-500" />
+                                <AlertCircle className="w-3 h-3 text-destructive" />
                               ) : (
                                 <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
                               )}
                               <span
                                 className={
                                   status === "failed"
-                                    ? "text-red-500 line-through"
+                                    ? "text-destructive line-through"
                                     : "text-muted-foreground"
                                 }
                               >
                                 {fileName}
                               </span>
                               {status === "failed" && (
-                                <span className="text-red-500">
+                                <span className="text-destructive">
                                   {t("caseQuestionGenerator.extractionFailed")}
                                 </span>
                               )}

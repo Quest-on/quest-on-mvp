@@ -37,7 +37,7 @@ interface GradingPanelProps {
 
 const SENTIMENT_CLASS: Record<"positive" | "negative" | "neutral", string> = {
   positive: "bg-green-100 text-green-700 border-green-200",
-  negative: "bg-red-100 text-red-700 border-red-200",
+  negative: "bg-destructive/15 text-destructive border-destructive",
   neutral: "bg-gray-100 text-gray-700 border-gray-200",
 };
 

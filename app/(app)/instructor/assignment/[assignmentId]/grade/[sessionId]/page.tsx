@@ -297,7 +297,7 @@ export default function AssignmentGradePage({
       <div className="container mx-auto p-6">
         <div className="text-center py-12 space-y-4">
           <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
-          <h2 className="text-xl font-semibold text-red-600 mb-2">
+          <h2 className="text-xl font-semibold text-destructive mb-2">
             {sessionError
               ? t("assignmentGradePage.errorTitle")
               : t("assignmentGradePage.notFoundTitle")}
@@ -428,7 +428,7 @@ export default function AssignmentGradePage({
                       <p className="text-sm text-blue-600 dark:text-blue-400">
                         {total > 0 ? t("assignmentGradePage.gradingProgress", { done, total }) : t("assignmentGradePage.gradingWaiting")}
                         {gp && gp.failed > 0 && (
-                          <span className="ml-2 text-red-600 dark:text-red-400">
+                          <span className="ml-2 text-destructive">
                             ({t("assignmentGradePage.gradingFailed", { count: gp.failed })})
                           </span>
                         )}

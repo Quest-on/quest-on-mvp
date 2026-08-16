@@ -1048,7 +1048,7 @@ export function BulkGradingPanel({
                         className={cn(
                           "shrink-0 rounded px-1.5 py-0.5 text-[11px]",
                           s.failed
-                            ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                            ? "bg-destructive/15 text-destructive"
                             : "bg-muted text-muted-foreground",
                         )}
                       >

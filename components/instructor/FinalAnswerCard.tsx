@@ -113,14 +113,14 @@ export function FinalAnswerCard({
         {submission ? (
           <div className="space-y-3">
             {suspiciousLogs.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-3">
+              <div className="bg-destructive/10 border border-destructive rounded-md p-3">
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-red-800 mb-1">
+                    <p className="text-sm font-semibold text-destructive mb-1">
                       {t("finalAnswerCard.suspiciousTitle")}
                     </p>
-                    <div className="text-xs text-red-700 space-y-1">
+                    <div className="text-xs text-destructive space-y-1">
                       {suspiciousLogs.map((log) => (
                         <p key={log.id}>
                           {t("finalAnswerCard.suspiciousLog", { chars: log.length.toLocaleString(), time: formatTime(log.timestamp, locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" }) })}
@@ -154,7 +154,7 @@ export function FinalAnswerCard({
               <div className="flex items-center gap-4 text-xs text-muted-foreground px-1">
                 {suspiciousLogs.length > 0 && (
                   <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-3 h-3 rounded bg-red-200" />
+                    <span className="inline-block w-3 h-3 rounded bg-destructive/25" />
                     {t("finalAnswerCard.legendExternal")}
                   </span>
                 )}
@@ -165,7 +165,7 @@ export function FinalAnswerCard({
                   </span>
                 )}
                 <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-3 h-3 rounded bg-red-100 opacity-60 border border-red-200" />
+                  <span className="inline-block w-3 h-3 rounded bg-destructive/15 opacity-60 border border-destructive" />
                   {t("finalAnswerCard.legendModified")}
                 </span>
               </div>
