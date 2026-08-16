@@ -385,10 +385,8 @@
     "scoreWeightsError": "Saved weights do not match the current question configuration. {error}",
     "buttonRestoreWeights": "Restore based on current questions",
     "fieldChatWeightLabel": "Grading Weight",
-    "fieldChatWeightHelper": "The ratio of AI conversation vs. final answer in grading. Defaults to 50:50 if left blank.",
+    "fieldChatWeightHelper": "How much the AI conversation and the final answer each count toward grading. The default is 50:50.",
     "chatWeightDisplay": "Conversation {chat}% / Final answer {final}%",
-    "buttonAdjust": "Adjust",
-    "switchCustomWeight": "Custom",
     "badgeReady": "Ready to publish",
     "badgeCheck": "Action required",
     "badgeQuestionCount": "{count, plural, one {# question} other {# questions}}",
@@ -405,7 +403,8 @@
     "buttonGenerating": "Generating...",
     "buttonAIGenerate": "Generate {count, plural, one {# question} other {# questions}} with AI",
     "buttonAddManual": "Add",
-    "optional": "Optional"
+    "optional": "Optional",
+    "buttonResetWeight": "Reset"
   },
   "examCode": {
     "copyAria": "Copy exam code",
