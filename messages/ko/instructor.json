@@ -405,7 +405,8 @@
     "colorPurple": "보라",
     "colorPink": "핑크",
     "colorGray": "회색",
-    "toastExamCodeBlocked": "발행 한도에 도달해 지금은 코드를 복사할 수 없습니다. 계정 인증 후 다시 시도해 주세요."
+    "toastExamCodeBlocked": "발행 한도에 도달해 지금은 코드를 복사할 수 없습니다. 계정 인증 후 다시 시도해 주세요.",
+    "loadError": "목록을 불러오지 못했습니다."
   },
   "new": {
     "createExamFailed": "시험 생성에 실패했습니다"
