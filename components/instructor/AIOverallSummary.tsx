@@ -76,7 +76,7 @@ export function AIOverallSummary({
             <h4 className="font-semibold mb-2 text-sm text-muted-foreground uppercase tracking-wider">
               {t("aiOverallSummary.overallOpinion")}
             </h4>
-            <p className="text-base leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+            <p className="text-base leading-relaxed text-foreground whitespace-pre-wrap">
               {summary.summary}
             </p>
           </div>
@@ -88,7 +88,7 @@ export function AIOverallSummary({
               </h4>
               <ul className="space-y-3">
                 {summary.keyQuotes.map((quote, i) => (
-                  <li key={i} className="relative pl-4 italic text-gray-700">
+                  <li key={i} className="relative pl-4 italic text-foreground">
                     <span className="absolute left-0 top-0 text-yellow-400 text-xl font-serif">
                       &quot;
                     </span>

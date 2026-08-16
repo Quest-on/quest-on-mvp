@@ -38,12 +38,12 @@ export function QuestionPromptCard({
       </CardHeader>
       <CardContent>
         {question ? (
-          <div className="bg-gray-50 rounded-lg p-4">
+          <div className="bg-muted rounded-lg p-4">
             <RichTextViewer content={question.prompt} className="text-sm" />
             {question.ai_context && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-xs text-gray-600 mb-2">{t("questionPromptCard.labelAiContext")}</p>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-xs text-muted-foreground mb-2">{t("questionPromptCard.labelAiContext")}</p>
+                <p className="text-sm text-foreground whitespace-pre-wrap">
                   {question.ai_context}
                 </p>
               </div>
@@ -52,7 +52,7 @@ export function QuestionPromptCard({
         ) : (
           <div className="text-center py-8 text-destructive">
             <p>{t("questionPromptCard.errorLoad")}</p>
-            <p className="text-sm mt-2 text-gray-600">
+            <p className="text-sm mt-2 text-muted-foreground">
               {t("questionPromptCard.errorIndex", { index: questionNumber - 1 })}
             </p>
           </div>

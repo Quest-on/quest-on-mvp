@@ -40,9 +40,9 @@ const getStudentStatusColor = (status: string) => {
     case "in-progress":
       return "bg-yellow-100 text-yellow-800";
     case "not-started":
-      return "bg-gray-100 text-gray-800";
+      return "bg-secondary text-secondary-foreground";
     default:
-      return "bg-gray-100 text-gray-800";
+      return "bg-secondary text-secondary-foreground";
   }
 };
 

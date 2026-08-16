@@ -37,7 +37,7 @@ function dashboardStatusClass(status: ReturnType<typeof dashboardStatus>): strin
     case "in-progress":
       return "bg-yellow-100 text-yellow-800 text-xs";
     default:
-      return "bg-gray-100 text-gray-800 text-xs";
+      return "bg-secondary text-secondary-foreground text-xs";
   }
 }
 

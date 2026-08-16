@@ -95,7 +95,7 @@ function getStatusBadge(
       </Badge>
     );
   }
-  return <Badge className="bg-gray-100 text-gray-800 text-xs">{t("assignmentDetail.statusNotSubmitted")}</Badge>;
+  return <Badge className="bg-secondary text-secondary-foreground text-xs">{t("assignmentDetail.statusNotSubmitted")}</Badge>;
 }
 
 export default function AssignmentDashboard({
@@ -303,7 +303,7 @@ export default function AssignmentDashboard({
 
     if (deadline && now > deadline) {
       return (
-        <Badge variant="outline" className="border-gray-500 text-gray-700">
+        <Badge variant="outline" className="border-border text-foreground">
           {t("assignmentDetail.statusClosed")}
         </Badge>
       );

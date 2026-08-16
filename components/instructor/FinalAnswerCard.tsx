@@ -57,7 +57,7 @@ export function FinalAnswerCard({
         </CardHeader>
         <CardContent>
           {text ? (
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-muted rounded-lg p-4">
               <pre className="text-sm whitespace-pre-wrap break-words font-sans">
                 {text}
               </pre>
@@ -170,7 +170,7 @@ export function FinalAnswerCard({
                 </span>
               </div>
             )}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-muted rounded-lg p-4">
               <div
                 className="text-sm prose max-w-none whitespace-pre-wrap break-words"
                 dangerouslySetInnerHTML={{

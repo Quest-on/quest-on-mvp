@@ -214,7 +214,7 @@ export function ExamControlButtons({
         // 기본적으로 항상 "시험 시작" 버튼 표시
         return {
           badge: (
-            <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+            <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
               {t("examControlButtons.statusDraft")}
             </Badge>
           ),
@@ -304,7 +304,7 @@ export function ExamControlButtons({
       case "closed":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+            <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
               {t("examControlButtons.statusClosed")}
             </Badge>
           ),
@@ -313,7 +313,7 @@ export function ExamControlButtons({
       default:
         return {
           badge: (
-            <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+            <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
               {examStatus || t("examControlButtons.statusUnknown")}
             </Badge>
           ),
