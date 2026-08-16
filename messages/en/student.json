@@ -87,7 +87,8 @@
       "startFirst": "Start your first exam",
       "noResults": "No results found",
       "noResultsHint": "Try a different keyword or filter.",
-      "resetSearch": "Clear search"
+      "resetSearch": "Clear search",
+      "loadError": "Could not load your exams."
     },
     "session": {
       "statusAria": "Status: {status}",

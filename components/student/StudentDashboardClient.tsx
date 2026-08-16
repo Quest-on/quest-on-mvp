@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/sidebar";
 import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { qk } from "@/lib/query-keys";
 import { useInView } from "react-intersection-observer";
 import { usePathname } from "next/navigation";
@@ -218,6 +219,8 @@ export default function StudentDashboard() {
     hasNextPage,
     isFetchingNextPage,
     isLoading: isSessionsLoading,
+    isError: isSessionsError,
+    refetch: refetchSessions,
   } = useInfiniteQuery({
     queryKey: qk.student.sessions(user?.id),
     queryFn: async ({ pageParam = 1, signal }) => {
@@ -985,6 +988,16 @@ export default function StudentDashboard() {
                           <SessionCardSkeletonList />
                         </div>
                       )
+                    ) : isSessionsError ? (
+                      /*
+                        오류를 빈 상태로 보여주면 안 된다. 예전에는 isError 를 안 봐서
+                        조회가 실패해도 "응시한 시험이 없다" 고 말했다. 학생에게 이건
+                        자기 응시 기록이 사라졌다는 뜻으로 읽힌다.
+                      */
+                      <ErrorAlert
+                        message={t("emptyState.loadError")}
+                        onRetry={() => refetchSessions()}
+                      />
                     ) : allSessions.length === 0 ? (
                       <div
                         className="text-center py-12 sm:py-16 border-2 border-dashed border-muted-foreground/20 rounded-lg bg-muted/30"
