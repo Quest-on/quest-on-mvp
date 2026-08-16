@@ -15,6 +15,20 @@ export class InstructorCreateExamPage {
     return this.page.locator("#code");
   }
 
+  /** 대화 비중 슬라이더 (#212 후속: 클릭 없이 바로 조작 가능해야 한다) */
+  get chatWeightSlider(): Locator {
+    return this.page.getByRole("slider", { name: /대화 비중|AI 대화/ });
+  }
+
+  /** 대화 N% / 최종 답안 M% 표시 */
+  get chatWeightDisplay(): Locator {
+    return this.page.getByText(/대화 \d+% *\/ *최종 답안 \d+%/);
+  }
+
+  /** 기본값 복귀 버튼 — 사용자가 값을 지정했을 때만 나타난다 */
+  get chatWeightResetBtn(): Locator {
+    return this.page.getByRole("button", { name: /^기본값$/ });
+  }
   get manualQuestionsToggle(): Locator {
     return this.page.getByTestId("manual-questions-toggle");
   }

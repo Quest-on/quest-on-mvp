@@ -387,8 +387,6 @@
     "fieldChatWeightLabel": "채점 비중",
     "fieldChatWeightHelper": "AI 대화 과정과 최종 답안을 채점에 반영하는 비율입니다. 비워두면 기본값 50:50으로 채점됩니다.",
     "chatWeightDisplay": "대화 {chat}% / 최종 답안 {final}%",
-    "buttonAdjust": "조정",
-    "switchCustomWeight": "직접 설정",
     "badgeReady": "출제 가능",
     "badgeCheck": "확인 필요",
     "badgeQuestionCount": "문제 {count}개",
@@ -405,7 +403,8 @@
     "buttonGenerating": "생성 중...",
     "buttonAIGenerate": "AI로 {count}개 생성",
     "buttonAddManual": "추가",
-    "optional": "선택"
+    "optional": "선택",
+    "buttonResetWeight": "기본값"
   },
   "examCode": {
     "copyAria": "시험 코드 복사",

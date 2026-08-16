@@ -151,4 +151,46 @@ test.describe("Instructor — Create Exam Flow", () => {
     await instructorPage.waitForURL(/\/instructor/, { timeout: TIMEOUTS.PAGE_LOAD });
     expect(instructorPage.url()).toContain("/instructor");
   });
+
+  test("대화 비중 슬라이더가 클릭 없이 바로 조작 가능하다", async ({
+    instructorPage,
+  }) => {
+    // 예전에는 "조정" 버튼 -> "직접 설정" 스위치를 거쳐야 슬라이더가 나타났다.
+    // 둘 다 아무 값도 정하지 않는 순수 UI 개폐 동작이었다.
+    const createExam = new InstructorCreateExamPage(instructorPage);
+    await createExam.goto();
+    await expect(createExam.pageHeading).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
+
+    await expect(createExam.chatWeightDisplay).toBeVisible();
+    await expect(createExam.chatWeightSlider).toBeVisible();
+
+    // 펼침 버튼과 스위치가 남아 있으면 클릭 비용이 되살아난 것이다.
+    await expect(
+      instructorPage.getByRole("button", { name: /^조정$/ })
+    ).toHaveCount(0);
+  });
+
+  test("기본값 복귀 버튼은 값을 바꾼 뒤에만 나타난다", async ({
+    instructorPage,
+  }) => {
+    const createExam = new InstructorCreateExamPage(instructorPage);
+    await createExam.goto();
+    await expect(createExam.chatWeightSlider).toBeVisible({
+      timeout: TIMEOUTS.PAGE_LOAD,
+    });
+
+    // 손대지 않은 상태에서는 되돌릴 것이 없다.
+    await expect(createExam.chatWeightResetBtn).toHaveCount(0);
+
+    // 키보드로 값을 바꾼다 — 드래그보다 안정적이고 접근성도 함께 검증한다.
+    await createExam.chatWeightSlider.focus();
+    await instructorPage.keyboard.press("ArrowRight");
+
+    await expect(createExam.chatWeightResetBtn).toBeVisible();
+
+    // 되돌리면 다시 사라진다(= chatWeight 가 null 로 돌아갔다).
+    await createExam.chatWeightResetBtn.click();
+    await expect(createExam.chatWeightResetBtn).toHaveCount(0);
+  });
+
 });

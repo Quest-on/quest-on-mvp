@@ -371,7 +371,6 @@ export function SimpleExamAuthoringForm({
   onRemoveExistingFile,
 }: SimpleExamAuthoringFormProps) {
   const t = useTranslations("authoring");
-  const [showAdvancedGrading, setShowAdvancedGrading] = useState(false);
   // "+" 문제 추가 — 문제 유형을 고르는 Dialog 의 열림 상태.
   const [isAddPickerOpen, setIsAddPickerOpen] = useState(false);
   // 추가 다이얼로그에서 선택 중인 문제 유형.
@@ -1278,46 +1277,43 @@ export function SimpleExamAuthoringForm({
               tooltip={t("simpleExamAuthoringForm.fieldChatWeightHelper")}
             >
               <div className="rounded-md border bg-muted/20 p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">
-                {t("simpleExamAuthoringForm.chatWeightDisplay", { chat: effectiveWeight, final: 100 - effectiveWeight })}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAdvancedGrading((prev) => !prev)}
-                className="ml-auto"
-              >
-                {t("simpleExamAuthoringForm.buttonAdjust")}
-              </Button>
-            </div>
-            {showAdvancedGrading && (
-              <div className="mt-3 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="simple-custom-weight"
-                    checked={isCustomWeight}
-                    onCheckedChange={(checked) =>
-                      onChatWeightChange(checked ? 50 : null)
-                    }
-                  />
-                  <Label htmlFor="simple-custom-weight" className="text-sm">
-                    {t("simpleExamAuthoringForm.switchCustomWeight")}
-                  </Label>
+                {/*
+                  슬라이더를 처음부터 펼쳐 둔다. 예전에는 "조정" 버튼으로 펼치고
+                  "직접 설정" 스위치를 켜야 슬라이더가 나타나서, 값을 바꾸려면
+                  아무것도 정하지 않는 클릭을 두 번 먼저 해야 했다. 게다가 스위치를
+                  켜면 기본값과 같은 50 이 들어가 화면상 아무 변화도 없었다.
+
+                  chatWeight 는 null 이 기본값이고 숫자가 사용자 지정이다. 그 내부
+                  상태를 스위치로 노출하는 대신, 슬라이더를 움직이는 행위 자체를
+                  사용자 지정으로 본다 — 안 건드리면 계속 null 이라 저장 계약이
+                  그대로 유지된다.
+                */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">
+                    {t("simpleExamAuthoringForm.chatWeightDisplay", { chat: effectiveWeight, final: 100 - effectiveWeight })}
+                  </span>
+                  {isCustomWeight && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="ml-auto"
+                      onClick={() => onChatWeightChange(null)}
+                    >
+                      {t("simpleExamAuthoringForm.buttonResetWeight")}
+                    </Button>
+                  )}
                 </div>
-                {isCustomWeight && (
-                  <Slider
-                    value={[effectiveWeight]}
-                    onValueChange={([value]) => onChatWeightChange(value)}
-                    min={0}
-                    max={100}
-                    step={10}
-                  />
-                )}
-              </div>
-            )}
+                <Slider
+                  className="mt-3"
+                  value={[effectiveWeight]}
+                  onValueChange={([value]) => onChatWeightChange(value)}
+                  min={0}
+                  max={100}
+                  step={10}
+                  aria-label={t("simpleExamAuthoringForm.fieldChatWeightLabel")}
+                />
               </div>
             </SubField>
           </div>
