@@ -736,9 +736,6 @@ export default function CreateExam() {
                 {isDemoMode ? t("newExam.backToDemo") : t("newExam.backToDashboard")}
               </Button>
             </div>
-            <p className="text-muted-foreground">
-              {t("newExam.pageDesc")}
-            </p>
           </div>
 
           {/* AI 에이전트 작성 중 배너 — 중단(take-over) 컨트롤 포함 */}

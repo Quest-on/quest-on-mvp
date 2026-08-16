@@ -199,7 +199,6 @@ export default function CreateAssignment() {
                 {t("newAssignment.backToDashboard")}
               </Button>
             </div>
-            <p className="text-muted-foreground">{t("newAssignment.pageDesc")}</p>
           </div>
 
           <form onSubmit={handleSubmit} onKeyDown={(e) => { if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "TEXTAREA") e.preventDefault(); }} className="space-y-6">

@@ -3,7 +3,6 @@
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -173,7 +172,6 @@ export function ExamInfoForm({
     <Card>
       <CardHeader>
         <CardTitle>{mode === "assignment" ? t("examInfoForm.cardTitleAssignment") : t("examInfoForm.cardTitleExam")}</CardTitle>
-        <CardDescription>{mode === "assignment" ? t("examInfoForm.cardDescriptionAssignment") : t("examInfoForm.cardDescriptionExam")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
