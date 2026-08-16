@@ -1169,7 +1169,7 @@ export function SimpleExamAuthoringForm({
                           style={{
                             width: `${totalScoreWeight > 0 ? (weight / totalScoreWeight) * 100 : 0}%`,
                           }}
-                          title={`${t(SCORE_BUCKET_LABEL_KEYS[bucket])} ${weight}%`}
+                          title={`${t(SCORE_BUCKET_LABEL_KEYS[bucket])} ${formatScoreValue(getScoreShare(bucket) * 100)}%`}
                         />
                       );
                     })}
@@ -1185,7 +1185,7 @@ export function SimpleExamAuthoringForm({
                           <span
                             className={`h-2 w-2 rounded-full ${SCORE_BUCKET_COLORS[bucket]}`}
                           />
-                          {t(SCORE_BUCKET_LABEL_KEYS[bucket])} {weight}%
+                          {t(SCORE_BUCKET_LABEL_KEYS[bucket])} {weight}
                         </span>
                       );
                     })}
@@ -1259,7 +1259,7 @@ export function SimpleExamAuthoringForm({
                             className="h-9 w-20 text-center"
                             aria-label={t("simpleExamAuthoringForm.ariaInputBucket", { bucket: t(SCORE_BUCKET_LABEL_KEYS[bucket]) })}
                           />
-                          <span className="text-sm text-muted-foreground">{t("simpleExamAuthoringForm.unitPercent")}</span>
+                          <span className="text-sm text-muted-foreground">{t("simpleExamAuthoringForm.unitWeight")}</span>
                         </div>
                       </div>
                     );

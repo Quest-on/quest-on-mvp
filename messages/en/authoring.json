@@ -378,7 +378,7 @@
     "buttonRedistribute": "Distribute Equally",
     "scoreWeightsCount": "{count, plural, one {# question} other {# questions}}",
     "scoreWeightsSingleType": "Only one question type is present — all points are assigned to this type.",
-    "scoreWeightsPerQuestion": "{count, plural, one {# question} other {# questions}} · {score} pts each",
+    "scoreWeightsPerQuestion": "{count} questions · about {score} pts each",
     "ariaSliderBucket": "{bucket} weight",
     "ariaInputBucket": "{bucket} weight",
     "unitPercent": "%",
@@ -405,7 +405,8 @@
     "buttonAddManual": "Add",
     "optional": "Optional",
     "buttonResetWeight": "Reset",
-    "scoreWeightsShare": "About {share}% of the final score"
+    "scoreWeightsShare": "About {share}% of the final score",
+    "unitWeight": "weight"
   },
   "examCode": {
     "copyAria": "Copy exam code",
