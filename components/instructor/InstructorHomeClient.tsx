@@ -1958,6 +1958,20 @@ export default function InstructorHome() {
                             )}
                           </div>
                         </>
+                      ) : isExamListError && !hasResults ? (
+                        /*
+                          오류는 "보여줄 게 없을 때" 만 낸다. React Query 는 재조회가
+                          실패해도 이전 data 를 들고 있으므로, hasResults 가 true 면
+                          가진 목록을 계속 보여주는 편이 낫다 - 있는 데이터를 오류로
+                          덮으면 사용자는 더 잃는다.
+
+                          반대로 가진 게 없는데 실패하면 "아직 시험이나 폴더가
+                          없습니다" 가 떠서 출제한 시험이 사라진 것처럼 읽힌다. (#241)
+                        */
+                        <ErrorAlert
+                          message={t("drive.loadError")}
+                          onRetry={() => refetchExamList()}
+                        />
                       ) : !hasResults ? (
                         <div className="text-center py-16 border-2 border-dashed border-muted-foreground/20 rounded-2xl bg-card/40">
                           <Folder className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -2088,17 +2102,7 @@ export default function InstructorHome() {
                                 );
                               })}
                             </div>
-                            {/*
-                              오류를 빈 상태로 보여주면 안 된다. 예전에는 isError 를 안 봐서
-                              목록 조회가 실패해도 "시험이 없습니다" 가 떴다. 교수자에게
-                              이건 출제한 시험이 사라졌다는 뜻으로 읽힌다. (#241)
-                            */}
-                            {isExamListError ? (
-                              <ErrorAlert
-                                message={t("drive.loadError")}
-                                onRetry={() => refetchExamList()}
-                              />
-                            ) : filteredExamNodes.length > 0 ? (
+                            {filteredExamNodes.length > 0 ? (
                               viewMode === "grid" ? (
                                 <>
                                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
