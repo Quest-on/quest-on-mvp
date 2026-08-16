@@ -385,7 +385,7 @@
     "scoreWeightsError": "저장된 비중이 현재 문제 구성과 맞지 않습니다. {error}",
     "buttonRestoreWeights": "현재 문제 기준으로 복구",
     "fieldChatWeightLabel": "채점 비중",
-    "fieldChatWeightHelper": "AI 대화 과정과 최종 답안을 채점에 반영하는 비율입니다. 비워두면 기본값 50:50으로 채점됩니다.",
+    "fieldChatWeightHelper": "AI 대화 과정과 최종 답안을 채점에 반영하는 비율입니다. 기본값은 50:50 입니다.",
     "chatWeightDisplay": "대화 {chat}% / 최종 답안 {final}%",
     "badgeReady": "출제 가능",
     "badgeCheck": "확인 필요",

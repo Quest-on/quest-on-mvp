@@ -3,19 +3,19 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * 대화 비중 슬라이더의 클릭 비용
+ * 대화 비중 슬라이더 — 구조 가드 (행동 검증 아님)
  *
- * 예전에는 슬라이더에 닿기까지 클릭이 3번 필요했다.
- *   ① "조정" 버튼으로 showAdvancedGrading 펼치기
- *   ② "직접 설정" Switch 로 isCustomWeight 켜기
- *   ③ 드래그
+ * 이 파일이 증명하는 것은 딱 하나다: **제거한 클릭 게이트가 되돌아오지 않는 것.**
+ * 슬라이더가 실제로 동작하는지, 값이 저장되는지는 여기서 증명할 수 없다 —
+ * 이 저장소의 vitest 는 `environment: "node"` 이고 React 렌더 인프라가 없다.
+ * 행동 검증은 `e2e/browser/instructor-chat-weight.spec.ts` 가 담당한다.
  *
- * ①②는 아무 값도 정하지 않는 순수 UI 개폐 동작이었다. 게다가 ②는 기본값과
- * 같은 50 을 넣어서 화면상 아무 변화가 없었다 — 눌러도 그대로인데 슬라이더만
- * 생기는 상태였다.
- *
- * chatWeight 는 null 이 기본값이고 숫자가 사용자 지정이다. 그 내부 상태를
- * 스위치로 노출한 게 원인이었다.
+ * 이 경계를 지키는 이유는 레드팀이 증명했다. 이전 버전은 소스 문자열을 정밀
+ * 매칭해서 "동작을 검증한다"고 주장했는데,
+ *   - 슬라이더 콜백을 `onChatWeightChange(100)` 으로 망가뜨려도 10개 전부 통과했고
+ *   - `className` 위치만 바꾸는 무해한 리팩터링에는 거짓 실패했다.
+ * 그래서 동작 주장은 전부 E2E 로 옮기고, 여기서는 식별자와 메시지 키만 본다.
+ * 식별자 존재/부재는 문자열 매칭으로도 신뢰할 수 있는 몇 안 되는 사실이다.
  */
 
 const SOURCE = readFileSync(
@@ -23,7 +23,7 @@ const SOURCE = readFileSync(
   "utf8"
 );
 
-/** 주석은 제외한다 — 설명문에 옛 식별자가 나와 자기 자신에 걸린다. */
+/** 주석 제외 — 설명문에 옛 식별자가 나와 자기 자신에 걸린다. */
 const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
 const ko = JSON.parse(
@@ -34,71 +34,47 @@ const en = JSON.parse(
   readFileSync(path.join(process.cwd(), "messages", "en", "authoring.json"), "utf8")
 ) as { simpleExamAuthoringForm: Record<string, string> };
 
-describe("슬라이더에 닿기까지 클릭이 필요 없다", () => {
-  it("펼침 게이트가 없다", () => {
-    // showAdvancedGrading 이 돌아오면 다시 클릭 한 번이 붙는다.
+describe("제거한 클릭 게이트가 되돌아오지 않는다", () => {
+  it("펼침 상태가 없다", () => {
+    // showAdvancedGrading 이 부활하면 슬라이더 앞에 클릭이 한 번 붙는다.
     expect(CODE).not.toMatch(/showAdvancedGrading/);
-    expect(CODE).not.toMatch(/setShowAdvancedGrading/);
   });
 
   it("사용자 지정 스위치가 없다", () => {
-    // 슬라이더를 움직이는 행위 자체가 사용자 지정이다.
-    expect(CODE).not.toMatch(/isCustomWeight\s*\}/);
+    // 스위치는 chatWeight 의 null/숫자 표현을 사용자에게 그대로 시키던 것이다.
     expect(CODE).not.toMatch(/simple-custom-weight/);
-    expect(ko.simpleExamAuthoringForm.switchCustomWeight).toBeUndefined();
-    expect(en.simpleExamAuthoringForm.switchCustomWeight).toBeUndefined();
   });
 
-  it("조정 버튼 문구가 제거됐다", () => {
-    expect(ko.simpleExamAuthoringForm.buttonAdjust).toBeUndefined();
-    expect(en.simpleExamAuthoringForm.buttonAdjust).toBeUndefined();
-  });
-
-  it("슬라이더가 조건부 렌더링 뒤에 숨지 않는다", () => {
-    // `{isCustomWeight && (<Slider` 같은 형태로 되돌아가면 안 된다.
-    const sliderIdx = CODE.indexOf("<Slider\n                  className=\"mt-3\"");
-    expect(sliderIdx).toBeGreaterThan(-1);
-
-    // 슬라이더 바로 앞 200자에 조건부 게이트가 없어야 한다.
-    const before = CODE.slice(Math.max(0, sliderIdx - 200), sliderIdx);
-    expect(before).not.toMatch(/&&\s*\($/);
+  it("게이트 문구가 ko/en 양쪽에서 제거됐다", () => {
+    for (const [name, msgs] of [
+      ["ko", ko.simpleExamAuthoringForm],
+      ["en", en.simpleExamAuthoringForm],
+    ] as const) {
+      expect(msgs.buttonAdjust, `${name}.buttonAdjust`).toBeUndefined();
+      expect(msgs.switchCustomWeight, `${name}.switchCustomWeight`).toBeUndefined();
+    }
   });
 });
 
-describe("저장 계약이 깨지지 않는다", () => {
-  it("슬라이더를 움직이면 숫자가 들어간다", () => {
-    expect(CODE).toMatch(/onValueChange=\{\(\[value\]\) => onChatWeightChange\(value\)\}/);
-  });
-
-  it("기본값으로 되돌리는 수단이 있고 null 을 넣는다", () => {
-    // null 이어야 "안 건드림"으로 저장된다. 50 을 넣으면 사용자 지정으로 남는다.
-    expect(CODE).toMatch(/onClick=\{\(\) => onChatWeightChange\(null\)\}/);
+describe("기본값 복귀 문구가 양쪽 로케일에 있다", () => {
+  it("ko/en 에 buttonResetWeight 가 있다", () => {
+    // 한쪽만 있으면 다른 로케일에서 키가 그대로 노출된다.
     expect(ko.simpleExamAuthoringForm.buttonResetWeight).toBeTruthy();
     expect(en.simpleExamAuthoringForm.buttonResetWeight).toBeTruthy();
   });
 
-  it("되돌리기 버튼은 사용자가 값을 지정했을 때만 보인다", () => {
-    // 기본 상태에서 "기본값" 버튼이 보이면 이미 바꾼 것처럼 읽힌다.
-    const resetIdx = CODE.indexOf("buttonResetWeight");
-    expect(resetIdx).toBeGreaterThan(-1);
-    const before = CODE.slice(Math.max(0, resetIdx - 400), resetIdx);
-    expect(before).toMatch(/\{isCustomWeight && \(/);
-  });
-
-  it("기본값 판정이 null 기준을 유지한다", () => {
-    expect(CODE).toMatch(/const isCustomWeight = chatWeight !== null/);
-    expect(CODE).toMatch(/const effectiveWeight = chatWeight \?\? 50/);
+  it("헬퍼 문구가 빈 상태를 안내하지 않는다", () => {
+    // 슬라이더가 항상 보이므로 "비워두면" 같은 안내는 불가능한 동작을 시킨다.
+    expect(ko.simpleExamAuthoringForm.fieldChatWeightHelper).not.toMatch(/비워두면/);
+    expect(en.simpleExamAuthoringForm.fieldChatWeightHelper).not.toMatch(/left blank/i);
   });
 });
 
-describe("표시가 값을 따라간다", () => {
-  it("대화/최종 비율을 함께 보여준다", () => {
-    expect(CODE).toMatch(/chatWeightDisplay[\s\S]{0,120}100 - effectiveWeight/);
-    expect(ko.simpleExamAuthoringForm.chatWeightDisplay).toMatch(/\{chat\}/);
-    expect(ko.simpleExamAuthoringForm.chatWeightDisplay).toMatch(/\{final\}/);
-  });
-
-  it("슬라이더에 접근성 라벨이 있다", () => {
-    expect(CODE).toMatch(/aria-label=\{t\("simpleExamAuthoringForm\.fieldChatWeightLabel"\)\}/);
+describe("기본값 판정 기준이 유지된다", () => {
+  it("null 을 기본값으로 본다", () => {
+    // 숫자 50 과 null 은 다른 상태다. 50 을 기본값으로 취급하면
+    // 교수자가 의도적으로 고른 50 이 사라진다.
+    expect(CODE).toMatch(/chatWeight !== null/);
+    expect(CODE).toMatch(/chatWeight \?\? 50/);
   });
 });
