@@ -512,10 +512,28 @@ export function SimpleExamAuthoringForm({
     0,
   );
 
+  /**
+   * 이 유형이 최종 점수에서 차지하는 비율(0~1).
+   *
+   * 채점은 weight 를 절대 배점이 아니라 **상대 비중**으로 쓴다
+   * (lib/grade-utils.ts: 유형평균 x weight / totalConfiguredWeight).
+   * 그래서 화면도 같은 분모를 써야 한다.
+   */
+  const getScoreShare = (bucket: ScoreWeightBucket) =>
+    totalScoreWeight > 0 ? getScoreWeightValue(bucket) / totalScoreWeight : 0;
+
+  /**
+   * 100점 만점 기준 문항당 점수.
+   *
+   * 예전에는 weight / count 였다. 그건 weight 를 절대 배점으로 본 것이라
+   * 채점과 분모가 달랐다. 총합이 100 일 때만 우연히 맞고, 예를 들어 30/20
+   * (합 50)이면 화면은 10점인데 실제 기여는 20점이었고, 100/100(합 200)이면
+   * 화면 33.3점에 실제 16.7점이었다.
+   */
   const getPerQuestionScore = (bucket: ScoreWeightBucket) => {
     const count = scoreBucketCounts[bucket];
     if (count === 0) return null;
-    return getScoreWeightValue(bucket) / count;
+    return (getScoreShare(bucket) * 100) / count;
   };
 
   const setScoreWeight = (bucket: ScoreWeightBucket, value: number) => {
@@ -1212,6 +1230,16 @@ export function SimpleExamAuthoringForm({
                             {perQuestionScore !== null
                               ? t("simpleExamAuthoringForm.scoreWeightsPerQuestion", { count: scoreBucketCounts[bucket], score: formatScoreValue(perQuestionScore) })
                               : t("simpleExamAuthoringForm.scoreWeightsCount", { count: scoreBucketCounts[bucket] })}
+                          </p>
+                          {/*
+                            채점이 실제로 쓰는 값은 이 비율이다. 슬라이더 눈금만
+                            보면 60/40 과 100/100 이 달라 보이지만 둘 다 60:40,
+                            50:50 이라는 사실이 여기서 드러난다.
+                          */}
+                          <p className="mt-0.5 text-xs font-medium">
+                            {t("simpleExamAuthoringForm.scoreWeightsShare", {
+                              share: formatScoreValue(getScoreShare(bucket) * 100),
+                            })}
                           </p>
                         </div>
                         <Slider

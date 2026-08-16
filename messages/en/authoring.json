@@ -404,7 +404,8 @@
     "buttonAIGenerate": "Generate {count, plural, one {# question} other {# questions}} with AI",
     "buttonAddManual": "Add",
     "optional": "Optional",
-    "buttonResetWeight": "Reset"
+    "buttonResetWeight": "Reset",
+    "scoreWeightsShare": "{share}% of the final score"
   },
   "examCode": {
     "copyAria": "Copy exam code",
