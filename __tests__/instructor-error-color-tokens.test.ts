@@ -20,16 +20,19 @@ import { describe, expect, it } from "vitest";
 const TARGET_DIRS = ["components/instructor", "app/(app)/instructor"];
 
 /**
- * 파일 타입 아이콘 줄.
+ * 파일 타입 아이콘 팔레트 파일.
  *
  * 확장자별 관례색(PDF=빨강, PPT=주황, XLS=초록 …)이라 상태색이 아니다.
- * 토큰으로 바꾸면 PDF 가 오류와 같은 색이 된다.
+ * 토큰으로 바꾸면 PDF 가 '오류'로, XLS 가 '성공'으로 읽힌다.
  *
- * 변수명(iconClass / cls)으로 판별하면 한쪽을 놓친다 — 실제로 #228 이
- * edit 화면만 잘못 바꿔 두 화면의 PDF 색이 갈렸다. 확장자 case 로 판별한다.
+ * 예전에는 줄 단위로 판별했다(변수명 iconClass / case pdf). 팔레트가 이
+ * 파일 하나로 모이면서 그 방식이 무의미해졌고, 실제로 CI 에서 걸렸다 —
+ * `pdf: { Icon: FileText, className: text-red-500 }` 줄에는 case 문이 없다.
+ *
+ * 파일 단위로 제외하고, 그 안의 색은 아래 전용 describe 가 따로 지킨다.
+ * 즉 이 파일만 원색을 쓸 수 있고, 그 값이 맞는지는 별도로 검증된다.
  */
-const FILE_TYPE_ICON_LINE =
-  /case "(pdf|ppt|pptx|doc|docx|xls|xlsx|csv|hwp|hwpx|jpg|jpeg|png|gif|webp)"|getFileIcon|iconClass/;
+const FILE_TYPE_ICON_MODULE = "components/instructor/FileTypeIcon.tsx";
 
 /** 원색 오류 클래스. Tailwind 의 red/rose 계열 전부. */
 const RAW_ERROR_COLOR =
@@ -51,6 +54,10 @@ describe("instructor 영역은 오류색에 원색을 쓰지 않는다", () => {
     const offenders: string[] = [];
 
     for (const file of targetFiles()) {
+      // 파일 타입 아이콘 팔레트만 예외다. 그 안의 색은 아래 전용 describe 가
+      // 따로 지키므로 여기서 빠져도 무방비가 되지 않는다.
+      if (file === FILE_TYPE_ICON_MODULE) continue;
+
       let source: string;
       try {
         source = readFileSync(file, "utf8");
@@ -59,9 +66,6 @@ describe("instructor 영역은 오류색에 원색을 쓰지 않는다", () => {
       }
 
       source.split("\n").forEach((line, i) => {
-        // 파일 타입 아이콘 색은 오류가 아니다 — PDF=빨강, PPT=주황처럼
-        // 확장자를 구분하는 관례색이라 destructive 로 바꾸면 의미가 왜곡된다.
-        if (FILE_TYPE_ICON_LINE.test(line)) return;
         const found = line.match(RAW_ERROR_COLOR);
         if (found) offenders.push(`${file}:${i + 1} — ${found.join(", ")}`);
       });
