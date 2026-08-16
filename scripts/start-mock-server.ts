@@ -2,6 +2,46 @@ import express from "express";
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// ---------- Local OAuth/OIDC compatibility stub ----------
+//
+// GoTrue's built-in Google provider hard-codes accounts.google.com and ignores
+// config URL overrides. Local E2E therefore routes the real Google button's
+// authorize request to the configurable Keycloak adapter. These endpoints
+// provide a Google-compatible test identity while still exercising the full
+// browser PKCE → GoTrue authorize → provider callback → app callback chain.
+const OAUTH_STUB_EMAIL = "consent-google-e2e@example.test";
+
+app.get("/oauth/keycloak/protocol/openid-connect/auth", (req, res) => {
+  const redirectUri = String(req.query.redirect_uri ?? "");
+  const state = String(req.query.state ?? "");
+  if (!redirectUri || !state) {
+    return res.status(400).json({ error: "missing_redirect_or_state" });
+  }
+
+  const callback = new URL(redirectUri);
+  callback.searchParams.set("code", "local-google-oauth-code");
+  callback.searchParams.set("state", state);
+  return res.redirect(302, callback.toString());
+});
+
+app.post("/oauth/keycloak/protocol/openid-connect/token", (_req, res) => {
+  return res.json({
+    access_token: "local-google-access-token",
+    token_type: "Bearer",
+    expires_in: 3600,
+  });
+});
+
+app.get("/oauth/keycloak/protocol/openid-connect/userinfo", (_req, res) => {
+  return res.json({
+    sub: "local-google-oauth-subject",
+    email: OAUTH_STUB_EMAIL,
+    email_verified: true,
+    name: "Consent Google E2E",
+  });
+});
 
 const PORT = Number(process.env.MOCK_SERVER_PORT) || 4010;
 
@@ -220,7 +260,9 @@ app.post("/v1/responses", (req, res) => {
       id: responseId,
       object: "response",
       created_at: Math.floor(Date.now() / 1000),
-      model: "gpt5.2-chat-latest",
+      // 이슈 #118: 요청 모델을 그대로 반향한다. 고정값이면 "이벤트에 기록된
+      // 모델 == 프로필이 요청한 모델" 을 검증할 수 없어 관측 테스트가 무의미해진다.
+      model: (req.body?.model as string) ?? "gpt5.2-chat-latest",
       status: "completed",
       output: [
         {

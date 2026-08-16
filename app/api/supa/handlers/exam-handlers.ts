@@ -47,7 +47,7 @@ export interface QuestionData {
 }
 
 /**
- * AI 문항 초안 보존 (028_grade_provenance).
+ * AI 문항 초안 보존 (033_grade_provenance).
  *
  * `exams.questions` 는 단일 JSON blob 이라 저장할 때마다 통째로 덮어쓰인다. 그래서
  * AI 가 만든 문항을 교수자가 편집하면 원본 초안이 사라지고, 무엇이 바뀌었는지 알 수 없다.

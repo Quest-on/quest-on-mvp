@@ -4,7 +4,12 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getOpenAI, AI_MODEL_BULK_GRADING_WORKER } from "@/lib/openai";
+import { getOpenAI } from "@/lib/openai";
+import {
+  applyProfileToChatBody,
+  resolveAiTaskProfile,
+  validatePinnedProfile,
+} from "@/lib/ai-task-profile";
 import { callTrackedChatCompletion, buildAiTextMetadata } from "@/lib/ai-tracking";
 import { logError } from "@/lib/logger";
 import {
@@ -183,7 +188,7 @@ export async function recalibrateBulkGradesIfClustered(
 ): Promise<boolean> {
   const { data: sessionRow, error } = await supabase
     .from("exam_grading_sessions")
-    .select("proposed_grades, grading_criteria, expected_session_ids, status, exams!inner(questions, language, type)")
+    .select("proposed_grades, grading_criteria, expected_session_ids, status, ai_config_version_id, ai_profile_snapshot, exams!inner(questions, language, type)")
     .eq("id", gradingSessionId)
     .eq("exam_id", examId)
     .single();
@@ -191,6 +196,14 @@ export async function recalibrateBulkGradesIfClustered(
   if (error || !sessionRow || sessionRow.status !== "grading_done") {
     return false;
   }
+
+  // 재보정도 같은 런의 일부다. 런에 고정된 프로필이 있으면 그걸 쓰고, 없으면
+  // (레거시 런) 코드 기본값으로 해석한다. 라벨을 새로 읽으면 런 안에서 설정이 갈린다.
+  const pinnedCluster = (sessionRow.ai_profile_snapshot as Record<string, unknown> | null)?.
+    bulk_grading_score_cluster;
+  const clusterProfile = pinnedCluster
+    ? validatePinnedProfile("bulk_grading_score_cluster", pinnedCluster)
+    : resolveAiTaskProfile({ task: "bulk_grading_score_cluster" }).profile;
 
   let criteria: ExtractedCriteria;
   try {
@@ -247,17 +260,18 @@ export async function recalibrateBulkGradesIfClustered(
     try {
       const tracked = await callTrackedChatCompletion(
         () =>
-          getOpenAI().chat.completions.create({
-            model: AI_MODEL_BULK_GRADING_WORKER,
-            messages: [{ role: "system", content: prompt }],
-            max_completion_tokens: 3000,
-            temperature: 0,
-            response_format: { type: "json_object" },
-          }),
+          getOpenAI().chat.completions.create(
+            applyProfileToChatBody(clusterProfile, {
+              messages: [{ role: "system" as const, content: prompt }],
+              response_format: { type: "json_object" as const },
+            }),
+            { timeout: clusterProfile.timeoutMs, maxRetries: clusterProfile.maxRetries }
+          ),
         {
           feature: "bulk_grading_chat",
           route: "lib/bulk-grade-score-cluster",
-          model: AI_MODEL_BULK_GRADING_WORKER,
+          model: clusterProfile.model,
+          configVersion: (sessionRow.ai_config_version_id as string | null) ?? null,
           examId,
           metadata: buildAiTextMetadata({ inputText: [prompt] }),
         },

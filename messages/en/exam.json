@@ -62,7 +62,11 @@
     "charCount": "{count} chars",
     "sendAriaLabel": "Send message",
     "sendSrOnly": "Send",
-    "openChatAriaLabel": "Open AI chat"
+    "openChatAriaLabel": "Open AI chat",
+    "promptsTitle": "Try asking",
+    "prompt1": "What should I decide first in this question?",
+    "prompt2": "What counterarguments could there be?",
+    "prompt3": "Point out where my reasoning is weak"
   },
   "chatLoading": {
     "analyzing": "Analyzing your question...",

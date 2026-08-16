@@ -3,7 +3,7 @@
  *
  * 소비자:
  *   - `/api/health` (관리자 진단): 배포된 환경에 뭐가 빠졌는지
- *   - `scripts/setup-staging-env.mjs`: 스테이징에 주입할 목록
+ *   - `scripts/check-env.ts` (`npm run env:check`): 로컬/배포 환경 점검
  *   - `.env.example` / `.env.staging.example`: 사람이 읽는 사본
  *
  * 값(시크릿)은 절대 여기 넣지 않는다. 이름과 정책만 둔다.
@@ -66,6 +66,81 @@ export const ENV_MANIFEST: readonly EnvSpec[] = [
     name: "OPENAI_API_KEY",
     purpose: "AI 출제/채점 호출. 스테이징은 예산 한도를 건 별도 키를 쓴다.",
     levels: { production: "required", staging: "required", development: "recommended" },
+  },
+  // ── AI 추론 강도 오버라이드 (이슈 #118) ────────────────────────────
+  // 전부 optional 이다. 미설정이 정상이며 그때는 코드 기본값(운영 현행)이 쓰인다.
+  // 값은 none | low | medium | high | xhigh 중 하나여야 하고, 잘못된 값은
+  // instrumentation.ts 가 기동 시점에 막는다.
+  {
+    name: "AI_REASONING_EFFORT",
+    purpose:
+      "모든 AI 태스크의 추론 강도 전역 오버라이드(none|low|medium|high|xhigh). 태스크별 키가 이 값을 이긴다.",
+    levels: {},
+  },
+  {
+    name: "AI_REASONING_EFFORT_AUTO_GRADING_QUESTION",
+    purpose: "문항 자동채점 추론 강도 오버라이드.",
+    levels: {},
+  },
+  {
+    name: "AI_REASONING_EFFORT_AUTO_GRADING_QUESTION_SUMMARY",
+    purpose: "문항 총평 생성 추론 강도 오버라이드.",
+    levels: {},
+  },
+  {
+    name: "AI_REASONING_EFFORT_AUTO_GRADING_SUMMARY",
+    purpose: "세션 종합 총평 추론 강도 오버라이드.",
+    levels: {},
+  },
+  {
+    name: "AI_REASONING_EFFORT_BULK_GRADING_SCORE_CLUSTER",
+    purpose: "대량채점 점수 군집 재보정 추론 강도 오버라이드.",
+    levels: {},
+  },
+  {
+    name: "AI_REASONING_EFFORT_BULK_GRADING_CRITERIA_EXTRACT",
+    purpose: "대량채점 기준 추출 추론 강도 오버라이드.",
+    levels: {},
+  },
+  {
+    name: "AI_REASONING_EFFORT_BULK_GRADING_WORKER",
+    purpose: "대량채점 워커 추론 강도 오버라이드.",
+    levels: {},
+  },
+  {
+    name: "AI_REASONING_EFFORT_ASSIGNMENT_CHAT_STREAM",
+    purpose: "과제 채팅 SSE 추론 강도 오버라이드.",
+    levels: {},
+  },
+  {
+    name: "CONSENT_GATE_MODE",
+    purpose: "동의 게이트 동작 모드(off | shadow | prompt | enforce). 배포 환경에서는 명시해야 한다.",
+    levels: ALL_DEPLOYED,
+  },
+  {
+    name: "CONSENT_RETENTION_PURGE_DISABLED",
+    purpose: "동의 원장 파기 cron 킬 스위치. 최초 배포는 1로 비활성화한다.",
+    levels: ALL_DEPLOYED,
+  },
+  {
+    name: "CONSENT_RETENTION_PURGE_MODE",
+    purpose: "동의 원장 파기 모드(dry-run | delete). 최초 배포는 dry-run이며 delete는 staging 증적과 별도 운영 승인 receipt 후에만 활성화한다.",
+    levels: ALL_DEPLOYED,
+  },
+  {
+    name: "INCOMPLETE_ACCOUNT_PURGE_DISABLED",
+    purpose: "온보딩 미완료 auth 계정 파기 cron 킬 스위치. 최초 배포는 1로 비활성화한다.",
+    levels: ALL_DEPLOYED,
+  },
+  {
+    name: "INCOMPLETE_ACCOUNT_PURGE_MODE",
+    purpose: "온보딩 미완료 auth 계정 파기 모드(dry-run | delete). 최초 배포는 dry-run이다.",
+    levels: ALL_DEPLOYED,
+  },
+  {
+    name: "CONSENT_AUDIT_DATABASE_URL",
+    purpose: "권리요청 승인 operator 환경 전용 consent_auditor 연결 문자열. Vercel 런타임에는 넣지 않는다.",
+    levels: {},
   },
   {
     name: "CONSENT_SUBJECT_HMAC_KEY_V1",

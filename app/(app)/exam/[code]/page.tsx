@@ -562,6 +562,7 @@ export default function ExamPage() {
           setSessionError={session.setSessionError}
           chatEndRef={chatEndRef}
           currentQuestion={currentQuestion}
+          isDemoPreview={session.demoPreview === true}
         />
       )}
 

@@ -58,6 +58,10 @@ export default function OnboardingPage() {
   const [ageOver14, setAgeOver14] = useState(false);
   const [terms, setTerms] = useState(false);
   const [prefillFailed, setPrefillFailed] = useState(false);
+  // 서버가 알려주는 동의 수집 활성 여부. null 은 "아직 모른다" 이며
+  // 모를 때는 수집하지 않는다 — off/shadow 로 배포됐는데 UI 가 앞서 나가
+  // 동의를 받아버리면 롤아웃을 되돌려도 받은 행이 남는다.
+  const [consentCollecting, setConsentCollecting] = useState<boolean | null>(null);
 
   // Profile fields (shared)
   const [name, setName] = useState("");
@@ -135,6 +139,29 @@ export default function OnboardingPage() {
       router.push("/sign-in");
     }
   }, [isLoaded, user, router]);
+
+  // 동의 수집 활성 여부는 서버가 정한다. 조회 실패는 "수집 안 함"으로 둔다.
+  // 여기서 낙관적으로 true 를 잡으면 off/shadow 배포에서 UI 가 앞서 나가
+  // 사용자가 체크한 뒤 서버 503 을 맞는다.
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/consents/onboarding");
+        if (!res.ok) throw new Error("consent status unavailable");
+        const data = (await res.json()) as { collecting?: boolean };
+        if (!cancelled) setConsentCollecting(data.collecting === true);
+      } catch {
+        if (!cancelled) setConsentCollecting(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, user]);
 
   // University search with debounce
   useEffect(() => {
@@ -218,7 +245,15 @@ export default function OnboardingPage() {
       return;
     }
 
-    if (!ageOver14 || !terms) {
+    // 수집이 켜졌을 때만 두 항목을 요구한다.
+    //
+    // off/shadow 에서는 체크박스가 아예 렌더되지 않으므로 여기서 무조건
+    // 막으면 아무도 온보딩을 끝낼 수 없다. 프로필만으로 통과해야 한다.
+    // 아직 모르는 상태(null)면 판단을 미루고 제출을 보류한다.
+    if (consentCollecting === null) {
+      return;
+    }
+    if (consentCollecting && (!ageOver14 || !terms)) {
       setError(tConsent("required"));
       return;
     }
@@ -293,16 +328,21 @@ export default function OnboardingPage() {
             });
       if (!roleProfileRes.ok) throw new Error("Role profile update failed");
 
-      // 4. Record the two required decisions after every profile write succeeds.
-      const consentRes = await fetch("/api/consents/onboarding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ageOver14: true, terms: true }),
-      });
-      if (!consentRes.ok) {
-        setError(consentRes.status === 503 ? tConsent("notActive") : tConsent("failed"));
-        setIsSubmitting(false);
-        return;
+      // 4. 수집이 활성일 때만 동의를 기록한다.
+      //
+      // off/shadow 에서는 서버가 503 을 내므로 호출 자체를 하지 않는다.
+      // 그래야 아직 켜지지 않은 롤아웃 단계에서 사용자가 헛되이 막히지 않는다.
+      if (consentCollecting === true) {
+        const consentRes = await fetch("/api/consents/onboarding", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ageOver14: true, terms: true }),
+        });
+        if (!consentRes.ok) {
+          setError(consentRes.status === 503 ? tConsent("notActive") : tConsent("failed"));
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       // 5. 교수자는 JTBD 2문항으로 넘어간다 (AC-4).
@@ -437,16 +477,13 @@ export default function OnboardingPage() {
           </CardContent>
         </Card>
       ) : step === "intake" ? (
-        /* ── Step 3: JTBD 2문항 (교수자 전용, AC-4) ── */
+        /* ── Step 3: JTBD 1문항 — 과목 (교수자 전용, AC-4) ── */
         <Card className="w-full shadow-xl border-0">
           <CardHeader className="text-center space-y-4">
             <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto">
               <GraduationCap className="w-8 h-8 text-primary-foreground" />
             </div>
             <CardTitle className="text-2xl font-bold">{t("intakeTitle")}</CardTitle>
-            <CardDescription className="text-base">
-              {t("intakeDesc")}
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {error && <ErrorAlert message={error} />}
@@ -464,9 +501,6 @@ export default function OnboardingPage() {
                 assessTarget 을 옵셔널로 받으므로 안 보내면 기본 템플릿이 된다. */}
 
             <div className="space-y-3">
-              <Label className="text-sm font-semibold">
-                {t("intakeSubjectLabel")}
-              </Label>
               <RadioGroup
                 value={subject}
                 onValueChange={(value) =>
@@ -641,34 +675,36 @@ export default function OnboardingPage() {
                 )}
               </div>
 
-              <fieldset className="space-y-3" aria-labelledby="consent-title">
-                <legend id="consent-title" className="font-medium">
-                  {tConsent("title")}
-                </legend>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="age-over-14"
-                    checked={ageOver14}
-                    onCheckedChange={(checked) => setAgeOver14(checked === true)}
-                  />
-                  <Label htmlFor="age-over-14" className="cursor-pointer">
-                    {tConsent("ageOver14.label")}
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="terms"
-                    checked={terms}
-                    onCheckedChange={(checked) => setTerms(checked === true)}
-                  />
-                  <Label htmlFor="terms" className="cursor-pointer">
-                    {tConsent("terms.label")}
-                  </Label>
-                  <a href="/legal/terms" className="text-sm text-primary underline">
-                    {tConsent("terms.linkLabel")}
-                  </a>
-                </div>
-              </fieldset>
+              {consentCollecting === true && (
+                <fieldset className="space-y-3" aria-labelledby="consent-title">
+                  <legend id="consent-title" className="font-medium">
+                    {tConsent("title")}
+                  </legend>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="age-over-14"
+                      checked={ageOver14}
+                      onCheckedChange={(checked) => setAgeOver14(checked === true)}
+                    />
+                    <Label htmlFor="age-over-14" className="cursor-pointer">
+                      {tConsent("ageOver14.label")}
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="terms"
+                      checked={terms}
+                      onCheckedChange={(checked) => setTerms(checked === true)}
+                    />
+                    <Label htmlFor="terms" className="cursor-pointer">
+                      {tConsent("terms.label")}
+                    </Label>
+                    <a href="/legal/terms" className="text-sm text-primary underline">
+                      {tConsent("terms.linkLabel")}
+                    </a>
+                  </div>
+                </fieldset>
+              )}
 
               {error && <ErrorAlert message={error} />}
 
@@ -688,8 +724,10 @@ export default function OnboardingPage() {
                   disabled={
                     isSubmitting ||
                     prefillFailed ||
-                    !ageOver14 ||
-                    !terms ||
+                    // 수집 여부를 아직 모르면 제출을 막는다. 알고 나서 정한다.
+                    consentCollecting === null ||
+                    // 수집이 켜진 경우에만 두 체크박스를 요구한다.
+                    (consentCollecting && (!ageOver14 || !terms)) ||
                     !name ||
                     !school ||
                     (role === "student" && !studentNumber)

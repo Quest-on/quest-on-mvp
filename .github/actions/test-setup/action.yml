@@ -15,6 +15,9 @@ runs:
       with:
         version: 2.113.0
 
+    # supabase/config.toml 이 없으면 `supabase start` 가 프로젝트를 인식하지
+    # 못하고, 실패 사유가 불명확한 채로 뒤 step 들이 줄줄이 깨진다.
+    # 여기서 먼저 확인해 원인을 분명히 남긴다.
     - name: Verify local Supabase project config
       run: |
         if [ ! -f supabase/config.toml ]; then
@@ -26,7 +29,10 @@ runs:
     - run: supabase start
       shell: bash
 
-    # DB 안전 멈춤 규칙의 preflight가 요구하는 폐기 로컬 DB 증거를 러너에만 만든다.
+    # DB 안전 멈춤 규칙(AGENTS.md)의 preflight 가 세 조건을 요구한다.
+    # `.env.test` 존재, DISPOSABLE_LOCAL_DB_CONFIRMED=1, 두 URL 이 localhost.
+    # CI 는 방금 띄운 로컬 Supabase 만 쓰므로 여기서 임시로 만들어 준다.
+    # 이 파일은 러너에서만 생기고 저장소에 커밋되지 않는다.
     - name: Create disposable local .env.test
       run: |
         ANON_KEY="$(supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2- | tr -d '"')"
@@ -90,13 +96,25 @@ runs:
           -- 없으면 PGRST205: public.profiles 테이블을 찾지 못해 조회가 실패한다.
           CREATE TABLE IF NOT EXISTS profiles (
             id TEXT PRIMARY KEY,
-            role TEXT NOT NULL DEFAULT 'student',
+            role TEXT,
             status TEXT NOT NULL DEFAULT 'approved',
             display_name TEXT,
             avatar_url TEXT,
+            school TEXT,
+            student_id TEXT,
             created_at TIMESTAMPTZ DEFAULT now(),
             updated_at TIMESTAMPTZ DEFAULT now()
           );
+          ALTER TABLE profiles ALTER COLUMN role DROP NOT NULL;
+          ALTER TABLE profiles ALTER COLUMN role DROP DEFAULT;
+          ALTER TABLE profiles ADD COLUMN IF NOT EXISTS school TEXT;
+          ALTER TABLE profiles ADD COLUMN IF NOT EXISTS student_id TEXT;
+
+          -- 가입 직후 public.profiles 행은 앱(lib/supabase-auth.ts 의
+          -- provisionProfile)이 만든다. 예전에는 CI 에만 auth.users 트리거를 두고
+          -- 스테이징·프로덕션에는 아무 것도 없어서, CI 는 초록인데 실제 배포에서는
+          -- 신규 가입자가 currentUser() null → 온보딩 API 전부 401 이었다.
+          -- 여기에 트리거를 다시 두면 CI 가 다시 그 경로를 검증하지 못한다.
 
           CREATE TABLE IF NOT EXISTS error_logs (
             id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -197,14 +215,35 @@ runs:
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -v ON_ERROR_STOP=1 \
           -f database/027_seed_consent_policy_release.sql
-        # 032 는 운영 DB 에만 있고 마이그레이션으로 잡히지 않던 카운터 RPC 2개를
-        # 회수한다(#199). 028~029 는 이 스택이 추가하는 컬럼·테이블이다.
-        # 적용하지 않으면 이 브랜치의 e2e(api/courses 등)가 CI 에서만 실패한다.
+        # 028 은 AI 설정 버전/라벨/감사와 발행 RPC 를 만든다. Prisma 는 RLS·함수·ACL 을
+        # 표현하지 못하므로 prisma db push 로는 생기지 않는다. 적용하지 않으면 CI 에서만
+        # 설정 저장소가 없어 관리자 라우트 테스트가 전부 실패한다.
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -v ON_ERROR_STOP=1 \
-          -f database/032_counter_rpcs.sql \
-          -f database/028_grade_provenance.sql \
-          -f database/029_courses.sql
+          -f database/028_create_ai_config.sql
+        # 029/030 은 런 핀 컬럼과 ai_events.config_version 을 만든다. 028 뒤에 와야 한다
+        # (둘 다 ai_config_versions 를 FK 로 참조한다).
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
+          -f database/029_pin_ai_config_to_grading_runs.sql \
+          -f database/030_stamp_ai_config_version.sql
+        # 032 는 운영 DB 에만 있고 마이그레이션으로 잡히지 않던 카운터 RPC 2개
+        # (increment_used_clarifications, increment_student_count)를 회수한다.
+        # 적용하지 않으면 /api/chat·/api/feedback 경로가 CI 에서만
+        # "function ... in the schema cache" 오류로 실패한다 (#199).
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
+          -f database/032_counter_rpcs.sql
+        # 033 은 이 브랜치가 추가하는 AI 제안 보존 컬럼이다. 적용하지 않으면
+        # 채점 커밋 경로 테스트가 ci 에서만 column does not exist 로 실패한다.
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
+          -f database/033_grade_provenance.sql
+        # 034 는 이 스택이 추가하는 코스(교과목) 테이블이다. 원래 029 였으나
+        # staging 이 029/030 을 먼저 가져가서 재번호했다.
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
+          -f database/034_courses.sql
         # Reload PostgREST schema cache so new functions are immediately callable
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -c "NOTIFY pgrst, 'reload schema';"
@@ -236,7 +275,9 @@ runs:
           -- CI 만 운영과 다른 보안 상태가 되어 검증이 무의미해진다.
           REVOKE ALL ON FUNCTION public.admit_exam_session(uuid, text, text, text) FROM anon, authenticated;
           REVOKE ALL ON FUNCTION public.restart_demo_attempt(uuid, text) FROM anon, authenticated;
-          -- 032 의 카운터 RPC 2개도 같은 이유로 회수한다.
+          -- 032 의 카운터 RPC 2개도 같은 이유로 회수한다 — 열린 채 두면 인증된
+          -- 학생이 임의 세션의 used_clarifications 나 임의 시험의 student_count 를
+          -- 부풀릴 수 있어 CI 가 운영과 다른 보안 상태가 된다.
           REVOKE ALL ON FUNCTION public.increment_used_clarifications(uuid, int) FROM anon, authenticated;
           REVOKE ALL ON FUNCTION public.increment_student_count(uuid) FROM anon, authenticated;
           -- 동의 원장 등 다른 SECURITY DEFINER 함수도 blanket GRANT 에 함께 열린다.
@@ -261,6 +302,13 @@ runs:
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -v ON_ERROR_STOP=1 \
           -f database/026_close_quota_gaps.sql
+        # 028 도 같은 이유로 재적용한다. blanket GRANT 가 ai_config_* 테이블의 쓰기와
+        # publish_ai_config_version 의 EXECUTE 를 anon/authenticated 에게 다시 열어 버리는데,
+        # 회수하지 않으면 CI 에서만 감사 없이 설정을 바꿀 수 있게 되어 이 이슈의 보안 경계
+        # 자체가 검증되지 않는다. 028 은 멱등이라 재적용이 안전하다.
+        psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          -v ON_ERROR_STOP=1 \
+          -f database/028_create_ai_config.sql
         psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
           -c "NOTIFY pgrst, 'reload schema';"
       shell: bash

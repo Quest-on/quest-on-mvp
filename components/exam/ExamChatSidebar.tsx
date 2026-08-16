@@ -58,6 +58,12 @@ interface ExamChatSidebarProps {
   setSessionError: (value: boolean) => void;
   chatEndRef: React.RefObject<HTMLDivElement | null>;
   currentQuestion: number;
+  /**
+   * 데모 미리보기인가 (이슈 #210). 서버가 내려준 값만 신뢰한다 —
+   * 클라이언트가 is_demo 를 스스로 판정하면 남의 데모나 일반 시험까지 우회된다.
+   * 실제 학생 응시에 예시 질문이 뜨면 평가가 오염된다.
+   */
+  isDemoPreview?: boolean;
 }
 
 export function ExamChatSidebar({
@@ -71,6 +77,7 @@ export function ExamChatSidebar({
   setSessionError,
   chatEndRef,
   currentQuestion,
+  isDemoPreview = false,
 }: ExamChatSidebarProps) {
   const t = useTranslations("exam");
   const { setOpen, isMobile, setOpenMobile } = useSidebar();
@@ -124,6 +131,35 @@ export function ExamChatSidebar({
                   <p className="text-sm sm:text-base text-muted-foreground max-w-md leading-relaxed mb-4">
                     {t("chat.emptyDescription")}
                   </p>
+
+                  {/*
+                    예시 질문은 **데모 미리보기에서만** 보여준다. 실제 학생 응시에
+                    뜨면 무엇을 묻는지가 답안에 영향을 주어 평가가 오염된다.
+                    문구도 정답을 요구하지 않고 사고 과정을 여는 것만 둔다.
+                  */}
+                  {isDemoPreview && (
+                    <div className="w-full max-w-md">
+                      <p className="text-xs text-muted-foreground mb-2">
+                        {t("chat.promptsTitle")}
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        {(["chat.prompt1", "chat.prompt2", "chat.prompt3"] as const).map(
+                          (key) => (
+                            <Button
+                              key={key}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="justify-start text-left h-auto py-2 whitespace-normal"
+                              onClick={() => setChatMessage(t(key))}
+                            >
+                              {t(key)}
+                            </Button>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>

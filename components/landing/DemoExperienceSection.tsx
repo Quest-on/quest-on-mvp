@@ -239,7 +239,7 @@ const InstructorDashboardContent = ({ onExamClick }: { onExamClick: (examId: str
       {/* Action Bar */}
       <div className="bg-card/80 border border-border rounded-lg p-3 mb-3">
         <div className="flex items-center gap-2">
-          <button className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-[10px] hover:bg-primary/90 flex items-center gap-1.5">
+          <button className="px-3 py-1.5 bg-pink-700 text-white rounded-md text-[10px] hover:bg-pink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-700 focus-visible:ring-offset-2 dark:bg-pink-600 dark:hover:bg-pink-700 dark:focus-visible:ring-pink-400 flex items-center gap-1.5">
             <Plus className="w-3 h-3" />새 항목
           </button>
           <div className="flex-1 relative">

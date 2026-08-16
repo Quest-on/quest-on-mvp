@@ -1,5 +1,5 @@
 /**
- * AI 문항 초안 보존 (028_grade_provenance)
+ * AI 문항 초안 보존 (033_grade_provenance)
  *
  * 버그: `exams.questions` 는 단일 JSON blob 이라 저장할 때마다 통째로 덮어쓴다.
  * AI 가 문항을 생성하고 교수자가 그것을 편집하면 원본 AI 초안은 사라지고,

@@ -29,6 +29,9 @@ quest-on 변경 영향/회귀 자동 리뷰가 사용하는 결정적 규칙과 
 - **객관식 채점:** MCQ/OX 채점은 raw 선택답 + `correctOptionIndex`만 사용. AI grade row나 `ai_summary` placeholder 혼입 금지.
 - **점수 비중:** 문항 유형 세트와 `score_weights`는 항상 동기화. stale weight 금지.
 - **DB 영향(파일로만):** 마이그레이션/스키마 변경은 `database/NNN_*.sql`(DDL·제약·RLS·인덱스 = source of truth)과 `prisma/schema.prisma`를 **읽어서** 판단 — RLS 누락, 위험한 backfill(NOT NULL+default), 인덱스 누락 등. **라이브 DB에는 절대 접속하지 않는다.**
+- **시험/과제 공유 채점 게이트:** 시험과 과제 양쪽에서 도달 가능한 채점 라우트·접근 가드는 시험=`status==="closed"`, 과제=`deadline` 경과를 직접 중복 구현하지 말고 `lib/grading-helpers.ts`의 `isGradingOpen`/`isAssignmentType` 계약을 재사용한다. 공유 진입점에서 `status==="closed"`만 하드코딩하면 과제가 영구 차단된다. 명시적으로 한 유형만 다루는 경로에는 반대 유형 분기를 억지로 추가하지 않는다.
+- **과제 최종응답 채점 데이터 소스:** 과제의 최종 자유응답을 채점할 때는 `sessions.final_answer`가 권위 데이터이고 학생-AI 대화는 `messages`의 q_idx 0이다. `submissions`는 시험 답안과 과제 canvas·quiz 기록의 유효한 소스이므로, 모든 과제 읽기를 금지하거나 항상 빈 답이라고 간주하지 않는다.
+- **단일 채점 writer:** 같은 `(session_id, q_idx)` grade 행을 두 커밋 경로(`/api/session/[id]/grade` POST vs `/api/session/[id]/case-grade/commit`)가 동시에 쓰지 않도록 — 한 화면에 점수 확정 UI를 둘 다 마운트하면 last-writer-wins clobber·stale 캐시가 된다.
 - **리뷰어 read-only 자기보존:** `lib/impact-review/*`·`scripts/impact-review.ts`·워크플로 자체가 Supabase/DB 연결·`.env.local` source·migration/seed 실행 코드를 넣으면 안 된다(러너는 파일 read 전용).
 
 ## Model guidance (LLM 레인용)

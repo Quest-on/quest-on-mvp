@@ -235,13 +235,21 @@ export const bulkGradeChatPostSchema = z.union([
   }),
 ]);
 
-export const bulkGradeWorkerSchema = z.object({
-  gradingSessionId: z.string().uuid("Invalid gradingSessionId"),
-  studentSessionId: z.string().uuid("Invalid studentSessionId"),
-  examId: z.string().uuid("Invalid examId"),
-  scope: z.enum(["sample", "full"]).default("full"),
-  attemptId: z.string().uuid("Invalid attemptId").optional(),
-});
+export const bulkGradeWorkerSchema = z
+  .object({
+    gradingSessionId: z.string().uuid("Invalid gradingSessionId"),
+    studentSessionId: z.string().uuid("Invalid studentSessionId"),
+    examId: z.string().uuid("Invalid examId"),
+    scope: z.enum(["sample", "full"]).default("full"),
+    attemptId: z.string().uuid("Invalid attemptId").optional(),
+    // 이슈 #118 컷오버 sentinel. 신규 발행 작업은 항상 둘을 함께 싣는다.
+    pinRequired: z.literal(true).optional(),
+    configVersionId: z.string().uuid("Invalid configVersionId").optional(),
+  })
+  .refine(
+    (payload) => payload.pinRequired !== true || typeof payload.configVersionId === "string",
+    { message: "pinRequired jobs must carry configVersionId", path: ["configVersionId"] }
+  );
 
 export const bulkGradeCommitSchema = z.object({
   grades: z

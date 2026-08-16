@@ -1326,7 +1326,7 @@ export default function InstructorHome() {
             )}
             {/* Type badge for exams/assignments */}
             {!isFolder && node.exams?.type && node.exams.type !== "exam" && (
-              <span className="absolute left-2 top-2 inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+              <span className="absolute left-2 top-2 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
                 {t("drive.assignmentBadge")}
               </span>
             )}
@@ -1716,7 +1716,7 @@ export default function InstructorHome() {
         >
           <div className="flex items-center gap-4 flex-1">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-background/80">
-              <FileText className="w-5 h-5 text-blue-500" />
+              <FileText className="w-5 h-5 text-muted-foreground" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -1724,7 +1724,7 @@ export default function InstructorHome() {
                   {node.name}
                 </p>
                 {node.exams?.type && node.exams.type !== "exam" && (
-                  <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 shrink-0">
+                  <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground shrink-0">
                     {t("drive.assignmentBadge")}
                   </span>
                 )}
@@ -1782,7 +1782,10 @@ export default function InstructorHome() {
                     <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button size="sm" className="gap-1.5 shrink-0">
+                          <Button
+                            size="sm"
+                            className="gap-1.5 shrink-0"
+                          >
                             <Plus className="w-4 h-4" />
                             <span className="hidden sm:inline">{t("drive.newItem")}</span>
                           </Button>
