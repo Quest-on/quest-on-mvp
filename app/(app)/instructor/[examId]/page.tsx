@@ -387,7 +387,7 @@ export default function ExamDetail({
     return (
       <div className="container mx-auto p-6">
         <div className="text-center py-12">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">{t("examDetail.error")}</h2>
+          <h2 className="text-xl font-semibold text-destructive mb-2">{t("examDetail.error")}</h2>
           <p className="text-muted-foreground">
             {error || t("examDetail.loadFail")}
           </p>

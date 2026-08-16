@@ -990,7 +990,7 @@ export function SimpleExamAuthoringForm({
                       key={`${file.name}-${index}`}
                       className={`inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-sm ${
                         disabled || status === "failed"
-                          ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+                          ? "border-destructive bg-destructive/10 text-destructive"
                           : status === "done"
                             ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
                             : "bg-muted/40"

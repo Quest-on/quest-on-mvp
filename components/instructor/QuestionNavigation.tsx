@@ -89,7 +89,7 @@ export function QuestionNavigation({
   if (!questions || !Array.isArray(questions)) {
     return (
       <div className="mb-6">
-        <div className="text-red-600">{t("questionNavigation.errorLoad")}</div>
+        <div className="text-destructive">{t("questionNavigation.errorLoad")}</div>
       </div>
     );
   }

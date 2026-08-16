@@ -91,7 +91,7 @@ export function SessionQuizResultsCard({
                       className={
                         isCorrect
                           ? "bg-green-500/10 text-green-700 dark:text-green-400 shrink-0"
-                          : "bg-red-500/10 text-red-700 dark:text-red-400 shrink-0"
+                          : "bg-destructive/100/10 text-destructive shrink-0"
                       }
                     >
                       {isCorrect ? t("sessionQuiz.badgeCorrect") : t("sessionQuiz.badgeWrong")}

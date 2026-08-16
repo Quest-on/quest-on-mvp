@@ -50,7 +50,7 @@ export function QuestionPromptCard({
             )}
           </div>
         ) : (
-          <div className="text-center py-8 text-red-600">
+          <div className="text-center py-8 text-destructive">
             <p>{t("questionPromptCard.errorLoad")}</p>
             <p className="text-sm mt-2 text-gray-600">
               {t("questionPromptCard.errorIndex", { index: questionNumber - 1 })}

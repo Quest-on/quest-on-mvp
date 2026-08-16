@@ -38,7 +38,7 @@ function dashboardStatusClass(status: ReturnType<typeof dashboardStatus>): strin
     case "grading":
       return "bg-amber-100 text-amber-800";
     case "failed":
-      return "bg-red-100 text-red-800";
+      return "bg-destructive/15 text-destructive";
     case "pending":
       return "bg-orange-100 text-orange-800";
     case "in-progress":

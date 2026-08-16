@@ -59,8 +59,8 @@ function getStatusConfig(status: ExtractionStatus, labels: Record<ExtractionStat
       return {
         label: labels.failed,
         barWidth: "w-full",
-        barColor: "bg-red-500",
-        textColor: "text-red-600 dark:text-red-400",
+        barColor: "bg-destructive/100",
+        textColor: "text-destructive",
         pulse: false,
       };
   }
@@ -215,11 +215,11 @@ export function FileUpload({
                     key={index}
                     className={`rounded-md overflow-hidden border transition-colors duration-300 ${
                       isDisabled
-                        ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+                        ? "bg-destructive/10 border-destructive"
                         : status === "done"
                         ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800"
                         : status === "failed"
-                        ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+                        ? "bg-destructive/10 border-destructive"
                         : isInProgress
                         ? "bg-muted/30 border-border"
                         : "bg-muted/50 border-transparent"
@@ -235,7 +235,7 @@ export function FileUpload({
                           ) : status === "done" ? (
                             <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                           ) : status === "failed" ? (
-                            <XCircle className="w-5 h-5 text-red-500" />
+                            <XCircle className="w-5 h-5 text-destructive" />
                           ) : (
                             getFileIcon(file.name)
                           )}
@@ -244,7 +244,7 @@ export function FileUpload({
                         <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                           <span
                             className={`text-sm font-medium truncate ${
-                              isDisabled ? "text-red-600 dark:text-red-400" : ""
+                              isDisabled ? "text-destructive" : ""
                             }`}
                           >
                             {file.name}
@@ -253,7 +253,7 @@ export function FileUpload({
                             ({(file.size / 1024 / 1024).toFixed(1)}MB)
                           </span>
                           {isDisabled && (
-                            <span className="text-xs text-red-500 font-medium shrink-0">
+                            <span className="text-xs text-destructive font-medium shrink-0">
                               {t("fileUpload.disabledFile")}
                             </span>
                           )}

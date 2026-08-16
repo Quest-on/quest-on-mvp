@@ -198,10 +198,10 @@ export function ExamInfoForm({
               onChange={(e) => onTitleChange(e.target.value)}
               placeholder={t("examInfoForm.placeholderTitle")}
               required
-              className={titleError ? "border-red-500 focus-visible:ring-red-500" : ""}
+              className={titleError ? "border-destructive focus-visible:ring-destructive" : ""}
             />
             {titleError && (
-              <p className="text-xs text-red-500 mt-1">{titleError}</p>
+              <p className="text-xs text-destructive mt-1">{titleError}</p>
             )}
           </div>
           <div className="space-y-2">
@@ -296,7 +296,7 @@ export function ExamInfoForm({
                 <Button
                   type="button"
                   variant="outline"
-                  className={`w-full max-w-xs justify-start font-normal ${!deadline ? "text-muted-foreground" : ""} ${deadlineError ? "border-red-500" : ""}`}
+                  className={`w-full max-w-xs justify-start font-normal ${!deadline ? "text-muted-foreground" : ""} ${deadlineError ? "border-destructive" : ""}`}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {deadline ? formatDate(new Date(deadline), locale) : t("examInfoForm.deadlinePlaceholder")}
@@ -318,7 +318,7 @@ export function ExamInfoForm({
               </PopoverContent>
             </Popover>
             {deadlineError && (
-              <p className="text-xs text-red-500 mt-1">{deadlineError}</p>
+              <p className="text-xs text-destructive mt-1">{deadlineError}</p>
             )}
           </div>
         ) : (

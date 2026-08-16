@@ -160,7 +160,7 @@ export function LateEntryPanel({ examId, examStatus }: LateEntryPanelProps) {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 px-3 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:text-red-400"
+                      className="h-8 px-3 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive dark:text-destructive"
                       disabled={isPending}
                       onClick={() =>
                         lateEntryMutation.mutate({ sessionId: student.id, action: "deny" })
