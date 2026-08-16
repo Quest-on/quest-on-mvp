@@ -99,13 +99,13 @@ export function LateEntryPanel({ examId, examStatus }: LateEntryPanelProps) {
   }
 
   return (
-    <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
+    <Card className="border-warning-border bg-warning-surface/50">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2 text-amber-700 dark:text-amber-400">
+        <CardTitle className="text-base flex items-center gap-2 text-warning-text">
           <Clock className="h-4 w-4" />
           {t("lateEntry.cardTitle")}
           {lateStudents.length > 0 && (
-            <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+            <Badge variant="secondary" className="bg-warning-subtle text-warning-text">
               {t("lateEntry.countBadge", { count: lateStudents.length })}
             </Badge>
           )}
@@ -133,14 +133,14 @@ export function LateEntryPanel({ examId, examStatus }: LateEntryPanelProps) {
               return (
                 <div
                   key={student.id}
-                  className="flex items-center justify-between gap-3 p-3 rounded-lg bg-white border border-amber-100 dark:border-amber-900"
+                  className="flex items-center justify-between gap-3 p-3 rounded-lg bg-white border border-warning-border"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm truncate">{student.student_name}</p>
                     {student.student_number && (
                       <p className="text-xs text-muted-foreground">{student.student_number}</p>
                     )}
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                    <p className="text-xs text-warning-text mt-0.5">
                       {t("lateEntry.waitingTime", { min: waitingMin, sec: waitingSec })}
                     </p>
                   </div>
@@ -148,7 +148,7 @@ export function LateEntryPanel({ examId, examStatus }: LateEntryPanelProps) {
                     <Button
                       size="sm"
                       variant="default"
-                      className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white"
+                      className="h-8 px-3 bg-success-solid hover:bg-success-solid/90 text-white"
                       disabled={isPending}
                       onClick={() =>
                         lateEntryMutation.mutate({ sessionId: student.id, action: "approve" })

@@ -443,7 +443,7 @@ export default function ExamDetail({
                     <span className={!allStudentsManuallyGraded ? "cursor-not-allowed" : undefined}>
                       <Button
                         size="sm"
-                        className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 focus-visible:ring-emerald-500"
+                        className="bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 focus-visible:ring-ring"
                         onClick={() => handleDownload("excel")}
                         disabled={!allStudentsManuallyGraded || isExporting !== null}
                       >
@@ -624,7 +624,7 @@ export default function ExamDetail({
             <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
               <div className="flex items-center gap-2">
                 {exam.grades_released ? (
-                  <Eye className="h-4 w-4 text-green-600" />
+                  <Eye className="h-4 w-4 text-success-text" />
                 ) : (
                   <EyeOff className="h-4 w-4 text-muted-foreground" />
                 )}
@@ -655,25 +655,25 @@ export default function ExamDetail({
             </div>
 
             {showBulkCaseGradingCta && (
-              <div className="flex items-center justify-between p-3 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+              <div className="flex items-center justify-between p-3 border border-info-border rounded-lg bg-info-surface">
                 <div className="flex items-center gap-2">
                   {isBulkGrading ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400 shrink-0" aria-hidden="true" />
+                    <Loader2 className="h-4 w-4 animate-spin text-info-text shrink-0" aria-hidden="true" />
                   ) : (
-                    <Bot className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" aria-hidden="true" />
+                    <Bot className="h-4 w-4 text-info-text shrink-0" aria-hidden="true" />
                   )}
                   <div>
-                    <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    <span className="text-sm font-medium text-info-text">
                       {bulkCtaTitle}
                     </span>
-                    <span className="text-xs text-blue-600 dark:text-blue-400 hidden sm:inline ml-2">
+                    <span className="text-xs text-info-text hidden sm:inline ml-2">
                       {bulkCtaDescription}
                     </span>
                   </div>
                 </div>
                 <Button
                   size="sm"
-                  className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white shrink-0"
+                  className="bg-primary hover:bg-primary/90 text-white shrink-0"
                   onClick={() => setBulkGradingOpen(true)}
                 >
                   {bulkCtaButtonLabel}
