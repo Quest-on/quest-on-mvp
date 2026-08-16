@@ -57,6 +57,7 @@ describe("ci.yml — 중복 트리거를 건너뛴다", () => {
     "unit-test",
     "api-integration-test",
     "browser-e2e-test",
+    "consent-flow-test",
   ];
 
   it("모든 잡이 main/staging head PR 을 건너뛴다", () => {
@@ -95,5 +96,33 @@ describe("ci.yml — 트리거 계약은 유지한다", () => {
     expect("pull_request" in on).toBe(true);
     const pr = on.pull_request as { branches?: string[] } | null;
     expect(pr?.branches).toBeUndefined();
+  });
+});
+
+describe("ci.yml — 한 잡이 서버를 두 번 띄우지 않는다 (#219)", () => {
+  it("각 E2E 잡은 playwright 를 한 번만 실행한다", () => {
+    // 한 잡에서 두 번 돌리면 2차가 CONSENT_GATE_MODE=prompt 로 서버를 새로
+    // 띄워야 하는데(값이 부팅 시점에 읽힌다), CI 는 reuseExistingServer=false 라
+    // 1차 서버가 포트를 놓을 때까지 기다리다 60초 타임아웃이 났다.
+    const { jobs } = loadWorkflow();
+    for (const name of ["browser-e2e-test", "consent-flow-test"]) {
+      const job = jobs?.[name] as { steps?: Array<{ run?: string }> } | undefined;
+      const run = (job?.steps ?? []).map((s) => s.run ?? "").join("\n");
+      const count = (run.match(/npx playwright test/g) ?? []).length;
+      expect(count, `${name} 의 playwright 실행 횟수`).toBe(1);
+    }
+  });
+
+  it("동의 플로우는 별도 잡에서 돈다", () => {
+    const { jobs } = loadWorkflow();
+    const consent = jobs?.["consent-flow-test"] as { steps?: Array<{ run?: string }> };
+    const run = (consent?.steps ?? []).map((s) => s.run ?? "").join("\n");
+    expect(run).toMatch(/CONSENT_GATE_MODE=prompt/);
+    expect(run).toMatch(/consent-onboarding-flow\.spec\.ts/);
+
+    // 1차 잡에는 남아 있으면 안 된다.
+    const browser = jobs?.["browser-e2e-test"] as { steps?: Array<{ run?: string }> };
+    const browserRun = (browser?.steps ?? []).map((s) => s.run ?? "").join("\n");
+    expect(browserRun).not.toMatch(/CONSENT_GATE_MODE=prompt/);
   });
 });

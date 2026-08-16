@@ -166,6 +166,54 @@ jobs:
           mkdir -p test-results junit
           PLAYWRIGHT_JUNIT_OUTPUT_NAME=junit/browser-results.xml \
             npx playwright test --project=browser-e2e --config=e2e/playwright.config.ts
+        env:
+          NODE_ENV: test
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WO_o0BQXj0V_fMnZXz7cz0yd2V0j2xN7OIRI
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          OPENAI_API_KEY: test-key
+          OPENAI_BASE_URL: http://localhost:4010/v1
+          ADMIN_USERNAME: test-admin
+          ADMIN_PASSWORD: test-password
+          ADMIN_SESSION_SECRET: test-secret-for-hmac-signing-minimum-32-chars
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_dummy
+          CLERK_SECRET_KEY: sk_test_dummy
+          TEST_BYPASS_SECRET: e2e-test-bypass-token-2024
+          INTERNAL_API_SECRET: test-internal-api-secret-ci
+          NEXT_PUBLIC_TEST_BYPASS_ENABLED: "true"
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-browser
+          path: |
+            playwright-report/
+            test-results/
+            junit/
+          retention-days: 7
+      - name: Test Summary
+        if: always()
+        uses: test-summary/action@v2
+        with:
+          paths: junit/*.xml
+
+
+  consent-flow-test:
+    # 뼈대(smoke/a11y/CSP/error-boundary)와 개인정보 동의 actual-auth flow를
+    # 필수 게이트로 둔다. 나머지 browser-flows는 UI 변경 민감도가 높아 로컬 전용이다.
+    name: Consent Flow E2E Tests
+    runs-on: ubuntu-latest
+    # 위 잡들과 같은 이유로 중복 실행을 건너뛴다.
+    if: github.event_name != 'pull_request' || !contains(fromJSON('["main","staging"]'), github.event.pull_request.head.ref)
+    timeout-minutes: 20
+    needs: [quality]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/test-setup
+      - name: Run consent flow E2E tests
+        run: |
+          mkdir -p test-results junit
           CONSENT_GATE_MODE=prompt \
             CONSENT_SUBJECT_HMAC_KEY_V1=ci-only-consent-hmac-key-at-least-32-bytes \
             CRON_SECRET=ci-only-cron-secret-at-least-32-bytes \
@@ -192,7 +240,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-browser
+          name: playwright-report-consent-flow
           path: |
             playwright-report/
             test-results/
