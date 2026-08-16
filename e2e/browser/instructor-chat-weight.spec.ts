@@ -11,6 +11,11 @@ import { TIMEOUTS } from "../constants";
  * 이 파일이 `e2e/browser/flows/` 가 아니라 `e2e/browser/` 에 있는 이유:
  * `browser-flows` 프로젝트는 CI 에서 동의 온보딩 스펙 하나만 돈다. flows 에
  * 두면 CI 가 이 테스트를 실행하지 않아 초록불이 아무것도 보증하지 않는다.
+ *
+ * 저장 계약(손대지 않으면 chat_weight 가 null)은 여기서 검증하지 않는다.
+ * 브라우저에서는 요청 본문까지만 볼 수 있어서, handler 를 다시 `?? 50` 으로
+ * 되돌려도 통과해버린다. 실제로 고친 경계는 insert 값이므로
+ * `__tests__/chat-weight-persistence.test.ts` 가 그걸 직접 지킨다.
  */
 
 const SLIDER = { name: /채점 비중|Grading Weight/ };
@@ -79,45 +84,4 @@ test.describe("시험 생성 — 대화 비중 슬라이더", () => {
     await expect(slider).toHaveAttribute("aria-valuenow", "50");
   });
 
-  test("손대지 않으면 저장 요청에 chat_weight 가 null 로 나간다", async ({
-    instructorPage,
-  }) => {
-    // 이게 이 변경의 가장 중요한 안전 조건이다. null 은 "교수자가 안 건드림"을
-    // 뜻하고, 숫자로 굳으면 그 사실이 사라진다.
-    await instructorPage.goto("/instructor/new");
-
-    const slider = instructorPage.getByRole("slider", SLIDER);
-    await expect(slider).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
-
-    const payloads: Array<Record<string, unknown>> = [];
-    await instructorPage.route("**/api/supa**", async (route) => {
-      const body = route.request().postDataJSON?.();
-      if (body && typeof body === "object") payloads.push(body as Record<string, unknown>);
-      await route.continue();
-    });
-
-    await instructorPage
-      .getByLabel("시험 제목")
-      .fill("대화 비중 기본값 유지 확인");
-
-    // 제목만 채우고 저장을 시도한다. 저장이 검증에서 막히더라도 요청 본문에
-    // chat_weight 가 실렸는지가 관심사다.
-    const saveBtn = instructorPage.getByRole("button", {
-      name: /저장|만들기|생성/,
-    });
-    if (await saveBtn.first().isVisible()) {
-      await saveBtn.first().click();
-      await instructorPage.waitForTimeout(2000);
-    }
-
-    const withChatWeight = payloads.filter(
-      (p) => "chat_weight" in p || "data" in p
-    );
-    for (const p of withChatWeight) {
-      const data = (p.data ?? p) as Record<string, unknown>;
-      if ("chat_weight" in data) {
-        expect(data.chat_weight, "손대지 않았으면 null 이어야 한다").toBeNull();
-      }
-    }
-  });
 });
