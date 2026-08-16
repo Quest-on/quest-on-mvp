@@ -153,7 +153,7 @@ export function ExamStudentCard({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-blue-600 border-blue-600 hover:bg-blue-50 h-8 px-2.5 text-xs"
+                  className="text-primary border-primary hover:bg-primary/10 h-8 px-2.5 text-xs"
                 >
                   <ClipboardCheck size={14} className="mr-1" />
                   {student.overallStatus === "manually_graded" ? t("examStudentCard.buttonRegrade") : t("examStudentCard.buttonGrade")}

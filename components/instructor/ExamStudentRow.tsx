@@ -182,7 +182,7 @@ export function ExamStudentRow({
               <Button
                 size="sm"
                 variant="outline"
-                className="text-blue-600 border-blue-600 hover:bg-blue-50 h-7 px-2 text-xs"
+                className="text-primary border-primary hover:bg-primary/10 h-7 px-2 text-xs"
               >
                 <ClipboardCheck size={14} className="mr-1" />
                 {student.overallStatus === "manually_graded" ? t("examStudentRow.buttonRegrade") : t("examStudentRow.buttonGrade")}
