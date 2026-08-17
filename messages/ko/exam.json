@@ -137,7 +137,8 @@
     "manualFailTitle": "답안 제출 실패",
     "manualFailDefault": "답안 제출에 실패했습니다. 네트워크 연결을 확인하고 다시 시도해주세요.",
     "manualFailClose": "닫기",
-    "manualFailRetry": "다시 제출"
+    "manualFailRetry": "다시 제출",
+    "exitDescriptionDemo": "진행한 내용은 저장됩니다. 시험을 종료하고 데모 상세 화면으로 돌아갑니다."
   },
   "submitConfirm": {
     "title": "시험 제출 확인",

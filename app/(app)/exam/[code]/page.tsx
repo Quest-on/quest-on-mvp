@@ -703,6 +703,7 @@ export default function ExamPage() {
         showExitConfirm={showExitConfirm}
         setShowExitConfirm={setShowExitConfirm}
         onExitConfirm={async () => { await autoSave.manualSave(); router.push(exitDestination); }}
+        exitToDemoDetail={Boolean(session.demoPreview && session.demoExamId)}
         unansweredDialog={submission.unansweredDialog}
         setUnansweredDialog={submission.setUnansweredDialog}
         setCurrentQuestion={setCurrentQuestionWithReveal}

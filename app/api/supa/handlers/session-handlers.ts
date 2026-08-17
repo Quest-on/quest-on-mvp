@@ -10,6 +10,7 @@ import { stripSensitiveQuestionFields } from "@/lib/sanitize-exam-questions";
 import {
   ONBOARDING_EVENTS,
   hasOnboardingEvent,
+  recordOnboardingEvent,
 } from "@/lib/onboarding-events";
 import { isDemoPreview } from "@/lib/demo-completion";
 
@@ -940,7 +941,7 @@ export async function submitExam(data: {
     // Validate answers array length against exam question count
     const { data: examForValidation, error: examValError } = await getSupabase()
       .from("exams")
-      .select("questions")
+      .select("questions, is_demo, instructor_id")
       .eq("id", data.examId)
       .single();
 
@@ -1016,6 +1017,36 @@ export async function submitExam(data: {
       targetId: data.sessionId,
       details: { examId: data.examId, submissionsCount: submissionsPayload.length },
     });
+    /*
+      데모 답변 마일스톤. (#174)
+
+      DEMO_ANSWERED 는 상수(lib/onboarding-events.ts)와 퍼널 정의
+      (lib/onboarding-funnel.ts)에만 있고 기록 호출부가 저장소 전체에 0개였다.
+      제출 경계에 붙이면 "답은 냈지만 결과는 못 본 교수자" 를 계측할 수 있다.
+
+      데모 소유자 본인일 때만 센다. 일반 학생의 제출은 이 마일스톤이 아니다.
+      판정은 isDemoPreview 가 갖고 있고, 판정 불능(null)이면 기록하지 않는다
+      — #167 과 같은 이유다. '일반 학생' 으로 단정하면 지표가 오염된다.
+
+      기록 실패가 제출을 막지 않는다. recordOnboardingEvent 는 boolean 을
+      반환하고 throw 하지 않는다.
+    */
+    const answeredPreview = isDemoPreview({
+      isDemo: (examForValidation as { is_demo?: unknown } | null)?.is_demo,
+      instructorId: (examForValidation as { instructor_id?: unknown } | null)?.instructor_id,
+      userId: verifiedStudentId,
+    });
+    if (answeredPreview === true) {
+      await recordOnboardingEvent({
+        userId: verifiedStudentId,
+        // 데모 소유자는 교수자다. 학생 퍼널을 오염시키지 않으려면 role 이
+        // 정확해야 한다 — #167 이 바로 그 오염을 고친 이슈다.
+        role: "instructor",
+        event: ONBOARDING_EVENTS.DEMO_ANSWERED,
+        examId: data.examId,
+      });
+    }
+
     if (!auditOk) {
       logError("[submitExam] Audit log failed for session_submit", new Error("auditLog returned false"), {
         path: "/api/supa/session-handlers",
