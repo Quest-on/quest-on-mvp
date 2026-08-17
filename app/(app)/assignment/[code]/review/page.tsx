@@ -129,7 +129,7 @@ export default function AssignmentReviewPage() {
     return (
       <div className="container mx-auto p-6 max-w-4xl">
         <div className="text-center py-12">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">
+          <h2 className="text-xl font-semibold text-destructive mb-2">
             {errorMessage || t("review.errorFallback")}
           </h2>
           <Link href="/student">
@@ -248,7 +248,7 @@ export default function AssignmentReviewPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <MessageCircle className="w-5 h-5 text-blue-600" />{t("review.sectionChat")}
+                <MessageCircle className="w-5 h-5 text-info-text" />{t("review.sectionChat")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -293,7 +293,7 @@ export default function AssignmentReviewPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <FileText className="w-5 h-5 text-emerald-600" />{t("review.sectionFinalAnswer")}
+                <FileText className="w-5 h-5 text-success-text" />{t("review.sectionFinalAnswer")}
               </CardTitle>
             </CardHeader>
             <CardContent>

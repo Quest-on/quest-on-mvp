@@ -390,7 +390,7 @@ export default function AdminDashboard() {
                   <Button
                     size="sm"
                     onClick={() => approveInstructor(instructor.id)}
-                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                    className="bg-warning-surface hover:bg-warning-surface text-white"
                   >
                     <UserCheck className="w-4 h-4 mr-1" />
                     {t("dashboard.pending.approve")}

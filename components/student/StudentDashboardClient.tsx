@@ -761,9 +761,9 @@ export default function StudentDashboard() {
                             <span className="text-sm font-medium text-muted-foreground">
                               {t("stats.todo")}
                             </span>
-                            <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                            <div className="h-8 w-8 rounded-lg bg-warning-surface/10 flex items-center justify-center">
                               <Clock
-                                className="w-4 h-4 text-amber-600"
+                                className="w-4 h-4 text-warning-text"
                                 aria-hidden="true"
                               />
                             </div>
