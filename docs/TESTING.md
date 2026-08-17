@@ -41,7 +41,7 @@ npm run lint
 # Unit tests
 npm run test
 
-# API 통합 테스트 (CI 와 동일)
+# API 통합 테스트 (CI 와 동일) — 먼저 scripts/setup-test-db.sh 를 돌린다
 npm run test:api
 
 # 브라우저 뼈대 테스트 (CI 와 동일)
@@ -53,3 +53,29 @@ npm run test:browser
 
 > DB 를 건드리는 테스트는 반드시 `docs/CODEX_DB_SAFETY.md` 를 먼저 읽는다.
 > `.env.local` 을 테스트에 물리지 않는다.
+
+## 로컬 DB 준비
+
+`test:api` 와 `test:e2e` 는 로컬 Supabase 가 있어야 돌아간다. Docker 가 필요하다.
+
+```bash
+bash scripts/setup-test-db.sh
+```
+
+끝나면 CI 와 같은 상태가 된다 — API 통합 381개, 브라우저 E2E 40개 전부 통과.
+
+스키마만 올리면 대부분 죽는다. 다음 네 가지가 함께 있어야 한다.
+
+- **비-Prisma 테이블** — `profiles`, `instructor_profiles`, `paste_logs`, `error_logs`.
+  `profiles` 를 만든 뒤 017·018·019·021 을 다시 돌려야 `plan` 컬럼이 생긴다.
+  `admit_exam_session` 이 그 컬럼을 읽는다.
+- **API 롤 권한** — Prisma 가 `postgres` 롤로 테이블을 만들어서
+  `anon`/`authenticated`/`service_role` 에 권한이 없다. 없으면 전부
+  `permission denied` 로 죽는다.
+- **보안 하드닝** — 위 blanket GRANT 는 경계까지 열어버린다. `028` 을 다시 돌려
+  `service_role` 도 `ai_config_*` 를 직접 못 쓰게 되돌린다(RPC 만이 쓰기 경로).
+  안 되돌리면 보안 경계 테스트가 실패한다.
+- **온보딩 시드** — 없으면 브라우저 E2E 가 전부 `/onboarding` 으로 튕긴다.
+  동의 주체는 `subject_ref = 'v1:' + HMAC-SHA256(user_id)` 이고,
+  **테스트 바이패스 경로는 userId 로 리터럴 `"test-bypass"` 를 넘긴다**
+  (`proxy.ts`). 쿠키의 사용자 id 가 아니다. 둘 다 시드해야 한다.
