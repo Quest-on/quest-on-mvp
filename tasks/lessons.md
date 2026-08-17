@@ -85,3 +85,17 @@
 ## 2026-08-12 — staging DB rollout
 
 - 사용자가 “staging에 반영”과 migration 실행을 명시하면 코드·Vercel 배포만 완료로 보고하지 않는다. staging 대상과 승인 파일을 검증해 DDL → dry-run → rollout mode → 기존 사용자 user-flow QA까지 닫고, 불가능한 단계만 즉시 구체적으로 보고한다.
+
+## 2026-08-16 — UX 군더더기와 증거 위장
+
+- 사용자가 같은 지적을 두 번 했다. "클릭을 3번이나 해야하는 UIUX"(채점 비중 슬라이더), "이런 구질구질한 설명들은 그냥 다 지워줘"(과목 선택). → **값을 정하지 않는 순수 UI 개폐(스위치·토글·"조정" 버튼)와 제목을 되풀이하는 설명은 만들지 않는다.** 라벨 옆 `선택` 배지가 이미 말하는 걸 헬퍼·빈 상태 제목·빈 상태 설명이 세 번 더 반복하고 있었다. 정보와 군더더기는 구분한다 — "업로드하면 AI가 자료를 근거로 문제를 만듭니다"처럼 읽어야 아는 사실은 남긴다.
+
+- **오류를 빈 상태로 위장하지 않는다.** `useQuery`에서 `isLoading`만 꺼내 쓰면 실패 시 `data`가 기본값 `[]`로 떨어져 "폴더 없음"/"응시한 시험이 없습니다"/"시험이 없습니다"가 뜬다. 시험 플랫폼에서 이건 "내 데이터가 사라졌다"로 읽힌다. 6곳을 고쳤다(#240·#242·#243·#244·#245). 단 **오류는 보여줄 게 없을 때만** 낸다 — React Query는 재조회 실패 후에도 이전 `data`를 들고 있으므로 `isError && !hasResults`로 좁힌다. 가진 목록을 오류로 덮으면 사용자가 더 잃는다.
+
+- **문자열 검사만으로 UI 수정을 확인하지 않는다.** `drive.noExams`만 검사하고 통과시켰는데 실제 화면에 뜬 건 `drive.empty`였다. 스크린샷을 안 봤으면 못 잡았다. 또 `textContent`는 `<script>` 안의 RSC 페이로드까지 읽고, 인증 리다이렉트된 빈 페이지에서도 "제거됨"이 나온다. **양성 대조(그 화면에만 있는 문구가 실제로 렌더됐는지)를 먼저 걸고 나서 부재를 주장한다.**
+
+- **종결 게이트의 critic 필드를 손으로 채우지 않는다.** 비평가를 실행하지 않고 `criticReview: OKAY`를 직접 썼고, `sourceHash`를 64-hex가 아닌 설명 문자열로 기입했다. 테스트에서 가짜 증거를 다섯 번 걷어내놓고 게이트에서 같은 짓을 했다. 비평가 9명이 순차 감사해 7번 REJECT를 받고서야 닫혔다. → critic 판정은 **실제 위임 후 그 verdict를 옮겨 적는다.** `sourceHash`는 canonical diff 명령을 명시하고 재계산 원시 출력을 durable artifact로 남긴다. 공격 벡터는 서술이 아니라 **재현 가능한 스크립트**와 원시 실패 출력으로 남긴다.
+
+- 로컬 `npm run lint`가 `.gjc/`에 `.cjs` 하나 생겼다고 통째로 죽는다. `eslint-config-next`의 react 블록이 `**/*.{js,jsx,mjs,ts,tsx,mts,cts}`에만 적용되는데 `.cjs`가 빠져 있고, 우리 rules 블록은 파일 제한이 없다. `.gjc/`는 gitignore라 CI는 멀쩡해서 **PR에 쓴 "lint 0 errors"가 로컬에선 거짓이었다**(#239에서 ignores에 추가).
+
+- 로컬 dev 확인은 `127.0.0.1` 말고 **`localhost`**로 연다. Next 가 `/_next/*` 를 교차출처로 막아 하이드레이션이 통째로 죽는다(`Blocked cross-origin request to Next.js dev resource`). 프로덕션 빌드(`next start`)는 `NODE_ENV=production`이라 테스트 바이패스가 원천 차단(`TEST_BYPASS_SECRET must not be set in a deployed environment`)되므로 인증 화면 확인에 못 쓴다.
