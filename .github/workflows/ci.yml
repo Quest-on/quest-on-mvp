@@ -147,12 +147,19 @@ jobs:
       # 아티팩트로도 올라가 있다. 그런데 continue-on-error 가 없으면 액션
       # 다운로드 실패만으로 잡 전체가 red 가 된다 — 실제로 codeload 가
       # 429 Too Many Requests 를 내서 통과한 테스트가 실패로 보고됐다.
+      # 결과 요약. 예전에는 test-summary/action 을 썼는데 codeload 가 429 를
+      # 내면 잡 전체가 red 가 됐다. 액션 다운로드는 스텝 실행 **전** 단계라
+      # continue-on-error 가 닿지 않는다 — 실제로 걸어 보고 확인했다
+      # (로그 39줄, 테스트 스텝은 시작조차 못 함).
+      #
+      # 보고 때문에 테스트 신호를 잃을 이유가 없어 외부 의존을 없앴다.
       - name: Test Summary
         if: always()
         continue-on-error: true
-        uses: test-summary/action@v2
-        with:
-          paths: test-results/api-results.xml
+        shell: bash
+        run: |
+          shopt -s nullglob
+          node scripts/ci-test-summary.mjs test-results/api-results.xml
 
   browser-e2e-test:
     # 뼈대(smoke/a11y/CSP/error-boundary)와 개인정보 동의 actual-auth flow를
@@ -201,12 +208,19 @@ jobs:
       # 아티팩트로도 올라가 있다. 그런데 continue-on-error 가 없으면 액션
       # 다운로드 실패만으로 잡 전체가 red 가 된다 — 실제로 codeload 가
       # 429 Too Many Requests 를 내서 통과한 테스트가 실패로 보고됐다.
+      # 결과 요약. 예전에는 test-summary/action 을 썼는데 codeload 가 429 를
+      # 내면 잡 전체가 red 가 됐다. 액션 다운로드는 스텝 실행 **전** 단계라
+      # continue-on-error 가 닿지 않는다 — 실제로 걸어 보고 확인했다
+      # (로그 39줄, 테스트 스텝은 시작조차 못 함).
+      #
+      # 보고 때문에 테스트 신호를 잃을 이유가 없어 외부 의존을 없앴다.
       - name: Test Summary
         if: always()
         continue-on-error: true
-        uses: test-summary/action@v2
-        with:
-          paths: junit/*.xml
+        shell: bash
+        run: |
+          shopt -s nullglob
+          node scripts/ci-test-summary.mjs junit/*.xml
 
 
   consent-flow-test:
@@ -260,9 +274,16 @@ jobs:
       # 아티팩트로도 올라가 있다. 그런데 continue-on-error 가 없으면 액션
       # 다운로드 실패만으로 잡 전체가 red 가 된다 — 실제로 codeload 가
       # 429 Too Many Requests 를 내서 통과한 테스트가 실패로 보고됐다.
+      # 결과 요약. 예전에는 test-summary/action 을 썼는데 codeload 가 429 를
+      # 내면 잡 전체가 red 가 됐다. 액션 다운로드는 스텝 실행 **전** 단계라
+      # continue-on-error 가 닿지 않는다 — 실제로 걸어 보고 확인했다
+      # (로그 39줄, 테스트 스텝은 시작조차 못 함).
+      #
+      # 보고 때문에 테스트 신호를 잃을 이유가 없어 외부 의존을 없앴다.
       - name: Test Summary
         if: always()
         continue-on-error: true
-        uses: test-summary/action@v2
-        with:
-          paths: junit/*.xml
+        shell: bash
+        run: |
+          shopt -s nullglob
+          node scripts/ci-test-summary.mjs junit/*.xml

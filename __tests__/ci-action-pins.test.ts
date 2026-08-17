@@ -93,16 +93,13 @@ describe("CI 액션 버전 핀", () => {
  * `setup-cli` 밖에서도 물린다는 증거다.
  */
 describe("보고용 스텝 격리", () => {
-  it("test-summary 사용처가 모두 continue-on-error 다", () => {
+  it("외부 요약 액션에 의존하지 않는다", () => {
     const ci = readFileSync(".github/workflows/ci.yml", "utf8");
-    const uses = ci.match(/uses:\s*test-summary\/action/g) ?? [];
-    expect(uses.length, "test-summary 사용처를 못 찾았다").toBeGreaterThan(0);
-
-    // 각 사용처 바로 앞 블록에 continue-on-error 가 있어야 한다.
-    const guarded = ci.match(
-      /continue-on-error:\s*true\s*\n\s*uses:\s*test-summary\/action/g
-    ) ?? [];
-    expect(guarded.length).toBe(uses.length);
+    // 액션 다운로드는 스텝 실행 전 단계라 continue-on-error 가 닿지 않는다.
+    // 보고용 외부 액션은 두지 않는다 — 저장소 안의 스크립트를 쓴다.
+    expect(ci).not.toMatch(/uses:\s*test-summary/);
+    const calls = ci.match(/ci-test-summary\.mjs/g) ?? [];
+    expect(calls.length, "요약 스크립트 호출이 없다").toBe(3);
   });
 
   it("테스트 실행 스텝에는 continue-on-error 를 걸지 않는다", () => {
