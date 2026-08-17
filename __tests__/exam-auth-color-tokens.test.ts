@@ -19,6 +19,8 @@ const FILES = [
   // 2단계: 로그인·가입. 첫 화면이라 다크모드에서 깨지면 바로 보인다.
   "components/auth/CustomSignUp.tsx",
   "components/auth/CustomSignIn.tsx",
+  // 4단계: ui 프리미티브. 여기 원색이 남으면 쓰는 화면 전부로 번진다.
+  "components/ui/rich-text-editor.tsx",
 ] as const;
 
 /**
