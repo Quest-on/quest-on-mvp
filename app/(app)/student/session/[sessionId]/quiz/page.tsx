@@ -171,8 +171,8 @@ export default function AssignmentQuizPage() {
       <div className="min-h-screen flex items-center justify-center p-6">
         <Card className="max-w-md w-full">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-3 w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6 text-green-600" />
+            <div className="mx-auto mb-3 w-12 h-12 rounded-full bg-success-solid/10 flex items-center justify-center">
+              <CheckCircle2 className="w-6 h-6 text-success-text" />
             </div>
             <CardTitle>{t("alreadyCompleted")}</CardTitle>
           </CardHeader>
@@ -205,7 +205,7 @@ export default function AssignmentQuizPage() {
             <div className="flex items-center gap-3">
               <Badge
                 variant="outline"
-                className={remainingSeconds !== null && remainingSeconds <= 5 ? "border-red-500 text-red-600" : ""}
+                className={remainingSeconds !== null && remainingSeconds <= 5 ? "border-red-500 text-destructive" : ""}
               >
                 <Clock className="w-4 h-4 mr-1" />
                 {t("timerSeconds", { seconds: remainingSeconds ?? 0 })}
@@ -222,7 +222,7 @@ export default function AssignmentQuizPage() {
       </div>
 
       <main className="container mx-auto max-w-4xl px-4 py-6">
-        <Card className="mb-6 border-amber-500/20 bg-amber-500/5">
+        <Card className="mb-6 border-amber-500/20 bg-warning-surface/5">
           <CardContent className="p-4 text-sm text-muted-foreground">
             {t("description")}
           </CardContent>

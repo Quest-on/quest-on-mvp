@@ -166,8 +166,8 @@ export function LateEntryWaiting({
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <div className="relative">
-              <Loader2 className="h-12 w-12 text-amber-500 animate-spin" />
-              <Clock className="h-6 w-6 text-amber-500 absolute top-3 left-3" />
+              <Loader2 className="h-12 w-12 text-warning-text animate-spin" />
+              <Clock className="h-6 w-6 text-warning-text absolute top-3 left-3" />
             </div>
           </div>
           <CardTitle className="text-2xl">{t("lateEntry.pendingTitle")}</CardTitle>
