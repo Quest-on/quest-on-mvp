@@ -94,7 +94,7 @@ export default function ExamCodeEntry() {
 
   return (
     <CenteredViewportShell
-      className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-950 dark:to-slate-900"
+      className="surface-page-gradient"
       contentClassName="max-w-4xl"
     >
       <div className="w-full">

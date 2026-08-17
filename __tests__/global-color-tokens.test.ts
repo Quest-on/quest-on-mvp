@@ -62,7 +62,7 @@ function countRaw(files: string[]): { total: number; byFile: Array<[string, numb
  * 현재 실측치. 이 숫자를 **올리는 변경은 거부된다.**
  * 치환 작업이 진행되면 이 값을 함께 낮춘다.
  */
-const RAW_CEILING = 176;
+const RAW_CEILING = 140;
 
 describe("전역 하드코딩 색 상한", () => {
   it(`raw palette 사용이 ${RAW_CEILING}건을 넘지 않는다`, () => {
