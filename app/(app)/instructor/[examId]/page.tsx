@@ -539,7 +539,7 @@ export default function ExamDetail({
                     <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-3">
                         <h3 className="font-semibold">{t("examDetail.examInfo")}</h3>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="type-hint">
                           {/* 코드는 헤더의 ExamCode 가 이미 내보낸다. 여기서
                               한 번 더 그리면 게이트를 우회하는 두 번째 표면이
                               된다 — 소요 시간만 남긴다. */}
@@ -585,7 +585,7 @@ export default function ExamDetail({
                     <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-3">
                         <h3 className="font-semibold">{t("examDetail.viewQuestions")}</h3>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="type-hint">
                           {questionsCount !== null
                             ? t("examDetail.questionsCountLabel", { count: questionsCount })
                             : t("examDetail.questionsLoading")}
@@ -628,7 +628,7 @@ export default function ExamDetail({
                 ) : (
                   <EyeOff className="h-4 w-4 text-muted-foreground" />
                 )}
-                <span className="text-sm font-medium">
+                <span className="type-field-label">
                   {exam.grades_released ? t("examDetail.gradesPublic") : t("examDetail.gradesHidden")}
                 </span>
                 <span className="text-xs text-muted-foreground hidden sm:inline">
@@ -724,7 +724,7 @@ export default function ExamDetail({
               </Button>
             </div>
 
-            <p className="text-sm text-muted-foreground">
+            <p className="type-hint">
               {t("examDetail.totalStudents", { count: filteredAndSortedStudents.length })}
             </p>
 

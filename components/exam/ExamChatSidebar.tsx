@@ -92,7 +92,7 @@ export function ExamChatSidebar({
                 <MessageCircle className="w-4 h-4" aria-hidden="true" />
                 <span>{t("chat.aiHelper")}</span>
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="type-meta">
                 {t("chat.questionContext", { number: currentQuestion + 1 })}
               </div>
             </div>

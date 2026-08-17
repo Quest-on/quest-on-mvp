@@ -55,7 +55,7 @@ export function AssignmentQuizResult({ quiz }: { quiz: AssignmentQuiz }) {
             })}
           </Badge>
           {quiz.submitted_at && (
-            <span className="text-sm text-muted-foreground">
+            <span className="type-hint">
               {t("completedAt", { date: formatDateTime(quiz.submitted_at, locale) })}
             </span>
           )}
@@ -93,7 +93,7 @@ export function AssignmentQuizResult({ quiz }: { quiz: AssignmentQuiz }) {
                     : t("noAnswer")}
                 </p>
                 {typeof correctIndex === "number" && (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="type-hint">
                     {t("correctAnswer")} {question.options[correctIndex]}
                   </p>
                 )}

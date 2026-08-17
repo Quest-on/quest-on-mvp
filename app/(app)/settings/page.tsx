@@ -61,7 +61,7 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold">{t("heading")}</h1>
+          <h1 className="type-page-title">{t("heading")}</h1>
           <p className="text-muted-foreground mt-2">
             {t("subtitle")}
           </p>
@@ -110,7 +110,7 @@ export default function SettingsPage() {
                       : t("consentRequired")}
                   </Badge>
                   {consentQuery.data.policyVersion && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="type-hint">
                       {t("policyVersion", { version: consentQuery.data.policyVersion })}
                     </p>
                   )}

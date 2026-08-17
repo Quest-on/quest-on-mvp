@@ -81,7 +81,7 @@ export default function AdminOnboardingPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">집계 대상</CardTitle>
+                  <CardTitle className="type-field-label">집계 대상</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold">{data.sampledUsers}명</p>
@@ -89,7 +89,7 @@ export default function AdminOnboardingPage() {
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">
+                  <CardTitle className="type-field-label">
                     데모 생성 → AI 채점 열람 (중앙값)
                   </CardTitle>
                 </CardHeader>

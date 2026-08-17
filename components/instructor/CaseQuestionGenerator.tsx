@@ -350,7 +350,7 @@ export function CaseQuestionGenerator({
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         {isDisabled && (
-          <p className="text-xs text-muted-foreground">
+          <p className="type-meta">
             {isAssignmentMode
               ? t("caseQuestionGenerator.disabledHintAssignment")
               : t("caseQuestionGenerator.disabledHintExam")}
@@ -611,7 +611,7 @@ export function CaseQuestionGenerator({
               )}
             </div>
             {isDisabled && (
-              <p className="text-xs text-muted-foreground">
+              <p className="type-meta">
                 {isAssignmentMode
                   ? t("caseQuestionGenerator.disabledHintAssignmentCard")
                   : t("caseQuestionGenerator.disabledHintExamCard")}

@@ -429,7 +429,7 @@ export default function AssignmentDashboard({
                         </div>
                       )}
                       {exam.createdAt && (
-                        <div className="text-sm text-muted-foreground">
+                        <div className="type-hint">
                           {t("assignmentDetail.createdAt")}{" "}
                           {formatDate(exam.createdAt, locale)}
                         </div>
@@ -447,7 +447,7 @@ export default function AssignmentDashboard({
                     <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-3">
                         <h3 className="font-semibold">{t("assignmentDetail.viewQuestions")}</h3>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="type-hint">
                           {questionsCount !== null
                             ? t("assignmentDetail.questionsCountLabel", { count: questionsCount })
                             : t("assignmentDetail.questionsLoading")}
@@ -591,7 +591,7 @@ export default function AssignmentDashboard({
               )}
             </div>
 
-            <div className="text-sm text-muted-foreground">
+            <div className="type-hint">
               {t("assignmentDetail.totalStudents", { count: allStudents.length })}
               {gradedStudents.length > 0 &&
                 ` ${t("assignmentDetail.gradedCount", { count: gradedStudents.length })}`}
@@ -649,7 +649,7 @@ function StudentRow({
       </div>
 
       {/* Submitted at */}
-      <div className="text-xs text-muted-foreground">
+      <div className="type-meta">
         {student.submittedAt
           ? formatDateTime(student.submittedAt, locale, {
               month: "short",

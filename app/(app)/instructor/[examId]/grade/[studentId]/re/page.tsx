@@ -81,7 +81,7 @@ export default function RegradePage() {
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="text-center space-y-4">
           <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-          <p className="text-sm text-muted-foreground">{t("regradePage.loading")}</p>
+          <p className="type-hint">{t("regradePage.loading")}</p>
         </div>
       </div>
     );
@@ -127,7 +127,7 @@ export default function RegradePage() {
         <CardContent className="text-center">
           <CardDescription className="mb-4">{message}</CardDescription>
           {status === "success" && (
-            <p className="text-sm text-muted-foreground">
+            <p className="type-hint">
               {t("regradePage.redirecting")}
             </p>
           )}

@@ -446,7 +446,7 @@ export default function AdminAiUsagePage() {
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("aiUsage.summary.totalCost")}</CardTitle>
+            <CardTitle className="type-field-label">{t("aiUsage.summary.totalCost")}</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -457,7 +457,7 @@ export default function AdminAiUsagePage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("aiUsage.summary.totalRequests")}</CardTitle>
+            <CardTitle className="type-field-label">{t("aiUsage.summary.totalRequests")}</CardTitle>
             <Bot className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -468,7 +468,7 @@ export default function AdminAiUsagePage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("aiUsage.summary.totalTokens")}</CardTitle>
+            <CardTitle className="type-field-label">{t("aiUsage.summary.totalTokens")}</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -479,7 +479,7 @@ export default function AdminAiUsagePage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("aiUsage.summary.avgCostPerRequest")}</CardTitle>
+            <CardTitle className="type-field-label">{t("aiUsage.summary.avgCostPerRequest")}</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -499,7 +499,7 @@ export default function AdminAiUsagePage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("aiUsage.summary.failRate")}</CardTitle>
+            <CardTitle className="type-field-label">{t("aiUsage.summary.failRate")}</CardTitle>
             <Timer className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -765,7 +765,7 @@ export default function AdminAiUsagePage() {
               >
                 {t("aiUsage.table.events.prev")}
               </Button>
-              <div className="text-sm text-muted-foreground">
+              <div className="type-hint">
                 {t("aiUsage.table.events.page", { page, total: totalPages })}
               </div>
               <Button
@@ -794,41 +794,41 @@ export default function AdminAiUsagePage() {
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <p className="text-sm font-medium">{t("aiUsage.detail.labelFeature")}</p>
-                  <p className="text-sm text-muted-foreground">{selectedEvent.feature}</p>
+                  <p className="type-field-label">{t("aiUsage.detail.labelFeature")}</p>
+                  <p className="type-hint">{selectedEvent.feature}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{t("aiUsage.detail.labelModel")}</p>
+                  <p className="type-field-label">{t("aiUsage.detail.labelModel")}</p>
                   <p className="font-mono text-sm text-muted-foreground">{selectedEvent.model}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{t("aiUsage.detail.labelStatus")}</p>
-                  <p className="text-sm text-muted-foreground">{selectedEvent.status}</p>
+                  <p className="type-field-label">{t("aiUsage.detail.labelStatus")}</p>
+                  <p className="type-hint">{selectedEvent.status}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{t("aiUsage.detail.labelLatency")}</p>
-                  <p className="text-sm text-muted-foreground">{selectedEvent.latencyMs ?? 0}ms</p>
+                  <p className="type-field-label">{t("aiUsage.detail.labelLatency")}</p>
+                  <p className="type-hint">{selectedEvent.latencyMs ?? 0}ms</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{t("aiUsage.detail.labelRequestId")}</p>
+                  <p className="type-field-label">{t("aiUsage.detail.labelRequestId")}</p>
                   <p className="font-mono text-xs text-muted-foreground">
                     {selectedEvent.requestId || "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{t("aiUsage.detail.labelResponseId")}</p>
+                  <p className="type-field-label">{t("aiUsage.detail.labelResponseId")}</p>
                   <p className="font-mono text-xs text-muted-foreground">
                     {selectedEvent.responseId || "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{t("aiUsage.detail.labelExam")}</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="type-field-label">{t("aiUsage.detail.labelExam")}</p>
+                  <p className="type-hint">
                     {selectedEvent.examTitle || selectedEvent.examId || "-"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{t("aiUsage.detail.labelSession")}</p>
+                  <p className="type-field-label">{t("aiUsage.detail.labelSession")}</p>
                   <p className="font-mono text-xs text-muted-foreground">
                     {selectedEvent.sessionId || "-"}
                   </p>
@@ -837,26 +837,26 @@ export default function AdminAiUsagePage() {
 
               <div className="grid gap-4 md:grid-cols-4">
                 <div>
-                  <p className="text-sm font-medium">{t("aiUsage.detail.labelInput")}</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="type-field-label">{t("aiUsage.detail.labelInput")}</p>
+                  <p className="type-hint">
                     {(selectedEvent.inputTokens ?? 0).toLocaleString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{t("aiUsage.detail.labelOutput")}</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="type-field-label">{t("aiUsage.detail.labelOutput")}</p>
+                  <p className="type-hint">
                     {(selectedEvent.outputTokens ?? 0).toLocaleString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{t("aiUsage.detail.labelTotal")}</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="type-field-label">{t("aiUsage.detail.labelTotal")}</p>
+                  <p className="type-hint">
                     {(selectedEvent.totalTokens ?? 0).toLocaleString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{t("aiUsage.detail.labelCost")}</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="type-field-label">{t("aiUsage.detail.labelCost")}</p>
+                  <p className="type-hint">
                     {formatUsdMicros(selectedEvent.estimatedCostUsdMicros)}
                   </p>
                 </div>

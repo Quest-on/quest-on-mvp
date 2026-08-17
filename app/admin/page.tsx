@@ -276,7 +276,7 @@ export default function AdminDashboard() {
       <div className="grid gap-6 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("dashboard.stats.totalUsers")}</CardTitle>
+            <CardTitle className="type-field-label">{t("dashboard.stats.totalUsers")}</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -285,7 +285,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("dashboard.stats.instructors")}</CardTitle>
+            <CardTitle className="type-field-label">{t("dashboard.stats.instructors")}</CardTitle>
             <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -294,7 +294,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("dashboard.stats.students")}</CardTitle>
+            <CardTitle className="type-field-label">{t("dashboard.stats.students")}</CardTitle>
             <UserX className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -305,7 +305,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("dashboard.stats.noRole")}</CardTitle>
+            <CardTitle className="type-field-label">{t("dashboard.stats.noRole")}</CardTitle>
             <Settings className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -317,7 +317,7 @@ export default function AdminDashboard() {
       <div className="grid gap-6 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("dashboard.ai.cost7d")}</CardTitle>
+            <CardTitle className="type-field-label">{t("dashboard.ai.cost7d")}</CardTitle>
             <Bot className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -328,7 +328,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("dashboard.ai.requests7d")}</CardTitle>
+            <CardTitle className="type-field-label">{t("dashboard.ai.requests7d")}</CardTitle>
             <Bot className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -339,7 +339,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("dashboard.ai.failRate7d")}</CardTitle>
+            <CardTitle className="type-field-label">{t("dashboard.ai.failRate7d")}</CardTitle>
             <Bot className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -378,12 +378,12 @@ export default function AdminDashboard() {
                 >
                   <div>
                     <p className="font-medium">{instructor.name || t("dashboard.pending.noName")}</p>
-                    <p className="text-sm text-muted-foreground">{instructor.email}</p>
+                    <p className="type-hint">{instructor.email}</p>
                     {/* AC-19: 소속이 승인 판단의 근거다. 없으면 판단할 게 없다. */}
-                    <p className="text-sm text-muted-foreground">
+                    <p className="type-hint">
                       {instructor.school || t("dashboard.pending.noSchool")}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="type-meta">
                       {t("dashboard.pending.appliedAt", { date: formatDateTime(instructor.created_at, locale, { year: "numeric", month: "short", day: "numeric" }) })}
                     </p>
                   </div>
@@ -414,7 +414,7 @@ export default function AdminDashboard() {
           {publishingError ? (
             <ErrorAlert message={t("dashboard.publishing.loadFailed")} />
           ) : !publishing || publishing.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="type-hint">
               {t("dashboard.publishing.empty")}
             </p>
           ) : (
@@ -431,7 +431,7 @@ export default function AdminDashboard() {
                     <p className="text-sm text-muted-foreground truncate">
                       {row.school || t("dashboard.pending.noSchool")}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="type-meta">
                       {row.lastPublishedAt
                         ? t("dashboard.publishing.lastPublishedAt", {
                             date: formatDateTime(row.lastPublishedAt, locale, {
@@ -541,8 +541,8 @@ export default function AdminDashboard() {
                                 : t("dashboard.userManagement.noRole")}
                           </Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="type-hint">{user.email}</p>
+                        <p className="type-meta">
                           {t("dashboard.userManagement.joinedAt", { date: formatDate(user.createdAt) })}
                         </p>
                       </div>

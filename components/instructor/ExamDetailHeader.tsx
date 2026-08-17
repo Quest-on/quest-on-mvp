@@ -68,7 +68,7 @@ export function ExamDetailHeader({
                 <Button>{demoRestartLabel ?? demoPreviewLabel}</Button>
               </Link>
               {demoRestartLabel && demoRestartHint && (
-                <span className="text-xs text-muted-foreground">
+                <span className="type-meta">
                   {demoRestartHint}
                 </span>
               )}

@@ -308,8 +308,8 @@ function QuestionTypePicker({
                 : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
             }`}
           >
-            <span className="text-base font-semibold">{t(option.labelKey)}</span>
-            <span className="text-xs text-muted-foreground">
+            <span className="type-section-title">{t(option.labelKey)}</span>
+            <span className="type-meta">
               {t(option.descKey)}
             </span>
           </button>
@@ -819,7 +819,7 @@ export function SimpleExamAuthoringForm({
               placeholder={isUnlimited ? t("simpleExamAuthoringForm.placeholderUnlimited") : t("simpleExamAuthoringForm.placeholderDuration")}
               className="h-11 w-28 text-center"
             />
-            <span className="text-sm text-muted-foreground">{t("simpleExamAuthoringForm.unitMinutes")}</span>
+            <span className="type-hint">{t("simpleExamAuthoringForm.unitMinutes")}</span>
             {[30, 60, 90, 120].map((value) => (
               <Button
                 key={value}
@@ -934,7 +934,7 @@ export function SimpleExamAuthoringForm({
                   ? t("simpleExamAuthoringForm.dropHint")
                   : t("simpleExamAuthoringForm.uploadHint")}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="type-meta">
                 {t("simpleExamAuthoringForm.uploadSupportedFormats")}
               </span>
             </button>
@@ -1097,7 +1097,7 @@ export function SimpleExamAuthoringForm({
               <span className="type-field-label">
                 {questions.length === 0 ? t("simpleExamAuthoringForm.buttonAddFirstQuestion") : t("simpleExamAuthoringForm.buttonAddQuestion")}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="type-meta">
                 {t("simpleExamAuthoringForm.addQuestionHint")}
               </span>
             </button>
@@ -1121,7 +1121,7 @@ export function SimpleExamAuthoringForm({
         <CardContent className="space-y-5">
           <div className="rounded-md border bg-muted/20 p-3">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm text-muted-foreground">
+              <span className="type-hint">
                 {scoreWeights && presentScoreBuckets.length > 0
                   ? t("simpleExamAuthoringForm.scoreWeightsHintFree")
                   : t("simpleExamAuthoringForm.scoreWeightsHintEmpty")}
@@ -1243,7 +1243,7 @@ export function SimpleExamAuthoringForm({
                             className="h-9 w-20 text-center"
                             aria-label={t("simpleExamAuthoringForm.ariaInputBucket", { bucket: t(SCORE_BUCKET_LABEL_KEYS[bucket]) })}
                           />
-                          <span className="text-sm text-muted-foreground">{t("simpleExamAuthoringForm.unitWeight")}</span>
+                          <span className="type-hint">{t("simpleExamAuthoringForm.unitWeight")}</span>
                         </div>
                       </div>
                     );
@@ -1300,7 +1300,7 @@ export function SimpleExamAuthoringForm({
                   보였다.
                 */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-muted-foreground">
+                  <span className="type-hint">
                     {t("simpleExamAuthoringForm.chatWeightDisplay", { chat: effectiveWeight, final: 100 - effectiveWeight })}
                   </span>
                   {isCustomWeight && (

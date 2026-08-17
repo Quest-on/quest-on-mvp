@@ -52,7 +52,7 @@ export function AssignmentSubmitDialog({
         {trimmed && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">{t("submitDialog.finalAnswerPreview")}</span>
+              <span className="type-field-label">{t("submitDialog.finalAnswerPreview")}</span>
               {onEditFinalAnswer && (
                 <Button
                   type="button"

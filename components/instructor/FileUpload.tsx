@@ -159,7 +159,7 @@ export function FileUpload({
               ) : (
                 <Upload className="w-8 h-8 text-muted-foreground" />
               )}
-              <div className="text-sm font-medium">
+              <div className="type-field-label">
                 {isDragOver
                   ? t("fileUpload.dropHint")
                   : t("fileUpload.uploadHint")}
@@ -171,8 +171,8 @@ export function FileUpload({
         {(existingFiles.length > 0 || files.length > 0) && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">{t("fileUpload.uploadedFilesLabel")}</Label>
-              <span className="text-xs text-muted-foreground">
+              <Label className="type-field-label">{t("fileUpload.uploadedFilesLabel")}</Label>
+              <span className="type-meta">
                 {t("fileUpload.totalSize", { size: (totalSize / 1024 / 1024).toFixed(1) })}
               </span>
             </div>
@@ -185,8 +185,8 @@ export function FileUpload({
                 >
                   <div className="flex items-center gap-2">
                     {getFileIcon(file.name)}
-                    <span className="text-sm font-medium">{file.name}</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="type-field-label">{file.name}</span>
+                    <span className="type-meta">
                       {t("fileUpload.existingFile")}
                     </span>
                   </div>

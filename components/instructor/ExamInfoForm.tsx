@@ -365,7 +365,7 @@ export function ExamInfoForm({
                   placeholder={isUnlimited ? t("examInfoForm.placeholderUnlimited") : t("examInfoForm.placeholderMinutes")}
                   className="w-20 text-center"
                 />
-                <span className="text-sm text-muted-foreground">{t("examInfoForm.unitMinutes")}</span>
+                <span className="type-hint">{t("examInfoForm.unitMinutes")}</span>
               </div>
               <Slider
                 min={1}

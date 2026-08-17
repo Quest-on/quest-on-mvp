@@ -149,7 +149,7 @@ export function QuestionsList({ questions, highlightedIds, defaultOpen = true, m
         <CollapsibleContent>
           <CardContent>
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-muted-foreground">{mode === "assignment" ? t("questionsList.hintAssignment") : t("questionsList.hintExam")}</p>
+              <p className="type-hint">{mode === "assignment" ? t("questionsList.hintAssignment") : t("questionsList.hintExam")}</p>
               {onAdd && (
                 <Button
                   type="button"

@@ -494,7 +494,7 @@ export default function StudentDashboard() {
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">{t("profileLoading")}</p>
+        <p className="type-hint">{t("profileLoading")}</p>
       </div>
     );
   }
@@ -611,7 +611,7 @@ export default function StudentDashboard() {
                 <User className="w-8 h-8 text-primary-foreground" />
               </div>
               <CardTitle className="text-xl">{t("loginRequired")}</CardTitle>
-              <p className="text-sm text-muted-foreground">
+              <p className="type-hint">
                 {t("loginHint")}
               </p>
             </CardHeader>
@@ -742,7 +742,7 @@ export default function StudentDashboard() {
                               </span>
                             </div>
                             {thisMonthSessions > 0 && (
-                              <span className="text-xs text-muted-foreground">
+                              <span className="type-meta">
                                 {t("stats.thisMonth", { count: thisMonthSessions })}
                               </span>
                             )}
@@ -1208,7 +1208,7 @@ export default function StudentDashboard() {
                                     </div>
                                     {session.score !== null &&
                                       session.maxScore !== null && (
-                                        <div className="text-xs text-muted-foreground">
+                                        <div className="type-meta">
                                           {t("session.scorePoints", {
                                             score: session.score,
                                             maxScore: session.maxScore,
@@ -1239,12 +1239,12 @@ export default function StudentDashboard() {
                                 className="w-6 h-6 animate-spin text-primary"
                                 aria-hidden="true"
                               />
-                              <span className="text-sm text-muted-foreground">
+                              <span className="type-hint">
                                 {t("infinite.loading")}
                               </span>
                             </>
                           ) : (
-                            <span className="text-sm text-muted-foreground">
+                            <span className="type-hint">
                               {t("infinite.scrollHint")}
                             </span>
                           )}

@@ -602,7 +602,7 @@ export default function InstructorHome() {
     }
     const studentCount = node.student_count ?? 0;
     return (
-      <span className="text-xs text-muted-foreground">
+      <span className="type-meta">
         {t("drive.studentCount", { count: studentCount })}
       </span>
     );
@@ -1515,7 +1515,7 @@ export default function InstructorHome() {
                             <FileIcon>
                               <FileText className="size-4 opacity-50" />
                             </FileIcon>
-                            <FileLabel className="text-xs text-muted-foreground">
+                            <FileLabel className="type-meta">
                               ...
                             </FileLabel>
                           </FilesFile>
@@ -2030,7 +2030,7 @@ export default function InstructorHome() {
                               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 {t("drive.sectionFolders")}
                               </p>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="type-meta">
                                 {t("drive.folderCount", { count: folderNodes.length })}
                               </span>
                             </div>
@@ -2071,7 +2071,7 @@ export default function InstructorHome() {
                               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 {t("drive.sectionExamsAssignments")}
                               </p>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="type-meta">
                                 {t("drive.examCount", { count: filteredExamNodes.length })}
                               </span>
                             </div>

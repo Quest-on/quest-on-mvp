@@ -816,7 +816,7 @@ export function BulkGradingPanel({
         render: () => (
           <p
             key="status-grading"
-            className="text-xs text-muted-foreground"
+            className="type-meta"
             aria-live="polite"
           >
             {t("bulkGrading.gradingStatusLabel", { gradeNoun, processed: processedCount, total: progress?.total ?? 0 })}
@@ -967,8 +967,8 @@ export function BulkGradingPanel({
     return (
       <Collapsible defaultOpen className="rounded-xl border bg-card text-card-foreground shadow-sm">
         <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-3 text-left">
-          <span className="text-sm font-medium">{title}</span>
-          <span className="text-xs text-muted-foreground">{t("bulkGrading.resultCount", { count })}</span>
+          <span className="type-field-label">{title}</span>
+          <span className="type-meta">{t("bulkGrading.resultCount", { count })}</span>
           {statusBadge}
           <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground transition-transform [[data-state=open]_&]:rotate-180" />
         </CollapsibleTrigger>
@@ -1068,7 +1068,7 @@ export function BulkGradingPanel({
             {/* (b) editable grade table OR (c) committed final summary. */}
             {committed ? (
               <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">{t("bulkGrading.committedNote")}</p>
+                <p className="type-meta">{t("bulkGrading.committedNote")}</p>
                 {finalSummariesLoading ? (
                   <div className="flex items-center justify-center rounded-md border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1192,7 +1192,7 @@ export function BulkGradingPanel({
               </table>
             ) : (
               !isGrading && (
-                <p className="text-sm text-muted-foreground">
+                <p className="type-hint">
                   {t("bulkGrading.noProposedGrades")}
                 </p>
               )
@@ -1273,7 +1273,7 @@ export function BulkGradingPanel({
           ) : !hasThreadContent ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
+              <p className="type-hint">
                 {t("bulkGrading.preparingMsg")}
               </p>
             </div>
@@ -1459,7 +1459,7 @@ export function BulkGradingPanel({
                     <DropdownMenuRadioItem key={key} value={key} className="items-start">
                       <div className="flex flex-col">
                         <span className="text-sm">{PERMISSION_LABELS[key]}</span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="type-meta">
                           {PERMISSION_DESCRIPTIONS[key]}
                         </span>
                       </div>

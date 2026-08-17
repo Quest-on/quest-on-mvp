@@ -112,7 +112,7 @@ export default async function PrivacyPage() {
               <strong>{t("privacy.section3.item3Label")}</strong> {t("privacy.section3.item3")}
             </li>
           </ul>
-          <p className="text-sm text-muted-foreground">
+          <p className="type-hint">
             {t("privacy.section3.principle")}
           </p>
 
@@ -242,7 +242,7 @@ export default async function PrivacyPage() {
             <li>{t("privacy.section6.email")}</li>
             <li>{t("privacy.section6.support")}</li>
           </ul>
-          <p className="text-sm text-muted-foreground">
+          <p className="type-hint">
             {t("privacy.section6.minor")}
           </p>
         </div>

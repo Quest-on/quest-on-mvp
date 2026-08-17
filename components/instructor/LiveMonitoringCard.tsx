@@ -232,7 +232,7 @@ export function LiveMonitoringCard({ examId }: LiveMonitoringCardProps) {
                           {message.role === "ai" ? "AI" : message.student.name}
                         </h4>
                         {message.role === "user" && message.student.student_number && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="type-meta">
                             ({message.student.student_number})
                           </span>
                         )}

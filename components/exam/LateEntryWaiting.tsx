@@ -206,7 +206,7 @@ export function LateEntryWaiting({
                 <p className="text-sm">
                   {t("lateEntry.lateAlertDescription")}
                 </p>
-                <p className="text-sm text-muted-foreground">
+                <p className="type-hint">
                   {t("lateEntry.doNotClose")}
                 </p>
               </div>
@@ -219,7 +219,7 @@ export function LateEntryWaiting({
               <Loader2 className="h-4 w-4 animate-spin" />
               <span>{t("lateEntry.waitingApproval")}</span>
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="type-meta">
               {t("lateEntry.elapsedTime", { minutes: Math.floor(elapsedSeconds / 60), seconds: (elapsedSeconds % 60).toString().padStart(2, "0") })}
             </div>
           </div>

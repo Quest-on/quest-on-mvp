@@ -171,12 +171,12 @@ export default function AssignmentReviewPage() {
                 {t("review.statusBadge")}
               </Badge>
               {deadline && (
-                <span className="text-sm text-muted-foreground">
+                <span className="type-hint">
                   {t("review.deadline", { deadline: formatDateTime(deadline, locale) })}
                 </span>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="type-hint">
               {t("review.readonlyNotice")}
             </p>
           </div>

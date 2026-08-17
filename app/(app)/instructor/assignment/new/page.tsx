@@ -193,7 +193,7 @@ export default function CreateAssignment() {
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2 w-full justify-between">
-              <h1 className="text-3xl font-bold">{t("newAssignment.pageTitle")}</h1>
+              <h1 className="type-page-title">{t("newAssignment.pageTitle")}</h1>
               <Button type="button" variant="outline" onClick={() => router.push("/instructor")} className="min-h-[44px] gap-2 border-border hover:bg-muted hover:text-foreground">
                 <ArrowLeft className="w-4 h-4" />
                 {t("newAssignment.backToDashboard")}
@@ -275,7 +275,7 @@ export default function CreateAssignment() {
               <div className="py-4">
                 <div className="space-y-3">
                   <div>
-                    <Label className="text-sm font-medium">{t("newAssignment.dialogAssignmentCode")}</Label>
+                    <Label className="type-field-label">{t("newAssignment.dialogAssignmentCode")}</Label>
                     <div className="flex items-center gap-2 mt-1">
                       {/* 코드는 ExamCode 만 내보낸다 (이슈 #84). 새로 만든 과제는 항상 미발행이다. */}
                       <ExamCode code={createdExamCode} quota={{ alreadyPublished: false, publishesRemaining: quotaData?.publishesRemaining ?? null }} />

@@ -140,7 +140,7 @@ export function CustomSignUp() {
               {/* 역할 선택 */}
               <div className="mb-6">
                 <div className="mb-2">
-                  <Label className="text-sm font-medium">{t("roleLabel")}</Label>
+                  <Label className="type-field-label">{t("roleLabel")}</Label>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {t("roleSubtitle")}
                   </p>
