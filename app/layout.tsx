@@ -63,7 +63,15 @@ export default async function RootLayout({
   const locale = await getLocale();
   return (
     // suppressHydrationWarning on <html> is required by next-themes (class/style injection)
-    <html lang={locale} suppressHydrationWarning={true}>
+    // data-scroll-behavior 는 globals.css 의 `html { scroll-behavior: smooth }`
+    // 와 짝이다. 이 표시가 없으면 라우트 전환 때 Next 의 스크롤 복원이
+    // 애니메이션으로 처리돼 페이지가 스르륵 움직인다. 개발 서버가 경고로
+    // 알려준다.
+    <html
+      lang={locale}
+      suppressHydrationWarning={true}
+      data-scroll-behavior="smooth"
+    >
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${robotoMono.variable} antialiased`}
         suppressHydrationWarning={true}
