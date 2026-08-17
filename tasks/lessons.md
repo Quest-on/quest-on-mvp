@@ -99,3 +99,4 @@
 - 로컬 `npm run lint`가 `.gjc/`에 `.cjs` 하나 생겼다고 통째로 죽는다. `eslint-config-next`의 react 블록이 `**/*.{js,jsx,mjs,ts,tsx,mts,cts}`에만 적용되는데 `.cjs`가 빠져 있고, 우리 rules 블록은 파일 제한이 없다. `.gjc/`는 gitignore라 CI는 멀쩡해서 **PR에 쓴 "lint 0 errors"가 로컬에선 거짓이었다**(#239에서 ignores에 추가).
 
 - 로컬 dev 확인은 `127.0.0.1` 말고 **`localhost`**로 연다. Next 가 `/_next/*` 를 교차출처로 막아 하이드레이션이 통째로 죽는다(`Blocked cross-origin request to Next.js dev resource`). 프로덕션 빌드(`next start`)는 `NODE_ENV=production`이라 테스트 바이패스가 원천 차단(`TEST_BYPASS_SECRET must not be set in a deployed environment`)되므로 인증 화면 확인에 못 쓴다.
+- 검증용 dev 서버는 `npm run dev:verify` 로 띄운다. `next dev` 는 인라인 env 를 덮지는 않지만 **설정하지 않은 키는 `.env.local` 에서 주입한다** — 실제로 `VERCEL_OIDC_TOKEN` 1193자가 검증 서버에 들어갔다. `AGENTS.md` 의 ".env.local 을 검증에 로드하지 않는다" 는 기억이 아니라 스크립트로 지킨다.

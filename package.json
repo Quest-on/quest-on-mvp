@@ -17,7 +17,8 @@
     "test:browser": "playwright test --project=browser-e2e --project=browser-flows --config=e2e/playwright.config.ts",
     "mock-server": "tsx scripts/start-mock-server.ts",
     "impact-review": "tsx scripts/impact-review.ts",
-    "env:check": "tsx scripts/check-env.ts"
+    "env:check": "tsx scripts/check-env.ts",
+    "dev:verify": "node scripts/dev-verify.mjs"
   },
   "dependencies": {
     "@base-ui-components/react": "^1.0.0-rc.0",
