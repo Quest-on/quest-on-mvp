@@ -34,6 +34,8 @@ interface SeedExamOverrides {
   allow_chat_in_waiting?: boolean;
   grades_released?: boolean;
   score_weights?: unknown;
+  // null 과 50 은 저장 형식만 다르고 채점 결과가 같다. 잠금 테스트가 그 구분을 쓴다.
+  chat_weight?: number | null;
 }
 
 export async function seedExam(overrides: SeedExamOverrides = {}) {
@@ -84,6 +86,9 @@ export async function seedExam(overrides: SeedExamOverrides = {}) {
   };
   if ("score_weights" in overrides) {
     (data as Record<string, unknown>).score_weights = overrides.score_weights ?? null;
+  }
+  if ("chat_weight" in overrides) {
+    (data as Record<string, unknown>).chat_weight = overrides.chat_weight ?? null;
   }
 
   const { error } = await supabase.from("exams").insert(data);

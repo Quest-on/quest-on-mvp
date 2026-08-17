@@ -353,18 +353,20 @@ export async function updateExam(data: {
     const needsCurrentExam =
       data.update.code !== undefined ||
       "score_weights" in data.update ||
+      "chat_weight" in data.update ||
       "questions" in data.update;
     let currentExam: {
       id: string;
       questions: unknown;
       score_weights: unknown;
       ai_draft_questions: unknown;
+      chat_weight: number | null;
     } | null = null;
 
     if (needsCurrentExam) {
       const { data: foundExam, error: findError } = await getSupabase()
         .from("exams")
-        .select("id, questions, score_weights, ai_draft_questions")
+        .select("id, questions, score_weights, ai_draft_questions, chat_weight")
         .eq("id", data.id)
         .eq("instructor_id", user.id)
         .maybeSingle();
@@ -378,6 +380,7 @@ export async function updateExam(data: {
         questions: unknown;
         score_weights: unknown;
         ai_draft_questions: unknown;
+        chat_weight: number | null;
       };
     }
 
@@ -506,6 +509,42 @@ export async function updateExam(data: {
       }
       if (hasScoreWeightsUpdate) {
         updateWithoutRubric.score_weights = scoreWeights;
+      }
+    }
+
+    /*
+      대화/최종답안 비중도 학생이 참여한 뒤에는 잠근다. (#226)
+
+      이 값이 채점 산식의 분모를 바꾼다. 중간에 바뀌면 같은 시험 안에서
+      먼저 채점된 학생과 나중에 채점된 학생이 다른 기준으로 평가된다.
+      score_weights 와 같은 이유이므로 같은 방식으로 막는다.
+
+      null 과 50 은 저장상 다른 값이지만 채점 결과가 같다(lib/grading.ts 가
+      `chat_weight ?? 50` 으로 읽는다). 그래서 '유효 값' 으로 비교한다 —
+      null -> 50 재전송은 변경이 아니다. 저장 형식만 바뀌는 것으로 409 를
+      내면 편집 화면을 열었다 저장만 해도 막힌다.
+    */
+    const hasChatWeightUpdate = "chat_weight" in data.update;
+    if (hasChatWeightUpdate && currentExam) {
+      const effective = (v: number | null | undefined) => v ?? 50;
+      const chatWeightChanged =
+        effective(currentExam.chat_weight) !==
+        effective(data.update.chat_weight as number | null | undefined);
+
+      if (chatWeightChanged) {
+        const { data: sessions } = await getSupabase()
+          .from("sessions")
+          .select("id")
+          .eq("exam_id", data.id)
+          .limit(1);
+
+        if (sessions && sessions.length > 0) {
+          return errorJson(
+            "CHAT_WEIGHT_LOCKED",
+            "학생이 이미 참여한 시험의 채점 비중은 변경할 수 없습니다.",
+            409
+          );
+        }
       }
     }
 
