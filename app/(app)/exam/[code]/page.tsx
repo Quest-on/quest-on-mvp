@@ -766,7 +766,7 @@ function SubmittedScreen({
               <p className="text-sm sm:text-base text-muted-foreground">
                 {t("submitted.gradingInfo")}
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="type-hint">
                 <span className="font-semibold text-foreground">{t("submitted.redirectCountdown", { countdown })}</span>
               </p>
             </div>

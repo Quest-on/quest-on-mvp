@@ -717,7 +717,7 @@ export default function CreateExam() {
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2 w-full justify-between">
-              <h1 className="text-3xl font-bold">{t("newExam.pageTitle")}</h1>
+              <h1 className="type-page-title">{t("newExam.pageTitle")}</h1>
               <Button
                 type="button"
                 variant="outline"
@@ -916,7 +916,7 @@ export default function CreateExam() {
                   <div className="py-4">
                     <div className="space-y-3">
                       <div>
-                        <Label className="text-sm font-medium">{t("newExam.dialogExamCode")}</Label>
+                        <Label className="type-field-label">{t("newExam.dialogExamCode")}</Label>
                         {/* 코드는 ExamCode 만 내보낸다 (이슈 #84).
                             여기가 교수자의 최단 경로다 — 생성 직후 이 대화상자에서
                             코드를 복사해 수업 자료에 붙인다. 여기서 안 막으면
@@ -976,7 +976,7 @@ export default function CreateExam() {
                 </DialogDescription>
               </DialogHeader>
               <div className="py-4">
-                <p className="text-sm text-muted-foreground">
+                <p className="type-hint">
                   {t("newExam.signUpDialogBody")}
                 </p>
               </div>

@@ -123,7 +123,7 @@ export default async function SecurityPage() {
               {t("security.reporting.process")}
             </p>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="type-hint">
             {t("security.reporting.disclosure")}
           </p>
         </div>

@@ -663,7 +663,7 @@ export default function OnboardingPage() {
                           className="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground transition-colors border-b last:border-b-0"
                         >
                           <div className="font-medium">{uni.fullName}</div>
-                          <div className="text-sm text-muted-foreground">
+                          <div className="type-hint">
                             {uni.type} · {uni.category}
                           </div>
                         </button>
@@ -672,7 +672,7 @@ export default function OnboardingPage() {
                   )}
                 </div>
                 {school && (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="type-hint">
                     {t("selectedSchool", { school })}
                   </p>
                 )}

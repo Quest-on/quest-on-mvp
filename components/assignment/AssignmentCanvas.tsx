@@ -221,7 +221,7 @@ export function AssignmentCanvas({
       <div className="border-b bg-background px-4 py-2 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium">{t("canvas.headerLabel")}</span>
+          <span className="type-field-label">{t("canvas.headerLabel")}</span>
         </div>
         <div className="flex items-center gap-1">
           <Button

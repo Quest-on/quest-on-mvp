@@ -209,7 +209,7 @@ export default function AssignmentPage({
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">{t("page.loading")}</p>
+        <p className="type-hint">{t("page.loading")}</p>
       </div>
     );
   }

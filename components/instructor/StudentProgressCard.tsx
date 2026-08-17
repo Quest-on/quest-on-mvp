@@ -206,13 +206,13 @@ export function StudentProgressCard({
                         </span>
                         {student.status === "completed" &&
                           student.submittedAt && (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="type-meta">
                               {formatDate(student.submittedAt, locale)}
                             </span>
                           )}
                         {student.status === "in-progress" &&
                           student.createdAt && (
-                            <div className="text-xs text-muted-foreground">
+                            <div className="type-meta">
                               <ElapsedTime createdAt={student.createdAt} />
                             </div>
                           )}
@@ -221,7 +221,7 @@ export function StudentProgressCard({
                     {student.status === "in-progress" &&
                       student.score === undefined &&
                       student.createdAt && (
-                        <div className="text-xs text-muted-foreground">
+                        <div className="type-meta">
                           <ElapsedTime createdAt={student.createdAt} />
                         </div>
                       )}

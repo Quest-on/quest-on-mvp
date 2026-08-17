@@ -206,7 +206,7 @@ export default function StudentReportPage() {
               : t("grading.inProgressDesc")}
           </p>
           {!isFailed && (
-            <p className="text-sm text-muted-foreground">
+            <p className="type-hint">
               {t("grading.estimatedTime")}
             </p>
           )}

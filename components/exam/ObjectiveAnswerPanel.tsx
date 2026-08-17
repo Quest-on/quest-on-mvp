@@ -100,7 +100,7 @@ export function ObjectiveAnswerPanel({
             />
           )}
 
-          <p className="text-xs text-muted-foreground">{t("objectivePanel.autoSaveNotice")}</p>
+          <p className="type-meta">{t("objectivePanel.autoSaveNotice")}</p>
         </div>
       </div>
     </div>

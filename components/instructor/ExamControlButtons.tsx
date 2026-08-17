@@ -344,7 +344,7 @@ export function ExamControlButtons({
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <Users className="h-4 w-4 text-muted-foreground" />
-                  <strong className="text-sm font-medium">
+                  <strong className="type-field-label">
                     {t("examControlButtons.waitingStudentsLabel", { count: waitingStudents?.length ?? 0 })}
                   </strong>
                 </div>
@@ -376,7 +376,7 @@ export function ExamControlButtons({
                             )}
                           </span>
                           {student.school && (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="type-meta">
                               {student.school}
                             </span>
                           )}
@@ -392,7 +392,7 @@ export function ExamControlButtons({
               </div>
 
               <div>
-                <Label htmlFor="close_at" className="text-sm font-medium">
+                <Label htmlFor="close_at" className="type-field-label">
                   {t("examControlButtons.closeAtLabel")}
                 </Label>
                 <Input

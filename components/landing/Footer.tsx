@@ -231,7 +231,7 @@ export default function Footer({ mode = "light" }: FooterProps) {
         >
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div
-              className="text-sm font-medium"
+              className="type-field-label"
               style={{ color: colors.textSec }}
             >
               Copyright © {new Date().getFullYear()}{" "}

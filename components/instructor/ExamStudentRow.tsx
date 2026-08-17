@@ -147,7 +147,7 @@ export function ExamStudentRow({
         {overallScoreLabel(student)}
       </div>
 
-      <div className="text-xs text-muted-foreground">
+      <div className="type-meta">
         {student.submittedAt
           ? formatDateTime(student.submittedAt, locale, {
               month: "short",

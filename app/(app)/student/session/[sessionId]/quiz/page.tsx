@@ -135,7 +135,7 @@ export default function AssignmentQuizPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">{t("loading")}</p>
+          <p className="type-hint">{t("loading")}</p>
         </div>
       </div>
     );
@@ -157,7 +157,7 @@ export default function AssignmentQuizPage() {
             <CardTitle>{t("cannotLoad")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
+            <p className="type-hint">
               {t("cannotLoadHint")}
             </p>
           </CardContent>
@@ -267,7 +267,7 @@ export default function AssignmentQuizPage() {
 
         <div className="sticky bottom-0 mt-6 border-t bg-background/95 py-4 backdrop-blur">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">
+            <p className="type-hint">
               {t("unansweredWarning")}
             </p>
             <Button

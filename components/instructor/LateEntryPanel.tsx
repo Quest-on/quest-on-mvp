@@ -138,7 +138,7 @@ export function LateEntryPanel({ examId, examStatus }: LateEntryPanelProps) {
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm truncate">{student.student_name}</p>
                     {student.student_number && (
-                      <p className="text-xs text-muted-foreground">{student.student_number}</p>
+                      <p className="type-meta">{student.student_number}</p>
                     )}
                     <p className="text-xs text-warning-text mt-0.5">
                       {t("lateEntry.waitingTime", { min: waitingMin, sec: waitingSec })}

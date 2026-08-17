@@ -79,7 +79,7 @@ export function StudentObjectiveAnswer({
       )}
 
       {resolvedOptions.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="type-hint">
           {answered ? t("mySelectText", { answer: selectedAnswer ?? "" }) : t("noOptionInfo")}
         </p>
       ) : (
@@ -122,7 +122,7 @@ export function StudentObjectiveAnswer({
       )}
 
       {!answered && resolvedOptions.length > 0 && (
-        <p className="text-sm text-muted-foreground">{t("noSelectionMade")}</p>
+        <p className="type-hint">{t("noSelectionMade")}</p>
       )}
     </div>
   );

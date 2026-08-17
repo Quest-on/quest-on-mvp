@@ -360,7 +360,7 @@ export default function AssignmentGradePage({
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold">
+                <h1 className="type-page-title">
                   {t("assignmentGradePage.studentGradeTitle", { studentName: sessionData.student.name })}
                 </h1>
                 <div className="text-muted-foreground space-y-1 mt-2">

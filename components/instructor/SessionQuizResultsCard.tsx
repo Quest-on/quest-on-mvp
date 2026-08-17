@@ -61,7 +61,7 @@ export function SessionQuizResultsCard({
             {t("sessionQuiz.metaBadge", { questions: quiz.total_questions, seconds: quiz.time_limit_seconds })}
           </Badge>
           {quiz.submitted_at && (
-            <span className="text-xs text-muted-foreground">
+            <span className="type-meta">
               {t("sessionQuiz.completedLabel")}{" "}
               {formatDateTime(quiz.submitted_at, locale, {
                 month: "short",
@@ -105,7 +105,7 @@ export function SessionQuizResultsCard({
                     : t("sessionQuiz.noAnswer")}
                 </p>
                 {typeof correctIndex === "number" && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="type-meta">
                     {t("sessionQuiz.answerLabel")} {question.options[correctIndex]}
                   </p>
                 )}

@@ -83,7 +83,7 @@ export function ObjectiveGradeCard({
   const content = (
     <>
       {resolvedOptions.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="type-hint">
           {t("objectiveGrade.noOptions")}
         </p>
       ) : (

@@ -82,8 +82,8 @@ export function GradingPanel({
         <CardContent>
           <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-info-solid" />
-            <p className="text-sm font-medium">{t("gradingPanel.inProgressDesc")}</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="type-field-label">{t("gradingPanel.inProgressDesc")}</p>
+            <p className="type-meta">
               {t("gradingPanel.inProgressNote")}
             </p>
           </div>
@@ -125,7 +125,7 @@ export function GradingPanel({
                   <stage.icon className={`h-5 w-5 ${stage.accentClass}`} />
                   <div>
                     <h4 className="text-sm font-semibold">{stage.label}</h4>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="type-meta">
                       {stage.description}
                     </p>
                   </div>
@@ -184,7 +184,7 @@ export function GradingPanel({
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor="score" className="text-sm font-medium">
+            <Label htmlFor="score" className="type-field-label">
               {t("gradingPanel.scoreLabel")}
             </Label>
             <div className="mt-1 flex gap-2">

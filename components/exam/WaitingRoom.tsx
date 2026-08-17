@@ -264,7 +264,7 @@ export function WaitingRoom({
               <Loader2 className="h-4 w-4 animate-spin" />
               <span>{t("waitingRoom.waitingSignal")}</span>
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="type-meta">
               {t("waitingRoom.elapsedTime", { minutes: Math.floor(elapsedSeconds / 60), seconds: (elapsedSeconds % 60).toString().padStart(2, "0") })}
             </div>
           </div>

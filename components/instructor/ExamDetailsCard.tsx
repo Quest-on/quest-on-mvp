@@ -106,17 +106,17 @@ export function ExamDetailsCard({
       <CardContent className="space-y-4">
         <div>
           <Label className="font-medium">{t("examDetailsCard.labelDescription")}</Label>
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="type-hint">{description}</p>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label className="font-medium">{t("examDetailsCard.labelTime")}</Label>
-            <p className="text-sm text-muted-foreground">{t("examDetailsCard.durationMin", { duration })}</p>
+            <p className="type-hint">{t("examDetailsCard.durationMin", { duration })}</p>
           </div>
         </div>
         <div>
           <Label className="font-medium">{t("examDetailsCard.labelCreatedAt")}</Label>
-          <p className="text-sm text-muted-foreground">
+          <p className="type-hint">
             {new Date(createdAt).toLocaleDateString()}
           </p>
         </div>
