@@ -19,6 +19,10 @@ export type AiFeature =
   | "case_grading_chat"
   | "bulk_grading_chat"
   | "bulk_grading_chat_options"
+  // 채팅이 아니라 점수를 만드는 경로다. 기준 토론과 한 덩어리로 뭉치면
+  // 기능별 비용·지연 분석에서 둘을 구분할 수 없다.
+  | "bulk_grading_execute"
+  | "bulk_grading_score_cluster"
   | "bulk_grading_criteria_extract"
   | "embedding";
 
@@ -39,6 +43,8 @@ export const AI_FEATURES: AiFeature[] = [
   "case_grading_chat",
   "bulk_grading_chat",
   "bulk_grading_chat_options",
+  "bulk_grading_execute",
+  "bulk_grading_score_cluster",
   "bulk_grading_criteria_extract",
   "embedding",
 ];

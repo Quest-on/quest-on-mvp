@@ -241,7 +241,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
             }
           ),
         {
-          feature: "bulk_grading_chat",
+          feature: "bulk_grading_execute",
           route: "/api/internal/bulk-grade-worker",
           model: aiContext.profile.model,
           configVersion: aiContext.configVersionId || null,
