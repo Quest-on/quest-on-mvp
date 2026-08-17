@@ -256,6 +256,17 @@
   * {
     @apply border-border outline-ring/50;
   }
+
+  /*
+    한글은 음절 단위로 끊기면 안 된다. 기본 word-break 는 '한데 묶어 봅니 /
+    다.' 처럼 단어 중간을 자르고 오른쪽에 빈 공간을 남긴다. keep-all 로
+    어절 경계에서만 끊는다. 영문은 긴 단어가 넘칠 수 있어 그때만 줄바꿈을
+    허용한다.
+  */
+  body {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
   html {
     scroll-behavior: smooth;
     scroll-padding-top: 80px; /* 헤더 높이만큼 오프셋 */
@@ -1200,4 +1211,45 @@
 
 .cl-socialButtonsBlockButton {
   width: 100% !important;
+}
+
+/*
+  타입 스케일.
+
+  text-xs ~ text-4xl 을 화면마다 손으로 고르면 같은 위계의 글자가 화면마다
+  달라진다. 실측 결과 8가지 크기 x 4가지 굵기가 1100건 넘게 흩어져 있었다.
+
+  역할로 부르면 크기를 몰라도 되고, 바꿀 때 한 곳만 고치면 된다.
+  본문 16px 를 기준으로 잡는다.
+*/
+@layer components {
+  /* 화면 제목. 페이지에 하나. */
+  .type-page-title {
+    @apply text-2xl font-bold tracking-tight sm:text-3xl;
+  }
+
+  /* 카드/섹션 제목. */
+  .type-section-title {
+    @apply text-base font-semibold;
+  }
+
+  /* 폼 필드 라벨. 입력 바로 위. */
+  .type-field-label {
+    @apply text-sm font-medium;
+  }
+
+  /* 본문. 기준 크기다. */
+  .type-body {
+    @apply text-base font-normal;
+  }
+
+  /* 보조 설명. 라벨 아래나 카드 설명. */
+  .type-hint {
+    @apply text-sm text-muted-foreground;
+  }
+
+  /* 메타 정보. 배지·타임스탬프·카운트. 여기보다 작게 쓰지 않는다. */
+  .type-meta {
+    @apply text-xs text-muted-foreground;
+  }
 }
