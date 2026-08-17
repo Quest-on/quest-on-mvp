@@ -281,7 +281,7 @@ export const createExamSchema = z.object({
   title: sanitizedString(z.string().min(1, "Title is required").max(500)),
   code: z.string().min(1).max(20),
   duration: z.number().int().min(0),
-  chat_weight: z.number().min(0).max(100).nullable().optional(),
+  chat_weight: z.number().int().min(0).max(100).nullable().optional(),
   score_weights: scoreWeightsSchema.nullable().optional(),
   course_id: z.string().uuid("Invalid course ID").nullable().optional(),
   questions: z.array(z.object({
@@ -364,7 +364,7 @@ export const updateExamSchema = z.object({
     })).optional(),
     status: z.string().optional(),
     code: z.string().min(1).max(20).optional(),
-    chat_weight: z.number().min(0).max(100).nullable().optional(),
+    chat_weight: z.number().int().min(0).max(100).nullable().optional(),
     score_weights: scoreWeightsSchema.nullable().optional(),
     course_id: z.string().uuid("Invalid course ID").nullable().optional(),
     open_at: z.string().nullable().optional(),
@@ -455,7 +455,7 @@ export const createAssignmentSchema = z.object({
   title: sanitizedString(z.string().min(1, "Title is required").max(500)),
   code: z.string().min(1).max(20),
   deadline: z.string().min(1, "Deadline is required"), // ISO datetime string
-  chat_weight: z.number().min(0).max(100).nullable().optional(),
+  chat_weight: z.number().int().min(0).max(100).nullable().optional(),
   course_id: z.string().uuid("Invalid course ID").nullable().optional(),
   questions: z.array(z.object({
     id: z.string(),

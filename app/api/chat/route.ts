@@ -781,7 +781,7 @@ export async function POST(request: NextRequest) {
 
     const { data: exam, error: examError } = await getSupabase()
       .from("exams")
-      .select("id, code, title, questions, materials_text, chat_weight, status, language")
+      .select("id, code, title, questions, materials_text, status, language")
       .eq("id", session.exam_id)
       .single();
 

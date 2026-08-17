@@ -127,7 +127,7 @@ export async function createAssignment(data: {
       materials_text: data.materials_text || [],
       rubric: data.rubric || [],
       rubric_public: data.rubric_public || false,
-      chat_weight: data.chat_weight ?? 50,
+      chat_weight: data.chat_weight ?? null,
       status: data.status,
       instructor_id: user.id,
       created_at: data.created_at,
