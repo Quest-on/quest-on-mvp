@@ -410,5 +410,12 @@
     "warning": "무료 등급에서 앞으로 {remaining}개 시험까지 학생을 받을 수 있습니다.",
     "blockedTitle": "코드를 배포하기 전에 계정 인증이 필요합니다",
     "blockedBody": "무료 등급의 발행 한도에 도달했습니다. 지금 코드를 배포하면 학생이 입장하지 못합니다. 인증을 마치면 코드가 다시 표시됩니다."
+  },
+  "examDetail": {
+    "restartConfirmTitle": "이 데모를 다시 풀까요?",
+    "restartConfirmBody": "지금까지의 답안과 AI 대화, 채점 결과가 지워집니다. 되돌릴 수 없습니다.",
+    "restartConfirmKeeps": "시험 자체와 문항은 그대로 남습니다.",
+    "restartConfirmCta": "지우고 다시 풀기",
+    "restartConfirmCancel": "취소"
   }
 }

@@ -30,7 +30,10 @@ describe("재응시 사슬이 끊기지 않았다", () => {
 
   it("CTA 가 재응시 의도를 URL 로 실어 보낸다", () => {
     expect(header).toMatch(/restartDemo=1/);
-    expect(header).toMatch(/demoRestartLabel \?\? demoPreviewLabel/);
+    // #174 로 재응시가 확인 다이얼로그를 거친다. URL 은 확인 시 router.push
+    // 로 나간다 — 의도(restartDemo=1 전달)는 그대로다. 삭제가 아니라 이동이다.
+    expect(header).toMatch(/restartDemo=1/);
+    expect(header).toMatch(/router\.push\(`\/exam\/\$\{code\}\?restartDemo=1`\)/);
   });
 
   it("재응시가 무엇을 지우는지 누르기 전에 알린다", () => {

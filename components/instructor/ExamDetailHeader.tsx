@@ -5,6 +5,18 @@ import { Button } from "@/components/ui/button";
 import { ExamCode, type ExamCodeQuota } from "@/components/instructor/ExamCode";
 import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface ExamDetailHeaderProps {
   title: string;
@@ -44,6 +56,7 @@ export function ExamDetailHeader({
   extraActions,
 }: ExamDetailHeaderProps) {
   const t = useTranslations("authoring");
+  const router = useRouter();
   return (
     <div className="mb-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -56,17 +69,47 @@ export function ExamDetailHeader({
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {isDemo && demoPreviewLabel && (
             <div className="flex flex-col items-start gap-1">
-              <Link
-                href={
-                  demoRestartLabel
-                    ? `/exam/${code}?restartDemo=1`
-                    : `/exam/${code}`
-                }
-              >
-                {/* 데모의 주 행동이다. 방금 온보딩을 마친 사람에게 이게 "다음 할 일"
-                    로 읽혀야 하는데 size="sm" 이면 헤더 버튼 무리에 묻힌다. */}
-                <Button>{demoRestartLabel ?? demoPreviewLabel}</Button>
-              </Link>
+              {/* 데모의 주 행동이다. 방금 온보딩을 마친 사람에게 이게 "다음 할 일"
+                  로 읽혀야 하는데 size="sm" 이면 헤더 버튼 무리에 묻힌다. */}
+              {demoRestartLabel ? (
+                /*
+                  재응시는 답안·AI 대화·채점 결과를 복구 불가능하게 지운다
+                  (restart_demo_attempt 가 grades/grading_chats/messages/
+                  submissions/session_quiz_attempts/paste_logs 를 DELETE 한다).
+
+                  RPC 가 원자적인 것과 사용자가 그걸 의도했는지는 다른 문제다.
+                  링크 한 번으로 지우지 않는다. (#174 · 7)
+                */
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button>{demoRestartLabel}</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t("examDetail.restartConfirmTitle")}</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t("examDetail.restartConfirmBody")}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    {/* 지워지는 것만 말하면 시험까지 사라지는 줄 안다. 남는 것도 적는다. */}
+                    <p className="type-hint">{t("examDetail.restartConfirmKeeps")}</p>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>
+                        {t("examDetail.restartConfirmCancel")}
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => router.push(`/exam/${code}?restartDemo=1`)}
+                      >
+                        {t("examDetail.restartConfirmCta")}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <Link href={`/exam/${code}`}>
+                  <Button>{demoPreviewLabel}</Button>
+                </Link>
+              )}
               {demoRestartLabel && demoRestartHint && (
                 <span className="type-meta">
                   {demoRestartHint}
