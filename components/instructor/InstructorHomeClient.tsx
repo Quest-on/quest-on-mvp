@@ -313,6 +313,12 @@ export default function InstructorHome() {
     );
   }, [allExamNodes, searchQuery]);
 
+  // 온보딩이 만든 데모. 있으면 착지 화면이 그걸 다음 걸음으로 가리킨다(#212).
+  const demoNode = useMemo(
+    () => examNodes.find((node) => node.exams?.is_demo === true) ?? null,
+    [examNodes]
+  );
+
   const filteredExamNodes = useMemo(() => {
     if (examFilter === "all") {
       return examNodes;
@@ -1816,13 +1822,35 @@ export default function InstructorHome() {
                     {t("home.greeting", { name: profile?.fullName || "강사" })}
                   </p>
 
+                  {/*
+                    착지 후 다음 걸음. 온보딩을 막 끝낸 사람에게 화면이 다음 할 일을
+                    말해주지 않으면 만든 데모가 어디 있는지도 모른 채 멈춘다. (#212)
+                  */}
+                  {demoNode ? (
+                    <div className="rounded-lg border border-info-border bg-info-surface p-4">
+                      <p className="type-field-label text-info-text">{t("home.nextStepTitle")}</p>
+                      <p className="type-hint mt-1">{t("home.nextStepDemo")}</p>
+                      <Link href={`/instructor/${demoNode.exams?.id ?? demoNode.id}`}>
+                        <Button variant="outline" size="sm" className="mt-3">
+                          {t("home.nextStepDemoCta")}
+                        </Button>
+                      </Link>
+                    </div>
+                  ) : null}
+
                   {/* 시험 관리 */}
                   <section className="space-y-4 min-w-0 overflow-x-hidden">
                     {/* Toolbar: new + search + view toggle — single row */}
                     <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
+                          {/*
+                            주 행동은 하나여야 한다. 빈 화면에서는 아래 "시험 만들기"
+                            CTA 가 다음 할 일이고, 이 드롭다운은 상시 보이는 보조
+                            진입점이다. 둘 다 강조하면 눈이 갈라진다. (#212)
+                          */}
                           <Button
+                            variant="outline"
                             size="sm"
                             className="gap-1.5 shrink-0"
                           >

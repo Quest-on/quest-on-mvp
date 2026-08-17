@@ -2,7 +2,12 @@
   "home": {
     "greeting": "안녕하세요, {name}님",
     "loadingTitle": "강사 대시보드를 불러오는 중...",
-    "loadingDesc": "시험 목록과 폴더 구조를 순차적으로 준비하고 있습니다."
+    "loadingDesc": "시험 목록과 폴더 구조를 순차적으로 준비하고 있습니다.",
+    "nextStepTitle": "다음 걸음",
+    "nextStepDemo": "만든 데모를 학생 화면으로 한 번 겪어 보세요. 학생이 무엇을 보는지 알아야 문제를 다듬을 수 있습니다.",
+    "nextStepDemoCta": "데모 열기",
+    "nextStepFirstExam": "첫 시험을 만들어 보세요. 자료를 올리면 AI 가 그걸 근거로 문제를 만듭니다.",
+    "nextStepFirstExamCta": "시험 만들기"
   },
   "nav": {
     "dashboard": "대시보드",
