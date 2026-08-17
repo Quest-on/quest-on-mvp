@@ -191,6 +191,9 @@ describe("e2e 부트스트랩 배선", () => {
     expect(workflow).toContain("CONSENT_GATE_MODE=prompt");
     // Playwright 두 번째 실행이 기본 test-results 를 지워도 첫 JUnit은 보존한다.
     expect(workflow).toContain("PLAYWRIGHT_JUNIT_OUTPUT_NAME=junit/browser-results.xml");
-    expect(workflow).toContain("paths: junit/*.xml");
+    // 요약이 그 JUnit 을 실제로 읽어야 한다. 예전에는 test-summary/action 의
+    // paths 였는데, codeload 429 로 잡이 죽어서 저장소 안 스크립트로 바꿨다
+    // (액션 다운로드는 스텝 실행 전 단계라 continue-on-error 가 닿지 않는다).
+    expect(workflow).toContain("ci-test-summary.mjs junit/*.xml");
   });
 });
