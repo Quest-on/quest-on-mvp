@@ -47,9 +47,12 @@ describe("데모 착지 화면의 주 행동이 눈에 띈다", () => {
     // size="sm" 이면 헤더의 보조 버튼들과 같은 크기라 다음 할 일로 안 읽힌다.
     const demoBlock = HEADER.slice(
       HEADER.indexOf("isDemo && demoPreviewLabel"),
-      HEADER.indexOf("isDemo && demoPreviewLabel") + 600
+      HEADER.indexOf("isDemo && demoPreviewLabel") + 1800
     );
-    expect(demoBlock).toMatch(/<Button>\{demoRestartLabel \?\? demoPreviewLabel\}/);
+    // #174 로 재응시가 확인 다이얼로그를 거치면서 한 줄 삼항이 분기로 갈렸다.
+    // 고정할 것은 구현 형태가 아니라 "기본 크기 버튼으로 렌더된다" 는 계약이다.
+    expect(demoBlock).toMatch(/<AlertDialogTrigger asChild>\s*<Button>\{demoRestartLabel\}/);
+    expect(demoBlock).toMatch(/<Button>\{demoPreviewLabel\}/);
     expect(demoBlock).not.toMatch(/<Button size="sm">\{demoRestartLabel/);
   });
 
