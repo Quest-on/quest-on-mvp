@@ -80,3 +80,37 @@ describe("CI 액션 버전 핀", () => {
     expect(all).toMatch(/uses:\s*\.\/\.github\/actions\//);
   });
 });
+
+/**
+ * 보고용 스텝은 잡을 죽이지 않는다.
+ *
+ * `test-summary/action` 은 결과를 요약해 보여주는 스텝이다. 테스트 결과는
+ * 이미 나왔고 아티팩트로도 올라가 있다. 그런데 `continue-on-error` 가 없으면
+ * **액션 다운로드 실패만으로 잡 전체가 red** 가 된다.
+ *
+ * 실제로 겪었다 — codeload 가 `429 Too Many Requests` 를 내서 통과한 테스트가
+ * 실패로 보고됐다. 재실행해도 같았다. #145 가 지적한 rate limit 문제가
+ * `setup-cli` 밖에서도 물린다는 증거다.
+ */
+describe("보고용 스텝 격리", () => {
+  it("test-summary 사용처가 모두 continue-on-error 다", () => {
+    const ci = readFileSync(".github/workflows/ci.yml", "utf8");
+    const uses = ci.match(/uses:\s*test-summary\/action/g) ?? [];
+    expect(uses.length, "test-summary 사용처를 못 찾았다").toBeGreaterThan(0);
+
+    // 각 사용처 바로 앞 블록에 continue-on-error 가 있어야 한다.
+    const guarded = ci.match(
+      /continue-on-error:\s*true\s*\n\s*uses:\s*test-summary\/action/g
+    ) ?? [];
+    expect(guarded.length).toBe(uses.length);
+  });
+
+  it("테스트 실행 스텝에는 continue-on-error 를 걸지 않는다", () => {
+    // 보고는 격리하되 테스트 자체는 격리하면 안 된다. 실패가 통과로 보인다.
+    const ci = readFileSync(".github/workflows/ci.yml", "utf8");
+    const bad = ci.match(
+      /continue-on-error:\s*true\s*\n\s*(?:name:[^\n]*\n\s*)?run:\s*(?:npm run test|npx playwright|npx vitest)/g
+    ) ?? [];
+    expect(bad, bad.join("\n")).toEqual([]);
+  });
+});

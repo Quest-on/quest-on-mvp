@@ -143,8 +143,13 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+      # 결과 요약은 보고용이다. 이 스텝이 실패해도 테스트 결과는 이미 나왔고
+      # 아티팩트로도 올라가 있다. 그런데 continue-on-error 가 없으면 액션
+      # 다운로드 실패만으로 잡 전체가 red 가 된다 — 실제로 codeload 가
+      # 429 Too Many Requests 를 내서 통과한 테스트가 실패로 보고됐다.
       - name: Test Summary
         if: always()
+        continue-on-error: true
         uses: test-summary/action@v2
         with:
           paths: test-results/api-results.xml
@@ -192,8 +197,13 @@ jobs:
             test-results/
             junit/
           retention-days: 7
+      # 결과 요약은 보고용이다. 이 스텝이 실패해도 테스트 결과는 이미 나왔고
+      # 아티팩트로도 올라가 있다. 그런데 continue-on-error 가 없으면 액션
+      # 다운로드 실패만으로 잡 전체가 red 가 된다 — 실제로 codeload 가
+      # 429 Too Many Requests 를 내서 통과한 테스트가 실패로 보고됐다.
       - name: Test Summary
         if: always()
+        continue-on-error: true
         uses: test-summary/action@v2
         with:
           paths: junit/*.xml
@@ -246,8 +256,13 @@ jobs:
             test-results/
             junit/
           retention-days: 7
+      # 결과 요약은 보고용이다. 이 스텝이 실패해도 테스트 결과는 이미 나왔고
+      # 아티팩트로도 올라가 있다. 그런데 continue-on-error 가 없으면 액션
+      # 다운로드 실패만으로 잡 전체가 red 가 된다 — 실제로 codeload 가
+      # 429 Too Many Requests 를 내서 통과한 테스트가 실패로 보고됐다.
       - name: Test Summary
         if: always()
+        continue-on-error: true
         uses: test-summary/action@v2
         with:
           paths: junit/*.xml
