@@ -60,7 +60,7 @@ export function StudentObjectiveAnswer({
           ) : !hasScore ? (
             <Badge variant="outline">{t("ungraded")}</Badge>
           ) : isCorrect ? (
-            <Badge className="gap-1 bg-emerald-600 hover:bg-emerald-600">
+            <Badge className="gap-1 bg-success-surface hover:bg-success-surface">
               <CheckCircle2 className="h-3 w-3" />
               {t("correct")}
             </Badge>
@@ -108,7 +108,7 @@ export function StudentObjectiveAnswer({
                   <Badge variant="outline" className="shrink-0 gap-1">
                     {released && hasScore &&
                       (isCorrect ? (
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                        <CheckCircle2 className="h-3 w-3 text-success-text" />
                       ) : (
                         <XCircle className="h-3 w-3 text-destructive" />
                       ))}
