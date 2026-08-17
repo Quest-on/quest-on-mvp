@@ -3,11 +3,16 @@
 import { useId, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { Plus } from "lucide-react";
+import { Plus, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorAlert } from "@/components/ui/error-alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -145,6 +150,19 @@ export function CourseSelectField({
           <span className="text-xs font-normal text-muted-foreground">
             {t("course.optional")}
           </span>
+          {/*
+            같은 카드의 다른 항목(시험 제목·시험 시간·AI 응답 언어)이 전부
+            물음표로 설명을 단다. 과목만 빠져 있었다. 설명은 본문에 늘어놓지
+            않고 여기 넣는다 — 필요한 사람만 열어보면 된다.
+          */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="max-w-xs">{t("course.tooltip")}</p>
+            </TooltipContent>
+          </Tooltip>
         </Label>
       </div>
 

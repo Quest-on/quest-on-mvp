@@ -41,7 +41,6 @@ import {
   ArrowDown,
   ArrowUp,
   CheckCircle2,
-  FileText,
   FolderOpen,
   HelpCircle,
   Loader2,
@@ -1296,7 +1295,7 @@ export function SimpleExamAuthoringForm({
               optionalLabel={t("simpleExamAuthoringForm.optional")}
               tooltip={t("simpleExamAuthoringForm.fieldChatWeightHelper")}
             >
-              <div className="rounded-md border bg-muted/20 p-3">
+              <div>
                 {/*
                   슬라이더를 처음부터 펼쳐 둔다. 예전에는 "조정" 버튼으로 펼치고
                   "직접 설정" 스위치를 켜야 슬라이더가 나타나서, 값을 바꾸려면
@@ -1308,9 +1307,14 @@ export function SimpleExamAuthoringForm({
                   사용자 지정으로 본다 — 안 건드리면 계속 null 이라 저장 계약이
                   그대로 유지된다.
                 */}
+                {/*
+                  shadcn 슬라이더 문서의 Controlled 패턴을 그대로 쓴다 —
+                  값은 오른쪽에 muted 로, 슬라이더는 그 아래. 예전에는 회색
+                  박스에 파일 아이콘까지 얹어서 입력이 아니라 진행 바처럼
+                  보였다.
+                */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">
+                  <span className="text-sm text-muted-foreground">
                     {t("simpleExamAuthoringForm.chatWeightDisplay", { chat: effectiveWeight, final: 100 - effectiveWeight })}
                   </span>
                   {isCustomWeight && (

@@ -59,7 +59,8 @@
     "createSubmit": "Add course",
     "creating": "Adding...",
     "cancel": "Cancel",
-    "createError": "Couldn't create the course. Please try again."
+    "createError": "Couldn't create the course. Please try again.",
+    "tooltip": "Groups exams and assignments from the same course. Optional — exams work without it."
   },
   "examDetail": {
     "error": "Error",
