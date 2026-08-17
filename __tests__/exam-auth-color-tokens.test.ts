@@ -21,6 +21,14 @@ const FILES = [
   "components/auth/CustomSignIn.tsx",
 ] as const;
 
+/**
+ * 랜딩 히어로는 실제 UI 와 브라우저 목업이 한 파일에 있다.
+ * 목업(463행 이후)은 가짜 주소창·탭을 그린 일러스트라 원색이 정당하다.
+ * 실제 UI 구간만 검사한다.
+ */
+const HERO = "components/landing/HeroSection.tsx";
+const HERO_MOCK_START = 462;
+
 describe.each(FILES)("%s", (file) => {
   const SOURCE = readFileSync(resolve(process.cwd(), file), "utf8");
 
@@ -61,6 +69,31 @@ describe("exam·auth 화면이 실제로 토큰을 쓴다", () => {
     // 남은 시간 경고는 위험 신호다. 다른 의미 토큰으로 바뀌면 안 된다.
     expect(readFileSync(resolve(process.cwd(), "components/exam/ExamTimer.tsx"), "utf8")).toMatch(
       /destructive/
+    );
+  });
+});
+
+describe("랜딩 히어로 — 실제 UI 구간", () => {
+  const LINES = readFileSync(resolve(process.cwd(), HERO), "utf8").split("\n");
+  const REAL = LINES.slice(0, HERO_MOCK_START).join("\n");
+  const MOCK = LINES.slice(HERO_MOCK_START).join("\n");
+
+  it("실제 UI 에 원색이 없다", () => {
+    const m = REAL.match(
+      /\b(bg|text|border|ring)-(red|orange|amber|yellow|green|emerald|blue|sky|indigo|violet|purple|gray|slate|zinc)-\d{2,3}\b/g
+    );
+    expect(m ?? [], (m ?? []).join(", ")).toEqual([]);
+  });
+
+  it("목업 구간은 건드리지 않는다", () => {
+    // 가짜 브라우저 크롬이라 토큰으로 바꾸면 일러스트가 깨진다.
+    expect(MOCK).toMatch(/\b(bg|text)-(zinc|blue|green)-\d{2,3}\b/);
+  });
+
+  it("토큰에 dark: 를 덧붙이지 않는다", () => {
+    // 토큰이 이미 두 모드를 갖는다. 덧붙이면 두 값이 어긋난다.
+    expect(REAL).not.toMatch(
+      /dark:(bg|text|border|ring)-(destructive|success|warning|info|primary|muted|foreground|background|border|input)/
     );
   });
 });

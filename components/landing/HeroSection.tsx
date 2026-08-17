@@ -52,7 +52,7 @@ const COLORS = {
     cardBorder: "#E5E5E5",
     editorBg: "#FFFFFF",
     chromeBg: "#FAFAFA",
-    glass: "backdrop-blur-md bg-white/70 border border-black/5",
+    glass: "backdrop-blur-md bg-background/70 border border-black/5",
     navBg: "rgba(255, 255, 255, 0.8)",
   },
   dark: {
@@ -64,7 +64,7 @@ const COLORS = {
     cardBorder: "rgba(255, 255, 255, 0.1)",
     editorBg: "#0F0F0F",
     chromeBg: "#141414",
-    glass: "backdrop-blur-md bg-white/5 border border-white/10",
+    glass: "backdrop-blur-md bg-background/5 border border-white/10",
     navBg: "rgba(0, 0, 0, 0.5)",
   },
 } as const;
@@ -235,18 +235,18 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
         >
           {/* Header */}
           <div
-            className="h-14 border-b flex items-center justify-between px-4 bg-white dark:bg-black/20"
+            className="h-14 border-b flex items-center justify-between px-4 bg-background"
             style={{ borderColor: colors.cardBorder }}
           >
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
+              <div className="p-1.5 rounded-md bg-success-solid text-success-text">
                 <ShieldCheck className="w-4 h-4" />
               </div>
               <div>
-                <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                <div className="text-xs font-bold text-foreground">
                   {t("demo.finalAnswer.heading")}
                 </div>
-                <div className="text-[9px] text-zinc-500">
+                <div className="text-[9px] text-muted-foreground">
                   {t("demo.finalAnswer.subtitle")}
                 </div>
               </div>
@@ -254,16 +254,16 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
           </div>
 
           {/* Content */}
-          <div className="p-3 flex-1 flex flex-col gap-3 overflow-hidden text-xs bg-zinc-50/50 dark:bg-transparent">
+          <div className="p-3 flex-1 flex flex-col gap-3 overflow-hidden text-xs bg-muted/50">
             {/* Status Badges */}
             <div className="flex gap-2">
-              <div className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded border bg-red-50 border-red-200 text-red-600 dark:bg-red-900/20 dark:border-red-900/50 dark:text-red-400">
+              <div className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded border bg-destructive/10 border-destructive/30 text-destructive">
                 <TriangleAlert className="w-3 h-3" />
                 <span className="font-semibold text-[10px]">
                   {t("demo.cheating.externalPaste")}
                 </span>
               </div>
-              <div className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded border bg-blue-50 border-blue-200 text-blue-600 dark:bg-blue-900/20 dark:border-blue-900/50 dark:text-blue-400">
+              <div className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded border bg-info-surface border-primary text-info-text">
                 <Copy className="w-3 h-3" />
                 <span className="font-semibold text-[10px]">
                   {t("demo.cheating.internalCopy")}
@@ -272,14 +272,14 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
             </div>
 
             {/* Suspicious Activity Box (Red) */}
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:bg-red-900/10 dark:border-red-900/30">
-              <div className="flex items-center gap-1.5 mb-2 text-red-700 dark:text-red-400">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+              <div className="flex items-center gap-1.5 mb-2 text-destructive">
                 <TriangleAlert className="w-3.5 h-3.5" />
                 <span className="font-bold text-[11px]">
                   {t("demo.cheating.suspiciousHeading")}
                 </span>
               </div>
-              <ul className="space-y-1 text-[10px] text-red-600/80 dark:text-red-400/80 font-mono">
+              <ul className="space-y-1 text-[10px] text-destructive/80 font-mono">
                 <li>• 84자 외부 붙여넣기 (오전 12:18:12)</li>
                 <li>• 380자 외부 붙여넣기 (오전 12:35:10)</li>
                 <li>• 112자 외부 붙여넣기 (오전 12:38:22)</li>
@@ -287,12 +287,12 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
             </div>
 
             {/* Internal Copy Box (Blue) */}
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:bg-blue-900/10 dark:border-blue-900/30">
-              <div className="flex items-center gap-1.5 mb-2 text-blue-700 dark:text-blue-400">
+            <div className="rounded-lg border border-primary bg-info-surface p-3">
+              <div className="flex items-center gap-1.5 mb-2 text-info-text">
                 <Copy className="w-3.5 h-3.5" />
                 <span className="font-bold text-[11px]">{t("demo.cheating.internalCopyHeading")}</span>
               </div>
-              <ul className="space-y-1 text-[10px] text-blue-600/80 dark:text-blue-400/80 font-mono">
+              <ul className="space-y-1 text-[10px] text-info-text/80 font-mono">
                 <li>• 149자 내부 복사 (오전 12:22:23)</li>
                 <li>• 116자 내부 복사 (오전 12:23:08)</li>
                 <li>• 80자 내부 복사 (오전 12:23:39)</li>
@@ -301,17 +301,17 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
 
             {/* Answer Content Snippet */}
             <div
-              className="flex-1 rounded-lg border bg-white dark:bg-zinc-900/50 p-3 space-y-2 overflow-hidden shadow-sm"
+              className="flex-1 rounded-lg border bg-background/50 p-3 space-y-2 overflow-hidden shadow-sm"
               style={{ borderColor: colors.cardBorder }}
             >
-              <div className="font-bold text-zinc-700 dark:text-zinc-300 text-[11px]">
+              <div className="font-bold text-muted-foreground text-[11px]">
                 0. 문제 제시 후 사고 과정
               </div>
-              <div className="text-[10px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+              <div className="text-[10px] leading-relaxed text-muted-foreground">
                 - 뛰어난 기술을 돋보이게 할 수 있는 프로모션(마케팅)이
                 필요하고...
                 <br />
-                <span className="bg-red-200/80 dark:bg-red-900/60 text-red-900 dark:text-red-100 px-1 py-0.5 rounded box-decoration-clone">
+                <span className="bg-destructive/80 text-destructive px-1 py-0.5 rounded box-decoration-clone">
                   - 프리미엄 전기자전거라면 불가피하게 가격을 고가로 설정하거나,
                   프리미엄 이미지를 설정해야 하고
                 </span>
@@ -323,7 +323,7 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
 
         {/* CENTER PANEL: CHAT HISTORY (5 cols) */}
         <div
-          className="lg:col-span-5 rounded-xl overflow-hidden border flex flex-col min-h-[500px] lg:h-[700px] shadow-2xl z-10 relative bg-white dark:bg-zinc-900 transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_25px_70px_-15px_rgba(59,130,246,0.35)]"
+          className="lg:col-span-5 rounded-xl overflow-hidden border flex flex-col min-h-[500px] lg:h-[700px] shadow-2xl z-10 relative bg-background transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_25px_70px_-15px_rgba(59,130,246,0.35)]"
           style={{
             backgroundColor: mode === "dark" ? colors.chromeBg : "#ffffff",
             boxShadow:
@@ -340,16 +340,16 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
         >
           {/* Header */}
           <div
-            className="h-16 border-b flex items-center justify-between px-5 bg-white dark:bg-zinc-900/90 backdrop-blur-sm"
+            className="h-16 border-b flex items-center justify-between px-5 bg-background/90 backdrop-blur-sm"
             style={{ borderColor: colors.cardBorder }}
           >
             <div className="flex items-center gap-3">
-              <MessageSquare className="w-5 h-5 text-blue-600" />
+              <MessageSquare className="w-5 h-5 text-info-text" />
               <div>
-                <div className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                <div className="text-sm font-bold text-foreground">
                   {t("demo.chat.heading")}
                 </div>
-                <div className="text-[10px] text-zinc-500">
+                <div className="text-[10px] text-muted-foreground">
                   {t("demo.chat.subtitle")}
                 </div>
               </div>
@@ -357,10 +357,10 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
           </div>
 
           {/* Chat Content */}
-          <div className="flex-1 p-5 overflow-y-auto space-y-6 bg-zinc-50/50 dark:bg-black/20 font-sans">
+          <div className="flex-1 p-5 overflow-y-auto space-y-6 bg-muted/50 font-sans">
             {/* Timestamp Separator */}
             <div className="flex justify-center">
-              <span className="text-[10px] text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-full">
+              <span className="text-[10px] text-muted-foreground bg-muted px-2 py-1 rounded-full">
                 오전 1:07:08
               </span>
             </div>
@@ -369,16 +369,16 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
             {shownStudentMessages.has(0) && (
               <div className="flex justify-end gap-2 animate-fade-in-up-xs">
                 <div className="flex flex-col items-end max-w-[85%]">
-                  <div className="bg-blue-600 text-white px-4 py-3 rounded-2xl rounded-tr-sm text-xs leading-relaxed shadow-sm">
+                  <div className="bg-primary text-white px-4 py-3 rounded-2xl rounded-tr-sm text-xs leading-relaxed shadow-sm">
                     경쟁사 제품 대비 그린휠의 제품은 얼마나 가벼워? 얼마나
                     경량화가 됐어?
                   </div>
-                  <span className="text-[9px] text-zinc-400 mt-1 mr-1">
+                  <span className="text-[9px] text-muted-foreground mt-1 mr-1">
                     오전 1:08:57
                   </span>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                  <div className="w-4 h-4 rounded-full border-2 border-blue-500" />
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+                  <div className="w-4 h-4 rounded-full border-2 border-primary" />
                 </div>
               </div>
             )}
@@ -386,18 +386,18 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
             {/* Message 2: AI */}
             {shownAIResponses.has(0) && (
               <div className="flex justify-start gap-2 animate-fade-in-up-xs">
-                <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center shrink-0">
-                  <Brain className="w-4 h-4 text-zinc-600 dark:text-zinc-300" />
+                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  <Brain className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div className="flex flex-col items-start max-w-[85%]">
-                  <div className="bg-white dark:bg-zinc-800 border dark:border-zinc-700 px-4 py-3 rounded-2xl rounded-tl-sm text-xs leading-relaxed text-zinc-800 dark:text-zinc-200 shadow-sm">
+                  <div className="bg-background border px-4 py-3 rounded-2xl rounded-tl-sm text-xs leading-relaxed text-foreground shadow-sm">
                     그린휠 E-Prime One은 평균{" "}
                     <span className="font-bold">17kg</span>으로 경쟁사 평균(약
                     21~23kg) 대비{" "}
                     <span className="font-bold">약 20% 경량화</span>
                     되었습니다.
                   </div>
-                  <span className="text-[9px] text-zinc-400 mt-1 ml-1">
+                  <span className="text-[9px] text-muted-foreground mt-1 ml-1">
                     오전 1:08:58
                   </span>
                 </div>
@@ -408,15 +408,15 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
             {shownStudentMessages.has(1) && (
               <div className="flex justify-end gap-2 animate-fade-in-up-xs">
                 <div className="flex flex-col items-end max-w-[85%]">
-                  <div className="bg-blue-600 text-white px-4 py-3 rounded-2xl rounded-tr-sm text-xs leading-relaxed shadow-sm">
+                  <div className="bg-primary text-white px-4 py-3 rounded-2xl rounded-tr-sm text-xs leading-relaxed shadow-sm">
                     전기 자전거가 경량화가 되면 뭐가 좋아?
                   </div>
-                  <span className="text-[9px] text-zinc-400 mt-1 mr-1">
+                  <span className="text-[9px] text-muted-foreground mt-1 mr-1">
                     오전 1:13:00
                   </span>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                  <div className="w-4 h-4 rounded-full border-2 border-blue-500" />
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+                  <div className="w-4 h-4 rounded-full border-2 border-primary" />
                 </div>
               </div>
             )}
@@ -424,18 +424,18 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
             {/* Message 4: AI */}
             {shownAIResponses.has(1) && (
               <div className="flex justify-start gap-2 animate-fade-in-up-xs">
-                <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center shrink-0">
-                  <Brain className="w-4 h-4 text-zinc-600 dark:text-zinc-300" />
+                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  <Brain className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div className="flex flex-col items-start max-w-[85%]">
-                  <div className="bg-white dark:bg-zinc-800 border dark:border-zinc-700 px-4 py-3 rounded-2xl rounded-tl-sm text-xs leading-relaxed text-zinc-800 dark:text-zinc-200 shadow-sm">
+                  <div className="bg-background border px-4 py-3 rounded-2xl rounded-tl-sm text-xs leading-relaxed text-foreground shadow-sm">
                     전기자전거가 경량화되면{" "}
                     <span className="font-bold">
                       휴대성·가속성·주행 효율성이 향상되고 배터리 소모가 감소
                     </span>
                     합니다.
                   </div>
-                  <span className="text-[9px] text-zinc-400 mt-1 ml-1">
+                  <span className="text-[9px] text-muted-foreground mt-1 ml-1">
                     오전 1:13:03
                   </span>
                 </div>
@@ -446,15 +446,15 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
             {shownStudentMessages.has(2) && (
               <div className="flex justify-end gap-2 animate-fade-in-up-xs">
                 <div className="flex flex-col items-end max-w-[85%]">
-                  <div className="bg-blue-600 text-white px-4 py-3 rounded-2xl rounded-tr-sm text-xs leading-relaxed shadow-sm">
+                  <div className="bg-primary text-white px-4 py-3 rounded-2xl rounded-tr-sm text-xs leading-relaxed shadow-sm">
                     배터리 수명은 어느 정도야?
                   </div>
-                  <span className="text-[9px] text-zinc-400 mt-1 mr-1">
+                  <span className="text-[9px] text-muted-foreground mt-1 mr-1">
                     오전 1:13:45
                   </span>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                  <div className="w-4 h-4 rounded-full border-2 border-blue-500" />
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+                  <div className="w-4 h-4 rounded-full border-2 border-primary" />
                 </div>
               </div>
             )}
