@@ -268,7 +268,7 @@ export async function recalibrateBulkGradesIfClustered(
             { timeout: clusterProfile.timeoutMs, maxRetries: clusterProfile.maxRetries }
           ),
         {
-          feature: "bulk_grading_chat",
+          feature: "bulk_grading_score_cluster",
           route: "lib/bulk-grade-score-cluster",
           model: clusterProfile.model,
           configVersion: (sessionRow.ai_config_version_id as string | null) ?? null,
