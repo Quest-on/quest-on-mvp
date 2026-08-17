@@ -273,7 +273,14 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-size: 15px;
+    /*
+      본문 16px 이 기준이다. 여기가 흔들리면 나머지 위계가 다 흔들린다.
+
+      예전에는 15px 였다. 의도한 결정이 아니라 무관한 커밋에 딸려 들어온
+      값이었고, 두 가지와 어긋났다 — type-body 가 text-base(16px) 를 쓰고,
+      아래 letter-spacing -0.3px 는 16~17px 본문에 맞춘 값이다.
+    */
+    font-size: 16px;
     line-height: 1.6;
     letter-spacing: -0.3px;
     -webkit-font-smoothing: antialiased;
