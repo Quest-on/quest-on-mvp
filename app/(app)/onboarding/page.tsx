@@ -419,7 +419,7 @@ export default function OnboardingPage() {
 
   if (!isLoaded || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
+      <div className="flex min-h-screen items-center justify-center surface-page-gradient">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto mb-4" />
           <p className="text-muted-foreground">{t("loading")}</p>
@@ -430,7 +430,7 @@ export default function OnboardingPage() {
 
   return (
     <CenteredViewportShell
-      className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-950 dark:to-slate-900"
+      className="surface-page-gradient"
       contentClassName="max-w-md"
     >
       {step === "role" ? (

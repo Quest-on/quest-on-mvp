@@ -173,7 +173,7 @@ export function WaitingRoom({
 
   return (
     <CenteredViewportShell
-      className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-950 dark:to-slate-900"
+      className="surface-page-gradient"
       contentClassName="max-w-2xl"
     >
       <Card className="w-full" data-testid="waiting-room">

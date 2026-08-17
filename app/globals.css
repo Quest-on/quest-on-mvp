@@ -1230,6 +1230,26 @@
   본문 16px 를 기준으로 잡는다.
 */
 @layer components {
+  /*
+    전면 배경 그라디언트.
+
+    같은 문자열이 8개 파일 10곳에 복제돼 있었다. 한 곳을 고치면 나머지가
+    남아 화면마다 배경이 갈라진다. 실제로 3단 변형이 따로 생겨 있었다.
+
+    slate 원색을 그대로 쓴다 — 이건 상태를 뜻하지 않는 중립 배경이라
+    destructive/success 같은 의미 토큰으로 바꾸면 뜻이 틀어진다. 대신
+    한 곳에 모아 두어 바꿀 때 한 번만 고치게 한다.
+  */
+  .surface-page-gradient {
+    @apply bg-gradient-to-br from-slate-50 to-white dark:from-slate-950 dark:to-slate-900;
+  }
+
+  /* 본문이 긴 문서형 화면. 중간 색을 하나 더 둬서 위아래 대비를 낮춘다. */
+  .surface-page-gradient-soft {
+    @apply bg-gradient-to-br from-slate-50 via-white to-slate-50/50;
+    @apply dark:from-slate-950 dark:via-slate-900 dark:to-slate-950/50;
+  }
+
   /* 화면 제목. 페이지에 하나. */
   .type-page-title {
     @apply text-2xl font-bold tracking-tight sm:text-3xl;

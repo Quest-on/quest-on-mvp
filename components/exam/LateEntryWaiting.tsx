@@ -131,7 +131,7 @@ export function LateEntryWaiting({
 
   if (isDenied) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white dark:from-slate-950 dark:to-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-screen surface-page-gradient flex items-center justify-center p-4">
         <Card className="w-full max-w-2xl">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
@@ -161,7 +161,7 @@ export function LateEntryWaiting({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white dark:from-slate-950 dark:to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen surface-page-gradient flex items-center justify-center p-4">
       <Card className="w-full max-w-2xl">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">

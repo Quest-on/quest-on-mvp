@@ -47,7 +47,7 @@ export default async function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950/50">
+    <div className="min-h-screen surface-page-gradient-soft">
       <PublicHeader />
       {/* Hero Section - AI 사고 과정 추적 */}
       <section id="hero">

@@ -56,7 +56,7 @@ export default function AdminLoginPage() {
 
   return (
     <CenteredViewportShell
-      className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-950 dark:to-slate-900"
+      className="surface-page-gradient"
       contentClassName="max-w-md"
     >
       <Card className="w-full shadow-xl border-0">
