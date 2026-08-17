@@ -58,7 +58,7 @@ export function CustomSignIn() {
   return (
     <div className="flex min-h-screen">
       {/* Left Section - Sign In Form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-white dark:bg-gray-950 relative">
+      <div className="flex-1 flex items-center justify-center p-8 bg-background relative">
         {/* 로고 - 왼쪽 상단 */}
         <Link
           href="/"
@@ -72,17 +72,17 @@ export function CustomSignIn() {
             className="w-8 h-8"
             priority
           />
-          <span className="text-lg font-bold text-gray-900 dark:text-white">
+          <span className="text-lg font-bold text-foreground dark:text-white">
             Quest-On
           </span>
         </Link>
 
         <div className="w-full max-w-md space-y-8">
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            <h1 className="text-3xl font-bold text-foreground dark:text-white">
               {t("welcome")}
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-muted-foreground">
               {t("subtitle")}
             </p>
           </div>
@@ -189,7 +189,7 @@ export function CustomSignIn() {
             </form>
           </div>
 
-          <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+          <div className="text-center text-sm text-muted-foreground">
             {t("noAccount")}{" "}
             <Link
               href="/sign-up"

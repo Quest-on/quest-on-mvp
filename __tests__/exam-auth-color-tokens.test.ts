@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * 학생이 시험 보는 화면의 색 계약. (#249 1단계)
+ * 학생이 시험 보는 화면과 로그인·가입 화면의 색 계약. (#249 1·2단계)
  *
  * instructor 영역은 #228~#237 에서 토큰으로 옮기며 `dark:` 변형이 통째로
  * 사라졌다. 토큰이 라이트/다크를 이미 갖기 때문이다. exam 은 그때 손대지
@@ -16,6 +16,9 @@ const FILES = [
   "components/exam/ExamTimer.tsx",
   "components/exam/PreflightModal.tsx",
   "components/exam/AnswerPanel.tsx",
+  // 2단계: 로그인·가입. 첫 화면이라 다크모드에서 깨지면 바로 보인다.
+  "components/auth/CustomSignUp.tsx",
+  "components/auth/CustomSignIn.tsx",
 ] as const;
 
 describe.each(FILES)("%s", (file) => {
@@ -43,7 +46,7 @@ describe.each(FILES)("%s", (file) => {
   });
 });
 
-describe("exam 화면이 실제로 토큰을 쓴다", () => {
+describe("exam·auth 화면이 실제로 토큰을 쓴다", () => {
   it("의미 토큰이 쓰이고 있다", () => {
     // 위 두 가드만 있으면 색을 통째로 지워도 통과한다. 반대편 증거를 둔다.
     const used = FILES.filter((f) =>

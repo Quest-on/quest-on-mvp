@@ -106,7 +106,7 @@ export function CustomSignUp() {
   return (
     <div className="flex min-h-screen">
       {/* Left Section - Sign Up Form */}
-      <div className="flex-1 flex flex-col justify-center px-6 py-10 sm:p-8 bg-white dark:bg-gray-950 relative">
+      <div className="flex-1 flex flex-col justify-center px-6 py-10 sm:p-8 bg-background relative">
         {/* 로고 - 왼쪽 상단 */}
         <Link
           href="/"
@@ -120,7 +120,7 @@ export function CustomSignUp() {
             className="w-8 h-8"
             priority
           />
-          <span className="text-lg font-bold text-gray-900 dark:text-white">
+          <span className="text-lg font-bold text-foreground dark:text-white">
             Quest-On
           </span>
         </Link>
@@ -129,10 +129,10 @@ export function CustomSignUp() {
           {step === "start" ? (
             <>
               <div className="space-y-2 mb-6">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                <h1 className="text-3xl font-bold text-foreground dark:text-white">
                   {t("heading")}
                 </h1>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-muted-foreground">
                   {t("subtitle")}
                 </p>
               </div>
@@ -152,16 +152,16 @@ export function CustomSignUp() {
                     className={`flex-1 flex flex-col items-start p-4 border-2 rounded-lg transition-all ${
                       role === "instructor"
                         ? "border-primary bg-primary/5 dark:bg-primary/10"
-                        : "border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700"
+                        : "border-border hover:border-input dark:hover:border-input"
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <Users className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground dark:text-white">
                         {t("instructorRole")}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 text-left">
+                    <p className="text-xs text-muted-foreground text-left">
                       {t("instructorRoleDesc")}
                     </p>
                   </button>
@@ -171,16 +171,16 @@ export function CustomSignUp() {
                     className={`flex-1 flex flex-col items-start p-4 border-2 rounded-lg transition-all ${
                       role === "student"
                         ? "border-primary bg-primary/5 dark:bg-primary/10"
-                        : "border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700"
+                        : "border-border hover:border-input dark:hover:border-input"
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <GraduationCap className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground dark:text-white">
                         {t("studentRole")}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 text-left">
+                    <p className="text-xs text-muted-foreground text-left">
                       {t("studentRoleDesc")}
                     </p>
                   </button>
@@ -289,7 +289,7 @@ export function CustomSignUp() {
                   </Button>
                 </form>
 
-                <div className="text-center text-sm text-gray-600 dark:text-gray-400 mt-6">
+                <div className="text-center text-sm text-muted-foreground mt-6">
                   {t("hasAccount")}{" "}
                   <Link
                     href="/sign-in"
@@ -304,11 +304,11 @@ export function CustomSignUp() {
             /* 이메일 인증 Step */
             <>
               <div className="space-y-2 mb-6">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                <h1 className="text-3xl font-bold text-foreground dark:text-white">
                   {t("verifyHeading")}
                 </h1>
-                <p className="text-gray-600 dark:text-gray-400">
-                  <span className="font-medium text-gray-900 dark:text-white">
+                <p className="text-muted-foreground">
+                  <span className="font-medium text-foreground dark:text-white">
                     {email}
                   </span>
                   {t("verifyDesc")}
