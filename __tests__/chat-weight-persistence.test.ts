@@ -144,15 +144,30 @@ describe("createExam 은 chat_weight 의 null 을 보존한다", () => {
 
 /** 편집 저장 경로. create 만 고쳤으므로 update 가 다시 접지 않는지 고정한다. */
 function mockExamUpdate() {
-  const exams = createChain({ data: { id: EXAM_ID, instructor_id: INSTRUCTOR_ID }, error: null });
+  // #226 이후 update 경로가 현재 exam 을 먼저 읽는다(chat_weight 잠금 비교).
+  // 목이 그 값을 안 주면 undefined 비교가 되어 무관한 실패가 난다.
+  const exams = createChain({
+    data: {
+      id: EXAM_ID,
+      instructor_id: INSTRUCTOR_ID,
+      questions: [],
+      score_weights: null,
+      ai_draft_questions: null,
+      chat_weight: null,
+    },
+    error: null,
+  });
   const updated: Array<Record<string, unknown>> = [];
   exams.update = vi.fn((payload: unknown) => {
     updated.push(payload as Record<string, unknown>);
     return exams;
   });
   (exams as unknown as { updated: unknown[] }).updated = updated;
+  const sessions = createChain({ data: [], error: null });
   supabaseMock.from.mockImplementation((table: string) => {
     if (table === "exams") return exams;
+    // 세션 없음. chat_weight 잠금은 세션이 있을 때만 걸린다.
+    if (table === "sessions") return sessions;
     throw new Error(`Unexpected table: ${table}`);
   });
   return exams as typeof exams & { updated: Array<Record<string, unknown>> };
