@@ -373,7 +373,7 @@ export default function StudentReportPage() {
         {oxQuestions.length > 0 && (
           <section className="space-y-4">
             <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-emerald-600" />
+              <CheckCircle className="w-5 h-5 text-success-text" />
               <h2 className="text-lg font-semibold">
                 {t("group.ox", { count: oxQuestions.length })}
               </h2>

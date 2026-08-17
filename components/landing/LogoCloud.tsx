@@ -30,7 +30,7 @@ export default function LogoCloud({
         <div className="flex flex-col items-center justify-center gap-8">
           <p
             className={`text-xs font-bold uppercase tracking-[0.2em] ${
-              isDark ? "text-zinc-500" : "text-zinc-600"
+              isDark ? "text-muted-foreground" : "text-muted-foreground"
             }`}
           >
             {t("logoCloud.caption")}
@@ -50,7 +50,7 @@ export default function LogoCloud({
                 </div>
                 <div
                   className={`text-[10px] font-bold uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity text-center ${
-                    isDark ? "text-zinc-400" : "text-zinc-500"
+                    isDark ? "text-muted-foreground" : "text-muted-foreground"
                   }`}
                 >
                   {partner.logo}
