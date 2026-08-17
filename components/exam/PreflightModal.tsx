@@ -248,17 +248,17 @@ export function PreflightModal({
                     {t("preflight.aiPolicySectionTitle")}
                   </h3>
                   <div className="space-y-2">
-                    <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
-                      <span className="text-blue-600 font-bold mt-0.5 text-sm">1</span>
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-info-surface border border-info-border">
+                      <span className="text-info-text font-bold mt-0.5 text-sm">1</span>
                       <div>
-                        <p className="font-semibold text-sm text-blue-700 dark:text-blue-400">{t("preflight.aiPolicyItem1Title")}</p>
+                        <p className="font-semibold text-sm text-info-text">{t("preflight.aiPolicyItem1Title")}</p>
                         <p className="text-muted-foreground text-xs mt-0.5">{t("preflight.aiPolicyItem1Description")}</p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
-                      <span className="text-red-600 font-bold mt-0.5 text-sm">2</span>
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+                      <span className="text-destructive font-bold mt-0.5 text-sm">2</span>
                       <div>
-                        <p className="font-semibold text-sm text-red-700 dark:text-red-400">{t("preflight.aiPolicyItem2Title")}</p>
+                        <p className="font-semibold text-sm text-destructive">{t("preflight.aiPolicyItem2Title")}</p>
                         <p className="text-muted-foreground text-xs mt-0.5">{t("preflight.aiPolicyItem2Description")}</p>
                       </div>
                     </div>
