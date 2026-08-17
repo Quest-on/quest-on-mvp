@@ -15,7 +15,7 @@ export default async function SecurityPage() {
       </header>
 
       <section className="mb-12">
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+        <div className="bg-info-surface border border-info-border rounded-lg p-6">
           <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
             <ShieldCheck className="w-6 h-6 text-blue-600" />
             {t("security.principles.heading")}

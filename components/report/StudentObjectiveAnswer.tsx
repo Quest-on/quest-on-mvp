@@ -94,7 +94,7 @@ export function StudentObjectiveAnswer({
                   isPick
                     ? released && hasScore
                       ? isCorrect
-                        ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
+                        ? "border-emerald-300 bg-emerald-50"
                         : "border-destructive/40 bg-destructive/5"
                       : "border-primary/40 bg-primary/5"
                     : "border-border",

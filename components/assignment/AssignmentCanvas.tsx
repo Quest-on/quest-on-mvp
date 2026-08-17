@@ -75,7 +75,7 @@ function CodeBlockNodeView({ node, updateAttributes }: NodeViewProps) {
         <select
           value={currentLang}
           onChange={(e) => updateAttributes({ language: e.target.value })}
-          className="h-6 text-[10px] font-medium rounded-md border border-white/20 bg-black/10 dark:bg-white/10 backdrop-blur-sm px-1.5 py-0 outline-none cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+          className="h-6 text-[10px] font-medium rounded-md border border-white/20 bg-black/10 dark:bg-background/10 backdrop-blur-sm px-1.5 py-0 outline-none cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
         >
           {CODE_LANGUAGES.map((lang) => (
             <option key={lang.value} value={lang.value}>
@@ -416,7 +416,7 @@ export function AssignmentCanvas({
 
       {/* Table sub-toolbar — only when cursor is in table */}
       {!isSubmitted && isInTable && (
-        <div className="border-b bg-blue-50/50 dark:bg-blue-950/20 px-3 py-1 flex items-center gap-1 shrink-0">
+        <div className="border-b bg-blue-50/50 px-3 py-1 flex items-center gap-1 shrink-0">
           <span className="text-[10px] font-medium text-muted-foreground mr-1.5">{t("canvas.tableEditLabel")}</span>
           <div className="w-px h-4 bg-border mx-0.5" />
           <Button

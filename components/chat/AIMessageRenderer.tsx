@@ -131,7 +131,7 @@ const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({
 
               // 테이블 스타일링
               table: ({ children }: React.ComponentProps<"table">) => (
-                <div className="overflow-x-auto my-0 mt-0 mb-0 border border-border/50 rounded-lg shadow-sm bg-white dark:bg-gray-800 [&+*]:mt-0">
+                <div className="overflow-x-auto my-0 mt-0 mb-0 border border-border/50 rounded-lg shadow-sm bg-background [&+*]:mt-0">
                   <table className="min-w-full divide-y divide-border">
                     {children}
                   </table>

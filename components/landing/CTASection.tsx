@@ -20,11 +20,11 @@ export default function CTASection({
   return (
     <section
       className={`py-32 px-6 relative overflow-hidden ${
-        isDark ? "bg-black" : "bg-white"
+        isDark ? "bg-black" : "bg-background"
       }`}
     >
       {/* Background Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl aspect-square bg-blue-600/10 dark:bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl aspect-square bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="container mx-auto max-w-5xl text-center relative z-10">
         <div className="space-y-8 animate-fade-in-up-sm">
@@ -64,7 +64,7 @@ export default function CTASection({
               onClick={onCtaClick}
               className={`group relative inline-flex items-center gap-2 px-8 py-4 text-sm font-semibold rounded-full transition-all hover:scale-105 active:scale-95 ${
                 isDark
-                  ? "bg-white text-black hover:bg-zinc-100 shadow-[0_0_30px_rgba(255,255,255,0.2)]"
+                  ? "bg-background text-black hover:bg-zinc-100 shadow-[0_0_30px_rgba(255,255,255,0.2)]"
                   : "bg-zinc-900 text-white hover:bg-zinc-800 shadow-[0_15px_30px_rgba(0,0,0,0.15)]"
               }`}
             >
