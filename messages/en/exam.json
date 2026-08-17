@@ -137,7 +137,8 @@
     "manualFailTitle": "Submission failed",
     "manualFailDefault": "Failed to submit your answers. Please check your network connection and try again.",
     "manualFailClose": "Close",
-    "manualFailRetry": "Try again"
+    "manualFailRetry": "Try again",
+    "exitDescriptionDemo": "Your progress will be saved. You will return to the demo detail screen."
   },
   "submitConfirm": {
     "title": "Submit exam",
