@@ -112,7 +112,7 @@ export function CourseSelectField({
   const isSection = variant === "section";
   const courses = coursesQuery.data ?? [];
   const showSkeleton = !isLoaded || coursesQuery.isLoading;
-  const controlClass = isSection ? "h-11 bg-white" : "";
+  const controlClass = isSection ? "h-11 bg-background" : "";
 
   const openCreateForm = () => {
     createCourse.reset();
@@ -142,14 +142,10 @@ export function CourseSelectField({
         <Label
           htmlFor={fieldId}
           className={cn(
-            "flex items-center gap-1.5",
-            isSection && "text-base font-semibold",
+            "type-field-label flex items-center gap-1.5",
           )}
         >
           {t("course.label")}
-          <span className="text-xs font-normal text-muted-foreground">
-            {t("course.optional")}
-          </span>
           {/*
             같은 카드의 다른 항목(시험 제목·시험 시간·AI 응답 언어)이 전부
             물음표로 설명을 단다. 과목만 빠져 있었다. 설명은 본문에 늘어놓지
@@ -261,9 +257,6 @@ export function CourseSelectField({
                 className="flex items-center gap-1.5"
               >
                 {t("course.termLabel")}
-                <span className="text-xs font-normal text-muted-foreground">
-                  {t("course.optional")}
-                </span>
               </Label>
               <Input
                 id={`${fieldId}-term`}

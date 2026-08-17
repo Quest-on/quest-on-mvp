@@ -160,8 +160,6 @@ function SubField({
   label,
   htmlFor,
   required,
-  optional,
-  optionalLabel = "선택",
   tooltip,
   action,
   children,
@@ -169,8 +167,6 @@ function SubField({
   label: string;
   htmlFor?: string;
   required?: boolean;
-  optional?: boolean;
-  optionalLabel?: string;
   tooltip?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
@@ -183,11 +179,6 @@ function SubField({
           {required && (
             <span className="text-destructive" aria-hidden>
               *
-            </span>
-          )}
-          {optional && (
-            <span className="text-xs font-normal text-muted-foreground">
-              {optionalLabel}
             </span>
           )}
         </Label>
@@ -902,9 +893,6 @@ export function SimpleExamAuthoringForm({
         <CardHeader>
           <CardTitle className="flex items-center gap-1.5">
             {t("simpleExamAuthoringForm.fieldMaterialsLabel")}
-            <span className="text-xs font-normal text-muted-foreground">
-              {t("simpleExamAuthoringForm.optional")}
-            </span>
           </CardTitle>
           <CardDescription>
             {t("simpleExamAuthoringForm.fieldMaterialsHelper")}
@@ -941,7 +929,7 @@ export function SimpleExamAuthoringForm({
               ) : (
                 <Upload className="h-8 w-8 text-muted-foreground" />
               )}
-              <span className="text-sm font-medium">
+              <span className="type-field-label">
                 {isDragOver
                   ? t("simpleExamAuthoringForm.dropHint")
                   : t("simpleExamAuthoringForm.uploadHint")}
@@ -1106,7 +1094,7 @@ export function SimpleExamAuthoringForm({
               className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-10 text-center transition-colors hover:border-muted-foreground hover:bg-muted/50"
             >
               <Plus className="h-8 w-8 text-muted-foreground" />
-              <span className="text-sm font-medium">
+              <span className="type-field-label">
                 {questions.length === 0 ? t("simpleExamAuthoringForm.buttonAddFirstQuestion") : t("simpleExamAuthoringForm.buttonAddQuestion")}
               </span>
               <span className="text-xs text-muted-foreground">
@@ -1210,7 +1198,7 @@ export function SimpleExamAuthoringForm({
                             <span
                               className={`h-2.5 w-2.5 rounded-full ${SCORE_BUCKET_COLORS[bucket]}`}
                             />
-                            <span className="text-sm font-medium">
+                            <span className="type-field-label">
                               {t(SCORE_BUCKET_LABEL_KEYS[bucket])}
                             </span>
                           </div>
@@ -1291,8 +1279,6 @@ export function SimpleExamAuthoringForm({
           <div className="border-t pt-5">
             <SubField
               label={t("simpleExamAuthoringForm.fieldChatWeightLabel")}
-              optional
-              optionalLabel={t("simpleExamAuthoringForm.optional")}
               tooltip={t("simpleExamAuthoringForm.fieldChatWeightHelper")}
             >
               <div>
@@ -1451,7 +1437,7 @@ export function SimpleExamAuthoringForm({
 
           {/* 프롬프트 입력란 */}
           <div className="mt-1">
-            <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
+            <label className="type-field-label text-muted-foreground mb-1.5 block">
               {t("simpleExamAuthoringForm.dialogPromptLabel")}{" "}
               <span className="text-xs">{t("simpleExamAuthoringForm.dialogPromptOptional")}</span>
             </label>

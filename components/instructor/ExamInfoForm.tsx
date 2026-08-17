@@ -344,7 +344,7 @@ export function ExamInfoForm({
               />
               <Label
                 htmlFor="unlimited"
-                className="text-sm font-medium cursor-pointer"
+                className="type-field-label cursor-pointer"
               >
                 {t("examInfoForm.unlimitedLabel")}
               </Label>
