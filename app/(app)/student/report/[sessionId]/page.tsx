@@ -156,7 +156,7 @@ export default function StudentReportPage() {
     return (
       <div className="container mx-auto p-6 max-w-4xl">
         <div className="text-center py-12">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">
+          <h2 className="text-xl font-semibold text-destructive mb-2">
             {errorMessage || t("cannotLoad")}
           </h2>
           <Link href="/student">
@@ -227,7 +227,7 @@ export default function StudentReportPage() {
               <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                 <div
                   className={`h-full transition-all ${
-                    isFailed ? "bg-red-500" : "bg-primary"
+                    isFailed ? "bg-destructive/10" : "bg-primary"
                   }`}
                   style={{ width: `${pct}%` }}
                 />
@@ -299,7 +299,7 @@ export default function StudentReportPage() {
             {gradesNotReleased ? (
               <Badge
                 variant="outline"
-                className="bg-amber-500/10 text-warning-text border-amber-500/20"
+                className="bg-warning-surface/10 text-warning-text border-amber-500/20"
               >
                 <Clock className="w-4 h-4 mr-1" />
                 {t("badge.pendingRelease")}
@@ -307,7 +307,7 @@ export default function StudentReportPage() {
             ) : (
               <Badge
                 variant="outline"
-                className="bg-green-500/10 text-success-text border-green-500/20"
+                className="bg-success-solid/10 text-success-text border-green-500/20"
               >
                 <CheckCircle className="w-4 h-4 mr-1" />
                 {t("badge.evaluated")}
@@ -318,7 +318,7 @@ export default function StudentReportPage() {
       </div>
 
       {allQuestions.length === 0 && (
-        <div className="text-red-600">{t("noQuestions")}</div>
+        <div className="text-destructive">{t("noQuestions")}</div>
       )}
 
       <div className="space-y-10">
@@ -326,7 +326,7 @@ export default function StudentReportPage() {
         {mcqQuestions.length > 0 && (
           <section className="space-y-4">
             <div className="flex items-center gap-2">
-              <ListChecks className="w-5 h-5 text-blue-600" />
+              <ListChecks className="w-5 h-5 text-info-text" />
               <h2 className="text-lg font-semibold">
                 {t("group.mcq", { count: mcqQuestions.length })}
               </h2>

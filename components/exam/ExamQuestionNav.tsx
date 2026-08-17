@@ -74,7 +74,7 @@ export function ExamQuestionNav({
             variant="ghost"
             size="sm"
             onClick={onExit}
-            className="w-full min-h-[44px] flex flex-col gap-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 px-1"
+            className="w-full min-h-[44px] flex flex-col gap-1 text-xs text-destructive hover:text-destructive hover:bg-red-50 dark:hover:bg-destructive/10/30 px-1"
             aria-label={t("nav.exitAriaLabel")}
           >
             <LogOut className="size-4 shrink-0" aria-hidden="true" />
@@ -104,7 +104,7 @@ export function ExamQuestionNav({
             variant="outline"
             size="sm"
             onClick={onExit}
-            className="shrink-0 min-h-[40px] text-xs border-red-200 text-red-600 hover:bg-red-50"
+            className="shrink-0 min-h-[40px] text-xs border-red-200 text-destructive hover:bg-red-50"
             aria-label={t("nav.exitAriaLabel")}
           >
             {t("nav.exit")}
@@ -165,7 +165,7 @@ function QuestionPill({
       )}
       {hasChat && (
         <span
-          className="absolute -bottom-0.5 -right-0.5 size-2.5 bg-blue-500 rounded-full border border-background"
+          className="absolute -bottom-0.5 -right-0.5 size-2.5 bg-primary rounded-full border border-background"
           aria-hidden="true"
         />
       )}
