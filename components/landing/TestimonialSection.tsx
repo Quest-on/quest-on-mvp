@@ -19,8 +19,8 @@ const MARQUEE_SLOW_MS = 50000;
  *    - 레이아웃: flex flex-col, relative, overflow-hidden
  *    - 모서리: rounded-[2.5rem] (40px)
  *    - 패딩: p-8 md:p-10 (32px / 40px)
- *    - 테두리: border, light → border-zinc-200, dark → border-zinc-800
- *    - 배경: light → bg-background, dark → bg-zinc-900/40
+ *    - 테두리: border, light → border-border, dark → border-border
+ *    - 배경: light → bg-background, dark → bg-muted/40
  *    - 그림자: light → shadow-xl shadow-zinc-200/50
  *    - 호버: hover:shadow-2xl hover:-translate-y-2, transition-all
  *    - 애니메이션: animate-fade-in-up-sm, animationDelay = index * 0.15s
@@ -108,8 +108,8 @@ function TestimonialCard({
     <div
       className={`group relative flex flex-col w-[320px] md:w-[380px] flex-shrink-0 rounded-[2.5rem] p-8 md:p-10 border transition-all hover:shadow-2xl hover:-translate-y-2 overflow-hidden ${
         isDark
-          ? "bg-zinc-900/40 border-zinc-800"
-          : "bg-background border-zinc-200 shadow-xl shadow-zinc-200/50"
+          ? "bg-muted/40 border-border"
+          : "bg-background border-border shadow-xl shadow-zinc-200/50"
       }`}
     >
       {/* 이미지 배경 - 오른쪽 하단. 고려대 교수님만: 4px 띄움 + 아랫면 흐림, 나머지 3명은 원래 스타일 */}
@@ -156,8 +156,8 @@ function TestimonialCard({
           <Quote
             className={`w-8 h-8 md:w-10 md:h-10 transition-colors duration-300 ${
               isDark
-                ? "text-blue-500/20 group-hover:text-blue-500"
-                : "text-blue-600/10 group-hover:text-blue-600"
+                ? "text-info-text/20 group-hover:text-info-text"
+                : "text-info-text/10 group-hover:text-info-text"
             }`}
             style={{
               filter: isDark
@@ -212,7 +212,7 @@ function TestimonialCard({
               </div>
               <div
                 className={`text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] ${
-                  isDark ? "text-zinc-400" : "text-zinc-600"
+                  isDark ? "text-muted-foreground" : "text-muted-foreground"
                 }`}
                 style={{
                   textShadow: isDark

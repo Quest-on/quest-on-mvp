@@ -60,7 +60,7 @@ export function DashboardSidebar({
     if (!deadline) {
       return {
         rowClass: "text-sidebar-foreground/80",
-        badgeClass: "text-blue-600 bg-blue-500/10 border-blue-500/30",
+        badgeClass: "text-info-text bg-primary/10 border-primary/30",
         label: t("sidebar.noDueDate"),
         icon: CircleAlert,
       };
@@ -72,7 +72,7 @@ export function DashboardSidebar({
     if (daysLeft <= 1) {
       return {
         rowClass: "text-destructive",
-        badgeClass: "text-red-600 bg-red-500/10 border-red-500/30",
+        badgeClass: "text-destructive bg-destructive/10/10 border-red-500/30",
         label: daysLeft <= 0 ? "D-DAY" : `D-${daysLeft}`,
         icon: AlertTriangle,
       };
@@ -80,14 +80,14 @@ export function DashboardSidebar({
     if (daysLeft <= 3) {
       return {
         rowClass: "text-warning-text",
-        badgeClass: "text-amber-600 bg-amber-500/10 border-amber-500/30",
+        badgeClass: "text-warning-text bg-warning-surface/10 border-amber-500/30",
         label: `D-${daysLeft}`,
         icon: CircleAlert,
       };
     }
     return {
       rowClass: "text-info-text",
-      badgeClass: "text-blue-600 bg-blue-500/10 border-blue-500/30",
+      badgeClass: "text-info-text bg-primary/10 border-primary/30",
       label: `D-${daysLeft}`,
       icon: CircleAlert,
     };

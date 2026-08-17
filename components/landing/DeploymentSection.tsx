@@ -73,7 +73,7 @@ export default function DeploymentSection({
         <div className="mx-auto mb-14 lg:mb-20 max-w-4xl text-center">
           <p
             className={`text-xs font-bold uppercase tracking-[0.2em] mb-4 ${
-              isDark ? "text-zinc-500" : "text-zinc-600"
+              isDark ? "text-muted-foreground" : "text-muted-foreground"
             }`}
           >
             {t("deployment.badge")}
@@ -90,7 +90,7 @@ export default function DeploymentSection({
           </h2>
           <p
             className={`mt-6 text-base md:text-lg leading-relaxed ${
-              isDark ? "text-zinc-400" : "text-zinc-600"
+              isDark ? "text-muted-foreground" : "text-muted-foreground"
             }`}
           >
             {t("deployment.subtitle")}
@@ -104,8 +104,8 @@ export default function DeploymentSection({
               key={m.labelKey}
               className={`flex flex-col items-center justify-center text-center rounded-3xl p-6 lg:p-8 border transition-all ${
                 isDark
-                  ? "bg-zinc-900/40 border-zinc-800"
-                  : "bg-background border-zinc-200 shadow-sm"
+                  ? "bg-muted/40 border-border"
+                  : "bg-background border-border shadow-sm"
               }`}
             >
               <div className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tighter gradient-animated-blue">
@@ -113,7 +113,7 @@ export default function DeploymentSection({
               </div>
               <div
                 className={`mt-2 text-xs md:text-sm font-bold uppercase tracking-[0.15em] ${
-                  isDark ? "text-zinc-400" : "text-zinc-500"
+                  isDark ? "text-muted-foreground" : "text-muted-foreground"
                 }`}
               >
                 {t(`deployment.metrics.${m.labelKey}`)}
@@ -128,7 +128,7 @@ export default function DeploymentSection({
           <div
             aria-hidden
             className={`absolute top-0 bottom-0 left-4 md:left-1/2 w-px md:-translate-x-1/2 ${
-              isDark ? "bg-zinc-800" : "bg-zinc-200"
+              isDark ? "bg-muted" : "bg-zinc-200"
             }`}
           />
           <ol className="space-y-12 lg:space-y-16">
@@ -153,8 +153,8 @@ export default function DeploymentSection({
                       <div
                         className={`relative aspect-[4/3] overflow-hidden rounded-3xl border ${
                           isDark
-                            ? "border-zinc-800"
-                            : "border-zinc-200 shadow-sm"
+                            ? "border-border"
+                            : "border-border shadow-sm"
                         }`}
                       >
                         <Image
@@ -181,7 +181,7 @@ export default function DeploymentSection({
                       </h3>
                       <p
                         className={`mt-3 text-sm md:text-base leading-relaxed ${
-                          isDark ? "text-zinc-300" : "text-zinc-600"
+                          isDark ? "text-zinc-300" : "text-muted-foreground"
                         }`}
                       >
                         {t(`deployment.milestones.${m.key}.description`)}
@@ -197,7 +197,7 @@ export default function DeploymentSection({
         {/* 출처 */}
         <p
           className={`mt-14 text-center text-xs md:text-sm ${
-            isDark ? "text-zinc-500" : "text-zinc-400"
+            isDark ? "text-muted-foreground" : "text-muted-foreground"
           }`}
         >
           {t("deployment.sourcePrefix")}{" "}

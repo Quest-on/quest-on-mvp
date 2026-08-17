@@ -24,15 +24,15 @@ export default function CTASection({
       }`}
     >
       {/* Background Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl aspect-square bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl aspect-square bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="container mx-auto max-w-5xl text-center relative z-10">
         <div className="space-y-8 animate-fade-in-up-sm">
           <div
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border ${
               isDark
-                ? "bg-zinc-900 border-zinc-800 text-blue-400"
-                : "bg-blue-50 border-blue-100 text-blue-600"
+                ? "bg-muted border-border text-info-text"
+                : "bg-blue-50 border-primary text-info-text"
             }`}
           >
             <Zap className="w-3 h-3 fill-current" />
@@ -51,7 +51,7 @@ export default function CTASection({
 
           <p
             className={`text-lg md:text-xl font-medium max-w-2xl mx-auto leading-relaxed ${
-              isDark ? "text-zinc-500" : "text-zinc-500"
+              isDark ? "text-muted-foreground" : "text-muted-foreground"
             }`}
           >
             {t("cta.body.line1")}
@@ -64,8 +64,8 @@ export default function CTASection({
               onClick={onCtaClick}
               className={`group relative inline-flex items-center gap-2 px-8 py-4 text-sm font-semibold rounded-full transition-all hover:scale-105 active:scale-95 ${
                 isDark
-                  ? "bg-background text-black hover:bg-zinc-100 shadow-[0_0_30px_rgba(255,255,255,0.2)]"
-                  : "bg-zinc-900 text-white hover:bg-zinc-800 shadow-[0_15px_30px_rgba(0,0,0,0.15)]"
+                  ? "bg-background text-black hover:bg-muted shadow-[0_0_30px_rgba(255,255,255,0.2)]"
+                  : "bg-muted text-white hover:bg-muted shadow-[0_15px_30px_rgba(0,0,0,0.15)]"
               }`}
             >
               {t("cta.button")}
