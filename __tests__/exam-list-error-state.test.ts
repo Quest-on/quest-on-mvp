@@ -22,13 +22,25 @@ describe("교수자 시험 목록 — 오류 상태", () => {
     expect(SOURCE).toMatch(/refetch:\s*refetchExamList/);
   });
 
+  it("오류는 보여줄 게 없을 때만 낸다", () => {
+    // React Query 는 재조회가 실패해도 이전 data 를 들고 있다. hasResults 가
+    // true 인데 오류로 덮으면 사용자가 가진 목록까지 잃는다.
+    expect(SOURCE).toMatch(/isExamListError && !hasResults \? \(/);
+  });
+
   it("오류 분기가 빈 상태보다 앞에 있다", () => {
-    // 순서가 뒤집히면 오류가 다시 '시험이 없습니다' 로 샌다.
-    const errIdx = SOURCE.indexOf("{isExamListError ? (");
-    const listIdx = SOURCE.indexOf(") : filteredExamNodes.length > 0 ? (");
+    // 순서가 뒤집히면 오류가 다시 '아직 시험이나 폴더가 없습니다' 로 샌다.
+    const errIdx = SOURCE.indexOf("isExamListError && !hasResults ? (");
+    const emptyIdx = SOURCE.indexOf(") : !hasResults ? (");
     expect(errIdx, "오류 분기가 없다").toBeGreaterThan(-1);
-    expect(listIdx, "목록 분기가 오류 분기 뒤에 있지 않다").toBeGreaterThan(-1);
-    expect(errIdx).toBeLessThan(listIdx);
+    expect(emptyIdx, "빈 상태 분기가 없다").toBeGreaterThan(-1);
+    expect(errIdx).toBeLessThan(emptyIdx);
+  });
+
+  it("오류 분기는 하나뿐이다", () => {
+    // 구조분해 1회 + 렌더 분기 1회. 목록 안쪽에도 두면 데이터를 가진 채
+    // 실패했을 때 목록이 사라진다.
+    expect((SOURCE.match(/isExamListError/g) ?? []).length).toBe(2);
   });
 
   it("기존 ErrorAlert 를 재사용한다", () => {
