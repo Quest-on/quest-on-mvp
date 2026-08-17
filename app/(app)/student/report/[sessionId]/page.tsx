@@ -217,7 +217,7 @@ export default function StudentReportPage() {
                 <span className="text-muted-foreground">
                   {t("grading.progressCount", { done, total: progress!.total })}
                   {progress!.failed > 0 && (
-                    <span className="text-red-600 dark:text-red-400 ml-2">
+                    <span className="text-destructive ml-2">
                       {t("grading.failedCount", { failed: progress!.failed })}
                     </span>
                   )}
@@ -290,7 +290,7 @@ export default function StudentReportPage() {
               </div>
             )}
             {gradesNotReleased && (
-              <p className="text-sm text-amber-600 dark:text-amber-400 mt-3">
+              <p className="text-sm text-warning-text mt-3">
                 {t("gradesNotReleased")}
               </p>
             )}
@@ -299,7 +299,7 @@ export default function StudentReportPage() {
             {gradesNotReleased ? (
               <Badge
                 variant="outline"
-                className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                className="bg-amber-500/10 text-warning-text border-amber-500/20"
               >
                 <Clock className="w-4 h-4 mr-1" />
                 {t("badge.pendingRelease")}
@@ -307,7 +307,7 @@ export default function StudentReportPage() {
             ) : (
               <Badge
                 variant="outline"
-                className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20"
+                className="bg-green-500/10 text-success-text border-green-500/20"
               >
                 <CheckCircle className="w-4 h-4 mr-1" />
                 {t("badge.evaluated")}

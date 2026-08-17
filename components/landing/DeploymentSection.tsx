@@ -66,7 +66,7 @@ export default function DeploymentSection({
   return (
     <section
       id="deployment"
-      className={`w-full py-20 lg:py-28 ${isDark ? "bg-black" : "bg-white"}`}
+      className={`w-full py-20 lg:py-28 ${isDark ? "bg-black" : "bg-background"}`}
     >
       <div className="container mx-auto px-4 lg:px-6">
         {/* 타이틀 */}
@@ -105,7 +105,7 @@ export default function DeploymentSection({
               className={`flex flex-col items-center justify-center text-center rounded-3xl p-6 lg:p-8 border transition-all ${
                 isDark
                   ? "bg-zinc-900/40 border-zinc-800"
-                  : "bg-white border-zinc-200 shadow-sm"
+                  : "bg-background border-zinc-200 shadow-sm"
               }`}
             >
               <div className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tighter gradient-animated-blue">

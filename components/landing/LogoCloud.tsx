@@ -23,7 +23,7 @@ export default function LogoCloud({
     <section
       id="partners"
       className={`min-h-[400px] lg:min-h-[500px] flex items-center py-12 lg:py-16 ${
-        isDark ? "bg-black" : "bg-white"
+        isDark ? "bg-black" : "bg-background"
       }`}
     >
       <div className="container mx-auto px-4 lg:px-6 w-full">

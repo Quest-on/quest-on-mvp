@@ -20,7 +20,7 @@ const MARQUEE_SLOW_MS = 50000;
  *    - 모서리: rounded-[2.5rem] (40px)
  *    - 패딩: p-8 md:p-10 (32px / 40px)
  *    - 테두리: border, light → border-zinc-200, dark → border-zinc-800
- *    - 배경: light → bg-white, dark → bg-zinc-900/40
+ *    - 배경: light → bg-background, dark → bg-zinc-900/40
  *    - 그림자: light → shadow-xl shadow-zinc-200/50
  *    - 호버: hover:shadow-2xl hover:-translate-y-2, transition-all
  *    - 애니메이션: animate-fade-in-up-sm, animationDelay = index * 0.15s
@@ -109,7 +109,7 @@ function TestimonialCard({
       className={`group relative flex flex-col w-[320px] md:w-[380px] flex-shrink-0 rounded-[2.5rem] p-8 md:p-10 border transition-all hover:shadow-2xl hover:-translate-y-2 overflow-hidden ${
         isDark
           ? "bg-zinc-900/40 border-zinc-800"
-          : "bg-white border-zinc-200 shadow-xl shadow-zinc-200/50"
+          : "bg-background border-zinc-200 shadow-xl shadow-zinc-200/50"
       }`}
     >
       {/* 이미지 배경 - 오른쪽 하단. 고려대 교수님만: 4px 띄움 + 아랫면 흐림, 나머지 3명은 원래 스타일 */}
@@ -268,7 +268,7 @@ export default function TestimonialSection({
 
   return (
     <section
-      className={`w-full py-20 lg:py-28 ${isDark ? "bg-black" : "bg-white"}`}
+      className={`w-full py-20 lg:py-28 ${isDark ? "bg-black" : "bg-background"}`}
     >
       <div className="container mx-auto px-4 lg:px-6">
         <div className="mx-auto mb-14 lg:mb-20 max-w-4xl text-center">

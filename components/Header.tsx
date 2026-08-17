@@ -63,7 +63,7 @@ export function Header() {
 
           {/* Vertical Separator */}
           {isSignedIn && hasRole && (
-            <div className="h-6 w-px bg-gray-300 dark:bg-gray-700" />
+            <div className="h-6 w-px bg-gray-300" />
           )}
 
           {/* Navigation */}

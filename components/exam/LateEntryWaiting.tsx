@@ -202,7 +202,7 @@ export function LateEntryWaiting({
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               <div className="space-y-2">
-                <p className="font-semibold text-amber-600 dark:text-amber-400">{t("lateEntry.lateAlertTitle")}</p>
+                <p className="font-semibold text-warning-text">{t("lateEntry.lateAlertTitle")}</p>
                 <p className="text-sm">
                   {t("lateEntry.lateAlertDescription")}
                 </p>
