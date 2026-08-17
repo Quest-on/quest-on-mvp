@@ -23,7 +23,30 @@ const robotoMono = Roboto_Mono({
   display: "swap",
 });
 
+/**
+ * OG/Twitter 이미지를 절대 URL 로 만들 기준.
+ *
+ * 없으면 Next 가 경고를 내고 로컬에서는 `http://localhost:PORT` 로 해석한다.
+ * Vercel 에서는 `VERCEL_URL` 로 떨어지는데 그건 배포마다 바뀌는 주소라,
+ * 공유된 링크의 미리보기 이미지가 옛 배포를 가리키게 된다.
+ *
+ * 우선순위는 `lib/qstash.ts` 의 getWorkerBaseUrl 과 같은 이유로 같게 둔다:
+ *   1. NEXT_PUBLIC_APP_URL — 안정된 정규 도메인. 배포돼도 안 바뀐다
+ *   2. VERCEL_URL         — 배포별 주소. 프리뷰에서는 이게 맞다
+ *   3. localhost          — 로컬 개발
+ */
+function resolveMetadataBase(): URL {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (appUrl) return new URL(appUrl);
+
+  const vercel = process.env.VERCEL_URL;
+  if (vercel) return new URL(`https://${vercel}`);
+
+  return new URL(`http://localhost:${process.env.PORT ?? 3000}`);
+}
+
 export const metadata: Metadata = {
+  metadataBase: resolveMetadataBase(),
   title: "Quest-On",
   description:
     "Connect instructors and students in an engaging, interactive learning environment",
