@@ -120,7 +120,7 @@ describe("보고용 스텝 격리", () => {
  * `The operation was canceled` 로 죽는다 — 실패 단언이 없어서 진짜 회귀와
  * 구분이 안 된다. 실제로 세 번 연속 그랬다.
  */
-describe("브라우저 설치 스텝 상한", () => {
+describe("브라우저 설치 스텝", () => {
   const SETUP = readFileSync(".github/actions/test-setup/action.yml", "utf8");
 
   it("playwright 설치 스텝에 시간 상한이 있다", () => {
@@ -136,6 +136,14 @@ describe("브라우저 설치 스텝 상한", () => {
         /run: timeout \d+ npx playwright/
       );
     }
+  });
+
+  it("시스템 deps 설치가 잡을 막지 않는다", () => {
+    // ubuntu-latest 는 Playwright 의존성을 이미 갖고 있다. apt 가 느릴 때
+    // 이 스텝이 잡을 죽이면 설치 사정과 제품 회귀가 섞인다.
+    const idx = SETUP.indexOf("install-deps chromium");
+    expect(idx).toBeGreaterThan(-1);
+    expect(SETUP.slice(Math.max(0, idx - 400), idx)).toMatch(/continue-on-error: true/);
   });
 
   it("상한이 잡 타임아웃보다 작다", () => {
