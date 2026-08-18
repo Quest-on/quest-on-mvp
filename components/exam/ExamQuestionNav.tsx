@@ -74,7 +74,7 @@ export function ExamQuestionNav({
             variant="ghost"
             size="sm"
             onClick={onExit}
-            className="w-full min-h-[44px] flex flex-col gap-1 text-xs text-destructive hover:text-destructive hover:bg-red-50 dark:hover:bg-destructive/10/30 px-1"
+            className="w-full min-h-[44px] flex flex-col gap-1 text-xs text-destructive hover:text-destructive hover:bg-danger-surface dark:hover:bg-destructive/10/30 px-1"
             aria-label={t("nav.exitAriaLabel")}
           >
             <LogOut className="size-4 shrink-0" aria-hidden="true" />
@@ -104,7 +104,7 @@ export function ExamQuestionNav({
             variant="outline"
             size="sm"
             onClick={onExit}
-            className="shrink-0 min-h-[40px] text-xs border-destructive/30 text-destructive hover:bg-red-50"
+            className="shrink-0 min-h-[40px] text-xs border-destructive/30 text-destructive hover:bg-danger-surface"
             aria-label={t("nav.exitAriaLabel")}
           >
             {t("nav.exit")}

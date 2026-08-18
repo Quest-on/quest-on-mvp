@@ -74,35 +74,11 @@ function countRaw(files: string[]): { total: number; byFile: Array<[string, numb
  */
 const FILE_BUDGET: Record<string, number> = {
   "app/(app)/assignment/[code]/review/page.tsx": 1,
-  "app/(app)/exam/[code]/page.tsx": 1,
   "app/(app)/student/report/[sessionId]/page.tsx": 1,
-  "app/admin/page.tsx": 2,
-  "app/legal/security/page.tsx": 1,
-  "app/legal/terms/page.tsx": 1,
-  "components/PublicHeader.tsx": 1,
-  "components/agent/AgentPanel.tsx": 1,
-  "components/animate-ui/components/buttons/icon.tsx": 1,
-  "components/assignment/AssignmentCanvas.tsx": 1,
-  "components/assignment/AssignmentSubmitDialog.tsx": 1,
-  "components/assignment/FinalAnswerButton.tsx": 1,
-  "components/assignment/FinalAnswerSheet.tsx": 1,
-  "components/canvas/TableNode.tsx": 2,
-  "components/chat/CopyMessageButton.tsx": 1,
-  "components/exam/ExamCenterToolbar.tsx": 1,
-  "components/exam/ExamLoading.tsx": 2,
-  "components/exam/ExamQuestionNav.tsx": 2,
   "components/instructor/AIOverallSummary.tsx": 1,
-  "components/instructor/ExamControlButtons.tsx": 2,
-  "components/instructor/ExamStudentCard.tsx": 2,
-  "components/instructor/ExamStudentRow.tsx": 2,
   "components/instructor/FileTypeIcon.tsx": 15,
-  "components/instructor/GradingPanel.tsx": 2,
-  "components/instructor/QuestionAiSummaryCard.tsx": 2,
-  "components/landing/TestimonialSection.tsx": 2,
-  "components/layout/dashboard-sidebar.tsx": 2,
-  "components/report/StudentObjectiveAnswer.tsx": 2,
 };
-const RAW_CEILING = 54;
+const RAW_CEILING = 18;
 
 describe("전역 하드코딩 색 상한", () => {
   it(`raw palette 사용이 ${RAW_CEILING}건을 넘지 않는다`, () => {

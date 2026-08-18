@@ -43,7 +43,7 @@ type TestimonialAsset = {
  * 3) 그라데이션 오버레이 (z-[5])
  *    - 위치: absolute inset-0, pointer-events-none
  *    - light: from-white/95 via-white/70 to-transparent
- *    - dark:  from-zinc-900/90 via-zinc-900/50 to-transparent
+ *    - dark:  from-foreground/90 via-foreground/50 to-transparent
  *    - 역할: 아바타 위에 텍스트가 잘 읽이도록 왼쪽→오른쪽 그라데이션
  *
  * 4) 콘텐츠 영역 (z-10, relative)

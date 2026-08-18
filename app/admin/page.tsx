@@ -353,7 +353,7 @@ export default function AdminDashboard() {
       </div>
 
       {pendingInstructors && pendingInstructors.length > 0 && (
-        <Card className="border-amber-200 bg-warning-surface">
+        <Card className="border-warning-border bg-warning-surface">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-warning-text">
               <Clock className="w-5 h-5" />
@@ -374,7 +374,7 @@ export default function AdminDashboard() {
               }) => (
                 <div
                   key={instructor.id}
-                  className="flex items-center justify-between rounded-lg border border-amber-200 bg-background p-4"
+                  className="flex items-center justify-between rounded-lg border border-warning-border bg-background p-4"
                 >
                   <div>
                     <p className="font-medium">{instructor.name || t("dashboard.pending.noName")}</p>

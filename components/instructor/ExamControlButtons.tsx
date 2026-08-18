@@ -277,7 +277,7 @@ export function ExamControlButtons({
       case "entry_closed":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+            <Badge variant="secondary" className="bg-warning-subtle text-warning-text">
               {t("examControlButtons.statusEntryClosed")}
             </Badge>
           ),

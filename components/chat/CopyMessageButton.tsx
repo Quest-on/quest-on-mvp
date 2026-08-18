@@ -45,7 +45,7 @@ export function CopyMessageButton({ text, className }: CopyMessageButtonProps) {
       )}
     >
       {copied ? (
-        <Check className="h-3.5 w-3.5 text-green-500" />
+        <Check className="h-3.5 w-3.5 text-success-solid" />
       ) : (
         <Copy className="h-3.5 w-3.5" />
       )}

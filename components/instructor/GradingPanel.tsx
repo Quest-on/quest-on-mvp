@@ -333,8 +333,8 @@ export function GradingPanel({
             {aiSummary.weaknesses.length > 0 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <Minus className="h-3.5 w-3.5 text-orange-600" />
-                  <span className="text-xs font-semibold text-orange-700">{t("questionAiSummary.weaknesses")}</span>
+                  <Minus className="h-3.5 w-3.5 text-warning-text" />
+                  <span className="text-xs font-semibold text-warning-text">{t("questionAiSummary.weaknesses")}</span>
                 </div>
                 <ul className="space-y-1 pl-5 list-disc">
                   {aiSummary.weaknesses.map((w, idx) => (

@@ -756,7 +756,7 @@ function SubmittedScreen({
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
         <Card data-testid="exam-submitted-state" className="max-w-2xl w-full shadow-xl border-0">
           <CardHeader className="text-center space-y-4 pb-6">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-green-500/10 rounded-full flex items-center justify-center mx-auto">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-success-solid/10 rounded-full flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-10 h-10 sm:w-12 sm:h-12 text-success-text" aria-hidden="true" />
             </div>
             <CardTitle className="text-xl sm:text-2xl font-bold text-success-text">{t("submitted.title")}</CardTitle>
