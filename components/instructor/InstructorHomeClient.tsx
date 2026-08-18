@@ -1000,7 +1000,7 @@ export default function InstructorHome() {
     const maxScrollLeft = container.scrollWidth - container.clientWidth;
     setCanScrollFoldersLeft(container.scrollLeft > 2);
     setCanScrollFoldersRight(container.scrollLeft < maxScrollLeft - 2);
-  }, [t]);
+  }, []);
 
   const handleFolderRowSlide = useCallback((direction: "left" | "right") => {
     const container = folderScrollRef.current;
