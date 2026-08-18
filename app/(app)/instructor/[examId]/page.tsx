@@ -443,7 +443,7 @@ export default function ExamDetail({
                     <span className={!allStudentsManuallyGraded ? "cursor-not-allowed" : undefined}>
                       <Button
                         size="sm"
-                        className="bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 focus-visible:ring-ring"
+                        variant="outline"
                         onClick={() => handleDownload("excel")}
                         disabled={!allStudentsManuallyGraded || isExporting !== null}
                       >
@@ -639,7 +639,9 @@ export default function ExamDetail({
               </div>
               <Button
                 size="sm"
-                variant={exam.grades_released ? "outline" : "default"}
+                variant={
+                    exam.grades_released || showBulkCaseGradingCta ? "outline" : "default"
+                  }
                 disabled={releaseGradesMutation.isPending}
                 onClick={handleToggleGradesRelease}
               >
@@ -673,7 +675,7 @@ export default function ExamDetail({
                 </div>
                 <Button
                   size="sm"
-                  className="bg-primary hover:bg-primary/90 text-white shrink-0"
+                  className="shrink-0"
                   onClick={() => setBulkGradingOpen(true)}
                 >
                   {bulkCtaButtonLabel}
