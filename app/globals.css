@@ -66,6 +66,21 @@
   --info-border: hsl(213 97% 87%);
   --info-solid: hsl(217 91% 60%);
   --info-text: hsl(226 71% 40%);
+  /* danger — destructive 는 버튼 배경 한 겹뿐이라 표면·텍스트 쌍이 없었다.
+     그래서 형광펜처럼 '연한 배경 + 진한 글씨'가 필요한 자리에서 배경과
+     글자가 같은 색이 되어 글씨가 사라졌다(대비 1.00). 나머지 상태색과
+     같은 5단계로 맞춘다. 값은 원래 화면이 쓰던 red 명도 그대로다. */
+  --danger-surface: hsl(0 86% 97%);
+  --danger-subtle: hsl(0 93% 94%);
+  --danger-border: hsl(0 96% 89%);
+  --danger-solid: hsl(0 84% 60%);
+  --danger-text: hsl(0 63% 31%);
+  /* solid 배경 위 전경. --foreground 는 테마에 따라 뒤집혀서 못 쓴다 —
+     solid 는 두 테마에서 명도가 비슷하므로 짝을 따로 고정한다. */
+  --success-solid-foreground: hsl(163 88% 10%);
+  --warning-solid-foreground: hsl(22 78% 16%);
+  --info-solid-foreground: hsl(226 71% 12%);
+  --danger-solid-foreground: hsl(0 63% 11%);
   --border: hsl(220 13.0435% 90.9804%);
   --input: hsl(220 13.0435% 90.9804%);
   --ring: hsl(222 56% 49%);
@@ -143,6 +158,15 @@
   --info-border: hsl(224 64% 33%);
   --info-solid: hsl(213 94% 68%);
   --info-text: hsl(213 97% 87%);
+  --danger-surface: hsl(0 63% 12%);
+  --danger-subtle: hsl(0 63% 18%);
+  --danger-border: hsl(0 63% 31%);
+  --danger-solid: hsl(0 84% 60%);
+  --danger-text: hsl(0 96% 89%);
+  --success-solid-foreground: hsl(163 88% 10%);
+  --warning-solid-foreground: hsl(22 78% 16%);
+  --info-solid-foreground: hsl(226 71% 12%);
+  --danger-solid-foreground: hsl(0 63% 11%);
   --border: hsl(0 0% 25.098%);
   --input: hsl(0 0% 25.098%);
   --ring: hsl(222 56% 49%);
@@ -215,6 +239,15 @@
   --color-info-border: var(--info-border);
   --color-info-solid: var(--info-solid);
   --color-info-text: var(--info-text);
+  --color-danger-surface: var(--danger-surface);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-danger-border: var(--danger-border);
+  --color-danger-solid: var(--danger-solid);
+  --color-danger-text: var(--danger-text);
+  --color-success-solid-foreground: var(--success-solid-foreground);
+  --color-warning-solid-foreground: var(--warning-solid-foreground);
+  --color-info-solid-foreground: var(--info-solid-foreground);
+  --color-danger-solid-foreground: var(--danger-solid-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
