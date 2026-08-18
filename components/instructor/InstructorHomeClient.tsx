@@ -2,7 +2,6 @@
 import { resolveCodeGate } from "@/components/instructor/ExamCode";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -434,7 +433,7 @@ export default function InstructorHome() {
       toast.success(t("drive.toastExamCodeCopied"), {
         id: "copy-exam-code", // 중복 방지
       });
-    } catch (error) {
+    } catch {
       toast.error(t("drive.toastExamCodeCopyFail"), {
         id: "copy-exam-code-error",
       });
