@@ -100,3 +100,4 @@
 
 - 로컬 dev 확인은 `127.0.0.1` 말고 **`localhost`**로 연다. Next 가 `/_next/*` 를 교차출처로 막아 하이드레이션이 통째로 죽는다(`Blocked cross-origin request to Next.js dev resource`). 프로덕션 빌드(`next start`)는 `NODE_ENV=production`이라 테스트 바이패스가 원천 차단(`TEST_BYPASS_SECRET must not be set in a deployed environment`)되므로 인증 화면 확인에 못 쓴다.
 - 검증용 dev 서버는 `npm run dev:verify` 로 띄운다. `next dev` 는 인라인 env 를 덮지는 않지만 **설정하지 않은 키는 `.env.local` 에서 주입한다** — 실제로 `VERCEL_OIDC_TOKEN` 1193자가 검증 서버에 들어갔다. `AGENTS.md` 의 ".env.local 을 검증에 로드하지 않는다" 는 기억이 아니라 스크립트로 지킨다.
+- CI 재실행이 필요하면 `gh run rerun` 이나 빈 커밋을 쓴다. `git push --force origin/staging:refs/heads/<브랜치>` 는 그 브랜치의 작업을 덮고 PR 을 자동으로 닫는다.
