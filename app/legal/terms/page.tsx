@@ -61,7 +61,7 @@ export default async function TermsPage() {
             <li>{t("terms.section3.item4")}</li>
           </ol>
 
-          <div className="bg-warning-surface border border-amber-200 rounded-lg p-4">
+          <div className="bg-warning-surface border border-warning-border rounded-lg p-4">
             <p className="text-sm">
               <strong>{t("terms.section3.warningLabel")}</strong> {t("terms.section3.warning")}
             </p>

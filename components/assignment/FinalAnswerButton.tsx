@@ -42,7 +42,7 @@ export function FinalAnswerButton({
           className={cn(
             "h-auto px-4 py-3 rounded-2xl rounded-br-sm shadow-lg hover:shadow-xl transition-all duration-200 gap-2 border-2 font-medium",
             hasContent
-              ? "bg-success-surface hover:bg-success-surface text-white border-emerald-700"
+              ? "bg-success-surface hover:bg-success-surface text-white border-success-border"
               : "bg-background hover:bg-muted text-foreground",
             !hasContent && !attention && "border-dashed border-primary/60",
             !hasContent && attention && "border-destructive bg-destructive/10 animate-shake",

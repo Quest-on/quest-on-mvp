@@ -27,10 +27,10 @@ function TableNodeComponent({ data }: { data: TableNodeData }) {
             className="flex items-center gap-2 px-3 py-1.5 text-xs"
           >
             {col.isPrimary && (
-              <span className="text-amber-500 font-bold" title="Primary Key">PK</span>
+              <span className="text-warning-text font-bold" title="Primary Key">PK</span>
             )}
             {col.isForeignKey && (
-              <span className="text-blue-500 font-bold" title="Foreign Key">FK</span>
+              <span className="text-info-text font-bold" title="Foreign Key">FK</span>
             )}
             <span className="font-medium">{col.name}</span>
             <span className="text-muted-foreground ml-auto">{col.type}</span>

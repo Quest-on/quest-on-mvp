@@ -72,7 +72,7 @@ export function DashboardSidebar({
     if (daysLeft <= 1) {
       return {
         rowClass: "text-destructive",
-        badgeClass: "text-destructive bg-destructive/10/10 border-red-500/30",
+        badgeClass: "text-destructive bg-destructive/10/10 border-danger-border/30",
         label: daysLeft <= 0 ? "D-DAY" : `D-${daysLeft}`,
         icon: AlertTriangle,
       };
@@ -80,7 +80,7 @@ export function DashboardSidebar({
     if (daysLeft <= 3) {
       return {
         rowClass: "text-warning-text",
-        badgeClass: "text-warning-text bg-warning-surface/10 border-amber-500/30",
+        badgeClass: "text-warning-text bg-warning-surface/10 border-warning-border/30",
         label: `D-${daysLeft}`,
         icon: CircleAlert,
       };

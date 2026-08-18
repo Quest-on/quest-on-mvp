@@ -162,7 +162,7 @@ export function SubmissionOverlay({ isSubmitting }: SubmissionOverlayProps) {
           </div>
         </div>
 
-        <div className="bg-yellow-50 text-yellow-800 px-4 py-3 rounded-md text-sm flex items-center gap-2">
+        <div className="bg-warning-surface text-warning-text px-4 py-3 rounded-md text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span className="text-left">
             {t("submissionOverlay.doNotClose")}

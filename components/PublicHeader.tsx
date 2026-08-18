@@ -20,7 +20,7 @@ export async function PublicHeader() {
             className="h-8 w-8"
             priority
           />
-          <span className="text-xl font-bold text-gray-900">{t("brand.name")}</span>
+          <span className="text-xl font-bold text-foreground">{t("brand.name")}</span>
         </Link>
 
         <div className="flex items-center gap-2">

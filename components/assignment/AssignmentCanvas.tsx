@@ -416,7 +416,7 @@ export function AssignmentCanvas({
 
       {/* Table sub-toolbar — only when cursor is in table */}
       {!isSubmitted && isInTable && (
-        <div className="border-b bg-blue-50/50 px-3 py-1 flex items-center gap-1 shrink-0">
+        <div className="border-b bg-info-surface/50 px-3 py-1 flex items-center gap-1 shrink-0">
           <span className="text-[10px] font-medium text-muted-foreground mr-1.5">{t("canvas.tableEditLabel")}</span>
           <div className="w-px h-4 bg-border mx-0.5" />
           <Button
