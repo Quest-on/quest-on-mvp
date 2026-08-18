@@ -117,20 +117,24 @@ describe("보고용 스텝 격리", () => {
  *
  * apt 미러가 느려지면  가 18분을 먹고 잡
  * 타임아웃(20분)에 걸린다. 테스트는 시작조차 못 하고 잡이
- *  로 죽는다 — 실패 단언이 없어서 진짜 회귀와
+ * `The operation was canceled` 로 죽는다 — 실패 단언이 없어서 진짜 회귀와
  * 구분이 안 된다. 실제로 세 번 연속 그랬다.
  */
 describe("브라우저 설치 스텝 상한", () => {
   const SETUP = readFileSync(".github/actions/test-setup/action.yml", "utf8");
 
-  it("playwright 설치 스텝에 timeout-minutes 가 있다", () => {
+  it("playwright 설치 스텝에 시간 상한이 있다", () => {
     const steps = SETUP.split(/\n(?=    - name:)/).filter((b) =>
       /playwright install/.test(b)
     );
     expect(steps.length, "설치 스텝을 못 찾았다").toBeGreaterThan(0);
     for (const step of steps) {
       const name = (step.match(/- name: ([^\n]+)/) || [])[1];
-      expect(step, ).toMatch(/timeout-minutes:\s*\d+/);
+      // composite action 스텝은 timeout-minutes 를 지원하지 않는다 — GitHub 이
+      // `Unexpected value 'timeout-minutes'` 로 거부한다. 셸 timeout 을 쓴다.
+      expect(step, `${name} 에 timeout 상한이 없다`).toMatch(
+        /run: timeout \d+ npx playwright/
+      );
     }
   });
 
@@ -139,7 +143,10 @@ describe("브라우저 설치 스텝 상한", () => {
     const ci = readFileSync(".github/workflows/ci.yml", "utf8");
     const jobTimeouts = [...ci.matchAll(/timeout-minutes:\s*(\d+)/g)].map((m) => Number(m[1]));
     const minJob = Math.min(...jobTimeouts);
-    const stepTimeouts = [...SETUP.matchAll(/timeout-minutes:\s*(\d+)/g)].map((m) => Number(m[1]));
+    // 셸 timeout 은 초 단위다. 분으로 환산해 비교한다.
+    const stepTimeouts = [...SETUP.matchAll(/run: timeout (\d+) npx playwright/g)].map(
+      (m) => Number(m[1]) / 60
+    );
     for (const t of stepTimeouts) expect(t).toBeLessThan(minJob);
   });
 });
