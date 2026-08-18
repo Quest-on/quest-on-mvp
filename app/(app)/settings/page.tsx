@@ -118,11 +118,35 @@ export default function SettingsPage() {
               )}
 
               <div className="flex flex-wrap gap-2">
-                {!consentQuery.data?.complete && (
-                  <Button asChild>
-                    <Link href="/onboarding?redirect=/settings">{t("reviewConsent")}</Link>
-                  </Button>
-                )}
+                {/*
+                  동의가 끝나면 이 버튼이 통째로 사라져서 온보딩을 다시 볼 방법이
+                  없었다. 진입을 항상 남긴다.
+
+                  목적지를 가른다.
+
+                    동의 미완료  ?redirect=/settings  — 동의만 받고 여기로 돌아온다.
+                    동의 완료    redirect 없음        — 프로필→JTBD→데모까지 전부 걷는다.
+
+                  redirect 를 붙이면 프로필 저장 직후 되돌아와서 JTBD 도 데모도
+                  안 거친다. "다시 보기"인데 아무것도 안 보이는 셈이다.
+                  데모 생성은 멱등이라(기존 데모가 있으면 그걸 돌려준다) 재실행이 안전하다.
+                */}
+                <Button
+                  asChild
+                  variant={consentQuery.data?.complete ? "outline" : "default"}
+                >
+                  <Link
+                    href={
+                      consentQuery.data?.complete
+                        ? "/onboarding"
+                        : "/onboarding?redirect=/settings"
+                    }
+                  >
+                    {consentQuery.data?.complete
+                      ? t("reopenOnboarding")
+                      : t("reviewConsent")}
+                  </Link>
+                </Button>
                 <Button variant="outline" asChild>
                   <Link href="/legal/privacy">{t("privacyPolicy")}</Link>
                 </Button>
