@@ -111,3 +111,29 @@ describe("전역 하드코딩 색 상한", () => {
     }
   });
 });
+
+/**
+ * 양쪽 값이 같은 isDark 삼항은 남기지 않는다.
+ *
+ * 토큰으로 옮기다 보면 
+ * 같은 잔재가 생긴다. 토큰이 이미 두 모드를 갖는데 런타임에 고르는 척만 하는
+ * 코드다. 읽는 사람은 두 값이 다른 줄 알고 한쪽만 고치게 된다.
+ */
+describe("무의미한 테마 분기", () => {
+  it("양쪽이 같은 isDark 삼항이 없다", () => {
+    const offenders: string[] = [];
+    for (const file of targetFiles()) {
+      let source: string;
+      try {
+        source = readFileSync(file, "utf8");
+      } catch {
+        continue;
+      }
+      source.split("\n").forEach((line, i) => {
+        const m = line.match(/isDark \? "([^"]*)" : "([^"]*)"/);
+        if (m && m[1] === m[2]) offenders.push(file + ":" + (i + 1) + " — " + m[1]);
+      });
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+});

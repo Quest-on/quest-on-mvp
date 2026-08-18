@@ -51,7 +51,7 @@ export default function CTASection({
 
           <p
             className={`text-lg md:text-xl font-medium max-w-2xl mx-auto leading-relaxed ${
-              isDark ? "text-muted-foreground" : "text-muted-foreground"
+              "text-muted-foreground"
             }`}
           >
             {t("cta.body.line1")}

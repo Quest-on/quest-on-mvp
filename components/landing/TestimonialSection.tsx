@@ -212,7 +212,7 @@ function TestimonialCard({
               </div>
               <div
                 className={`text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] ${
-                  isDark ? "text-muted-foreground" : "text-muted-foreground"
+                  "text-muted-foreground"
                 }`}
                 style={{
                   textShadow: isDark
