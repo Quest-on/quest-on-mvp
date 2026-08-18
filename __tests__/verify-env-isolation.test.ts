@@ -59,3 +59,28 @@ describe(".env 커밋 차단", () => {
     expect(ignore).toMatch(/\.env/);
   });
 });
+
+describe("강제 종료 뒤 고아 parked 복구", () => {
+  // taskkill /F 나 도커 정지로 죽으면 복원 훅이 하나도 돌지 않는다.
+  // 그러면 .env.local 은 사라지고 parked 만 남는다. 다음 실행이 조용히
+  // 넘어가면 원본이 갇힌 채 방치된다 — 실제로 겪었다.
+  const SRC = read("scripts/dev-verify.mjs");
+  const PARK = SRC.slice(SRC.indexOf("function park()"), SRC.indexOf("function restore()"));
+
+  it("park() 가 고아 parked 를 되돌린다", () => {
+    expect(PARK, "고아 복구 분기가 없다").toMatch(
+      /!existsSync\(ENV_LOCAL\)\s*&&\s*existsSync\(PARKED\)/
+    );
+    expect(PARK, "되돌리는 rename 이 없다").toMatch(/renameSync\(PARKED,\s*ENV_LOCAL\)/);
+
+    // 복구 분기는 조기 return 보다 먼저 와야 한다. 뒤에 있으면 절대 안 닿는다.
+    const recover = PARK.indexOf("existsSync(PARKED)");
+    const bail = PARK.indexOf("if (!existsSync(ENV_LOCAL)) return;");
+    expect(recover, "복구 분기가 조기 return 뒤에 있어 닿지 않는다").toBeLessThan(bail);
+  });
+
+  it("둘 다 있으면 여전히 거부한다", () => {
+    // 고아 복구가 무조건 덮어쓰기로 퇴화하면 원본을 잃는다.
+    expect(PARK, "충돌 시 throw 가 사라졌다").toMatch(/throw new Error/);
+  });
+});

@@ -26,6 +26,17 @@ const PARKED = resolve(process.cwd(), ".env.local.verify-parked");
 let parked = false;
 
 function park() {
+  // 앞선 실행이 SIGKILL(taskkill /F, 도커 정지 등)로 죽으면 복원 훅이 하나도
+  // 돌지 않는다. 그러면 .env.local 은 사라지고 parked 만 남는다.
+  //
+  // 여기서 그냥 return 하면 원본이 parked 에 갇힌 채 방치된다 — 실제로
+  // 겪었다. 조용히 넘어가지 않고 되돌린다. 충돌 대상이 없으니 안전하다.
+  if (!existsSync(ENV_LOCAL) && existsSync(PARKED)) {
+    renameSync(PARKED, ENV_LOCAL);
+    process.stdout.write(
+      "이전 실행이 강제 종료된 흔적을 찾아 .env.local 을 되돌렸다\n"
+    );
+  }
   if (!existsSync(ENV_LOCAL)) return;
   if (existsSync(PARKED)) {
     // 이전 실행이 비정상 종료했다. 덮어쓰면 원본을 잃는다.
