@@ -140,7 +140,7 @@ export default function AssignmentPage({
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitted, isSubmitting, session?.id, exam?.id, userId, router, finalAnswer]);
+  }, [isSubmitted, isSubmitting, session?.id, exam?.id, userId, router, finalAnswer, t]);
 
   // Pre-flight: header "제출하기" 클릭 시 호출 — 미작성이면 sheet 열고 어필
   const handleHeaderSubmitClick = () => {

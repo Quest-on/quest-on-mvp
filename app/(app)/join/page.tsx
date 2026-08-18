@@ -58,7 +58,7 @@ export default function ExamCodeEntry() {
       errorMessages[errorParam] ||
         t("unknownError")
     );
-  }, []);
+  }, [t]);
 
   const navigateToCode = async (code: string) => {
     setIsLoading(true);
