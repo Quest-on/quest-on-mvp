@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { createSupabaseClient } from "@/lib/supabase-client";
 import { getAuthCallbackUrl } from "@/lib/auth-redirect";
 import { useTranslations } from "next-intl";
+import { useOAuthProviders } from "@/lib/use-oauth-providers";
+import { isProviderUnavailable } from "@/lib/oauth-providers";
 
 export function CustomSignIn() {
   const t = useTranslations("auth.signIn");
@@ -21,6 +23,8 @@ export function CustomSignIn() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+  const providers = useOAuthProviders();
+  const googleUnavailable = isProviderUnavailable(providers, "google");
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,12 +51,19 @@ export function CustomSignIn() {
     if (oauthLoading) return;
     setOauthLoading(provider);
     const supabase = createSupabaseClient();
-    await supabase.auth.signInWithOAuth({
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: getAuthCallbackUrl(window.location.origin),
       },
     });
+
+    // 성공하면 브라우저가 이미 떠났으므로 여기 안 온다. 여기 왔다는 건
+    // 실패했다는 뜻이다. 로딩만 걸어두면 버튼이 영영 도는 채로 남는다.
+    if (oauthError) {
+      setOauthLoading(null);
+      setError(t("providerUnavailable"));
+    }
   };
 
   return (
@@ -94,7 +105,7 @@ export function CustomSignIn() {
                 type="button"
                 variant="outline"
                 className="w-full min-h-[44px]"
-                disabled={!!oauthLoading}
+                disabled={!!oauthLoading || googleUnavailable}
                 onClick={() => handleOAuth("google")}
               >
                 {oauthLoading === "google" ? (
@@ -107,7 +118,14 @@ export function CustomSignIn() {
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                   </svg>
                 )}
-                <span className="font-medium">{t("googleBtn")}</span>
+                <span className="flex items-center gap-2 font-medium">
+                  {t("googleBtn")}
+                  {googleUnavailable ? (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {t("providerUnavailable")}
+                    </Badge>
+                  ) : null}
+                </span>
               </Button>
 
               <Button
