@@ -83,14 +83,14 @@ export function AssignmentHeader({
         </Button>
         <h1 className="text-lg font-semibold truncate">{title}</h1>
         {isSubmitted && (
-          <Badge variant="secondary" className="bg-green-100 text-green-700">
+          <Badge variant="secondary" className="bg-success-solid text-success-text">
             {t("header.submittedBadge")}
           </Badge>
         )}
       </div>
       <div className="flex items-center gap-3 shrink-0">
         {deadline && (
-          <div className={`flex items-center gap-1.5 text-sm ${isOverdue ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
+          <div className={`flex items-center gap-1.5 text-sm ${isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}`}>
             <Clock className="w-4 h-4" />
             <span>{timeLeft}</span>
           </div>

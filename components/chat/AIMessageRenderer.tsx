@@ -194,7 +194,7 @@ const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({
               a: ({ children, href }: React.ComponentProps<"a">) => (
                 <a
                   href={href}
-                  className="text-blue-500 hover:text-blue-600 hover:underline transition-colors font-medium"
+                  className="text-info-text hover:text-info-text hover:underline transition-colors font-medium"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -252,7 +252,7 @@ const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({
         <>
           <div className="mt-4 pt-3 border-t border-border/30 flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+              <div className="w-1.5 h-1.5 rounded-full bg-success-solid"></div>
               <span className="text-xs font-medium text-muted-foreground">
                 {t("chat.aiAnswer")}
               </span>
