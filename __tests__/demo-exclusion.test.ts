@@ -27,6 +27,10 @@ const root = path.resolve(__dirname, "..");
 type Classification = "excludes-demo" | "single-exam" | "demo-neutral";
 
 const REGISTRY: Record<string, { kind: Classification; why: string }> = {
+  "app/api/onboarding/demo/status/route.ts": {
+    kind: "single-exam",
+    why: "소유자의 데모 한 건을 id 로 가리키기 위한 조회. 목록·통계가 아니라 대시보드 안내 링크용이라 제외하면 안내가 죽는다(#212)",
+  },
   // ── 데모를 빼야 하는 목록·집계 ──────────────────────────────────
   "app/api/supa/handlers/drive-handlers.ts": {
     kind: "excludes-demo",
