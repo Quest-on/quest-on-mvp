@@ -299,7 +299,7 @@ export default function StudentReportPage() {
             {gradesNotReleased ? (
               <Badge
                 variant="outline"
-                className="bg-warning-surface/10 text-warning-text border-amber-500/20"
+                className="bg-warning-surface/10 text-warning-text border-warning-border/20"
               >
                 <Clock className="w-4 h-4 mr-1" />
                 {t("badge.pendingRelease")}
@@ -307,7 +307,7 @@ export default function StudentReportPage() {
             ) : (
               <Badge
                 variant="outline"
-                className="bg-success-solid/10 text-success-text border-green-500/20"
+                className="bg-success-solid/10 text-success-text border-success-border/20"
               >
                 <CheckCircle className="w-4 h-4 mr-1" />
                 {t("badge.evaluated")}

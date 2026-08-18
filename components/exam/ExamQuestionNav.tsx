@@ -104,7 +104,7 @@ export function ExamQuestionNav({
             variant="outline"
             size="sm"
             onClick={onExit}
-            className="shrink-0 min-h-[40px] text-xs border-red-200 text-destructive hover:bg-red-50"
+            className="shrink-0 min-h-[40px] text-xs border-destructive/30 text-destructive hover:bg-red-50"
             aria-label={t("nav.exitAriaLabel")}
           >
             {t("nav.exit")}
