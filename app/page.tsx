@@ -54,15 +54,15 @@ export default async function LandingPage() {
         <HeroSection
           headline={
             <>
-              <span className="text-strikethrough-bottom text-gray-800">
+              <span className="text-strikethrough-bottom text-foreground">
                 {t("hero.headline.cheating")}
               </span>
-              <span className="text-gray-700 text-2xl sm:text-3xl md:text-4xl lg:text-5xl">
+              <span className="text-muted-foreground text-2xl sm:text-3xl md:text-4xl lg:text-5xl">
                 {t("hero.headline.cannotStop")}
               </span>{" "}
               <br />
               <span className="gradient-animated-blue">{t("hero.headline.partOf")}</span>
-              <span className="text-gray-700 text-2xl sm:text-3xl md:text-4xl lg:text-5xl">
+              <span className="text-muted-foreground text-2xl sm:text-3xl md:text-4xl lg:text-5xl">
                 {t("hero.headline.makePart")}
               </span>
             </>

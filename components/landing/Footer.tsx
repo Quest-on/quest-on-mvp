@@ -77,9 +77,9 @@ export default function Footer({ mode = "light" }: FooterProps) {
   return (
     <footer
       className={`relative w-full py-8 ${
-        isDark
-          ? "bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950/50"
-          : "bg-gradient-to-br from-slate-50 via-white to-slate-50/50"
+        // dark: 변형은 surface-page-gradient-soft 가 이미 갖고 있다.
+          // isDark 로 손수 갈라 두면 유틸리티를 고쳐도 여기만 남는다(#204).
+          "surface-page-gradient-soft"
       }`}
     >
       <div className="container mx-auto px-4 lg:px-8 max-w-7xl">
@@ -207,7 +207,7 @@ export default function Footer({ mode = "light" }: FooterProps) {
                           <a
                             href={link.href}
                             onClick={handleClick}
-                            className="text-sm font-medium transition-all cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+                            className="text-sm font-medium transition-all cursor-pointer hover:text-info-text"
                             style={{ color: colors.textSec }}
                           >
                             {t(`footer.links.${link.labelKey}`)}

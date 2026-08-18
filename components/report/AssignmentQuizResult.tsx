@@ -39,13 +39,13 @@ export function AssignmentQuizResult({ quiz }: { quiz: AssignmentQuiz }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <ShieldQuestion className="w-5 h-5 text-amber-600" />
+          <ShieldQuestion className="w-5 h-5 text-warning-text" />
           {t("title")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
-          <Badge variant="outline" className="bg-amber-500/10 text-warning-text">
+          <Badge variant="outline" className="bg-warning-surface/10 text-warning-text">
             {t("score", { score: quiz.score ?? 0 })}
           </Badge>
           <Badge variant="secondary">
@@ -78,8 +78,8 @@ export function AssignmentQuizResult({ quiz }: { quiz: AssignmentQuiz }) {
                       variant="outline"
                       className={
                         isCorrect
-                          ? "bg-green-500/10 text-success-text"
-                          : "bg-red-500/10 text-destructive"
+                          ? "bg-success-solid/10 text-success-text"
+                          : "bg-destructive/10/10 text-destructive"
                       }
                     >
                       {isCorrect ? t("correct") : t("incorrect")}
