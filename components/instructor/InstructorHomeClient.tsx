@@ -314,10 +314,20 @@ export default function InstructorHome() {
   }, [allExamNodes, searchQuery]);
 
   // 온보딩이 만든 데모. 있으면 착지 화면이 그걸 다음 걸음으로 가리킨다(#212).
-  const demoNode = useMemo(
-    () => examNodes.find((node) => node.exams?.is_demo === true) ?? null,
-    [examNodes]
-  );
+  //
+  // 예전에는 examNodes 에서 찾았는데, 드라이브 조회가 AC-17 때문에
+  // .eq("exams.is_demo", false) 로 데모를 걸러낸다(drive-handlers.ts:141).
+  // 그래서 이 안내는 한 번도 뜬 적이 없는 죽은 코드였다. 목록에 끼우는
+  // 대신 id 만 따로 받는다.
+  const { data: demoStatus } = useQuery({
+    queryKey: qk.instructor.demoStatus(),
+    queryFn: async () => {
+      const res = await fetch("/api/onboarding/demo/status");
+      if (!res.ok) return null;
+      return (await res.json()) as { examId: string | null } | null;
+    },
+  });
+  const demoExamId = demoStatus?.examId ?? null;
 
   const filteredExamNodes = useMemo(() => {
     if (examFilter === "all") {
@@ -1826,11 +1836,11 @@ export default function InstructorHome() {
                     착지 후 다음 걸음. 온보딩을 막 끝낸 사람에게 화면이 다음 할 일을
                     말해주지 않으면 만든 데모가 어디 있는지도 모른 채 멈춘다. (#212)
                   */}
-                  {demoNode ? (
+                  {demoExamId ? (
                     <div className="rounded-lg border border-info-border bg-info-surface p-4">
                       <p className="type-field-label text-info-text">{t("home.nextStepTitle")}</p>
                       <p className="type-hint mt-1">{t("home.nextStepDemo")}</p>
-                      <Link href={`/instructor/${demoNode.exams?.id ?? demoNode.id}`}>
+                      <Link href={`/instructor/${demoExamId}`}>
                         <Button variant="outline" size="sm" className="mt-3">
                           {t("home.nextStepDemoCta")}
                         </Button>

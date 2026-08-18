@@ -55,18 +55,22 @@ describe("착지 후 다음 걸음", () => {
   it("데모가 있으면 다음 걸음을 안내한다", () => {
     expect(HOME).toMatch(/home\.nextStepTitle/);
     expect(HOME).toMatch(/home\.nextStepDemo/);
-    expect(HOME).toMatch(/demoNode \?/);
+    expect(HOME).toMatch(/demoExamId \?/);
   });
 
   it("데모를 실제로 찾아서 연결한다", () => {
     // 문구만 있고 링크가 엉뚱한 곳으로 가면 안내가 아니다.
-    expect(HOME).toMatch(/examNodes\.find\(\(node\) => node\.exams\?\.is_demo === true\)/);
-    expect(HOME).toMatch(/\/instructor\/\$\{demoNode\.exams\?\.id \?\? demoNode\.id\}/);
+    expect(HOME).toMatch(/qk\.instructor\.demoStatus\(\)/);
+    // 예전에는 examNodes(드라이브 목록)에서 찾았다. 그 조회는 AC-17 때문에
+    // 데모를 걸러내서 이 안내가 한 번도 뜬 적이 없었다. 찾는 경로는 바뀌었지만
+    // 계약은 같다 - 실제 데모를 찾아 그 id 로 연결한다.
+    expect(HOME).toMatch(/qk\.instructor\.demoStatus\(\)/);
+    expect(HOME).toMatch(/\/instructor\/\$\{demoExamId\}/);
   });
 
   it("데모가 없으면 그 블록이 뜨지 않는다", () => {
     // 데모 없는 사람에게 "데모 열기" 를 보여주면 막다른 길이다.
-    const idx = HOME.indexOf("{demoNode ? (");
+    const idx = HOME.indexOf("{demoExamId ? (");
     expect(idx).toBeGreaterThan(-1);
     expect(HOME.slice(idx, idx + 800)).toMatch(/\) : null\}/);
   });

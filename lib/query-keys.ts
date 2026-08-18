@@ -9,6 +9,13 @@
 export const qk = {
   instructor: {
     /**
+     * 온보딩 데모 상태(완료 여부, AI 재생성 해제, 데모 examId)
+     *
+     * 데모는 드라이브 목록 쿼리에서 제외되므로(AC-17) 목록으로는 찾을 수
+     * 없다. 가리키기 위한 id 는 이 키로 따로 받는다.
+     */
+    demoStatus: () => ["instructor-demo-status"] as const,
+    /**
      * 강사가 생성한 시험 목록
      * @param userId - 강사 사용자 ID (optional, 부분 매칭 가능)
      */
