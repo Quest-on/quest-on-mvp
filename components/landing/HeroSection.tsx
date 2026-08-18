@@ -239,7 +239,7 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
             style={{ borderColor: colors.cardBorder }}
           >
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-success-solid text-foreground">
+              <div className="p-1.5 rounded-md bg-success-solid text-success-solid-foreground">
                 <ShieldCheck className="w-4 h-4" />
               </div>
               <div>
@@ -311,7 +311,7 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
                 - 뛰어난 기술을 돋보이게 할 수 있는 프로모션(마케팅)이
                 필요하고...
                 <br />
-                <span className="bg-destructive/80 text-destructive px-1 py-0.5 rounded box-decoration-clone">
+                <span className="bg-danger-subtle text-danger-text px-1 py-0.5 rounded box-decoration-clone">
                   - 프리미엄 전기자전거라면 불가피하게 가격을 고가로 설정하거나,
                   프리미엄 이미지를 설정해야 하고
                 </span>

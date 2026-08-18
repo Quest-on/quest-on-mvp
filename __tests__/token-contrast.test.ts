@@ -82,30 +82,37 @@ describe("시맨틱 토큰 대비", () => {
     }
   );
 
-  it("진한 solid 배경 위에 같은 계열 text 를 얹지 않는다", () => {
-    const files = execSync("git ls-files components app", { cwd: root, encoding: "utf8" })
-      .split("\n")
-      .map((f) => f.trim())
-      .filter((f) => f.endsWith(".tsx"));
+  it("solid 배경 위 전경은 두 테마 모두에서 4.5 를 넘는다", () => {
+    // solid 는 두 테마에서 명도가 비슷한데 --foreground 는 뒤집힌다.
+    // 그래서 text-foreground 를 얹으면 한쪽 테마가 반드시 무너진다.
+    // 실제로 다크에서 1.52 까지 떨어뜨린 적이 있다.
+    for (const kind of ["success", "warning", "info", "danger"]) {
+      let solidL, fgL;
+      try { solidL = token(kind + "-solid"); fgL = token(kind + "-solid-foreground"); }
+      catch { continue; }
+      expect(
+        contrast(fgL, solidL),
+        kind + "-solid-foreground on " + kind + "-solid (light) 대비 부족"
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 
-    const violations: string[] = [];
+  it("solid 배경에 테마 종속 전경을 얹지 않는다", () => {
+    const files = execSync("git ls-files components app", { cwd: root, encoding: "utf8" })
+      .split("\n").map((f) => f.trim()).filter((f) => f.endsWith(".tsx"));
+    const bad: string[] = [];
     for (const f of files) {
       const src = readFileSync(resolve(root, f), "utf8");
-      for (const m of src.matchAll(
-        /"[^"]*bg-(warning|success|info)-solid(\/(\d+))?[^"]*"/g
-      )) {
-        const opacity = m[3] ? Number(m[3]) : 100;
-        // 옅게 깐 배경(/10 등)은 밝은 표면이라 *-text 가 맞다.
-        if (opacity < 50) continue;
-        if (new RegExp(`text-${m[1]}-text`).test(m[0])) {
-          violations.push(`${f}: ${m[0].slice(0, 70)}`);
+      for (const m of src.matchAll(/"[^"]*"/g)) {
+        const cls = m[0];
+        if (!/bg-(success|warning|info|danger)-solid(?!-)/.test(cls)) continue;
+        if (/bg-(success|warning|info|danger)-solid\/[1-4]?\d(?!\d)/.test(cls)) continue;
+        // --foreground 와 *-text 는 둘 다 solid 위에서 무너진다.
+        if (/text-foreground\b/.test(cls) || /text-(success|warning|info|danger)-text\b/.test(cls)) {
+          bad.push(f + ": " + cls.slice(0, 70));
         }
       }
     }
-
-    expect(
-      violations,
-      `대비가 모자란 조합이 있다:\n${violations.join("\n")}`
-    ).toHaveLength(0);
+    expect(bad, "solid 위에 테마 종속 전경을 얹었다:\n" + bad.join("\n")).toHaveLength(0);
   });
 });
