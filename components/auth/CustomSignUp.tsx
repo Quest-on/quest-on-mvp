@@ -220,13 +220,20 @@ export function CustomSignUp() {
                     )}
                     <span className="flex items-center gap-2 font-medium">
                   {t("googleBtn")}
-                  {googleUnavailable ? (
-                    <Badge variant="secondary" className="text-[10px]">
-                      {t("providerUnavailable")}
-                    </Badge>
-                  ) : null}
                 </span>
                   </Button>
+                  {/*
+                    잠긴 이유는 버튼 밖에 둔다.
+                  
+                    disabled 버튼은 opacity 0.5 라 안에 넣으면 안내까지 같이 흐려진다.
+                    다크에서 실측 10.79 -> 3.95 로 떨어져 왜 못 누르는지 읽을 수 없었다.
+                    버튼은 흐려도 되지만 이유는 읽혀야 한다.
+                  */}
+                  {googleUnavailable ? (
+                    <p className="type-hint text-center" role="note">
+                      {t("providerUnavailable")}
+                    </p>
+                  ) : null}
 
                   <Button
                     type="button"

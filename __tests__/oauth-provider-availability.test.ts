@@ -142,3 +142,31 @@ describe("로그인·가입 화면 배선", () => {
     }
   });
 });
+
+describe("잠긴 이유가 읽혀야 한다", () => {
+  // disabled 버튼은 opacity 0.5 다. 안내를 버튼 안에 넣으면 같이 흐려져서
+  // 다크에서 대비가 10.79 -> 3.95 로 떨어졌다. 왜 못 누르는지 못 읽는다.
+  // 버튼은 흐려도 되지만 이유는 읽혀야 한다.
+  const FILES = [
+    "components/auth/CustomSignIn.tsx",
+    "components/auth/CustomSignUp.tsx",
+  ] as const;
+
+  it.each(FILES)("%s 의 안내가 버튼 밖에 있다", (path) => {
+    const src = read(path);
+    const start = src.indexOf("googleUnavailable ?");
+    expect(start, "안내 조건을 찾지 못했다").toBeGreaterThan(-1);
+
+    // 안내 블록이 </Button> 뒤에 와야 한다.
+    const closed = src.lastIndexOf("</Button>", start);
+    expect(closed, "안내가 버튼 안에 있다").toBeGreaterThan(-1);
+  });
+
+  it.each(FILES)("%s 가 안내를 Badge 로 버튼 안에 넣지 않는다", (path) => {
+    const src = read(path);
+    expect(
+      src,
+      "providerUnavailable 이 다시 Badge 로 들어갔다"
+    ).not.toMatch(/<Badge[^>]*>\s*\{t\("providerUnavailable"\)\}/);
+  });
+});
