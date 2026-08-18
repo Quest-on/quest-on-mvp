@@ -121,7 +121,7 @@ const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({
                   </div>
                 ) : (
                   <code
-                    className="bg-muted text-primary px-1 py-0 rounded-md text-xs font-mono border border-border/50"
+                    className="bg-muted text-primary dark:text-info-text px-1 py-0 rounded-md text-xs font-mono border border-border/50"
                     {...props}
                   >
                     {children}

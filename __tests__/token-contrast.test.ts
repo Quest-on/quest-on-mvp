@@ -47,13 +47,19 @@ function contrast(fg: [number, number, number], bg: [number, number, number]): n
   return (hi + 0.05) / (lo + 0.05);
 }
 
-/** `:root` 블록에서 토큰의 hsl 값을 읽는다. 다크 블록은 보지 않는다. */
-function token(name: string): [number, number, number] {
-  const light = CSS.slice(0, CSS.indexOf(".dark"));
-  const m = new RegExp(`--${name}:\\s*hsl\\(([\\d.]+)\\s+([\\d.]+)%\\s+([\\d.]+)%\\)`).exec(
-    light
+/** 테마별 블록에서 토큰의 hsl 값을 읽는다. */
+function token(
+  name: string,
+  mode: "light" | "dark" = "light"
+): [number, number, number] {
+  const theme = mode;
+  const cut = CSS.indexOf(".dark {");
+  const blk = theme === "light" ? CSS.slice(0, cut) : CSS.slice(cut, CSS.indexOf("@theme"));
+  const re = new RegExp(
+    "--" + name + ":\\s*hsl\\(\\s*([\\d.]+)\\s+([\\d.]+)%\\s+([\\d.]+)%\\s*\\)"
   );
-  if (!m) throw new Error(`토큰 --${name} 를 :root 에서 찾지 못했다`);
+  const m = re.exec(blk);
+  if (!m) throw new Error(name + " 토큰을 " + theme + " 블록에서 찾지 못했다");
   return hslToRgb(Number(m[1]), Number(m[2]), Number(m[3]));
 }
 
@@ -114,5 +120,50 @@ describe("시맨틱 토큰 대비", () => {
       }
     }
     expect(bad, "solid 위에 테마 종속 전경을 얹었다:\n" + bad.join("\n")).toHaveLength(0);
+  });
+});
+
+/**
+ * CI a11y 스펙은 /, /student, /instructor 세 라우트만 본다. 색 토큰화는
+ * 전 화면을 건드렸으므로 그 바깥에서 난 회귀는 아무도 못 봤다. 코드에서
+ * 전수로 계산한다.
+ */
+describe("전수 대비 검사", () => {
+  it("함께 쓰이는 bg/text 조합이 두 테마에서 4.5 를 넘는다", () => {
+    const files = execSync("git ls-files components app", { cwd: root, encoding: "utf8" })
+      .split("\n").map((f) => f.trim()).filter((f) => f.endsWith(".tsx"));
+    const bad: string[] = [];
+    for (const f of files) {
+      const src = readFileSync(resolve(root, f), "utf8");
+      for (const q of src.matchAll(/"[^"]*"/g)) {
+        const groups: Record<string, string[]> = {};
+        for (const t of q[0].slice(1, -1).split(/\s+/)) {
+          const p = t.lastIndexOf(":");
+          const pre = p < 0 ? "" : t.slice(0, p + 1);
+          (groups[pre] = groups[pre] || []).push(p < 0 ? t : t.slice(p + 1));
+        }
+        for (const [pre, list] of Object.entries(groups)) {
+          // 같은 variant 접두사끼리만 실제로 동시에 적용된다.
+          const bg = list.find((x) => x.startsWith("bg-"));
+          const tx = list.find((x) => x.startsWith("text-"));
+          if (!bg || !tx) continue;
+          const bm = /^bg-([a-z-]+?)(\/(\d+))?$/.exec(bg);
+          const tm = /^text-([a-z-]+?)(\/(\d+))?$/.exec(tx);
+          if (!bm || !tm) continue;
+          // 옅게 깐 배경은 표면색이 다르므로 이 검사 대상이 아니다.
+          if (bm[3] && Number(bm[3]) < 50) continue;
+          for (const mode of ["light", "dark"] as const) {
+            if (pre === "dark:" && mode === "light") continue;
+            // dark: 오버라이드가 있으면 다크에서는 그쪽이 이긴다.
+            if (mode === "dark" && pre === "" && /dark:text-/.test(q[0])) continue;
+            let b, t;
+            try { b = token(bm[1], mode); t = token(tm[1], mode); } catch { continue; }
+            const v = contrast(t, b);
+            if (v < 4.5) bad.push();
+          }
+        }
+      }
+    }
+    expect(bad, ).toHaveLength(0);
   });
 });

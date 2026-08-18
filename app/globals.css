@@ -41,10 +41,10 @@
   --secondary: hsl(240 5% 96%);
   --secondary-foreground: hsl(240 6% 10%);
   --muted: hsl(240 5% 96%);
-  --muted-foreground: hsl(240 4% 46%);
+  --muted-foreground: hsl(240 4% 44%);
   --accent: hsl(240 5% 96%);
   --accent-foreground: hsl(240 6% 10%);
-  --destructive: hsl(0 84.2365% 60.1961%);
+  --destructive: hsl(0 84% 48%);
   --destructive-foreground: hsl(0 0% 100%);
   /* 상태색 — 현재 화면이 쓰던 Tailwind 명도를 그대로 토큰화한다.
      한 토큰으로 여러 명도를 접으면 화면이 바뀌므로 역할별로 나눈다.
@@ -140,7 +140,7 @@
   --muted-foreground: hsl(0 0% 63.9216%);
   --accent: hsl(224.4444 64.2857% 32.9412%);
   --accent-foreground: hsl(213.3333 96.9231% 87.2549%);
-  --destructive: hsl(0 84.2365% 60.1961%);
+  --destructive: hsl(0 75% 40%);
   --destructive-foreground: hsl(0 0% 100%);
   /* 다크 모드 — 같은 역할, 명도 반전. 라이트의 950/900/800/400/300 대역을 쓴다. */
   --success-surface: hsl(166 91% 9%);
