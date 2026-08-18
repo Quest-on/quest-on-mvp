@@ -8,6 +8,14 @@ import { useTranslations } from "next-intl";
 const MARQUEE_FAST_MS = 36000;
 const MARQUEE_SLOW_MS = 50000;
 
+type TestimonialAsset = {
+  key: "kang" | "lee" | "kwon" | "choi" | "chang";
+  avatar: string;
+  logo: string;
+  avatarFade?: boolean;
+  avatarSize?: "small";
+};
+
 /**
  * =============================================================================
  * TESTIMONIAL CARD 디자인 스펙
@@ -53,49 +61,39 @@ const MARQUEE_SLOW_MS = 50000;
 
 const TESTIMONIALS = [
   {
-    quote:
-      "단순 암기를 넘어 문제 해결에 몰입하게 만드는 변화, AI의 실시간 피드백이 교수 설계의 새로운 영감을 줍니다.",
-    name: "강현정 교수님",
-    title: "홍익대학교",
+    key: "kang",
     avatar: "/kang_pf-removebg-preview.png",
     logo: "/hongik_emblem_blue.png",
   },
   {
-    quote:
-      "AI시대 새롭게 요구되는 인재상에 대비할 수 있는 방법입니다. 많은 교수자님께서도 관심과 응원 부탁드립니다.",
-    name: "이중학 교수님",
-    title: "동국대학교",
+    key: "lee",
     avatar: "/lee_pf-avatar.png",
     logo: "/dongguk_emblem.png",
     avatarFade: true, // 정장 하단이 딱 잘려 보여 아랫면만 흐림 처리(크기는 기본 규격)
   },
   {
-    quote:
-      "AI 시대에 꼭 필요한 '사고 과정' 평가의 해답. 공정성과 설명 가능성을 모두 갖춘 혁신적인 플랫폼입니다.",
-    name: "권효찬 교수님",
-    title: "경기과학기술대학교",
+    key: "kwon",
     avatar: "/kwan_pf-removebg-preview.png",
     logo: "/gtec_logo.svg",
   },
   {
-    quote:
-      "기존 시험으로는 불가능했던 '추론 과정의 가시화', Quest-On을 통해 진정한 의미의 평가가 시작되었습니다.",
-    name: "최인대 교수님",
-    title: "경기과학기술대학교",
+    key: "choi",
     avatar: "/choi_pf-removebg-preview.png",
     logo: "/gtec_logo.svg",
   },
   {
-    quote: "학생-교수 모두에게 의미가 있는 가치있는 시도입니다",
-    name: "장진욱 교수님",
-    title: "고려대학교",
+    key: "chang",
     avatar: "/jangjinook-removebg-preview.png",
     logo: "/korea_logo.svg",
     avatarSize: "small" as const, // 이미지 스타일 차이로 비율 맞추기
   },
-];
+] as const satisfies readonly TestimonialAsset[];
 
-type Testimonial = (typeof TESTIMONIALS)[number];
+type Testimonial = TestimonialAsset & {
+  quote: string;
+  name: string;
+  title: string;
+};
 
 function TestimonialCard({
   testimonial,
@@ -290,16 +288,26 @@ export default function TestimonialSection() {
             <div className="flex flex-nowrap gap-6 md:gap-8 pr-6 md:pr-8 flex-shrink-0">
               {TESTIMONIALS.map((testimonial) => (
                 <TestimonialCard
-                  key={`a-${testimonial.name}`}
-                  testimonial={testimonial}
+                  key={`a-${testimonial.key}`}
+                  testimonial={{
+                    ...testimonial,
+                    quote: t(`testimonial.items.${testimonial.key}.quote`),
+                    name: t(`testimonial.items.${testimonial.key}.name`),
+                    title: t(`testimonial.items.${testimonial.key}.university`),
+                  }}
                 />
               ))}
             </div>
             <div className="flex flex-nowrap gap-6 md:gap-8 pr-6 md:pr-8 flex-shrink-0">
               {TESTIMONIALS.map((testimonial) => (
                 <TestimonialCard
-                  key={`b-${testimonial.name}`}
-                  testimonial={testimonial}
+                  key={`b-${testimonial.key}`}
+                  testimonial={{
+                    ...testimonial,
+                    quote: t(`testimonial.items.${testimonial.key}.quote`),
+                    name: t(`testimonial.items.${testimonial.key}.name`),
+                    title: t(`testimonial.items.${testimonial.key}.university`),
+                  }}
                 />
               ))}
             </div>

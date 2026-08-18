@@ -56,6 +56,33 @@
     "sectionTitle": {
       "line1": "Educators around the world",
       "line2": "are already transforming their classrooms."
+    },
+    "items": {
+      "kang": {
+        "quote": "Moving beyond memorization to immerse students in problem-solving, AI's real-time feedback brings new inspiration to course design.",
+        "name": "Professor Kang",
+        "university": "Hongik University"
+      },
+      "lee": {
+        "quote": "This is a way to prepare students for the new capabilities demanded in the AI era. I hope more educators will take interest and support it.",
+        "name": "Professor Lee",
+        "university": "Dongguk University"
+      },
+      "kwon": {
+        "quote": "The answer to assessing the thinking process essential in the AI era—an innovative platform with both fairness and explainability.",
+        "name": "Professor Kwon",
+        "university": "Gyeonggi University of Science and Technology"
+      },
+      "choi": {
+        "quote": "Quest-On makes the reasoning process visible in ways traditional exams never could, marking the beginning of truly meaningful assessment.",
+        "name": "Professor Choi",
+        "university": "Gyeonggi University of Science and Technology"
+      },
+      "chang": {
+        "quote": "A valuable initiative that is meaningful for both students and professors.",
+        "name": "Professor Chang",
+        "university": "Korea University"
+      }
     }
   },
   "deployment": {
