@@ -76,7 +76,7 @@ export function StudentLiveMonitoring({
           parsed.forEach((msg: LiveMessage) => {
             messagesMapRef.current.set(msg.id, msg);
           });
-        } catch (e) {
+        } catch {
           // Ignore parse errors
         }
       }
@@ -112,7 +112,7 @@ export function StudentLiveMonitoring({
           }
         }, 0);
       }
-    } catch (error) {
+    } catch {
       // Ignore load errors
     } finally {
       setIsLoading(false);
@@ -161,7 +161,7 @@ export function StudentLiveMonitoring({
             try {
               const decompressed = decompressData(newMessage.compressed_content);
               content = typeof decompressed === "string" ? decompressed : content;
-            } catch (error) {
+            } catch {
               // Use original content on decompression failure
             }
           }

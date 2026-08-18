@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldCheck, Lock, Eye, Database, AlertTriangle } from "lucide-react";
+import { ShieldCheck, Lock, Database, AlertTriangle } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 export default async function SecurityPage() {

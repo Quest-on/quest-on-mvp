@@ -158,7 +158,7 @@ export function ExamControlButtons({
           errorData.message || t("examControlButtons.toastStartFailed")
         );
       }
-    } catch (error) {
+    } catch {
       toast.error(t("examControlButtons.toastStartError"));
     } finally {
       setIsStarting(false);
@@ -182,7 +182,7 @@ export function ExamControlButtons({
           errorData.message || t("examControlButtons.toastEndFailed")
         );
       }
-    } catch (error) {
+    } catch {
       toast.error(t("examControlButtons.toastEndError"));
     } finally {
       setIsEnding(false);

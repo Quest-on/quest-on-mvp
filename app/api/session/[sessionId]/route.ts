@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { decompressData } from "@/lib/compression";
 import { currentUser } from "@/lib/get-current-user";
@@ -84,7 +84,7 @@ export async function GET(
         decompressedSessionData = decompressData(
           session.compressed_session_data,
         );
-      } catch (error) {
+      } catch {
         logWarn("Decompression failed for session data", {
           payload: { sessionId, field: "compressed_session_data" },
         });
@@ -104,7 +104,7 @@ export async function GET(
             decompressedAnswerData = decompressData(
               submission.compressed_answer_data,
             );
-          } catch (error) {
+          } catch {
             logWarn("Decompression failed for submission answer data", {
               payload: { sessionId, field: "compressed_answer_data", submissionId: submission.id },
             });
@@ -130,7 +130,7 @@ export async function GET(
         ) {
           try {
             decompressedContent = decompressData(message.compressed_content);
-          } catch (error) {
+          } catch {
             logWarn("Decompression failed for message content", {
               payload: { sessionId, field: "compressed_content", messageId: message.id },
             });
@@ -206,7 +206,7 @@ export async function GET(
       messages: decompressedMessages,
       compressionStats,
     });
-  } catch (error) {
+  } catch {
     return errorJson("INTERNAL_ERROR", "Internal server error", 500);
   }
 }

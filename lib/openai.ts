@@ -1,6 +1,5 @@
 import OpenAI from "openai";
 import pLimit from "p-limit";
-import { logError } from "@/lib/logger";
 
 // NOTE: The grading queue that used to live here (`enqueueGrading` +
 // `gradingLimiter = pLimit(60)`) was removed when the grading pipeline
