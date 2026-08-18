@@ -63,21 +63,19 @@ runs:
       run: timeout 480 npx playwright install --with-deps chromium
       shell: bash
 
-    # 브라우저 바이너리는 캐시에서 오지만 시스템 라이브러리(apt)는 매번 깐다.
+    # 시스템 라이브러리(apt) 설치.
     #
-    # 보통 몇 초로 끝나는데, apt 미러가 느려지면 여기서 18분을 먹고 잡
-    # 타임아웃(20분)에 걸린다. 그러면 테스트는 시작조차 못 하고 잡이
-    # `The operation was canceled` 로 죽는다 — 실패 단언이 하나도 없어서
-    # 진짜 회귀와 구분이 안 된다. 실제로 세 번 연속 그랬다.
+    # ubuntu-latest 이미지는 Playwright 의존성을 이미 갖고 있다. 그런데 이
+    # 스텝이 apt 미러를 타면서 18분을 먹고 잡 타임아웃(20분)에 걸린 적이
+    # 세 번 있었다. 5분 상한을 걸었더니 이번엔 exit 124 로 끊겼다 —
+    # 원인은 분명해졌지만 잡은 여전히 빨갛다.
     #
-    # 셸 timeout 으로 5분 상한을 건다(composite action 스텝은
-    # timeout-minutes 를 지원하지 않는다). 실패 지점이 분명해지고 남은
-    # 시간을 테스트가 쓴다.
-    #
-    # continue-on-error 는 쓰지 않는다. 시스템 라이브러리가 없으면 브라우저가
-    # 뜨지 않아 어차피 뒤에서 죽는다 — 여기서 멈추는 편이 원인이 분명하다.
-    - name: Install Playwright system deps (cached)
+    # 여기서는 막지 않는다. 러너에 이미 있으면 없어도 되고, 정말 없으면
+    # 브라우저가 안 떠서 **테스트가** 실패한다. 그게 더 정확한 신호다 —
+    # 설치 스텝의 네트워크 사정과 제품 회귀를 섞지 않는다.
+    - name: Install Playwright system deps (best effort)
       if: steps.playwright-cache.outputs.cache-hit == 'true'
+      continue-on-error: true
       run: timeout 300 npx playwright install-deps chromium
       shell: bash
 
