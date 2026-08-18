@@ -187,6 +187,26 @@ export const test = base.extend<ConsentAuthFixtures>({
       // GoTrue 컨테이너는 host.docker.internal 로 mock server를 보지만,
       // Windows Chromium은 그 호스트명을 해석하지 못한다. 브라우저가 provider
       // authorize 화면으로 갈 때만 같은 서버의 127.0.0.1 주소로 바꾼다.
+      // 로그인 화면은 /auth/v1/settings 를 읽어 꺼진 provider 버튼을 잠근다.
+      // 로컬 스택은 스텁을 keycloak 으로 등록해서 google: false 를 돌려주는데,
+      // 이 흐름에서는 아래 authorize 인터셉트 덕분에 Google 가입이 실제로
+      // 동작한다. 설정 응답만 사실과 어긋나서 버튼이 잠기고 클릭이 30초
+      // 타임아웃으로 죽는다.
+      //
+      // authorize 를 이미 스텁하고 있으니 설정도 같은 사실을 말하게 맞춘다.
+      await page.route("**/auth/v1/settings**", async (route) => {
+        const res = await route.fetch();
+        const body = await res.json().catch(() => null);
+        if (!body?.external) {
+          await route.continue();
+          return;
+        }
+        await route.fulfill({
+          response: res,
+          json: { ...body, external: { ...body.external, google: true } },
+        });
+      });
+
       await page.route("**/oauth/keycloak/**", async (route) => {
         const url = new URL(route.request().url());
         url.hostname = "127.0.0.1";
