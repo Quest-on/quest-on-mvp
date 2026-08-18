@@ -6,7 +6,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { Users, GraduationCap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { createSupabaseClient } from "@/lib/supabase-client";
@@ -250,11 +249,17 @@ export function CustomSignUp() {
                     </svg>
                     <span className="flex items-center gap-2 font-medium">
                       {t("microsoftBtn")}
-                      <Badge variant="secondary" className="text-[10px]">
-                        {t("comingSoon")}
-                      </Badge>
                     </span>
                   </Button>
+                  {/*
+                    '준비중' 도 버튼 밖에 둔다.
+                  
+                    disabled 버튼은 opacity 0.5 라 안에 두면 같이 흐려진다. 왜 못 누르는지를
+                    알려주는 정보가 흐려지면 사용자는 버튼이 죽은 이유를 모른다.
+                  */}
+                  <p className="type-hint text-center" role="note">
+                    {t("comingSoon")}
+                  </p>
                 </div>
 
                 {/* 구분선 */}

@@ -169,4 +169,13 @@ describe("잠긴 이유가 읽혀야 한다", () => {
       "providerUnavailable 이 다시 Badge 로 들어갔다"
     ).not.toMatch(/<Badge[^>]*>\s*\{t\("providerUnavailable"\)\}/);
   });
+
+  it.each(FILES)("%s 의 준비중 안내도 버튼 밖에 있다", (path) => {
+    // Microsoft 버튼은 상시 disabled 다. 같은 이유로 안내가 흐려지면 안 된다.
+    const src = read(path);
+    expect(
+      src,
+      "comingSoon 이 버튼 안 Badge 로 들어갔다"
+    ).not.toMatch(/<Badge[^>]*>\s*\{t\("comingSoon"\)\}/);
+  });
 });
