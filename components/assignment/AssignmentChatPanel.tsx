@@ -151,7 +151,7 @@ export function AssignmentChatPanel({
                           href={citation.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-blue-500 hover:text-blue-400 hover:underline truncate"
+                          className="text-xs text-info-text hover:text-info-text hover:underline truncate"
                         >
                           {cidx + 1}. {citation.title}
                         </a>
