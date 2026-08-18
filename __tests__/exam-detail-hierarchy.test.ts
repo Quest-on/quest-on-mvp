@@ -38,11 +38,13 @@ describe("시험 상세 버튼 위계 (#212)", () => {
     expect(raw, "버튼에 하드코딩 색이 있다").toHaveLength(0);
   });
 
-  it("채점이 남았으면 성적 공개가 물러선다", () => {
+  it("성적 공개는 공개할 게 있을 때만 강조된다", () => {
     // 채점 전에 성적 공개를 같은 강도로 들이밀면 순서를 잘못 안내한다.
-    expect(PAGE, "성적 공개가 채점 CTA 와 같은 강도로 경쟁한다").toMatch(
-      /grades_released \|\| showBulkCaseGradingCta \? "outline" : "default"/
-    );
+    // 갓 만든 데모는 응시자가 0명이라 공개할 것 자체가 없다.
+    const m = /variant=\{[\s\S]{0,600}?grades_released[\s\S]{0,600}?\}/.exec(PAGE);
+    expect(m, "성적 공개 버튼의 조건을 찾지 못했다").toBeTruthy();
+    expect(m![0], "채점 CTA 와 경쟁한다").toMatch(/showBulkCaseGradingCta/);
+    expect(m![0], "응시자가 0명이어도 강조된다").toMatch(/studentCount/);
   });
 
   it("내보내기 두 개가 같은 강도다", () => {

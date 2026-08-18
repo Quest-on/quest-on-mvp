@@ -640,7 +640,17 @@ export default function ExamDetail({
               <Button
                 size="sm"
                 variant={
-                    exam.grades_released || showBulkCaseGradingCta ? "outline" : "default"
+                  // 공개할 성적이 없으면 다음 행동이 아니다.
+                  //
+                  // 갓 만든 데모에는 응시자가 0명이다. 그런데도 이 버튼이 강조돼서
+                  // 착지 화면에 강조 CTA 가 셋(학생 시점 / 시험 시작 / 성적 공개)이나
+                  // 떴다. 온보딩 직후 첫 걸음은 학생 시점 하나다 - 데모를 겪어 보는
+                  // 게 목적이고 나머지 둘은 그 뒤 행동이다.
+                  exam.grades_released ||
+                  showBulkCaseGradingCta ||
+                  (bulkGradeStatus?.studentCount ?? 0) === 0
+                    ? "outline"
+                    : "default"
                   }
                 disabled={releaseGradesMutation.isPending}
                 onClick={handleToggleGradesRelease}
