@@ -102,7 +102,7 @@ export default function AdminDashboard() {
     error: queryError,
     refetch,
   } = useQuery<AdminUsersResponse>({
-    queryKey: ["admin-users"],
+    queryKey: qk.admin.users(),
     queryFn: async () => {
       const response = await fetch("/api/admin/users");
 
@@ -143,7 +143,7 @@ export default function AdminDashboard() {
   });
 
   const { data: pendingInstructors, refetch: refetchPending } = useQuery({
-    queryKey: ["admin-pending-instructors"],
+    queryKey: qk.admin.pendingInstructors(),
     queryFn: async () => {
       const res = await fetch("/api/admin/instructors/pending");
       if (!res.ok) return [];
@@ -159,7 +159,7 @@ export default function AdminDashboard() {
     refetch: refetchPublishing,
     isError: publishingError,
   } = useQuery({
-    queryKey: ["admin-instructor-publishing"],
+    queryKey: qk.admin.instructorPublishing(),
     queryFn: async (): Promise<PublishingRow[]> => {
       const res = await fetch("/api/admin/instructors/publishing");
       // 장애를 빈 목록으로 위장하지 않는다. 018 미적용이나 DB 오류로 500 이

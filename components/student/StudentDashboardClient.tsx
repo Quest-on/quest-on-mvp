@@ -169,7 +169,7 @@ export default function StudentDashboard() {
     data: profileData,
     isLoading: isProfileLoading,
   } = useQuery({
-    queryKey: ["student-profile", user?.id],
+    queryKey: qk.student.profile(user?.id),
     enabled:
       isLoaded &&
       isSignedIn &&
@@ -410,7 +410,7 @@ export default function StudentDashboard() {
   const handleSessionHover = (session: { id: string; status: string; isGraded: boolean; gradesReleased?: boolean }) => {
     if (session.status === "completed" && (session.isGraded || session.gradesReleased === false)) {
       queryClient.prefetchQuery({
-        queryKey: ["student-report", session.id, user?.id],
+        queryKey: qk.student.report(session.id, user?.id),
         queryFn: async () => {
           const response = await fetch(`/api/student/session/${session.id}/report`);
           if (!response.ok) throw new Error("Prefetch failed");

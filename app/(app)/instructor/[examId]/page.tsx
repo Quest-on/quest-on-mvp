@@ -107,7 +107,7 @@ export default function ExamDetail({
   // 세션 생성 시 DB 가 하지만, 그때는 이미 코드를 배포한 뒤다.
   // 데모는 한도를 소모하지 않으므로 조회하지 않는다.
   const { data: quotaData } = useQuery<{ publishesRemaining: number | null }>({
-    queryKey: ["instructor-quota", user?.id],
+    queryKey: qk.instructor.quota(user?.id),
     queryFn: async ({ signal }) => {
       const response = await fetch("/api/instructor/quota", { signal });
       if (!response.ok) throw new Error("Failed to fetch quota");
@@ -120,7 +120,7 @@ export default function ExamDetail({
     isLoading: demoStatusLoading,
     isError: demoStatusError,
   } = useQuery<{ completed: boolean; aiRegenerationUnlocked: boolean }>({
-    queryKey: ["onboarding-demo-status", user?.id],
+    queryKey: qk.instructor.onboardingDemoStatus(user?.id),
     queryFn: async ({ signal }) => {
       const response = await fetch("/api/onboarding/demo/status", { signal });
       if (!response.ok) {
