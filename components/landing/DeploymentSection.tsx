@@ -55,18 +55,13 @@ const MILESTONES: Milestone[] = [
   },
 ];
 
-export default function DeploymentSection({
-  mode = "light",
-}: {
-  mode?: "light" | "dark";
-}) {
-  const isDark = mode === "dark";
+export default function DeploymentSection() {
   const t = useTranslations("landing");
 
   return (
     <section
       id="deployment"
-      className={`w-full py-20 lg:py-28 ${isDark ? "bg-black" : "bg-background"}`}
+      className={`w-full py-20 lg:py-28 ${"bg-background"}`}
     >
       <div className="container mx-auto px-4 lg:px-6">
         {/* 타이틀 */}
@@ -80,7 +75,7 @@ export default function DeploymentSection({
           </p>
           <h2
             className={`text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl animate-fade-in-up-sm ${
-              isDark ? "text-white" : "text-[#1F1F1F]"
+              "text-[#1F1F1F]"
             }`}
             style={{ letterSpacing: "-0.01em" }}
           >
@@ -103,9 +98,7 @@ export default function DeploymentSection({
             <div
               key={m.labelKey}
               className={`flex flex-col items-center justify-center text-center rounded-3xl p-6 lg:p-8 border transition-all ${
-                isDark
-                  ? "bg-muted/40 border-border"
-                  : "bg-background border-border shadow-sm"
+                "bg-background border-border shadow-sm"
               }`}
             >
               <div className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tighter gradient-animated-blue">
@@ -128,7 +121,7 @@ export default function DeploymentSection({
           <div
             aria-hidden
             className={`absolute top-0 bottom-0 left-4 md:left-1/2 w-px md:-translate-x-1/2 ${
-              isDark ? "bg-muted" : "bg-zinc-200"
+              "bg-zinc-200"
             }`}
           />
           <ol className="space-y-12 lg:space-y-16">
@@ -140,7 +133,7 @@ export default function DeploymentSection({
                   <div
                     aria-hidden
                     className={`absolute left-4 md:left-1/2 top-2 h-3 w-3 -translate-x-1/2 rounded-full ring-4 bg-gradient-to-br from-blue-600 to-indigo-600 ${
-                      isDark ? "ring-black" : "ring-white"
+                      "ring-white"
                     }`}
                   />
                   <div
@@ -152,9 +145,7 @@ export default function DeploymentSection({
                     <div className="md:w-1/2">
                       <div
                         className={`relative aspect-[4/3] overflow-hidden rounded-3xl border ${
-                          isDark
-                            ? "border-border"
-                            : "border-border shadow-sm"
+                          "border-border shadow-sm"
                         }`}
                       >
                         <Image
@@ -174,14 +165,14 @@ export default function DeploymentSection({
                       </p>
                       <h3
                         className={`mt-2 text-xl md:text-2xl font-black tracking-tight ${
-                          isDark ? "text-white" : "text-[#1F1F1F]"
+                          "text-[#1F1F1F]"
                         }`}
                       >
                         {t(`deployment.milestones.${m.key}.title`)}
                       </h3>
                       <p
                         className={`mt-3 text-sm md:text-base leading-relaxed ${
-                          isDark ? "text-zinc-300" : "text-muted-foreground"
+                          "text-muted-foreground"
                         }`}
                       >
                         {t(`deployment.milestones.${m.key}.description`)}

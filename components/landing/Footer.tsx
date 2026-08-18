@@ -4,23 +4,13 @@ import { Mail, Phone } from "lucide-react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 
-interface FooterProps {
-  mode?: "light" | "dark";
-}
-
+// 라이트 값만 쓴다. dark 항목이 있었지만 mode 가 항상 "light" 라 도달하지 않는
+// 죽은 코드였다 - 호출부(app/page.tsx)가 mode="light" 만 넘겼다. (#204)
 const COLORS = {
-  light: {
     bg: "#FFFFFF",
     text: "#1F1F1F",
     textSec: "#52525B", // Improved contrast: changed from #6B7280 to #52525B (zinc-600) for better WCAG AA compliance
     border: "#E5E5E5",
-  },
-  dark: {
-    bg: "#0A0A0A",
-    text: "#E4E4E4",
-    textSec: "#A1A1AA",
-    border: "rgba(255, 255, 255, 0.1)",
-  },
 } as const;
 
 const FOOTER_LINKS_CONFIG = [
@@ -64,9 +54,8 @@ const FOOTER_LINKS_CONFIG = [
   },
 ];
 
-export default function Footer({ mode = "light" }: FooterProps) {
-  const colors = COLORS[mode];
-  const isDark = mode === "dark";
+export default function Footer() {
+  const colors = COLORS;
   const t = useTranslations("landing");
   const tc = useTranslations("common");
 
@@ -226,7 +215,7 @@ export default function Footer({ mode = "light" }: FooterProps) {
         <div
           className="pt-8 border-t"
           style={{
-            borderColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
+            borderColor: "rgba(0,0,0,0.05)",
           }}
         >
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">

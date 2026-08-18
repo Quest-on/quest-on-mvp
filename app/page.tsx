@@ -79,18 +79,18 @@ export default async function LandingPage() {
       {/* Demo Experience Section */}
       {/* TODO: 데모 섹션 잠시 주석처리 */}
       {/* <section id="demo-experience">
-        <DemoExperienceSection mode="light" />
+        <DemoExperienceSection />
       </section> */}
       {/* Features Section - 실시간 평가 시스템 */}
       <section id="features">
-        <TestimonialSection mode="light" />
+        <TestimonialSection />
       </section>
       {/* Deployment Section - 실제 강의 현장 트랙션 */}
-      <DeploymentSection mode="light" />
+      <DeploymentSection />
       {/* Partners Section - 파트너십 */}
-      <LogoCloud mode="light" />
+      <LogoCloud />
       {/* Footer */}
-      <Footer mode="light" />
+      <Footer />
     </div>
   );
 }

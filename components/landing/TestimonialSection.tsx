@@ -99,17 +99,13 @@ type Testimonial = (typeof TESTIMONIALS)[number];
 
 function TestimonialCard({
   testimonial,
-  isDark,
 }: {
   testimonial: Testimonial;
-  isDark: boolean;
 }) {
   return (
     <div
       className={`group relative flex flex-col w-[320px] md:w-[380px] flex-shrink-0 rounded-[2.5rem] p-8 md:p-10 border transition-all hover:shadow-2xl hover:-translate-y-2 overflow-hidden ${
-        isDark
-          ? "bg-muted/40 border-border"
-          : "bg-background border-border shadow-xl shadow-zinc-200/50"
+        "bg-background border-border shadow-xl shadow-zinc-200/50"
       }`}
     >
       {/* 이미지 배경 - 오른쪽 하단. 고려대 교수님만: 4px 띄움 + 아랫면 흐림, 나머지 3명은 원래 스타일 */}
@@ -133,7 +129,7 @@ function TestimonialCard({
           {(testimonial.avatarSize === "small" || testimonial.avatarFade) && (
             <div
               className={`absolute inset-x-0 bottom-0 h-2/5 pointer-events-none bg-gradient-to-t ${
-                isDark ? "from-zinc-900" : "from-white"
+                "from-white"
               } to-transparent`}
               aria-hidden
             />
@@ -144,9 +140,7 @@ function TestimonialCard({
       {/* 그라데이션 오버레이 - 텍스트 영역 가시성 향상 */}
       <div
         className={`absolute inset-0 z-[5] pointer-events-none ${
-          isDark
-            ? "bg-gradient-to-r from-zinc-900/90 via-zinc-900/50 to-transparent"
-            : "bg-gradient-to-r from-white/95 via-white/70 to-transparent"
+          "bg-gradient-to-r from-white/95 via-white/70 to-transparent"
         }`}
       />
 
@@ -155,14 +149,10 @@ function TestimonialCard({
         <div className="mb-6">
           <Quote
             className={`w-8 h-8 md:w-10 md:h-10 transition-colors duration-300 ${
-              isDark
-                ? "text-info-text/20 group-hover:text-info-text"
-                : "text-info-text/10 group-hover:text-info-text"
+              "text-info-text/10 group-hover:text-info-text"
             }`}
             style={{
-              filter: isDark
-                ? "drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8))"
-                : "drop-shadow(0 2px 4px rgba(255, 255, 255, 1))",
+              filter: "drop-shadow(0 2px 4px rgba(255, 255, 255, 1))",
             }}
           />
         </div>
@@ -170,13 +160,11 @@ function TestimonialCard({
         <blockquote className="flex-1 mb-8 pr-4 md:pr-8">
           <p
             className={`text-base md:text-lg lg:text-xl leading-[1.6] font-bold tracking-tight ${
-              isDark ? "text-zinc-200" : "text-[#1F1F1F]"
+              "text-[#1F1F1F]"
             }`}
             style={{
               letterSpacing: "-0.3px",
-              textShadow: isDark
-                ? "0 2px 4px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.9)"
-                : "0 2px 4px rgba(255, 255, 255, 1), 0 0 12px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(255, 255, 255, 1)",
+              textShadow: "0 2px 4px rgba(255, 255, 255, 1), 0 0 12px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(255, 255, 255, 1)",
             }}
           >
             &quot;{testimonial.quote}&quot;
@@ -200,12 +188,10 @@ function TestimonialCard({
             <div className="flex-1">
               <div
                 className={`text-base md:text-lg font-bold tracking-tight mb-1 ${
-                  isDark ? "text-white" : "text-[#1F1F1F]"
+                  "text-[#1F1F1F]"
                 }`}
                 style={{
-                  textShadow: isDark
-                    ? "0 2px 4px rgba(0, 0, 0, 0.8), 0 0 10px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.9)"
-                    : "0 2px 4px rgba(255, 255, 255, 1), 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(255, 255, 255, 1)",
+                  textShadow: "0 2px 4px rgba(255, 255, 255, 1), 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(255, 255, 255, 1)",
                 }}
               >
                 {testimonial.name}
@@ -215,9 +201,7 @@ function TestimonialCard({
                   "text-muted-foreground"
                 }`}
                 style={{
-                  textShadow: isDark
-                    ? "0 1px 2px rgba(0, 0, 0, 0.8), 0 0 6px rgba(0, 0, 0, 0.5)"
-                    : "0 1px 2px rgba(255, 255, 255, 1), 0 0 6px rgba(255, 255, 255, 0.8)",
+                  textShadow: "0 1px 2px rgba(255, 255, 255, 1), 0 0 6px rgba(255, 255, 255, 0.8)",
                 }}
               >
                 {testimonial.title}
@@ -230,12 +214,7 @@ function TestimonialCard({
   );
 }
 
-export default function TestimonialSection({
-  mode = "light",
-}: {
-  mode?: "light" | "dark";
-}) {
-  const isDark = mode === "dark";
+export default function TestimonialSection() {
   const [isHovered, setIsHovered] = useState(false);
   const t = useTranslations("landing");
   const trackRef = useRef<HTMLDivElement>(null);
@@ -268,13 +247,13 @@ export default function TestimonialSection({
 
   return (
     <section
-      className={`w-full py-20 lg:py-28 ${isDark ? "bg-black" : "bg-background"}`}
+      className={`w-full py-20 lg:py-28 ${"bg-background"}`}
     >
       <div className="container mx-auto px-4 lg:px-6">
         <div className="mx-auto mb-14 lg:mb-20 max-w-4xl text-center">
           <h2
             className={`text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl animate-fade-in-up-sm ${
-              isDark ? "text-white" : "text-[#1F1F1F]"
+              "text-[#1F1F1F]"
             }`}
             style={{ letterSpacing: "-0.01em" }}
           >
@@ -293,14 +272,14 @@ export default function TestimonialSection({
           {/* 좌측 페이드 */}
           <div
             className={`pointer-events-none absolute left-0 top-0 bottom-0 z-10 w-24 md:w-32 lg:w-40 bg-gradient-to-r ${
-              isDark ? "from-black to-transparent" : "from-white to-transparent"
+              "from-white to-transparent"
             }`}
             aria-hidden
           />
           {/* 우측 페이드 */}
           <div
             className={`pointer-events-none absolute right-0 top-0 bottom-0 z-10 w-24 md:w-32 lg:w-40 bg-gradient-to-l ${
-              isDark ? "from-black to-transparent" : "from-white to-transparent"
+              "from-white to-transparent"
             }`}
             aria-hidden
           />
@@ -313,7 +292,6 @@ export default function TestimonialSection({
                 <TestimonialCard
                   key={`a-${testimonial.name}`}
                   testimonial={testimonial}
-                  isDark={isDark}
                 />
               ))}
             </div>
@@ -322,7 +300,6 @@ export default function TestimonialSection({
                 <TestimonialCard
                   key={`b-${testimonial.name}`}
                   testimonial={testimonial}
-                  isDark={isDark}
                 />
               ))}
             </div>
