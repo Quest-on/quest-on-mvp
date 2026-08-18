@@ -64,6 +64,23 @@ function token(
 }
 
 describe("시맨틱 토큰 대비", () => {
+  it("토큰이 실제로 정의돼 있다", () => {
+    // 아래 검사들은 토큰이 없으면 조용히 건너뛴다. globals.css 를 통째로
+    // 비워도 전부 통과했다 - 그러면 이 파일은 아무것도 지키지 않는다.
+    // 전제를 먼저 고정한다.
+    const required = [
+      "success-solid", "success-surface", "success-text", "success-solid-foreground",
+      "warning-solid", "warning-surface", "warning-text", "warning-solid-foreground",
+      "info-solid", "info-surface", "info-text", "info-solid-foreground",
+      "danger-subtle", "danger-text", "danger-solid-foreground",
+      "foreground", "muted", "muted-foreground", "destructive",
+    ];
+    const missing = required.filter((n) => {
+      try { token(n, "light"); return false; } catch { return true; }
+    });
+    expect(missing, ).toHaveLength(0);
+  });
+
   it.each(["warning", "success", "info"])(
     "%s-text 는 밝은 표면용이지 solid 배경용이 아니다",
     (kind) => {
