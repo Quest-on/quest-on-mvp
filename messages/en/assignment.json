@@ -11,7 +11,13 @@
     "saveError": "Failed to save your final answer. Please try again.",
     "submitError": "Submission failed.",
     "quizRedirect": "Redirecting to the timed quiz.",
-    "submitNetworkError": "An error occurred during submission."
+    "submitNetworkError": "An error occurred during submission.",
+    "entryWindowNotOpen": "This assignment has not started yet.",
+    "examNotAvailable": "This assignment has ended or is not public.",
+    "examNotFound": "Assignment not found.",
+    "publishLimitReached": "This assignment has reached its participation limit. Please contact your instructor.",
+    "studentLimitReached": "The student capacity for this assignment is full. Please contact your instructor.",
+    "sessionInitError": "Something went wrong opening this assignment. Please try again shortly."
   },
   "review": {
     "errorNotViewable": "This assignment is not available for review.",

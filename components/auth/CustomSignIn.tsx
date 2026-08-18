@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { createSupabaseClient } from "@/lib/supabase-client";
 import { getAuthCallbackUrl } from "@/lib/auth-redirect";
+import { safeInternalPath } from "@/lib/safe-redirect";
 import { useTranslations } from "next-intl";
 import { useOAuthProviders } from "@/lib/use-oauth-providers";
 import { isProviderUnavailable } from "@/lib/oauth-providers";
@@ -43,7 +44,14 @@ export function CustomSignIn() {
       return;
     }
 
-    router.push("/");
+    // 로그인 전에 가려던 곳으로 되돌린다.
+    //
+    // redirect 는 URL 쿼리(= 사용자 입력)라 그대로 믿으면 안 된다.
+    // startsWith("/") 만으로는 //evil.com 이 통과해 외부로 튕긴다.
+    const redirect = safeInternalPath(
+      new URLSearchParams(window.location.search).get("redirect")
+    );
+    router.push(redirect ?? "/");
     router.refresh();
   };
 

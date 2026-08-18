@@ -143,7 +143,14 @@ export async function proxy(request: NextRequest) {
   // 미인증 → 공개 라우트 통과, 나머지는 로그인 페이지
   if (!user) {
     if (isPublicRoute(pathname)) return response;
-    return NextResponse.redirect(new URL("/sign-in", request.url));
+    // 원래 가려던 곳을 실어 보낸다.
+    //
+    // 학생이 시험 링크를 열었다가 여기로 튕기면, 로그인 뒤 기본 화면으로
+    // 가버려서 링크가 통째로 유실됐다. 쿼리까지 보존해야 상태가 담긴
+    // 딥링크가 살아난다. 돌려보낼 때 safeInternalPath 로 검증한다.
+    const signInUrl = new URL("/sign-in", request.url);
+    signInUrl.searchParams.set("redirect", `${pathname}${request.nextUrl.search}`);
+    return NextResponse.redirect(signInUrl);
   }
 
   // profiles 테이블에서 role 읽기.
