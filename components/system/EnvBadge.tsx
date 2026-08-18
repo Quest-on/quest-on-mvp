@@ -14,7 +14,7 @@ export function EnvBadge() {
   return (
     <div
       role="status"
-      className="pointer-events-none fixed bottom-3 left-3 z-[9999] rounded-full border border-warning-border/40 bg-warning-solid/90 px-2.5 py-1 font-mono text-xs font-semibold uppercase tracking-wide text-warning-text shadow-sm"
+      className="pointer-events-none fixed bottom-3 left-3 z-[9999] rounded-full border border-warning-border/40 bg-warning-solid/90 px-2.5 py-1 font-mono text-xs font-semibold uppercase tracking-wide text-foreground shadow-sm"
     >
       {appEnv}
     </div>
