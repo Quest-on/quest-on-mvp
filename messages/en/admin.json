@@ -272,5 +272,22 @@
       "task_env": "Task env",
       "admin": "Admin setting"
     }
+  },
+  "onboardingFunnel": {
+    "title": "Onboarding funnel",
+    "scope": "Scope",
+    "noSample": "No sample",
+    "proxyMetric": "Proxy metric",
+    "start": "Start",
+    "noPrev": "No previous step",
+    "prevRate": "Previous {rate}",
+    "subtitle": "See where instructors get stuck on the way from sign-up to a real student submission.",
+    "proxyNote": "Demo completion is a proxy metric; the first student submission is the real one.",
+    "loadFailed": "Could not load the funnel.",
+    "capped": "The query hit its cap, so this is partial. The numbers below undercount.",
+    "medianLabel": "Demo created → AI grading viewed (median)",
+    "within15m": "Target: within 15 minutes",
+    "trueMetric": "Real metric",
+    "biggestDrop": "The biggest drop-off is {from} → {to} ({count} people). Fixing this first has the highest payoff."
   }
 }
