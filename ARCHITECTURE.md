@@ -333,8 +333,34 @@ erDiagram
 
 - `questions` 테이블은 **레거시**다. 문항 원본은 `exams.questions` JSON 이다.
 - `exams.rubric` 컬럼은 남아 있지만 채점 파이프라인이 더 이상 읽지 않는다.
-- `submissions` / `grades` 는 `(session_id, q_idx)` 로 유일하다. **qIdx 정합성이 채점 불변식의 핵심**이며 규칙은 `.github/impact-review/rules.md` 에 있다.
+- `submissions` / `grades` 는 `(session_id, q_idx)` 로 유일하다. **qIdx 정합성이 채점 불변식의 핵심**이며 규칙은 아래 "거울 쌍 · 채점 불변식" 에 있다.
 - 모든 AI 호출은 `lib/ai-tracking.ts` 를 거쳐 `ai_events` 에 토큰·지연·비용이 기록된다. 우회하면 관리자 대시보드가 비고 비용 추적이 끊긴다.
+
+---
+
+## 거울 쌍 · 채점 불변식
+
+여기 있는 것은 **실제로 사고를 낸 적이 있는** 불변식이다. 손대기 전에 읽는다.
+
+### 거울 쌍 (mirror pairs)
+
+생성(new)·수정(edit) 폼은 거울이다. **복붙이라 import edge 가 없어 의존성 그래프로는 drift 를 못 잡는다.** 한쪽만 고치면 짝도 같이 고친다.
+
+| 쌍 | 파일 |
+|---|---|
+| 시험 출제 | `app/(app)/instructor/new/page.tsx` ↔ `app/(app)/instructor/[examId]/edit/page.tsx` |
+| 과제 출제 | `app/(app)/instructor/assignment/new/page.tsx` ↔ `app/(app)/instructor/assignment/[assignmentId]/edit/page.tsx` |
+
+검증 로직은 양쪽이 `lib/authoring-validation.ts` 의 공용 헬퍼를 **import 해서** 쓴다. 한쪽에 복붙하면 `__tests__/mirror-drift.test.ts` 가 깨진다.
+
+### 채점 불변식
+
+- **qIdx 딥링크:** 딥링크·채점 선택은 배열 위치를 가정하지 않는다. 명시적 `qIdx` 또는 테스트된 `idx ?? pos` 규약을 쓴다. 회귀 가드는 `__tests__/qidx-grade-mapping.test.ts`.
+- **객관식 채점:** MCQ/OX 는 raw 선택답 + `correctOptionIndex` 만 쓴다. AI grade row 나 `ai_summary` placeholder 를 섞지 않는다.
+- **점수 비중:** 문항 유형 세트와 `score_weights` 는 항상 동기화한다. stale weight 금지.
+- **시험/과제 공용 채점 게이트:** 양쪽에서 도달 가능한 채점 라우트·접근 가드는 `lib/grading-helpers.ts` 의 `isGradingOpen`/`isAssignmentType` 계약을 재사용한다. 공유 진입점에 `status==="closed"` 만 하드코딩하면 과제가 영구 차단된다.
+- **과제 최종응답 데이터 소스:** 과제의 최종 자유응답은 `sessions.final_answer` 가 권위 데이터이고 학생-AI 대화는 `messages` 의 q_idx 0 이다. `submissions` 는 시험 답안과 과제 canvas·quiz 기록의 유효한 소스다.
+- **단일 채점 writer:** 같은 `(session_id, q_idx)` grade 행을 `/api/session/[id]/grade` POST 와 `/api/session/[id]/case-grade/commit` 이 동시에 쓰지 않는다. 한 화면에 점수 확정 UI 를 둘 다 마운트하면 last-writer-wins clobber·stale 캐시가 된다.
 
 ---
 
@@ -434,5 +460,4 @@ flowchart LR
 | 인증·CORS·레이트리밋·입력검증 규칙 | `docs/SECURITY.md` |
 | 스테이징 환경 구축·운영 | `docs/STAGING.md` |
 | 테스트 명령과 기대치 | `docs/TESTING.md` |
-| 거울 쌍·qIdx·채점 불변식 | `.github/impact-review/rules.md` |
 | 라우트 핸들러 계약 | `app/api/CLAUDE.md` |

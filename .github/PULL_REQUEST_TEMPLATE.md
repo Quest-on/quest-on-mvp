@@ -29,4 +29,4 @@ $ npx vitest run <파일>
 - [ ] `main`과 `staging`이 아닌 작업 브랜치, 한 PR = 한 가지 변경
 - [ ] `.env*` / 운영 DB 접속정보 미포함, 운영 DB로 테스트하지 않음
 - [ ] DB 스키마·마이그레이션 변경 있음 → 폐기 가능한 로컬 DB로만 검증함 (해당 없으면 이 줄 체크)
-- [ ] CI의 Lint & Type Check, Build, Unit Tests, API Integration Tests, Browser E2E Tests(뼈대 smoke/a11y/CSP/error-boundary만), impact-review, pr-hygiene가 전부 초록
+- [ ] CI의 Lint & Type Check, Build, Unit Tests, API Integration Tests, Browser E2E Tests(뼈대 smoke/a11y/CSP/error-boundary만), pr-hygiene가 전부 초록

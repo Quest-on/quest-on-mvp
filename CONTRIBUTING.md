@@ -114,7 +114,7 @@ git push -u origin feat/login-button
 
 ### 6) 리뷰 반영
 - 코멘트가 달리면 같은 브랜치에서 수정 후 다시 push 하면 PR 이 자동 갱신됩니다.
-- CI(Lint & Type Check, Build, Unit Tests, API Integration Tests, Browser E2E Tests, impact-review, pr-hygiene)가 **전부 초록**이어야 머지합니다.
+- CI(Lint & Type Check, Build, Unit Tests, API Integration Tests, Browser E2E Tests, pr-hygiene)가 **전부 초록**이어야 머지합니다.
 - `staging` PR 은 CI 초록이면 승인 없이 머지할 수 있습니다. `main` 승격 PR 은 **승인 1개**가 필요합니다.
 
 ### 7) QA

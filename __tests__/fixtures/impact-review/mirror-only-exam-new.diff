@@ -1,8 +1,0 @@
-diff --git a/app/(app)/instructor/new/page.tsx b/app/(app)/instructor/new/page.tsx
---- a/app/(app)/instructor/new/page.tsx
-+++ b/app/(app)/instructor/new/page.tsx
-@@ -613,3 +613,3 @@ export default function CreateExam() {
-     const incompleteObjectiveIndices = questions
--      .map((q, i) => (isObjectiveQuestionIncomplete(q) ? i + 1 : -1))
-+      .map((q, i) => (isObjectiveQuestionIncomplete(q) || (q.options?.length ?? 0) === 0 ? i + 1 : -1))
-       .filter((i) => i !== -1);
