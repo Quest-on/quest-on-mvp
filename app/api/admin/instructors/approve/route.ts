@@ -1,17 +1,22 @@
+import { z } from "zod";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { successJson, errorJson } from "@/lib/api-response";
 import { logError } from "@/lib/logger";
+
+const BodySchema = z.object({ instructorId: z.string().uuid() });
 
 export async function POST(request: Request) {
   try {
     const denied = await requireAdmin();
     if (denied) return denied;
 
-    const { instructorId } = await request.json();
-    if (!instructorId) {
-      return errorJson("BAD_REQUEST", "instructorId is required", 400);
+    // 존재만 확인하면 UUID 가 아닌 값이 그대로 RPC 로 간다.
+    const parsed = BodySchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return errorJson("INVALID_INPUT", "Invalid input", 400);
     }
+    const { instructorId } = parsed.data;
 
     const supabase = getSupabaseServer();
 
