@@ -43,13 +43,13 @@ export function PasteLogsCard({ pasteLogs, questionId }: PasteLogsCardProps) {
   const suspiciousCount = suspiciousLogs.length;
 
   return (
-    <Card className={suspiciousCount > 0 ? "border-destructive bg-destructive/5" : "border-orange-200 bg-orange-50/50"}>
+    <Card className={suspiciousCount > 0 ? "border-destructive bg-destructive/5" : "border-warning-border bg-warning-surface/50"}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           {suspiciousCount > 0 ? (
             <AlertTriangle className="h-4 w-4 text-destructive" />
           ) : (
-            <Copy className="h-4 w-4 text-orange-600" />
+            <Copy className="h-4 w-4 text-warning-text" />
           )}
           <span className={suspiciousCount > 0 ? "text-destructive" : ""}>
             {suspiciousCount > 0 ? t("pasteLogs.suspiciousTitle") : t("pasteLogs.pasteTitle")}

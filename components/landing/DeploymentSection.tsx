@@ -121,7 +121,7 @@ export default function DeploymentSection() {
           <div
             aria-hidden
             className={`absolute top-0 bottom-0 left-4 md:left-1/2 w-px md:-translate-x-1/2 ${
-              "bg-zinc-200"
+              "bg-muted"
             }`}
           />
           <ol className="space-y-12 lg:space-y-16">
@@ -132,7 +132,7 @@ export default function DeploymentSection() {
                   {/* 시점 마커 */}
                   <div
                     aria-hidden
-                    className={`absolute left-4 md:left-1/2 top-2 h-3 w-3 -translate-x-1/2 rounded-full ring-4 bg-gradient-to-br from-blue-600 to-indigo-600 ${
+                    className={`absolute left-4 md:left-1/2 top-2 h-3 w-3 -translate-x-1/2 rounded-full ring-4 bg-gradient-to-br from-primary to-primary ${
                       "ring-white"
                     }`}
                   />

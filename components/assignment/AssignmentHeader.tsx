@@ -83,7 +83,7 @@ export function AssignmentHeader({
         </Button>
         <h1 className="text-lg font-semibold truncate">{title}</h1>
         {isSubmitted && (
-          <Badge variant="secondary" className="bg-success-solid text-success-text">
+          <Badge variant="secondary" className="bg-success-solid text-foreground">
             {t("header.submittedBadge")}
           </Badge>
         )}

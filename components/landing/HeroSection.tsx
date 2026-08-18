@@ -239,7 +239,7 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
             style={{ borderColor: colors.cardBorder }}
           >
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-success-solid text-success-text">
+              <div className="p-1.5 rounded-md bg-success-solid text-foreground">
                 <ShieldCheck className="w-4 h-4" />
               </div>
               <div>

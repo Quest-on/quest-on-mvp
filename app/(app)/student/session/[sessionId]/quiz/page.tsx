@@ -205,7 +205,7 @@ export default function AssignmentQuizPage() {
             <div className="flex items-center gap-3">
               <Badge
                 variant="outline"
-                className={remainingSeconds !== null && remainingSeconds <= 5 ? "border-red-500 text-destructive" : ""}
+                className={remainingSeconds !== null && remainingSeconds <= 5 ? "border-destructive text-destructive" : ""}
               >
                 <Clock className="w-4 h-4 mr-1" />
                 {t("timerSeconds", { seconds: remainingSeconds ?? 0 })}
@@ -222,7 +222,7 @@ export default function AssignmentQuizPage() {
       </div>
 
       <main className="container mx-auto max-w-4xl px-4 py-6">
-        <Card className="mb-6 border-amber-500/20 bg-warning-surface/5">
+        <Card className="mb-6 border-warning-border/20 bg-warning-surface/5">
           <CardContent className="p-4 text-sm text-muted-foreground">
             {t("description")}
           </CardContent>

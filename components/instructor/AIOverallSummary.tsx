@@ -125,14 +125,14 @@ export function AIOverallSummary({
             </ul>
           </div>
 
-          <div className="bg-orange-50/50 p-4 rounded-lg border border-orange-100">
-            <h4 className="font-semibold text-orange-700 mb-3 flex items-center gap-2">
+          <div className="bg-warning-surface/50 p-4 rounded-lg border border-warning-border">
+            <h4 className="font-semibold text-warning-text mb-3 flex items-center gap-2">
               <Minus className="w-4 h-4" /> {t("aiOverallSummary.weaknesses")}
             </h4>
             <ul className="space-y-2 text-sm">
               {(summary.weaknesses ?? []).map((item, i) => (
                 <li key={i} className="flex items-start gap-2">
-                  <span className="text-orange-400 mt-1">•</span>
+                  <span className="text-warning-text mt-1">•</span>
                   <span>{item}</span>
                 </li>
               ))}
