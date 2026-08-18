@@ -49,8 +49,16 @@ async function fillProfile(page: import("@playwright/test").Page) {
     "학교를 고른 뒤 제안 목록이 다시 열렸다 - 동의 체크박스를 덮는다"
   ).toBeHidden();
 
-  await page.locator("#age-over-14").click();
-  await page.locator("#terms").click();
+  // 동의 수집은 롤아웃 플래그다. 서버가 off/shadow 면 UI 가 아예 안 그린다
+  // (`consentCollecting === true` 일 때만 fieldset 이 렌더된다). 로컬 스택은
+  // 켜져 있고 CI 는 꺼져 있어서, 무조건 클릭하면 CI 에서만 30초 타임아웃으로
+  // 죽는다. 있으면 체크하고 없으면 넘어간다 - 이 스펙이 보려는 건 동의 UI 가
+  // 아니라 교수자가 데모까지 가는 경로다.
+  const ageCheck = page.locator("#age-over-14");
+  if (await ageCheck.count()) {
+    await ageCheck.click();
+    await page.locator("#terms").click();
+  }
   await page.getByRole("button", CONTINUE).click();
 }
 
