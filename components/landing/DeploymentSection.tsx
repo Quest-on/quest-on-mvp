@@ -73,7 +73,7 @@ export default function DeploymentSection({
         <div className="mx-auto mb-14 lg:mb-20 max-w-4xl text-center">
           <p
             className={`text-xs font-bold uppercase tracking-[0.2em] mb-4 ${
-              isDark ? "text-muted-foreground" : "text-muted-foreground"
+              "text-muted-foreground"
             }`}
           >
             {t("deployment.badge")}
@@ -90,7 +90,7 @@ export default function DeploymentSection({
           </h2>
           <p
             className={`mt-6 text-base md:text-lg leading-relaxed ${
-              isDark ? "text-muted-foreground" : "text-muted-foreground"
+              "text-muted-foreground"
             }`}
           >
             {t("deployment.subtitle")}
@@ -113,7 +113,7 @@ export default function DeploymentSection({
               </div>
               <div
                 className={`mt-2 text-xs md:text-sm font-bold uppercase tracking-[0.15em] ${
-                  isDark ? "text-muted-foreground" : "text-muted-foreground"
+                  "text-muted-foreground"
                 }`}
               >
                 {t(`deployment.metrics.${m.labelKey}`)}
@@ -197,7 +197,7 @@ export default function DeploymentSection({
         {/* 출처 */}
         <p
           className={`mt-14 text-center text-xs md:text-sm ${
-            isDark ? "text-muted-foreground" : "text-muted-foreground"
+            "text-muted-foreground"
           }`}
         >
           {t("deployment.sourcePrefix")}{" "}
