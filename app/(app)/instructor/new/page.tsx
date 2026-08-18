@@ -74,7 +74,7 @@ export default function CreateExam() {
 
   // 발행 한도. 코드를 건네기 전에 알아야 한다(이슈 #84).
   const { data: quotaData } = useQuery<{ publishesRemaining: number | null }>({
-    queryKey: ["instructor-quota"],
+    queryKey: qk.instructor.quota(),
     queryFn: async ({ signal }) => {
       const response = await fetch("/api/instructor/quota", { signal });
       if (!response.ok) throw new Error("quota");
@@ -561,7 +561,7 @@ export default function CreateExam() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.instructor.exams() });
-      queryClient.refetchQueries({ queryKey: ["drive-folder-contents"], type: "all" });
+      queryClient.refetchQueries({ queryKey: qk.drive.folderContentsAll(), type: "all" });
     },
   });
 
@@ -952,7 +952,7 @@ export default function CreateExam() {
                   <DialogFooter>
                     <Button
                       onClick={() => {
-                        queryClient.refetchQueries({ queryKey: ["drive-folder-contents"], type: "all" });
+                        queryClient.refetchQueries({ queryKey: qk.drive.folderContentsAll(), type: "all" });
                         setIsDialogOpen(false);
                         router.push("/instructor");
                       }}

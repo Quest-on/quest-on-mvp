@@ -409,7 +409,7 @@ export default function InstructorHome() {
 
   // 발행 한도. 교수자가 코드를 건네기 전에 알아야 한다(이슈 #84).
   const { data: quotaData } = useQuery<{ publishesRemaining: number | null }>({
-    queryKey: ["instructor-quota"],
+    queryKey: qk.instructor.quota(),
     queryFn: async ({ signal }) => {
       const response = await fetch("/api/instructor/quota", { signal });
       if (!response.ok) throw new Error("quota");

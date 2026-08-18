@@ -29,6 +29,7 @@ import {
 } from "@/components/report/AssignmentQuizResult";
 import { formatDateTime, formatTime } from "@/lib/i18n/format";
 import type { Locale } from "@/lib/i18n/config";
+import { qk } from "@/lib/query-keys";
 
 interface Question {
   id: string;
@@ -93,7 +94,7 @@ export default function StudentReportPage() {
     isLoading,
     error: queryError,
   } = useQuery({
-    queryKey: ["student-report", sessionId, user?.id],
+    queryKey: qk.student.report(sessionId, user?.id),
     enabled:
       isLoaded &&
       isSignedIn &&

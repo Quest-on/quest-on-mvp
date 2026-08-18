@@ -66,7 +66,8 @@ describe("재응시 사슬이 끊기지 않았다", () => {
 
   it("재응시 여부가 쿼리 키에 들어간다", () => {
     // 안 넣으면 같은 캐시를 재사용해 앞선 읽기 전용 응답이 그대로 돌아온다.
-    expect(hook).toMatch(/queryKey: \["exam-session-init", examCode, user\?\.id, restartDemo\]/);
+    // 키가 qk 로 옮겨졌다(#301 후속). 계약은 그대로 - restartDemo 가 키에 들어간다.
+    expect(hook).toMatch(/qk\.session\.init\(examCode, user\?\.id, restartDemo\)/);
   });
 
   it("zod 스키마가 필드를 보존한다", () => {

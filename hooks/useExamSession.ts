@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { getDeviceFingerprint } from "@/lib/device-fingerprint";
 import { createSupabaseClient } from "@/lib/supabase-client";
 import { hasAiChatQuestions } from "@/lib/grading-helpers";
+import { qk } from "@/lib/query-keys";
 
 interface Question {
   id: string;
@@ -111,7 +112,7 @@ export function useExamSession({
   // 그래서 게이트는 init 결과를 기다렸다가 demoPreview 가 아닐 때만 리다이렉트한다.
   const [profileGateChecked, setProfileGateChecked] = useState(false);
   const { data: profileGateData } = useQuery({
-    queryKey: ["student-profile-gate", user?.id],
+    queryKey: qk.student.profileGate(user?.id),
     queryFn: async () => {
       const response = await fetch("/api/student/profile");
       if (!response.ok) return { hasProfile: false };
@@ -127,7 +128,7 @@ export function useExamSession({
   const { data: initData, isLoading: initLoading } = useQuery({
     // 재응시 여부를 키에 넣는다. 안 넣으면 같은 캐시를 재사용해 "다시 해보기"가
     // 앞선 읽기 전용 응답을 그대로 돌려준다.
-    queryKey: ["exam-session-init", examCode, user?.id, restartDemo],
+    queryKey: qk.session.init(examCode, user?.id, restartDemo),
     queryFn: async () => {
       try {
         const deviceFingerprint = getDeviceFingerprint();
@@ -328,7 +329,7 @@ export function useExamSession({
 
   // Heartbeat — uses heartbeatSessionId state for reactive query key
   const { data: heartbeatData } = useQuery({
-    queryKey: ["session-heartbeat", heartbeatSessionId],
+    queryKey: qk.session.heartbeat(heartbeatSessionId),
     queryFn: async () => {
       const sid = heartbeatSessionId;
       if (!sid) return null;

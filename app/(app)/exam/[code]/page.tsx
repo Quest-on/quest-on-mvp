@@ -56,6 +56,7 @@ import { LateEntryWaiting } from "@/components/exam/LateEntryWaiting";
 import { ObjectiveNavBar } from "@/components/exam/ObjectiveNavBar";
 import { seededOptionOrder, examQuestionDisplayOrder } from "@/lib/shuffle";
 import { useObjectiveKeyboardSelect } from "@/hooks/useObjectiveKeyboardSelect";
+import { qk } from "@/lib/query-keys";
 
 interface Question {
   id: string;
@@ -454,7 +455,7 @@ export default function ExamPage() {
     }
 
     if (sessionId) {
-      queryClient.invalidateQueries({ queryKey: ["session-heartbeat", sessionId] });
+      queryClient.invalidateQueries({ queryKey: qk.session.heartbeat(sessionId) });
     }
   };
 
