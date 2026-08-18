@@ -52,6 +52,17 @@ export default function OnboardingPage() {
   // intake 는 교수자 전용 JTBD 2문항 단계다 (AC-4). 학생은 거치지 않는다.
   const [step, setStep] = useState<"role" | "profile" | "intake">("role");
   const [role, setRole] = useState<"instructor" | "student">("student");
+  // 사용자가 역할을 실제로 골랐는가.
+  //
+  // role 기본값이 "student" 라서, OAuth 역할 쿠키가 만료돼 역할 단계로
+  // 떨어진 사람은 학생이 이미 선택된 화면을 본다. 교수로 시작했더라도
+  // 그대로 확인하면 학생으로 굳는다 - 역할은 최초 1회 불변이다.
+  //
+  // role 은 35곳에서 쓰여 nullable 로 바꾸면 파급이 크다. 선택 여부만
+  // 따로 들고 라디오 표시와 진행 가능 여부를 그걸로 정한다.
+  const [roleChosen, setRoleChosen] = useState(false);
+  // 역할이 metadata/쿠키로 복원돼 역할 단계를 건너뛴 경우.
+  const [roleRestored, setRoleRestored] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -101,6 +112,7 @@ export default function OnboardingPage() {
     });
     if (resolved) {
       setRole(resolved);
+      setRoleRestored(true);
       setStep("profile");
     }
   }, [isLoaded, user, profile]);
@@ -460,10 +472,11 @@ export default function OnboardingPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <RadioGroup
-              value={role}
-              onValueChange={(value) =>
-                setRole(value as "instructor" | "student")
-              }
+              value={roleChosen ? role : ""}
+              onValueChange={(value) => {
+                setRole(value as "instructor" | "student");
+                setRoleChosen(true);
+              }}
             >
               <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
                 <RadioGroupItem value="instructor" id="instructor" />
@@ -486,6 +499,7 @@ export default function OnboardingPage() {
             </RadioGroup>
 
             <Button
+              disabled={!roleChosen}
               onClick={() => setShowConfirm(true)}
               className="w-full h-12 text-lg"
             >
@@ -691,6 +705,28 @@ export default function OnboardingPage() {
                   </p>
                 )}
               </div>
+
+              {/*
+                역할 불변 고지.
+              
+                역할이 metadata/쿠키로 복원되면 역할 단계를 통째로 건너뛴다. 그러면
+                확인 다이얼로그도 안 뜨고, "처음 한 번만 정할 수 있다"는 말을 한 번도
+                못 본 채 "완료"로 역할이 영구 확정된다. 정작 그 문구는 #170 에서
+                정확하게 고쳐 뒀는데 정상 경로에서만 안 보였다.
+              
+                다이얼로그로 다시 막지는 않는다 - 이미 정해진 걸 되묻는 꼴이다.
+                대신 완료 직전에 사실만 알린다.
+              */}
+              {roleRestored && (
+                <p className="type-hint" role="note">
+                  {t("confirmDescSuffix", {
+                    role:
+                      role === "instructor"
+                        ? t("confirmDescInstructor")
+                        : t("confirmDescStudent"),
+                  })}
+                </p>
+              )}
 
               {consentCollecting === true && (
                 <fieldset className="space-y-3" aria-labelledby="consent-title">
