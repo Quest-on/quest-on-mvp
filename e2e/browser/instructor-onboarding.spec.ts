@@ -37,6 +37,18 @@ async function fillProfile(page: import("@playwright/test").Page) {
   await expect(suggestion).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
   await suggestion.click();
 
+  // 고른 뒤에는 목록이 다시 열리면 안 된다.
+  //
+  // handleSchoolSelect 가 질의를 대학 전체 이름으로 세팅하는데, 검색 effect 가
+  // 그걸 새 입력으로 보고 같은 검색을 다시 돌리던 때가 있었다. 300ms 뒤 목록이
+  // 되살아나 동의 체크박스와 제출 버튼을 덮었다. 로컬에서는 안 터지고 CI 에서만
+  // 터졌다 - debounce 를 넘겨 기다려야 보인다.
+  await page.waitForTimeout(600);
+  await expect(
+    suggestion,
+    "학교를 고른 뒤 제안 목록이 다시 열렸다 - 동의 체크박스를 덮는다"
+  ).toBeHidden();
+
   await page.locator("#age-over-14").click();
   await page.locator("#terms").click();
   await page.getByRole("button", CONTINUE).click();

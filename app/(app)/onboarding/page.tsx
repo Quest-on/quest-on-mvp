@@ -69,6 +69,13 @@ export default function OnboardingPage() {
   const [schoolSearchQuery, setSchoolSearchQuery] = useState("");
   const [schoolSuggestions, setSchoolSuggestions] = useState<University[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  // 제안을 골라서 질의가 바뀐 것인지 구분한다.
+  //
+  // handleSchoolSelect 가 schoolSearchQuery 를 대학 전체 이름으로 세팅하면
+  // 아래 검색 effect 가 그걸 새 입력으로 보고 같은 검색을 다시 돌린다. 목록을
+  // 방금 닫았는데 300ms 뒤 되살아나서, 동의 체크박스와 제출 버튼을 덮는다.
+  // 학교를 고른 사용자가 다음 칸으로 못 넘어간다.
+  const justSelectedRef = useRef(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -169,6 +176,12 @@ export default function OnboardingPage() {
       clearTimeout(searchTimeoutRef.current);
     }
 
+    // 선택으로 바뀐 질의는 다시 검색하지 않는다.
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
+      return;
+    }
+
     if (schoolSearchQuery.trim().length === 0) {
       setSchoolSuggestions([]);
       return;
@@ -218,6 +231,7 @@ export default function OnboardingPage() {
   }, []);
 
   const handleSchoolSelect = (university: University) => {
+    justSelectedRef.current = true;
     setSchool(university.fullName);
     setSchoolSearchQuery(university.fullName);
     setSchoolSuggestions([]);
