@@ -62,6 +62,46 @@ function countRaw(files: string[]): { total: number; byFile: Array<[string, numb
  * 현재 실측치. 이 숫자를 **올리는 변경은 거부된다.**
  * 치환 작업이 진행되면 이 값을 함께 낮춘다.
  */
+/**
+ * 파일별 예산.
+ *
+ * 총량 상한만으로는 한 파일에서 빼고 다른 파일에 넣는 변경이 그대로
+ * 통과한다. 실제로 이 세션에서 251 -> 54 로 줄이는 동안 새 하드코딩이
+ * 섞여 들어가도 총량이 줄기만 하면 아무도 못 봤다.
+ *
+ * 여기 없는 파일은 0 이 예산이다. 새 하드코딩 색은 그 파일 이름과 함께
+ * 거부된다. 줄이면 이 숫자도 함께 낮춘다.
+ */
+const FILE_BUDGET: Record<string, number> = {
+  "app/(app)/assignment/[code]/review/page.tsx": 1,
+  "app/(app)/exam/[code]/page.tsx": 1,
+  "app/(app)/student/report/[sessionId]/page.tsx": 1,
+  "app/admin/page.tsx": 2,
+  "app/legal/security/page.tsx": 1,
+  "app/legal/terms/page.tsx": 1,
+  "components/PublicHeader.tsx": 1,
+  "components/agent/AgentPanel.tsx": 1,
+  "components/animate-ui/components/buttons/icon.tsx": 1,
+  "components/assignment/AssignmentCanvas.tsx": 1,
+  "components/assignment/AssignmentSubmitDialog.tsx": 1,
+  "components/assignment/FinalAnswerButton.tsx": 1,
+  "components/assignment/FinalAnswerSheet.tsx": 1,
+  "components/canvas/TableNode.tsx": 2,
+  "components/chat/CopyMessageButton.tsx": 1,
+  "components/exam/ExamCenterToolbar.tsx": 1,
+  "components/exam/ExamLoading.tsx": 2,
+  "components/exam/ExamQuestionNav.tsx": 2,
+  "components/instructor/AIOverallSummary.tsx": 1,
+  "components/instructor/ExamControlButtons.tsx": 2,
+  "components/instructor/ExamStudentCard.tsx": 2,
+  "components/instructor/ExamStudentRow.tsx": 2,
+  "components/instructor/FileTypeIcon.tsx": 15,
+  "components/instructor/GradingPanel.tsx": 2,
+  "components/instructor/QuestionAiSummaryCard.tsx": 2,
+  "components/landing/TestimonialSection.tsx": 2,
+  "components/layout/dashboard-sidebar.tsx": 2,
+  "components/report/StudentObjectiveAnswer.tsx": 2,
+};
 const RAW_CEILING = 54;
 
 describe("전역 하드코딩 색 상한", () => {
@@ -75,6 +115,31 @@ describe("전역 하드코딩 색 상한", () => {
     expect(total, `상한 ${RAW_CEILING} 초과. 상위 파일:\n${top}`).toBeLessThanOrEqual(RAW_CEILING);
   });
 
+  it("파일별 예산을 넘지 않는다 — 새 하드코딩 색은 여기서 막힌다", () => {
+    const { byFile } = countRaw(targetFiles());
+    const over: string[] = [];
+    for (const [file, n] of byFile) {
+      const allowed = FILE_BUDGET[file] ?? 0;
+      if (n > allowed) over.push(`${file}  ${allowed} -> ${n}`);
+    }
+    expect(
+      over,
+      `예산 초과:\n${over.join("\n")}\n\n토큰을 쓰거나, 색이 뜻을 나르면 FILE_BUDGET 에 이유와 함께 올려라.`
+    ).toHaveLength(0);
+  });
+
+  it("예산에 죽은 항목이 없다", () => {
+    // 파일이 사라졌거나 색을 다 걷었으면 예산도 지운다.
+    const { byFile } = countRaw(targetFiles());
+    const actual = new Map(byFile);
+    const stale = Object.keys(FILE_BUDGET).filter(
+      (f) => (actual.get(f) ?? 0) === 0
+    );
+    expect(
+      stale,
+      `예산은 있는데 색이 0 인 파일:\n${stale.join("\n")}\n\n치웠으면 FILE_BUDGET 에서도 지운다.`
+    ).toHaveLength(0);
+  });
   it("하드코딩 흰 배경이 없다", () => {
     // 다크모드에서 그대로 흰색이라 대비가 깨진다. #255 에서 0 으로 만들었다.
     const offenders: string[] = [];
