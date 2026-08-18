@@ -106,7 +106,7 @@ function ElapsedTime({ createdAt }: { createdAt: string | undefined }) {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [createdAt]);
+  }, [createdAt, t]);
 
   if (!elapsedTime) return null;
 

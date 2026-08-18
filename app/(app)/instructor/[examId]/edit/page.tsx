@@ -335,7 +335,7 @@ export default function EditExam({
       setIsLoading(false);
       isSubmittingRef.current = false;
     }
-  }, [examData, questions, chatWeight, scoreWeights, courseId, hasSessions, fileUpload, resolvedParams.examId]);
+  }, [examData, questions, chatWeight, scoreWeights, courseId, hasSessions, fileUpload, resolvedParams.examId, t]);
 
   // ── 제출 사유 ─────────────────────────────────────────────────────────────
   const submitReasons = useMemo(() => {
@@ -358,7 +358,7 @@ export default function EditExam({
         questions.map((q) => q.type)
       ),
     ].filter(Boolean) as string[];
-  }, [examData.title, examData.duration, questions, canAddMoreFiles, scoreWeights]);
+  }, [examData.title, examData.duration, questions, canAddMoreFiles, scoreWeights, t]);
 
   // ── 로딩 스피너 ───────────────────────────────────────────────────────────
   if (isLoadingExam) {

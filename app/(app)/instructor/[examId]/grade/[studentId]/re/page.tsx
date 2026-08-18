@@ -74,7 +74,7 @@ export default function RegradePage() {
     };
 
     triggerRegrade();
-  }, [examId, studentId, user, isLoaded, router]);
+  }, [examId, studentId, user, isLoaded, router, t]);
 
   if (!isLoaded) {
     return (

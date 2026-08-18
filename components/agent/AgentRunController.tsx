@@ -391,7 +391,7 @@ export function AgentRunControllerProvider({
     void cancelAgentRun(runId).catch(() => {
       // 취소 요청 실패는 치명적이지 않다 — 루프는 로컬 플래그로도 멈춘다.
     });
-  }, []);
+  }, [t]);
 
   const reset = useCallback(() => {
     if (loopRunningRef.current) return;

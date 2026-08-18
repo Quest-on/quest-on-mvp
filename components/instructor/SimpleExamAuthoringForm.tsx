@@ -456,7 +456,7 @@ export function SimpleExamAuthoringForm({
       language,
       materialsText: materialsText && materialsText.length > 0 ? materialsText : undefined,
     });
-  }, [pickedPrompt, pickedType, pickedCount, onQuestionAdd, generateAll, title, language, materialsText]);
+  }, [pickedPrompt, pickedType, pickedCount, onQuestionAdd, generateAll, title, language, materialsText, t]);
 
   const isUnlimited = duration === 0;
   const effectiveWeight = chatWeight ?? 50;
@@ -542,7 +542,7 @@ export function SimpleExamAuthoringForm({
     if (failed > 0) return t("simpleExamAuthoringForm.materialSummaryFailed", { total: files.length, failed });
     if (inProgress > 0) return t("simpleExamAuthoringForm.materialSummaryAnalyzing", { total: files.length });
     return t("simpleExamAuthoringForm.materialSummaryReady", { total: files.length });
-  }, [extractionStatus, files.length]);
+  }, [extractionStatus, files.length, t]);
 
   const [durationInput, setDurationInput] = useState<string>(
     duration === 0 ? "" : duration.toString(),

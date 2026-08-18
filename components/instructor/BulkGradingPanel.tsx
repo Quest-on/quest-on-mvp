@@ -451,7 +451,7 @@ export function BulkGradingPanel({
     }
 
     return rows;
-  }, [data?.students, finalSummaries, finalSummariesBySessionId]);
+  }, [data?.students, finalSummaries, finalSummariesBySessionId, t]);
 
   const startGradingMutation = useMutation({
     mutationFn: async () => {

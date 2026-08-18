@@ -73,7 +73,7 @@ export function AssignmentHeader({
     const intervalMs = diff <= 5 * 60 * 1000 ? 1000 : 60000;
     const interval = setInterval(updateTimer, intervalMs);
     return () => clearInterval(interval);
-  }, [deadline, isSubmitted, onDeadlineExpired]);
+  }, [deadline, isSubmitted, onDeadlineExpired, t]);
 
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur-sm">
