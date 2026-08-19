@@ -7,7 +7,7 @@ import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ExamDetailHeader } from "@/components/instructor/ExamDetailHeader";
-import { resolveCodeGate } from "@/components/instructor/ExamCode";
+import { resolveCodeGate, type InstructorQuotaResponse } from "@/components/instructor/ExamCode";
 import { ExamDetailsCard } from "@/components/instructor/ExamDetailsCard";
 import { QuestionsListCard } from "@/components/instructor/QuestionsListCard";
 import { ExamControlButtons } from "@/components/instructor/ExamControlButtons";
@@ -106,12 +106,12 @@ export default function ExamDetail({
   // 발행 한도. 교수자가 **코드를 건네기 전에** 알아야 한다 — 최종 강제는
   // 세션 생성 시 DB 가 하지만, 그때는 이미 코드를 배포한 뒤다.
   // 데모는 한도를 소모하지 않으므로 조회하지 않는다.
-  const { data: quotaData } = useQuery<{ publishesRemaining: number | null }>({
+  const { data: quotaData } = useQuery<InstructorQuotaResponse>({
     queryKey: qk.instructor.quota(user?.id),
     queryFn: async ({ signal }) => {
       const response = await fetch("/api/instructor/quota", { signal });
       if (!response.ok) throw new Error("Failed to fetch quota");
-      return response.json() as Promise<{ publishesRemaining: number | null }>;
+      return response.json() as Promise<InstructorQuotaResponse>;
     },
     enabled: !!user?.id && !isDemoExam,
   });
@@ -417,6 +417,16 @@ export default function ExamDetail({
               isDemo: isDemoExam,
               alreadyPublished: !!exam.first_published_at,
               publishesRemaining: quotaData?.publishesRemaining ?? null,
+              // 이 시험이 실제로 몇 명을 받았는지 알고 있으므로 잔여를 계산해
+              // 넘긴다. 상한을 모르면 null 이고, 그러면 안 막는다.
+              studentsRemaining:
+                quotaData?.studentsRemaining === null ||
+                quotaData?.studentsRemaining === undefined
+                  ? null
+                  : Math.max(
+                      0,
+                      quotaData.studentsRemaining - (bulkGradeStatus?.studentCount ?? 0)
+                    ),
             }}
             demoPreviewLabel={t("examDetail.tryAsStudent")}
             // 완주한 데모는 이미 제출본이 있어 그냥 들어가면 읽기 전용 화면만

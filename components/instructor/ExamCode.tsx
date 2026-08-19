@@ -26,6 +26,18 @@ import { cn } from "@/lib/utils";
  *   - 도달       → **코드 반출 차단** + 인증 CTA
  *   - 데모       → 아무것도 안 보임 (데모는 한도를 소모하지 않는다)
  */
+/**
+ * `/api/instructor/quota` 응답.
+ *
+ * 네 화면이 각자 인라인으로 선언하고 있었다 - 한 곳에 필드를 더해도
+ * 나머지가 모르면 게이트가 판정할 값을 못 받는다.
+ */
+export type InstructorQuotaResponse = {
+  publishesRemaining: number | null;
+  studentsRemaining: number | null;
+  plan?: string | null;
+};
+
 export type ExamCodeQuota = {
   /** 데모는 한도를 소모하지 않으므로 어떤 안내도 띄우지 않는다. */
   isDemo?: boolean;
@@ -33,6 +45,13 @@ export type ExamCodeQuota = {
   alreadyPublished?: boolean;
   /** 남은 발행 횟수. `null` 이면 무제한. */
   publishesRemaining?: number | null;
+  /**
+   * 이 시험이 더 받을 수 있는 학생 수. `null` 이면 무제한.
+   *
+   * 발행 한도와 별개다 — 발행에 여유가 있어도 이 시험의 학생 자리가 차면
+   * 새 학생은 못 들어온다(`admit_exam_session` 의 student_limit).
+   */
+  studentsRemaining?: number | null;
 };
 
 type ExamCodeProps = {
@@ -44,13 +63,36 @@ type ExamCodeProps = {
 };
 
 /** 한도 상태를 하나의 값으로 정리한다. 표면마다 다르게 판단하면 안 된다. */
+/**
+ * 코드를 내보내도 되는지 판정한다.
+ *
+ * 두 한도를 다 본다. 예전에는 발행 한도만 봐서, 학생 자리가 꽉 찬 시험의
+ * 코드를 그대로 내보냈다 — 교수자는 다 뿌린 뒤에야 학생들이 못 들어온다는
+ * 걸 알았고, 코드는 회수할 수 없다.
+ *
+ * 모르는 값(`null`/`undefined`)은 막지 않는다. 조회 실패와 "자리 없음" 은
+ * 다르고, 최종 강제는 어차피 DB 함수가 한다.
+ */
 export function resolveCodeGate(quota?: ExamCodeQuota): "open" | "warning" | "blocked" {
   if (!quota) return "open";
+  // 데모는 어느 한도도 소모하지 않는다.
   if (quota.isDemo) return "open";
-  if (quota.alreadyPublished) return "open";
-  if (quota.publishesRemaining === null || quota.publishesRemaining === undefined) return "open";
-  if (quota.publishesRemaining <= 0) return "blocked";
-  if (quota.publishesRemaining <= 1) return "warning";
+
+  const students = quota.studentsRemaining;
+  const knowStudents = students !== null && students !== undefined;
+  if (knowStudents && students <= 0) return "blocked";
+
+  // 이미 발행한 시험은 발행 한도를 다시 적용하지 않는다
+  // (`first_published_at IS NOT NULL`). 학생 한도는 위에서 이미 봤다.
+  if (!quota.alreadyPublished) {
+    const publishes = quota.publishesRemaining;
+    if (publishes !== null && publishes !== undefined) {
+      if (publishes <= 0) return "blocked";
+      if (publishes <= 1) return "warning";
+    }
+  }
+
+  if (knowStudents && students <= 3) return "warning";
   return "open";
 }
 

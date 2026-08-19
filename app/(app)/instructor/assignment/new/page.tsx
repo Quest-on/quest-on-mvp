@@ -1,5 +1,5 @@
 "use client";
-import { ExamCode } from "@/components/instructor/ExamCode";
+import { ExamCode, type InstructorQuotaResponse } from "@/components/instructor/ExamCode";
 import { useQuery } from "@tanstack/react-query";
 
 import { useState, useEffect, useRef } from "react";
@@ -40,12 +40,12 @@ export default function CreateAssignment() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [createdExamCode, setCreatedExamCode] = useState("");
 
-  const { data: quotaData } = useQuery<{ publishesRemaining: number | null }>({
+  const { data: quotaData } = useQuery<InstructorQuotaResponse>({
     queryKey: qk.instructor.quota(),
     queryFn: async ({ signal }) => {
       const response = await fetch("/api/instructor/quota", { signal });
       if (!response.ok) throw new Error("quota");
-      return response.json() as Promise<{ publishesRemaining: number | null }>;
+      return response.json() as Promise<InstructorQuotaResponse>;
     },
   });
 
