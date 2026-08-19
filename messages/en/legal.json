@@ -66,7 +66,7 @@
     },
     "section5": {
       "heading": "5. Managing your cookie settings",
-      "body": "You can refuse or delete cookies through your browser settings. However, blocking strictly necessary cookies may prevent certain features. such as login. from working.",
+      "body": "You can refuse or delete cookies through your browser settings. However, blocking strictly necessary cookies may prevent certain features — such as login — from working.",
       "browserSettings": {
         "heading": "How to manage cookies in major browsers",
         "chrome": "Settings → Privacy and security → Cookies and other site data",
@@ -333,7 +333,7 @@
       },
       "vulnerability": {
         "heading": "Vulnerability scanning and patching",
-        "body": "Regular security vulnerability assessments are conducted, and identified vulnerabilities are patched promptly. Comprehensive security updates. including dependency updates. are applied on an ongoing basis."
+        "body": "Regular security vulnerability assessments are conducted, and identified vulnerabilities are patched promptly. Comprehensive security updates — including dependency updates — are applied on an ongoing basis."
       },
       "incident": {
         "heading": "Incident response",
@@ -353,11 +353,11 @@
     "section1": {
       "heading": "1. Purpose and definitions",
       "article1": {
-        "heading": "Article 1: Purpose",
+        "heading": "Article 1 — Purpose",
         "body": "These Terms of Service govern the rights, obligations, and responsibilities of Quest-On (the \"Company\") and users of the Company's AI-powered exam and assessment platform service."
       },
       "article2": {
-        "heading": "Article 2: Definitions",
+        "heading": "Article 2 — Definitions",
         "user": "\"User\" refers to both educators (professors, instructors, and administrators) and examinees.",
         "content": "\"Content\" means exams, rubrics, submitted answers, AI conversation logs, feedback, and uploaded materials.",
         "service": "\"Service\" refers to the Company's AI-powered exam and assessment platform in its entirety."
