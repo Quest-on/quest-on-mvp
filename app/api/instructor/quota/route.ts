@@ -37,13 +37,20 @@ export async function GET(_request: NextRequest) {
     const limits = await getPlanLimits(profile?.plan ?? "free");
 
     if (limits.maxPublishes === null) {
-      return successJson({ publishesRemaining: null, plan: limits.plan });
+      return successJson({
+        publishesRemaining: null,
+        studentsRemaining: limits.maxStudents,
+        plan: limits.plan,
+      });
     }
 
     const used = await countPublishedExams(user.id);
 
     return successJson({
       publishesRemaining: Math.max(0, limits.maxPublishes - used),
+      // 시험별 잔여는 상세 화면이 계산한다. 여기서는 플랜 상한만 알린다 -
+      // 목록에서 시험마다 학생 수를 세면 조회가 N 배로 늘어난다.
+      studentsRemaining: limits.maxStudents,
       plan: limits.plan,
     });
   } catch (error) {
@@ -51,6 +58,10 @@ export async function GET(_request: NextRequest) {
       path: "/api/instructor/quota",
     });
     // 판정 불능은 무제한으로 답한다. 최종 강제는 DB 함수가 한다.
-    return successJson({ publishesRemaining: null, plan: null });
+    return successJson({
+      publishesRemaining: null,
+      studentsRemaining: null,
+      plan: null,
+    });
   }
 }

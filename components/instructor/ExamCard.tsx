@@ -84,6 +84,7 @@ export function ExamCard({
               isDemo: exam.is_demo,
               alreadyPublished: !!exam.first_published_at,
               publishesRemaining: quota?.publishesRemaining ?? null,
+              studentsRemaining: quota?.studentsRemaining ?? null,
             }}
           />
           <div className="flex items-center space-x-1">

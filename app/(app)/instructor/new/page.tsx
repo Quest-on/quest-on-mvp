@@ -8,7 +8,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { ExamCode } from "@/components/instructor/ExamCode";
+import { ExamCode, type InstructorQuotaResponse } from "@/components/instructor/ExamCode";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -73,12 +73,12 @@ export default function CreateExam() {
   const [createdExamCode, setCreatedExamCode] = useState("");
 
   // 발행 한도. 코드를 건네기 전에 알아야 한다(이슈 #84).
-  const { data: quotaData } = useQuery<{ publishesRemaining: number | null }>({
+  const { data: quotaData } = useQuery<InstructorQuotaResponse>({
     queryKey: qk.instructor.quota(),
     queryFn: async ({ signal }) => {
       const response = await fetch("/api/instructor/quota", { signal });
       if (!response.ok) throw new Error("quota");
-      return response.json() as Promise<{ publishesRemaining: number | null }>;
+      return response.json() as Promise<InstructorQuotaResponse>;
     },
   });
 
