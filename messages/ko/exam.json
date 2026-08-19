@@ -27,7 +27,7 @@
   "answerPanel": {
     "label": "답안 작성",
     "placeholder": "여기에 상세한 답안을 작성하세요...\n\n• 문제의 핵심을 파악하여 답변하세요\n• 풀이 과정을 단계별로 명확히 작성하세요\n• AI와의 대화를 통해 필요한 정보를 얻을 수 있습니다",
-    "saveError": "저장 실패 — 네트워크를 확인하세요",
+    "saveError": "저장 실패: 네트워크를 확인하세요",
     "saveRetryHint": "으로 재시도",
     "saving": "저장 중...",
     "saved": "저장됨",
@@ -151,9 +151,9 @@
   "preflight": {
     "title": "시험 시작 전 안내사항",
     "description": "시험을 시작하기 전에 다음 사항을 확인해주세요.",
-    "timePolicyUnlimited": "시간 제한 없음 (과제형) · 답안은 30초마다 자동 저장",
-    "timePolicyAuto": "시간 종료 시 자동 제출 · 답안은 30초마다 자동 저장",
-    "aiOnly": "플랫폼 내 AI만 사용 가능 · 외부 도구 사용 금지",
+    "timePolicyUnlimited": "시간 제한 없음 (과제형), 답안은 30초마다 자동 저장",
+    "timePolicyAuto": "시간 종료 시 자동 제출, 답안은 30초마다 자동 저장",
+    "aiOnly": "플랫폼 내 AI만 사용 가능, 외부 도구 사용 금지",
     "aiLogged": "모든 AI 대화 및 활동이 기록되어 평가에 활용됩니다",
     "examInfoTitle": "시험 정보",
     "examName": "시험명:",

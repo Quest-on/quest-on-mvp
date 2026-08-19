@@ -37,21 +37,35 @@ describe("데모 상세 CTA와 완주 상태", () => {
     expect(page).toContain("canOpenGrading={canOpenGrading}");
   });
 
-  it("완주 상태 조회는 데모 상세에서만 활성화되고 개방 여부를 표시한다", () => {
+  it("완주 상태 조회는 데모 상세에서만 활성화된다", () => {
     expect(page).toContain('fetch("/api/onboarding/demo/status", { signal })');
     expect(page).toContain("enabled: isDemoExam && isLoaded && !!isSignedIn");
-    expect(page).toContain("demoStatus?.aiRegenerationUnlocked");
-    expect(page).toContain('t("examDetail.demoAiRegenerationLockedDescription")');
-    expect(page).toContain('t("examDetail.demoAiRegenerationUnlockedDescription")');
+    // 결과는 "데모 다시 풀기" 버튼이 쓴다.
+    expect(page).toContain("demoStatus?.completed");
+  });
+
+  it("AI 재생성 잠금 안내를 화면에 띄우지 않는다", () => {
+    // 예전에는 "학생 시점에서 1문항에 답하고 AI 채점 결과를 열어보면
+    // 데모 완주로 기록됩니다" 를 띄웠다. 두 가지가 잘못이었다.
+    //
+    //   AI 재생성 기능 자체가 아직 없다(#83 열림). 없는 기능의 잠금을 알렸다.
+    //   "기록됩니다" 는 내부 계측을 사용자에게 노출한 문장이다.
+    expect(page, "잠금 안내가 되살아났다").not.toMatch(/demoAiRegeneration/);
   });
 
   it("데모 안내 문구는 두 지원 언어에 모두 있다", () => {
     for (const messages of [koMessages, enMessages]) {
       expect(messages.examDetail).toMatchObject({
         tryAsStudent: expect.any(String),
-        demoAiRegenerationLockedDescription: expect.any(String),
-        demoAiRegenerationUnlockedDescription: expect.any(String),
+        retryAsStudent: expect.any(String),
       });
+      // 지운 문구가 메시지에만 남아 있으면 다시 붙이기 쉬워진다.
+      expect(
+        Object.keys(messages.examDetail).filter((k) =>
+          k.startsWith("demoAiRegeneration")
+        ),
+        "쓰지 않는 잠금 문구가 남아 있다"
+      ).toHaveLength(0);
     }
   });
 });

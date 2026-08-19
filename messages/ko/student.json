@@ -43,7 +43,7 @@
     "stats": {
       "totalExams": "전체 시험",
       "completionRate": "완료율 {rate}%",
-      "thisMonth": "· 이번 달 {count}개",
+      "thisMonth": "이번 달 {count}개",
       "completedAndInProgress": "{completed}개 완료, {inProgress}개 진행 중",
       "todo": "ToDo",
       "unsubmittedAssignments": "미제출 과제 {count}개",

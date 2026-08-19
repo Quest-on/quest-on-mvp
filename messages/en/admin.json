@@ -209,7 +209,7 @@
     },
     "running": {
       "stopping": "Stopping…",
-      "statusLabel": "Agent running · Press ESC to stop",
+      "statusLabel": "Agent running, Press ESC to stop",
       "stopAriaLabel": "Stop agent"
     },
     "done": {

@@ -42,7 +42,7 @@
     },
     "publishing": {
       "title": "교수자 발행 현황",
-      "description": "무료 한도(발행 3회·시험당 학생 5명)를 얼마나 쓰고 있는지 봅니다. 데모 시험은 한도에 포함되지 않습니다.",
+      "description": "무료 한도(발행 3회, 시험당 학생 5명)를 얼마나 쓰고 있는지 봅니다. 데모 시험은 한도에 포함되지 않습니다.",
       "empty": "아직 교수자 계정이 없습니다.",
       "publishedCount": "발행 {count}건",
       "lastPublishedAt": "최근 발행: {date}",
@@ -209,7 +209,7 @@
     },
     "running": {
       "stopping": "중단 중…",
-      "statusLabel": "에이전트 실행 중 · ESC로 중단",
+      "statusLabel": "에이전트 실행 중, ESC로 중단",
       "stopAriaLabel": "에이전트 실행 중단"
     },
     "done": {
