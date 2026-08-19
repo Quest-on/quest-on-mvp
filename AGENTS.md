@@ -55,7 +55,7 @@ DB 백엔드 테스트와 `e2e/helpers/seed.ts::cleanupTestData()` 는 사용자
 | 인증·환경변수·CORS·레이트리밋·입력검증 | `docs/SECURITY.md` |
 | 테스트 명령과 기대치 | `docs/TESTING.md` |
 | 채점/QStash/스위퍼 | `docs/GRADING_PIPELINE_RUNBOOK.md` |
-| 거울 쌍·qIdx·채점 불변식 | `.github/impact-review/rules.md` |
+| 거울 쌍·qIdx·채점 불변식 | `ARCHITECTURE.md` 의 "거울 쌍 · 채점 불변식" |
 | 제품 판단 기준 | `PRODUCT_PHILOSOPHY.md` |
 | 이 프로젝트에서 반복된 실수 | `tasks/lessons.md` |
 | 브랜치·PR 상세 절차 | `CONTRIBUTING.md` |
