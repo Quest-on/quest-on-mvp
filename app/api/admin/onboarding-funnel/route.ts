@@ -3,10 +3,13 @@ import { successJson, errorJson } from "@/lib/api-response";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { ONBOARDING_EVENTS } from "@/lib/onboarding-events";
 import {
   buildOnboardingFunnel,
+  buildIntakeSkip,
   INSTRUCTOR_FUNNEL,
   type OnboardingEventRow,
+  type IntakeRow,
 } from "@/lib/onboarding-funnel";
 
 /**
@@ -44,8 +47,23 @@ export async function GET() {
     const rows = (data ?? []) as OnboardingEventRow[];
     const funnel = buildOnboardingFunnel(rows);
 
+    // intake 는 퍼널 단계가 아니라 별도 조회다 — 통과/이탈이 아니라
+    // "답했나 건너뛰었나" 하나만 본다. 실패해도 퍼널은 나가야 한다.
+    let intakeSkip: ReturnType<typeof buildIntakeSkip> = null;
+    try {
+      const { data: intake } = await getSupabaseServer()
+        .from("onboarding_events")
+        .select("user_id, metadata")
+        .eq("event", ONBOARDING_EVENTS.INTAKE_SUBMITTED)
+        .limit(MAX_ROWS);
+      intakeSkip = buildIntakeSkip((intake ?? []) as IntakeRow[]);
+    } catch {
+      intakeSkip = null;
+    }
+
     return successJson({
       ...funnel,
+        intakeSkip,
       // 상한에 걸리면 숫자가 실제보다 작다. 화면이 그 사실을 밝혀야 한다.
       truncated: rows.length >= MAX_ROWS,
     });

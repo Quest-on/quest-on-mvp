@@ -288,6 +288,9 @@
     "medianLabel": "Demo created → AI grading viewed (median)",
     "within15m": "Target: within 15 minutes",
     "trueMetric": "Real metric",
-    "biggestDrop": "The biggest drop-off is {from} → {to} ({count} people). Fixing this first has the highest payoff."
+    "biggestDrop": "The biggest drop-off is {from} → {to} ({count} people). Fixing this first has the highest payoff.",
+    "intakeSkipTitle": "Intake skipped",
+    "intakeSkipNote": "Skipping means we ship a fixed template without knowing the subject. A demo unrelated to their field loses them there.",
+    "intakeSkipValue": "{skipped} of {total}"
   }
 }
