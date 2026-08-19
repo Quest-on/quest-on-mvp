@@ -56,7 +56,7 @@ import {
 type PermissionKey = "review_before_commit" | "no_precheck" | "ai_default";
 
 const EXAMPLE_CRITERIA = [
-  "논리 40 · 완성도 30 · 개념 30",
+  "논리 40, 완성도 30, 개념 30",
   "핵심 개념 중심, 표현 실수는 관대하게",
   "요구사항 충족을 최우선",
 ];
@@ -423,7 +423,7 @@ export function BulkGradingPanel({
         identity.email ?? summary?.email,
       ]
         .filter(Boolean)
-        .join(" · ");
+        .join(", ");
 
       return {
         sessionId: identity.sessionId,
@@ -440,7 +440,7 @@ export function BulkGradingPanel({
       if (rows.some((row) => row.sessionId === summary.sessionId)) continue;
       const studentMeta = [summary.studentNumber, summary.email]
         .filter(Boolean)
-        .join(" · ");
+        .join(", ");
       rows.push({
         sessionId: summary.sessionId,
         studentName: summary.name,
@@ -534,7 +534,7 @@ export function BulkGradingPanel({
       const student = studentEntry?.student;
       const studentMeta = [student?.studentNumber, student?.email]
         .filter(Boolean)
-        .join(" · ");
+        .join(", ");
       for (const [qIdxStr, { score, comment }] of Object.entries(qMap)) {
         rows.push({
           sessionId,
@@ -979,7 +979,7 @@ export function BulkGradingPanel({
               <span>
                 {t("bulkGrading.progressProcessed", { processed: processedCount, total: progress.total })}
                 {progress.failed > 0
-                  ? ` · ${t("bulkGrading.progressDetail", { completed: progress.completed, failed: progress.failed })}`
+                  ? ` ${t("bulkGrading.progressDetail", { completed: progress.completed, failed: progress.failed })}`
                   : ""}
               </span>
               <span>{progressPercent}%</span>
@@ -1041,7 +1041,7 @@ export function BulkGradingPanel({
                       <div className="min-w-0 truncate">
                         <span className="font-medium text-foreground">{s.studentName}</span>
                         {s.studentMeta && (
-                          <span className="ml-1 text-muted-foreground">· {s.studentMeta}</span>
+                          <span className="ml-1 text-muted-foreground">{s.studentMeta}</span>
                         )}
                       </div>
                       <span

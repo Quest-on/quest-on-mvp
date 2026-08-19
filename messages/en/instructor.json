@@ -32,7 +32,8 @@
     "nodeEmpty": "Empty",
     "noDueDate": "No due date",
     "folderError": "Could not load",
-    "folderRetry": "Retry"
+    "folderRetry": "Retry",
+    "todoTitle": "To do"
   },
   "footer": {
     "profile": "Profile",

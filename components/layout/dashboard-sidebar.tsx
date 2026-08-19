@@ -150,7 +150,7 @@ export function DashboardSidebar({
 
         {hasTodoSection && (
           <SidebarGroup>
-            <SidebarGroupLabel>TODO</SidebarGroupLabel>
+            <SidebarGroupLabel>{t("sidebar.todoTitle")}</SidebarGroupLabel>
             <SidebarGroupContent>
               {safeTodoItems.length === 0 ? (
                 <div className="px-2 py-2 text-xs text-sidebar-foreground/80 group-data-[collapsible=icon]:hidden">
