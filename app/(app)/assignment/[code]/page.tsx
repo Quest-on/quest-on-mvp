@@ -188,7 +188,12 @@ export default function AssignmentPage({
           setFinalAnswerAttention(true);
           throw new Error(t("page.finalAnswerRequired"));
         }
-        throw new Error(errData.message || t("page.submitError"));
+        // 서버 원문(영문)을 학생 화면에 흘리지 않는다. 코드로 판정한다.
+        throw new Error(
+          errData?.error === "ALREADY_SUBMITTED"
+            ? t("page.submitAlreadySubmitted")
+            : t("page.submitError")
+        );
       }
 
       setIsSubmitted(true);

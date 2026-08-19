@@ -106,6 +106,27 @@ export default function ExamPage() {
   const t = useTranslations("exam");
 
   // --- Shared state owned by the page (used by multiple hooks) ---
+  /**
+   * preflight 오류를 코드로 판정한다.
+   *
+   * 예전에는 errorData.details/message/error 를 순서대로 보간했다 -
+   * 서버 영문이 학생 화면에 그대로 떴다.
+   */
+  const resolvePreflightError = (code?: string): string => {
+    switch (code) {
+      case "EXAM_NOT_FOUND":
+        return t("page.preflightExamNotFound");
+      case "EXAM_NOT_AVAILABLE":
+        return t("page.preflightNotAvailable");
+      case "FORBIDDEN":
+        return t("page.preflightForbidden");
+      case "RATE_LIMITED":
+        return t("page.preflightRateLimited");
+      default:
+        return t("page.unknownError");
+    }
+  };
+
   const [exam, setExam] = useState<Exam | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
@@ -425,7 +446,7 @@ export default function ExamPage() {
           const text = await response.text().catch(() => "");
           errorData = { message: text || t("page.unknownError") };
         }
-        toast.error(t("page.preflightError", { detail: errorData.details || errorData.message || errorData.error || t("page.unknownError") }));
+        toast.error(resolvePreflightError(errorData?.error));
       }
     } catch {
       toast.error(t("page.preflightNetworkError"));
