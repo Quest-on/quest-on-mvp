@@ -60,6 +60,34 @@ export default function ExamCodeEntry() {
     );
   }, [t]);
 
+  /**
+   * 서버 코드로 문구를 고른다.
+   *
+   * 예전에는 errData.message 를 그대로 썼다. 서버 메시지는 영문이고
+   * 개발자용이라 학생 화면에 "Exam not found" 가 그대로 떴다.
+   * 모르는 코드는 일반 문구로 떨어뜨린다 - 원문을 흘리지 않는다.
+   */
+  const resolveJoinError = (code?: string): string => {
+    switch (code) {
+      case "EXAM_NOT_FOUND":
+        return t("examNotFound");
+      case "EXAM_NOT_AVAILABLE":
+        return t("examNotAvailable");
+      case "ENTRY_WINDOW_CLOSED":
+        return t("entryWindowClosed");
+      case "ALREADY_SUBMITTED":
+        return t("alreadySubmitted");
+      case "STUDENT_LIMIT_REACHED":
+        return t("studentLimitReached");
+      case "PUBLISH_LIMIT_REACHED":
+        return t("publishLimitReached");
+      case "UNAUTHORIZED":
+        return t("unauthorized");
+      default:
+        return t("codeCheckFailed");
+    }
+  };
+
   const navigateToCode = async (code: string) => {
     setIsLoading(true);
     setError(null);
@@ -71,7 +99,7 @@ export default function ExamCodeEntry() {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || t("codeCheckFailed"));
+        throw new Error(resolveJoinError(errData?.error));
       }
       const data = await res.json();
       const examType = data.exam?.type;

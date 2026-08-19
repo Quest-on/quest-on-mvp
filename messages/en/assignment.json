@@ -17,7 +17,8 @@
     "examNotFound": "Assignment not found.",
     "publishLimitReached": "This assignment has reached its participation limit. Please contact your instructor.",
     "studentLimitReached": "The student capacity for this assignment is full. Please contact your instructor.",
-    "sessionInitError": "Something went wrong opening this assignment. Please try again shortly."
+    "sessionInitError": "Something went wrong opening this assignment. Please try again shortly.",
+    "submitAlreadySubmitted": "This session has already been submitted."
   },
   "review": {
     "errorNotViewable": "This assignment is not available for review.",

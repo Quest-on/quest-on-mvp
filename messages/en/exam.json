@@ -16,7 +16,11 @@
     "cancelConfirm": "Cancel entry",
     "preflightError": "Failed to verify exam entry: {detail}",
     "preflightNetworkError": "An error occurred while verifying exam entry. Please try again.",
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "preflightExamNotFound": "Exam not found.",
+    "preflightNotAvailable": "This exam is not available. It is closed or unpublished.",
+    "preflightForbidden": "You do not have access to this exam.",
+    "preflightRateLimited": "Too many requests. Please try again shortly."
   },
   "submitted": {
     "title": "Your answers have been submitted!",
