@@ -33,6 +33,7 @@ type FunnelResponse = {
   medianMinutesToProxyValue: number | null;
   sampledUsers: number;
   truncated: boolean;
+  intakeSkip: { answered: number; skipped: number; skipRate: number } | null;
 };
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
@@ -107,6 +108,27 @@ export default function AdminOnboardingPage() {
                   </p>
                 </CardContent>
               </Card>
+            {data.intakeSkip ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="type-field-label">
+                    {t("intakeSkipTitle")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="type-metric">
+                    {pct(data.intakeSkip.skipRate)}
+                  </p>
+                  <p className="type-hint">
+                    {t("intakeSkipValue", {
+                      skipped: data.intakeSkip.skipped,
+                      total: data.intakeSkip.skipped + data.intakeSkip.answered,
+                    })}
+                  </p>
+                  <p className="type-hint">{t("intakeSkipNote")}</p>
+                </CardContent>
+              </Card>
+            ) : null}
             </div>
 
             <div className="space-y-3">

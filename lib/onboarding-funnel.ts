@@ -46,6 +46,17 @@ export type OnboardingEventRow = {
   occurred_at: string;
 };
 
+/**
+ * intake 응답 행.
+ *
+ * 퍼널 단계와 따로 둔다 — intake 는 통과/이탈을 세는 단계가 아니라
+ * "답했나 건너뛰었나" 하나만 보는 값이다.
+ */
+export type IntakeRow = {
+  user_id: string;
+  metadata: { skipped?: boolean } | null;
+};
+
 export type FunnelStep = {
   event: string;
   label: string;
@@ -67,6 +78,13 @@ export type OnboardingFunnel = {
   /** 데모 생성 → AI 채점 열람까지 걸린 시간의 중앙값(분). 표본이 없으면 null */
   medianMinutesToProxyValue: number | null;
   sampledUsers: number;
+  /**
+   * intake 2문항을 건너뛴 비율.
+   *
+   * 건너뛰면 과목을 모른 채 고정 템플릿이 나간다 — 데모가 자기 과목과
+   * 무관해 보이면 거기서 이탈한다. 표본이 없으면 null.
+   */
+  intakeSkip: { answered: number; skipped: number; skipRate: number } | null;
 };
 
 /**
@@ -109,6 +127,30 @@ function median(values: number[]): number | null {
  * 4단계에 도달한 사용자가 있을 수 있는데(예: 데모를 건너뛰고 바로 실제 시험 개설),
  * 그걸 0으로 접으면 진짜 지표가 실제보다 작게 보인다.
  */
+/**
+ * intake 건너뛴 비율을 센다.
+ *
+ * `skipped` 는 데모 생성 라우트가 `onboarding_events` 메타데이터에 남긴다.
+ * 지금까지 아무도 읽지 않아 죽은 값이었다(#82).
+ */
+export function buildIntakeSkip(
+  rows: IntakeRow[]
+): { answered: number; skipped: number; skipRate: number } | null {
+  const byUser = new Map<string, boolean>();
+  for (const r of rows) {
+    if (!r?.user_id) continue;
+    // 같은 사용자가 여러 번 있으면 한 번이라도 답한 쪽을 채택한다.
+    const skipped = r.metadata?.skipped === true;
+    const prev = byUser.get(r.user_id);
+    byUser.set(r.user_id, prev === false ? false : skipped);
+  }
+  const total = byUser.size;
+  if (total === 0) return null;
+  let skipped = 0;
+  for (const v of byUser.values()) if (v) skipped++;
+  return { answered: total - skipped, skipped, skipRate: skipped / total };
+}
+
 export function buildOnboardingFunnel(
   rows: OnboardingEventRow[],
   funnel: readonly OnboardingEventName[] = INSTRUCTOR_FUNNEL
@@ -168,5 +210,7 @@ export function buildOnboardingFunnel(
     biggestDrop,
     medianMinutesToProxyValue: med === null ? null : Math.round(med * 10) / 10,
     sampledUsers: byUser.size,
+    // intake 는 별도 조회다. 라우트가 buildIntakeSkip 으로 채운다.
+    intakeSkip: null,
   };
 }
