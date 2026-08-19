@@ -52,12 +52,17 @@ describe("문구가 지킬 수 없는 약속을 하지 않는다", () => {
     expect(ko.join.studentLimitReached).toMatch(/코드는 확인/);
   });
 
-  it("AI 재생성을 '개방됨'이라고 하지 않는다 — 실행할 기능이 없다", () => {
+  it("AI 재생성 잠금 문구가 아예 없다", () => {
     // 성공을 약속하고 아무 행동도 못 하게 하는 게 가장 나쁜 조합이다.
-    const ko = JSON.parse(read("messages/ko/instructor.json"));
-    const en = JSON.parse(read("messages/en/instructor.json"));
-    expect(ko.examDetail.demoAiRegenerationUnlockedDescription).toMatch(/준비 중/);
-    expect(en.examDetail.demoAiRegenerationUnlockedDescription).toMatch(/coming soon/i);
+    // 그래서 "준비 중" 으로 눌러 뒀었는데, 아예 안 띄우는 쪽으로 갔다 -
+    // 기능이 없으면 잠금도 알릴 이유가 없다.
+    for (const locale of ["ko", "en"]) {
+      const m = JSON.parse(read(`messages/${locale}/instructor.json`));
+      const left = Object.keys(m.examDetail ?? {}).filter((k) =>
+        k.startsWith("demoAiRegeneration")
+      );
+      expect(left, `${locale}: 잠금 문구가 남아 있다`).toHaveLength(0);
+    }
   });
 });
 

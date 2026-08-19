@@ -43,7 +43,7 @@
     "stats": {
       "totalExams": "Total exams",
       "completionRate": "{rate}% completion rate",
-      "thisMonth": "· {count} this month",
+      "thisMonth": "{count} this month",
       "completedAndInProgress": "{completed} completed, {inProgress} in progress",
       "todo": "To-do",
       "unsubmittedAssignments": "{count} unsubmitted {count, plural, one {assignment} other {assignments}}",

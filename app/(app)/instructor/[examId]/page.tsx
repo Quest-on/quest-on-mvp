@@ -14,7 +14,6 @@ import { ExamControlButtons } from "@/components/instructor/ExamControlButtons";
 import { LateEntryPanel } from "@/components/instructor/LateEntryPanel";
 import { ExamStudentRow } from "@/components/instructor/ExamStudentRow";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Collapsible,
   CollapsibleContent,
@@ -117,8 +116,6 @@ export default function ExamDetail({
   });
   const {
     data: demoStatus,
-    isLoading: demoStatusLoading,
-    isError: demoStatusError,
   } = useQuery<{ completed: boolean; aiRegenerationUnlocked: boolean }>({
     queryKey: qk.instructor.onboardingDemoStatus(user?.id),
     queryFn: async ({ signal }) => {
@@ -511,25 +508,6 @@ export default function ExamDetail({
             }
           />
 
-          {isDemoExam && (
-            <Alert className="mb-6 border-primary/30 bg-primary/5">
-              <Bot aria-hidden="true" />
-              <AlertTitle>
-                {demoStatus?.aiRegenerationUnlocked
-                  ? t("examDetail.demoAiRegenerationUnlockedTitle")
-                  : t("examDetail.demoAiRegenerationLockedTitle")}
-              </AlertTitle>
-              <AlertDescription>
-                {demoStatusLoading
-                  ? t("examDetail.demoAiRegenerationLoading")
-                  : demoStatusError
-                    ? t("examDetail.demoAiRegenerationUnavailable")
-                    : demoStatus?.aiRegenerationUnlocked
-                      ? t("examDetail.demoAiRegenerationUnlockedDescription")
-                      : t("examDetail.demoAiRegenerationLockedDescription")}
-              </AlertDescription>
-            </Alert>
-          )}
 
           <div className="space-y-3 mt-6 mb-6">
             <div id="exam-info-section">
