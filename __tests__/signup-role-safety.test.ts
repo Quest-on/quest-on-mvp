@@ -57,3 +57,19 @@ describe("코드 입력 화면", () => {
     expect(src, "autoFocus 가 없다").toMatch(/autoFocus/);
   });
 });
+
+describe("인증 폼 자동완성", () => {
+  // autocomplete 이 없으면 비밀번호 관리자와 브라우저 자동완성이 안 붙는다.
+  // 교수자는 학기마다 한 번 들어오는 사람이라 더 크게 걸린다.
+  it("로그인 폼", () => {
+    const src = read("components/auth/CustomSignIn.tsx");
+    expect(src).toMatch(/autoComplete="email"/);
+    expect(src).toMatch(/autoComplete="current-password"/);
+  });
+
+  it("회원가입 폼", () => {
+    const src = read("components/auth/CustomSignUp.tsx");
+    expect(src).toMatch(/autoComplete="email"/);
+    expect(src).toMatch(/autoComplete="new-password"/);
+  });
+});

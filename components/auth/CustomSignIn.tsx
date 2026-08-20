@@ -189,6 +189,7 @@ export function CustomSignIn() {
                 <Input
                   id="email"
                   type="email"
+                  autoComplete="email"
                   placeholder={t("emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -201,6 +202,7 @@ export function CustomSignIn() {
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="current-password"
                   placeholder={t("passwordPlaceholder")}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
