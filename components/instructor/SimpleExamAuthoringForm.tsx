@@ -1243,7 +1243,7 @@ export function SimpleExamAuthoringForm({
                             className="h-9 w-20 text-center"
                             aria-label={t("simpleExamAuthoringForm.ariaInputBucket", { bucket: t(SCORE_BUCKET_LABEL_KEYS[bucket]) })}
                           />
-                          <span className="type-hint">{t("simpleExamAuthoringForm.unitWeight")}</span>
+                          <span className="type-hint whitespace-nowrap">{t("simpleExamAuthoringForm.unitWeight")}</span>
                         </div>
                       </div>
                     );
