@@ -141,6 +141,9 @@ export const test = base.extend<ConsentAuthFixtures>({
       // 실제 auth 버튼은 React handler가 붙은 뒤 눌러야 한다. dev server에서
       // DOMContentLoaded 직후 클릭하면 빈 state로 signUp이 호출돼 flake한다.
       await page.goto("/sign-up", { waitUntil: "networkidle" });
+      // 역할을 고르지 않으면 가입 버튼이 잠긴다(#317). 기본 선택을 없앤
+      // 뒤로 실제 사용자도 반드시 눌러야 하는 단계다.
+      await page.getByRole("button", { name: /강사|Instructor/ }).first().click();
       await page.fill("#email", email);
       await page.fill("#password", password);
       await page.click('form button[type="submit"]');
