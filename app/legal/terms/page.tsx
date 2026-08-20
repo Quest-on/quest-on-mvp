@@ -129,11 +129,9 @@ export default async function TermsPage() {
           <Link href="/legal/privacy" className="hover:text-foreground transition-colors">
             {t("footerLinks.privacy")}
           </Link>
-          <span>·</span>
           <Link href="/legal/security" className="hover:text-foreground transition-colors">
             {t("footerLinks.security")}
           </Link>
-          <span>·</span>
           <Link href="/legal/cookies" className="hover:text-foreground transition-colors">
             {t("footerLinks.cookies")}
           </Link>

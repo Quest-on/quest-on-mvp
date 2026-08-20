@@ -431,7 +431,7 @@ const ProductSimulation = ({ mode }: { mode: "light" | "dark" }) => {
                   <div className="bg-background border px-4 py-3 rounded-2xl rounded-tl-sm text-xs leading-relaxed text-foreground shadow-sm">
                     전기자전거가 경량화되면{" "}
                     <span className="font-bold">
-                      휴대성·가속성·주행 효율성이 향상되고 배터리 소모가 감소
+                      휴대성, 가속성, 주행 효율성이 향상되고 배터리 소모가 감소
                     </span>
                     합니다.
                   </div>

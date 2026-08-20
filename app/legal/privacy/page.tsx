@@ -285,11 +285,9 @@ export default async function PrivacyPage() {
           <Link href="/legal/terms" className="hover:text-foreground transition-colors">
             {t("footerLinks.terms")}
           </Link>
-          <span>·</span>
           <Link href="/legal/security" className="hover:text-foreground transition-colors">
             {t("footerLinks.security")}
           </Link>
-          <span>·</span>
           <Link href="/legal/cookies" className="hover:text-foreground transition-colors">
             {t("footerLinks.cookies")}
           </Link>

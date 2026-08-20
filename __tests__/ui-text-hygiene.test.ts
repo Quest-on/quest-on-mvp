@@ -67,3 +67,25 @@ describe("사용자 노출 문구 규칙", () => {
     );
   });
 });
+
+describe("컴포넌트 리터럴에도 중간점이 없다", () => {
+  // messages/ 만 훑으면 컴포넌트가 직접 그리는 구분자를 놓친다.
+  // 실제로 대시보드에 12개가 살아 있었다 - <span>·</span>, join(" · ") 형태.
+  it("JSX 와 코드에 화면용 중간점이 없다", () => {
+    const files = execSync("git ls-files components app", { cwd: root, encoding: "utf8" })
+      .split("\n").map((f) => f.trim()).filter((f) => f.endsWith(".tsx"));
+    const bad: string[] = [];
+    for (const f of files) {
+      readFileSync(resolve(root, f), "utf8").split("\n").forEach((l, i) => {
+        if (!l.includes("\u00b7")) return;
+        const t = l.trim();
+        // 주석은 화면에 안 뜬다. 여러 줄 주석의 이어진 줄까지 포함한다.
+        const isComment =
+          t.startsWith("//") || t.startsWith("*") || t.startsWith("/*") || t.startsWith("{/*");
+        if (isComment) return;
+        bad.push();
+      });
+    }
+    expect(bad, ).toHaveLength(0);
+  });
+});
