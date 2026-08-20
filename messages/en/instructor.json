@@ -407,7 +407,9 @@
     "colorPink": "Pink",
     "colorGray": "Gray",
     "toastExamCodeBlocked": "You have reached the publish limit, so this code cannot be copied yet. Verify your account and try again.",
-    "loadError": "Could not load your exams."
+    "loadError": "Could not load your exams.",
+    "folderItems": "{count} items",
+    "folderEmpty": "Empty"
   },
   "new": {
     "createExamFailed": "Failed to create exam"
