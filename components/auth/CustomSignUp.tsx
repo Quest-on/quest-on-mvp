@@ -21,7 +21,19 @@ type Step = "start" | "verify";
 export function CustomSignUp() {
   const t = useTranslations("auth.signUp");
   const router = useRouter();
-  const [role, setRole] = useState<"instructor" | "student">("student");
+  /**
+   * 고르기 전에는 아무것도 선택하지 않는다.
+   *
+   * 기본값을 두면 "계정 유형을 선택해주세요" 라고 적어 놓고 이미 하나를
+   * 칠해 둔 꼴이 된다. 그 값은 `options.data.role` 로 나가고
+   * `lib/supabase-auth.ts` 가 프로필 역할을 최초 1회 확정하므로,
+   * 교수자가 안 누르면 영구히 학생이 된다.
+   *
+   * `role` 은 여러 곳에서 문자열로 쓰여 nullable 로 바꾸면 파급이 크다.
+   * 온보딩(#287)과 같이 선택 여부만 따로 든다.
+   */
+  const [role, setRole] = useState<"instructor" | "student">("instructor");
+  const [roleChosen, setRoleChosen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -42,6 +54,7 @@ export function CustomSignUp() {
 
   const handleRoleChange = (value: "instructor" | "student") => {
     setRole(value);
+    setRoleChosen(true);
     rememberRole(value);
   };
 
@@ -160,7 +173,7 @@ export function CustomSignUp() {
                     type="button"
                     onClick={() => handleRoleChange("instructor")}
                     className={`flex-1 flex flex-col items-start p-4 border-2 rounded-lg transition-all ${
-                      role === "instructor"
+                      roleChosen && role === "instructor"
                         ? "border-primary bg-primary/5 dark:bg-primary/10"
                         : "border-border hover:border-input dark:hover:border-input"
                     }`}
@@ -179,7 +192,7 @@ export function CustomSignUp() {
                     type="button"
                     onClick={() => handleRoleChange("student")}
                     className={`flex-1 flex flex-col items-start p-4 border-2 rounded-lg transition-all ${
-                      role === "student"
+                      roleChosen && role === "student"
                         ? "border-primary bg-primary/5 dark:bg-primary/10"
                         : "border-border hover:border-input dark:hover:border-input"
                     }`}
@@ -309,7 +322,8 @@ export function CustomSignUp() {
                     type="submit"
                     className="w-full min-h-[44px]"
                     size="lg"
-                    disabled={loading}
+                    // 역할을 고르기 전에는 가입시키지 않는다. 기본값으로 계정이 굳는다.
+                    disabled={loading || !roleChosen}
                   >
                     {loading ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
