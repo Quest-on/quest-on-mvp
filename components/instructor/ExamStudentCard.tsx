@@ -55,7 +55,7 @@ export function ExamStudentCard({
 }: ExamStudentCardProps) {
   const t = useTranslations("authoring");
   const locale = useLocale() as "ko" | "en";
-  const subInfo = [student.studentNumber, student.school].filter(Boolean).join(" · ");
+  const subInfo = [student.studentNumber, student.school].filter(Boolean).join(", ");
   const status = dashboardStatus(student);
 
   return (

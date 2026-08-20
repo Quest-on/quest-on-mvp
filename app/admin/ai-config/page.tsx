@@ -147,7 +147,7 @@ export default function AdminAiConfigPage() {
                   return source ? `${field}: ${t(`sources.${source}`)}` : null;
                 })
                   .filter(Boolean)
-                  .join(" · ")}
+                  .join(", ")}
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

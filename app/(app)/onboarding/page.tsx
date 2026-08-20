@@ -692,7 +692,7 @@ export default function OnboardingPage() {
                         >
                           <div className="font-medium">{uni.fullName}</div>
                           <div className="type-hint">
-                            {uni.type} · {uni.category}
+                            {uni.type}, {uni.category}
                           </div>
                         </button>
                       ))}

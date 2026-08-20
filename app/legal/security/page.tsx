@@ -134,11 +134,9 @@ export default async function SecurityPage() {
           <Link href="/legal/terms" className="hover:text-foreground transition-colors">
             {t("footerLinks.terms")}
           </Link>
-          <span>·</span>
           <Link href="/legal/privacy" className="hover:text-foreground transition-colors">
             {t("footerLinks.privacy")}
           </Link>
-          <span>·</span>
           <Link href="/legal/cookies" className="hover:text-foreground transition-colors">
             {t("footerLinks.cookies")}
           </Link>

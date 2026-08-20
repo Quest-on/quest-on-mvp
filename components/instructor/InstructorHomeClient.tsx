@@ -1364,13 +1364,12 @@ export default function InstructorHome() {
             </h3>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {isFolder ? (
-                <span>{t("drive.folderLabel")} · {formatDate(node.updated_at)}</span>
+                <span>{t("drive.folderLabel")}, {formatDate(node.updated_at)}</span>
               ) : (
                 <>
                   {node.exams?.code && (
                     <span className="exam-code font-mono">{node.exams.code}</span>
                   )}
-                  <span>·</span>
                   {node.exams?.type && node.exams.type !== "exam" && node.exams?.deadline ? (
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
@@ -1724,7 +1723,7 @@ export default function InstructorHome() {
                     </p>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <span>{formatDate(node.updated_at)}</span>
-                      <span>· {t("drive.folderLabel")}</span>
+                      <span>{t("drive.folderLabel")}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1788,10 +1787,10 @@ export default function InstructorHome() {
                 {node.exams?.code && <span>{node.exams.code}</span>}
                 {node.exams?.type && node.exams.type !== "exam" && node.exams?.deadline ? (
                   <span className="flex items-center gap-1">
-                    · <Clock className="w-3 h-3" /> {t("drive.deadline", { date: formatDate(node.exams.deadline) })}
+                    <Clock className="w-3 h-3" /> {t("drive.deadline", { date: formatDate(node.exams.deadline) })}
                   </span>
                 ) : (
-                  <span>· {t("drive.created", { date: formatDate(node.created_at) })}</span>
+                  <span>{t("drive.created", { date: formatDate(node.created_at) })}</span>
                 )}
               </div>
             </div>

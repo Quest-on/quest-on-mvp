@@ -73,7 +73,7 @@ export function ExamDetailHeader({
                   로 읽혀야 하는데 size="sm" 이면 헤더 버튼 무리에 묻힌다. */}
               {demoRestartLabel ? (
                 /*
-                  재응시는 답안·AI 대화·채점 결과를 복구 불가능하게 지운다
+                  재응시는 답안·AI 대화, 채점 결과를 복구 불가능하게 지운다
                   (restart_demo_attempt 가 grades/grading_chats/messages/
                   submissions/session_quiz_attempts/paste_logs 를 DELETE 한다).
 

@@ -70,7 +70,7 @@ export function ExamStudentRow({
   const locale = useLocale() as "ko" | "en";
   const subInfo = [student.studentNumber, student.school]
     .filter(Boolean)
-    .join(" · ");
+    .join(", ");
   const primaryGradingHref =
     student.caseProgress.total > 0
       ? `/instructor/${examId}/grade/${student.sessionId}?questionType=case`
