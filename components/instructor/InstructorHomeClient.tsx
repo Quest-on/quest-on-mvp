@@ -1294,12 +1294,22 @@ export default function InstructorHome() {
               <p className="font-semibold text-foreground truncate text-sm w-full text-center px-2">
                 {node.name}
               </p>
+              {/*
+                이름만으로는 구분이 안 된다. 실제 계정에 "새 폴더" 가 10개 있었다.
+                child_count 는 서버가 이미 세어 보낸다(drive-handlers.ts:194).
+              */}
+              <p className="type-hint text-center">
+                {(node.child_count ?? 0) > 0
+                  ? t("drive.folderItems", { count: node.child_count ?? 0 })
+                  : t("drive.folderEmpty")}
+              </p>
             </div>
           </div>
         </div>
       );
     },
     [
+      t,
       formatDate,
       handleNodeClick,
       renderNodeActions,
