@@ -367,9 +367,13 @@ export function SimpleExamAuthoringForm({
   const t = useTranslations("authoring");
   // "+" 문제 추가 — 문제 유형을 고르는 Dialog 의 열림 상태.
   const [isAddPickerOpen, setIsAddPickerOpen] = useState(false);
-  // 추가 다이얼로그에서 선택 중인 문제 유형.
+  // 추가 다이얼로그에서 선택 중인 문제 유형. 기본은 사례형이다.
+  //
+  // 이 제품은 AI 와의 대화로 사고 과정을 평가하는 게 핵심이다. 사지선다를
+  // 미리 골라 두면 그 차별점에서 멀어지는 쪽으로 유도한다. 객관식이
+  // 필요하면 한 번 더 누르면 된다.
   const [pickedType, setPickedType] =
-    useState<Question["type"]>("multiple-choice");
+    useState<Question["type"]>("essay");
   // 추가 다이얼로그에서 한 번에 추가할 문제 개수 (1~5).
   const [pickedCount, setPickedCount] = useState(1);
   // 추가 다이얼로그에서 입력하는 AI 생성 프롬프트.
@@ -824,9 +828,12 @@ export function SimpleExamAuthoringForm({
               <Button
                 key={value}
                 type="button"
-                variant={
-                  !isUnlimited && duration === value ? "default" : "outline"
-                }
+                // 프리셋은 선택 상태를 들지 않는다.
+                //
+                // 숫자 입력과 칩이 같은 값을 동시에 칠하면 어느 쪽이 진짜인지 알 수
+                // 없다. Canvas 도 Moodle 도 프리셋 없이 숫자 하나만 받는다. 여기서는
+                // 속도를 위해 칩을 남기되 값을 바꾸는 동작으로만 둔다.
+                variant="outline"
                 size="sm"
                 onClick={() => {
                   onDurationChange(value);

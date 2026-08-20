@@ -1364,7 +1364,20 @@ export default function InstructorHome() {
             </h3>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {isFolder ? (
-                <span>{t("drive.folderLabel")}, {formatDate(node.updated_at)}</span>
+                <>
+                  {/*
+                    폴더 이름만으로는 구분이 안 된다. 실제 계정에 "새 폴더" 가 10개
+                    있었다. 안에 몇 개가 들었는지가 유일하게 남는 단서다.
+                    child_count 는 서버가 이미 세어 보내는데 화면이 안 썼다.
+                  */}
+                  <span>
+                    {(node.child_count ?? 0) > 0
+                      ? t("drive.folderItems", { count: node.child_count ?? 0 })
+                      : t("drive.folderEmpty")}
+                  </span>
+                  <span aria-hidden="true">,</span>
+                  <span>{formatDate(node.updated_at)}</span>
+                </>
               ) : (
                 <>
                   {node.exams?.code && (
