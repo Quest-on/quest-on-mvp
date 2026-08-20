@@ -143,6 +143,7 @@ export default function ExamCodeEntry() {
                 <div className="space-y-2 mb-12">
                   <div className="flex justify-center">
                     <InputOTP
+            autoFocus
                       maxLength={6}
                       pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
                       inputMode="text"
