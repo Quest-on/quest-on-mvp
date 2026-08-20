@@ -47,22 +47,22 @@ export default async function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950/50">
+    <div className="min-h-screen surface-page-gradient-soft">
       <PublicHeader />
       {/* Hero Section - AI 사고 과정 추적 */}
       <section id="hero">
         <HeroSection
           headline={
             <>
-              <span className="text-strikethrough-bottom text-gray-800">
+              <span className="text-strikethrough-bottom text-foreground">
                 {t("hero.headline.cheating")}
               </span>
-              <span className="text-gray-700 text-2xl sm:text-3xl md:text-4xl lg:text-5xl">
+              <span className="text-muted-foreground text-2xl sm:text-3xl md:text-4xl lg:text-5xl">
                 {t("hero.headline.cannotStop")}
               </span>{" "}
               <br />
               <span className="gradient-animated-blue">{t("hero.headline.partOf")}</span>
-              <span className="text-gray-700 text-2xl sm:text-3xl md:text-4xl lg:text-5xl">
+              <span className="text-muted-foreground text-2xl sm:text-3xl md:text-4xl lg:text-5xl">
                 {t("hero.headline.makePart")}
               </span>
             </>
@@ -79,18 +79,18 @@ export default async function LandingPage() {
       {/* Demo Experience Section */}
       {/* TODO: 데모 섹션 잠시 주석처리 */}
       {/* <section id="demo-experience">
-        <DemoExperienceSection mode="light" />
+        <DemoExperienceSection />
       </section> */}
       {/* Features Section - 실시간 평가 시스템 */}
       <section id="features">
-        <TestimonialSection mode="light" />
+        <TestimonialSection />
       </section>
       {/* Deployment Section - 실제 강의 현장 트랙션 */}
-      <DeploymentSection mode="light" />
+      <DeploymentSection />
       {/* Partners Section - 파트너십 */}
-      <LogoCloud mode="light" />
+      <LogoCloud />
       {/* Footer */}
-      <Footer mode="light" />
+      <Footer />
     </div>
   );
 }

@@ -31,7 +31,7 @@ export function AIConversationsCard({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <MessageSquare className="w-5 h-5 text-blue-600" />
+          <MessageSquare className="w-5 h-5 text-info-text" />
           {t("aiConversations.title")}
         </CardTitle>
         <CardDescription>{t("aiConversations.description")}</CardDescription>

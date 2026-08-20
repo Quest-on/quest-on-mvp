@@ -83,7 +83,7 @@ export function ObjectiveGradeCard({
   const content = (
     <>
       {resolvedOptions.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="type-hint">
           {t("objectiveGrade.noOptions")}
         </p>
       ) : (
@@ -97,7 +97,7 @@ export function ObjectiveGradeCard({
                 className={cn(
                   "flex items-center gap-3 rounded-md border p-3 text-sm",
                   isAnswer
-                    ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
+                    ? "border-success-border bg-success-surface"
                     : isStudentPick
                       ? "border-destructive/40 bg-destructive/5"
                       : "border-border",
@@ -111,7 +111,7 @@ export function ObjectiveGradeCard({
                   {isStudentPick && (
                     <Badge variant="outline" className="gap-1">
                       {isAnswer ? (
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                        <CheckCircle2 className="h-3 w-3 text-success-text" />
                       ) : (
                         <XCircle className="h-3 w-3 text-destructive" />
                       )}
@@ -119,7 +119,7 @@ export function ObjectiveGradeCard({
                     </Badge>
                   )}
                   {isAnswer && (
-                    <Badge className="bg-emerald-600 hover:bg-emerald-600">
+                    <Badge className="bg-success-solid hover:bg-success-solid">
                       {t("objectiveGrade.badgeAnswer")}
                     </Badge>
                   )}
@@ -130,7 +130,7 @@ export function ObjectiveGradeCard({
         </ul>
       )}
       {!hasCorrect && (
-        <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">
+        <p className="mt-3 text-sm text-warning-text">
           {t("objectiveGrade.noCorrectInfo")}
         </p>
       )}

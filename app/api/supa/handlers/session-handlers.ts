@@ -7,6 +7,12 @@ import { logError } from "@/lib/logger";
 import { triggerGradingIfNeeded } from "@/lib/grading-trigger";
 import { sanitizeUserInput } from "@/lib/sanitize";
 import { stripSensitiveQuestionFields } from "@/lib/sanitize-exam-questions";
+import {
+  ONBOARDING_EVENTS,
+  hasOnboardingEvent,
+  recordOnboardingEvent,
+} from "@/lib/onboarding-events";
+import { isDemoPreview } from "@/lib/demo-completion";
 
 /** 5-second grace period for network latency (shared across heartbeat/initExamSession/feedback) */
 const GRACE_PERIOD_MS = 5_000;
@@ -226,20 +232,47 @@ export async function createOrGetSession(data: { examId: string; studentId: stri
       return errorJson("UNAUTHORIZED", "Student ID mismatch", 403);
     }
 
-    // Upsert session (race-safe: uses UNIQUE(exam_id, student_id) constraint)
-    // Use ignoreDuplicates to avoid overwriting existing session data
+    // 이 경로도 같은 원자 연산을 거친다 (이슈 #84).
+    //
+    // `create_or_get_session` 은 API 액션으로 노출돼 있어서, 여기서 직접
+    // upsert 하면 학생이 이 액션을 불러 발행·학생 한도를 통째로 우회할 수
+    // 있다. 한도는 한 문(門)으로만 지나가야 한다.
+    const { data: admission, error: admitError } = await getSupabase().rpc(
+      "admit_exam_session",
+      {
+        p_exam_id: data.examId,
+        p_student_id: data.studentId,
+        p_status: "joined",
+        p_fingerprint: null,
+      }
+    );
+
+    if (admitError) {
+      // fail-open. 한도 계산 장애로 수업이 멈추는 것보다 낫다.
+      logError("[createOrGetSession] quota_fail_open", admitError, {
+        path: "/api/supa/session-handlers",
+        additionalData: { examId: data.examId, reason: "admit_rpc_failed" },
+      });
+    }
+
+    const verdict = Array.isArray(admission) ? admission[0] : admission;
+    if (verdict && verdict.admitted === false) {
+      return errorJson(
+        verdict.denial_reason === "publish_limit"
+          ? "PUBLISH_LIMIT_REACHED"
+          : "STUDENT_LIMIT_REACHED",
+        verdict.denial_reason === "publish_limit"
+          ? "Instructor verification required before more exams can be published"
+          : "This exam has reached its student limit",
+        403
+      );
+    }
+
     const { data: upsertedSession, error: upsertError } = await getSupabase()
       .from("sessions")
-      .upsert(
-        {
-          exam_id: data.examId,
-          student_id: data.studentId,
-          used_clarifications: 0,
-          created_at: new Date().toISOString(),
-        },
-        { onConflict: "exam_id,student_id", ignoreDuplicates: true }
-      )
       .select()
+      .eq("exam_id", data.examId)
+      .eq("student_id", data.studentId)
       .maybeSingle();
 
     if (upsertError) throw upsertError;
@@ -289,6 +322,7 @@ export async function initExamSession(data: {
   examCode: string;
   studentId: string;
   deviceFingerprint?: string;
+  restartDemoAttempt?: boolean;
 }) {
   try {
     // Verify current user matches the studentId
@@ -303,13 +337,30 @@ export async function initExamSession(data: {
     // 1. Fetch Exam by Code
     const { data: exam, error: examError } = await getSupabase()
       .from("exams")
-      .select("id, title, code, description, duration, questions, rubric, rubric_public, chat_weight, status, instructor_id, materials, materials_text, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, student_count, type, deadline")
+      .select("id, title, code, description, duration, questions, rubric, rubric_public, chat_weight, status, instructor_id, is_demo, materials, materials_text, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, student_count, type, deadline")
       .eq("code", data.examCode)
       .single();
 
     if (examError || !exam) {
       return errorJson("EXAM_NOT_FOUND", "Exam not found", 404);
     }
+
+    // 데모 미리보기 (AC-7): 교수자가 자기 데모를 학생 시점으로 겪는 경로다.
+    //
+    // 온볼딩의 목표가 "가입 직후 자기 과목 데모를 학생 시점으로 끝까지 겪는 것"인데,
+    // 이 검사 없이는 교수자가 자기 시험 코드로 들어와도 학생 프로필 게이트에서
+    // 403/리다이렉트로 막혀 완주에 도달할 수 없었다.
+    //
+    // 범위를 is_demo=true + 소유자로 좁힌다. 이걸 일반 시험까지 열으면 교수자가
+    // 자기 시험에 세션을 만들어 통계·발행 카운트를 오염시킬 수 있다.
+    // 판정은 lib/demo-completion.ts 한 곳에 둔다. 계측 격리(#167)와 이 진입
+    // 판정이 같은 정의를 써야 한쪽만 고쳐졌을 때 지표가 갈라지지 않는다.
+    const isDemoPreviewAttempt =
+      isDemoPreview({
+        isDemo: exam.is_demo,
+        instructorId: exam.instructor_id,
+        userId: user.id,
+      }) === true;
 
     // ✅ Gate 방식: 시험 상태 및 입장 가능 여부 확인
     const now = new Date().toISOString();
@@ -362,40 +413,75 @@ export async function initExamSession(data: {
 
     if (checkError) throw checkError;
 
-    // ✅ 요구사항: 이미 제출된 세션이 있으면 재시험 불가
+    // 일반 학생의 제출본은 계속 읽기 전용으로 돌려준다. 데모 재응시는 CTA가
+    // restartDemoAttempt를 명시하고 isDemoPreviewAttempt가 참일 때만 이전
+    // 제출·채점·채점 대화·응시 대화를 지운다. UNIQUE (exam_id, student_id) 제약
+    // 아래 새 세션을 만들 수 없으므로, 이 확인 없이 자동 초기화하면 새로고침만으로
+    // 과거 결과가 사라진다. 완주 마일스톤은 세션 데이터가 아니므로 유지한다.
     const mostRecentSubmittedSession =
       (existingSessions || []).find((s) => !!s.submitted_at) || null;
+    let resetDemoSession: (typeof existingSessions)[0] | null = null;
 
     if (mostRecentSubmittedSession) {
-      // 제출된 세션이 있으면 재시험 불가 - 제출된 세션만 반환
+      if (isDemoPreviewAttempt && data.restartDemoAttempt === true) {
+        // 초기화를 DB 함수 하나로 맡긴다.
+        //
+        // 여기서 DELETE 를 여러 번 + UPDATE 로 하면 각각이 독립 커밋이라, 중간에
+        // 실패하면 답안은 지워졌는데 세션은 제출 상태로 남는 깨진 상태가
+        // 영구화된다 — 다시 풀 수도, 예전 결과를 볼 수도 없게 된다.
+        //
+        // 함수는 세션 행을 잠그고 데모·소유자 여부를 **다시** 확인한다. 여기서
+        // 이미 판정했더라도 그게 유일한 삭제 경로여야 한다.
+        const { data: restartedId, error: restartRpcError } = await getSupabase().rpc(
+          "restart_demo_attempt",
+          { p_exam_id: exam.id, p_user_id: data.studentId }
+        );
+        if (restartRpcError) throw restartRpcError;
 
-      // Get messages for submitted session (read-only)
-      const { data: sessionMessages } = await getSupabase()
-        .from("messages")
-        .select("id, role, content, q_idx, created_at")
-        .eq("session_id", mostRecentSubmittedSession.id)
-        .order("created_at", { ascending: true });
+        if (restartedId) {
+          const { data: restartedSession, error: reloadError } = await getSupabase()
+            .from("sessions")
+            .update({ device_fingerprint: data.deviceFingerprint || null })
+            .eq("id", restartedId)
+            .eq("student_id", data.studentId)
+            .select()
+            .single();
+          if (reloadError) throw reloadError;
+          resetDemoSession = restartedSession;
+        }
+      }
 
-      const messages = (sessionMessages || []).map((msg) => ({
-        type: msg.role === "user" ? "user" : "assistant",
-        message: msg.content,
-        timestamp: msg.created_at,
-        qIdx: msg.q_idx || 0,
-      }));
+      if (!resetDemoSession) {
+        // 제출된 세션이 있으면 재시험 불가 - 제출된 세션만 반환
 
-      // Fetch submissions for the submitted session
-      const { data: submittedSubmissions } = await getSupabase()
-        .from("submissions")
-        .select("q_idx, answer")
-        .eq("session_id", mostRecentSubmittedSession.id);
+        // Get messages for submitted session (read-only)
+        const { data: sessionMessages } = await getSupabase()
+          .from("messages")
+          .select("id, role, content, q_idx, created_at")
+          .eq("session_id", mostRecentSubmittedSession.id)
+          .order("created_at", { ascending: true });
 
-      return successJson({
-        exam,
-        session: mostRecentSubmittedSession,
-        messages,
-        submissions: submittedSubmissions || [],
-        isRetakeBlocked: true, // 재시험 차단 플래그
-      });
+        const messages = (sessionMessages || []).map((msg) => ({
+          type: msg.role === "user" ? "user" : "assistant",
+          message: msg.content,
+          timestamp: msg.created_at,
+          qIdx: msg.q_idx || 0,
+        }));
+
+        // Fetch submissions for the submitted session
+        const { data: submittedSubmissions } = await getSupabase()
+          .from("submissions")
+          .select("q_idx, answer")
+          .eq("session_id", mostRecentSubmittedSession.id);
+
+        return successJson({
+          exam,
+          session: mostRecentSubmittedSession,
+          messages,
+          submissions: submittedSubmissions || [],
+          isRetakeBlocked: true, // 재시험 차단 플래그
+        });
+      }
     }
 
     // 제출되지 않은 세션만 처리
@@ -434,8 +520,28 @@ export async function initExamSession(data: {
         ? null
         : unsubmittedSessions.find((s) => !s.device_fingerprint) || null;
 
+    // 다른 기기에서 다시 들어온 경우도 **같은 세션을 인계**한다.
+    //
+    // 이게 없으면 수업 중 노트북이 끊겨 휴대폰으로 들어온 학생이 반쪽 상태가
+    // 된다: DB 는 (exam_id, student_id) 로 통과시켜 정원이 차도 안 튕기지만,
+    // 여기서 기기 지문이 다르다는 이유로 existingSession 을 null 로 두면
+    // 재활성화·fingerprint 갱신·이전 AI 대화 로드를 전부 건너뛴다. 화면은
+    // 응시 중인데 heartbeat 는 SESSION_INACTIVE 로 계속 실패하고 대화는 비어
+    // 있다. 새로고침해도 지문은 계속 다르니 영영 복구되지 않는다.
+    //
+    // 인계 범위는 **같은 사용자의 미제출 세션**뿐이다. student_id 는 이미
+    // 인증 사용자와 일치하는지 확인했으므로 남의 세션을 가져올 수 없다.
+    const crossDeviceSession =
+      incomingFingerprint === null
+        ? null
+        : unsubmittedSessions[0] || null;
+
     let existingSession: (typeof existingSessions)[0] | null =
-      exactDeviceMatch || claimableLegacySession || null;
+      resetDemoSession ||
+      exactDeviceMatch ||
+      claimableLegacySession ||
+      crossDeviceSession ||
+      null;
 
     let session = existingSession;
     let sessionReactivated = false;
@@ -551,19 +657,19 @@ export async function initExamSession(data: {
         } else {
           session = updatedSession;
         }
-      } else if (currentStatus === "late_pending") {
+      } else if (currentStatus === "late_pending" && !isDemoPreviewAttempt) {
         // 지각 학생: 강사 승인 대기 중 — heartbeat만 업데이트, 상태 전환 없음
         const { data: updatedSession } = await getSupabase()
           .from("sessions")
-          .update({ is_active: true, last_heartbeat_at: now })
+          .update({ is_active: true, last_heartbeat_at: now, device_fingerprint: incomingFingerprint })
           .eq("id", existingSession.id)
           .eq("status", "late_pending")
           .select()
           .maybeSingle();
         session = updatedSession || existingSession;
       } else if (
-        (examStarted || isNonExamType) &&
-        ["waiting", "joined", "not_joined"].includes(currentStatus)
+        (isDemoPreviewAttempt || examStarted || isNonExamType) &&
+        ["waiting", "joined", "not_joined", "late_pending"].includes(currentStatus)
       ) {
         // 시험이 시작되었거나 비시험 유형이면 바로 in_progress로 전환
         session = await promoteSessionToInProgress(existingSession, now, {
@@ -617,15 +723,12 @@ export async function initExamSession(data: {
         qIdx: msg.q_idx || 0,
       }));
     } else {
-      // ✅ 새 세션 생성: 기본적으로 시작 전에는 waiting 상태
-      // 시험이 이미 시작되었는지 확인 (started_at이 있고 status가 running)
+      // 새 데모 소유자 미리보기는 교수자의 시작·지각 승인 절차를 거치지 않는다.
+      // isDemoPreviewAttempt는 is_demo와 소유자를 함께 확인했으므로 일반 시험의
+      // 지각 입장 승인 구멍으로 넓어지지 않는다.
       const examStarted = isExamStarted(examStatus, exam.started_at, nowTime);
-
-      // 시작 전: waiting 상태 (Join만 가능, 응시 불가)
-      // 시작 후 + 무제한(과제형): in_progress (바로 응시 가능)
-      // 시작 후 + 제한시간 있음: late_pending (강사 승인 필요)
       let initialStatus: string;
-      if (isNonExamType) {
+      if (isDemoPreviewAttempt || isNonExamType) {
         initialStatus = "in_progress";
       } else if (!examStarted) {
         initialStatus = "waiting"; // 시험 미시작: 무제한/유한 모두 대기
@@ -635,43 +738,102 @@ export async function initExamSession(data: {
         initialStatus = "late_pending"; // 유한 + 시작 후 입장: 강사 승인 필요
       }
 
-      // Upsert session (race-safe: uses UNIQUE(exam_id, student_id) constraint)
-      // ignoreDuplicates: true prevents overwriting existing session data (timer, status)
+      // 입장 판정과 세션 생성을 하나의 원자 연산으로 맡긴다 (이슈 #84).
+      //
+      // 여기서 "세어보고 → 괜찮으면 → 넣기"를 하면 TOCTOU 다. 수업 시작 순간
+      // 30명이 동시에 들어오면 전부 카운트를 읽고 전부 통과해 한도를 넘긴다.
+      // 함수가 교수자 단위 advisory lock 으로 직렬화하고, 기존 학생 통과·데모
+      // 우회·학생 수 한도·발행 한도·세션 삽입·first_published_at 기록을
+      // 한 트랜잭션에서 처리한다.
+      const { data: admission, error: admitError } = await getSupabase().rpc(
+        "admit_exam_session",
+        {
+          p_exam_id: exam.id,
+          p_student_id: data.studentId,
+          p_status: initialStatus,
+          p_fingerprint: incomingFingerprint ?? null,
+        }
+      );
+
+      // 한도 판정이 깨지면 학생을 들여보낸다(fail-open). 한도 계산 장애로
+      // 수업이 멈추는 것보다 잠시 한도가 풀리는 쪽이 낫다.
+      //
+      // 로그만 남기고 넘어가면 fail-open 이 아니다 — RPC 가 세션을 못 만들었으니
+      // 아래 조회가 비어 500 이 된다. 그래서 여기서 직접 만들어 준다.
+      if (admitError) {
+        logError("[initExamSession] quota_fail_open", admitError, {
+          path: "/api/supa/session-handlers",
+          additionalData: { examId: exam.id, reason: "admit_rpc_failed" },
+        });
+
+        const { error: fallbackError } = await getSupabase()
+          .from("sessions")
+          .upsert(
+            {
+              exam_id: exam.id,
+              student_id: data.studentId,
+              used_clarifications: 0,
+              is_active: true,
+              last_heartbeat_at: now,
+              device_fingerprint: incomingFingerprint,
+              created_at: now,
+              status: initialStatus,
+              started_at: initialStatus === "in_progress" ? now : null,
+              attempt_timer_started_at: initialStatus === "in_progress" ? now : null,
+            },
+            { onConflict: "exam_id,student_id", ignoreDuplicates: true }
+          );
+        if (fallbackError) throw fallbackError;
+
+        // 발행 시각도 함께 기록한다. 이걸 빼면 fail-open 으로 들어온 시험이
+        // 영영 "미발행"으로 남아 발행 한도가 조용히 새어 나간다 — 장애가
+        // 끝난 뒤에도 그 시험은 카운트되지 않는다.
+        if (exam.is_demo !== true) {
+          const { error: publicationError } = await getSupabase()
+            .from("exams")
+            .update({ first_published_at: now })
+            .eq("id", exam.id)
+            .is("first_published_at", null);
+          if (publicationError) {
+            logError("[initExamSession] quota_fail_open publication", publicationError, {
+              path: "/api/supa/session-handlers",
+              additionalData: { examId: exam.id },
+            });
+          }
+        }
+      }
+
+      const verdict = Array.isArray(admission) ? admission[0] : admission;
+
+      if (verdict && verdict.admitted === false) {
+        return errorJson(
+          verdict.denial_reason === "publish_limit"
+            ? "PUBLISH_LIMIT_REACHED"
+            : "STUDENT_LIMIT_REACHED",
+          verdict.denial_reason === "publish_limit"
+            ? "Instructor verification required before more exams can be published"
+            : "This exam has reached its student limit",
+          403
+        );
+      }
+
       const { data: upsertedSession, error: upsertError } = await getSupabase()
         .from("sessions")
-        .upsert(
-          {
-            exam_id: exam.id,
-            student_id: data.studentId,
-            used_clarifications: 0,
-            is_active: true,
-            last_heartbeat_at: now,
-            device_fingerprint: incomingFingerprint,
-            created_at: now,
-            status: initialStatus,
-            started_at: initialStatus === "in_progress" ? now : null,
-            attempt_timer_started_at: initialStatus === "in_progress" ? now : null,
-          },
-          { onConflict: "exam_id,student_id", ignoreDuplicates: true }
-        )
         .select()
+        .eq("exam_id", exam.id)
+        .eq("student_id", data.studentId)
         .maybeSingle();
 
       if (upsertError) throw upsertError;
 
-      // ignoreDuplicates skipped the insert — fetch existing session
+      // RPC 가 세션을 만들었으므로 여기서는 읽기만 한다.
+      //
+      // first_published_at 기록도 RPC 안에서 세션 삽입과 같은 트랜잭션에 있다.
+      // 밖에서 하면 세션은 생겼는데 발행이 안 잡혀 한도가 영영 차지 않는다.
       if (!upsertedSession) {
-        const { data: existing, error: fetchError } = await getSupabase()
-          .from("sessions")
-          .select("id, exam_id, student_id, submitted_at, is_active, status, started_at, attempt_timer_started_at, device_fingerprint, created_at, used_clarifications, compressed_session_data, compression_metadata, last_heartbeat_at")
-          .eq("exam_id", exam.id)
-          .eq("student_id", data.studentId)
-          .single();
-        if (fetchError) throw fetchError;
-        session = existing;
-      } else {
-        session = upsertedSession;
+        return errorJson("INIT_SESSION_FAILED", "Failed to initialize session", 500);
       }
+      session = upsertedSession;
     }
 
     if (!session) {
@@ -695,6 +857,14 @@ export async function initExamSession(data: {
       nowTime
     );
 
+    // 고지를 이미 확인한 학생인가 (AC-15). preflight 자체는 시험마다 뜨지만
+    // AI 사용 3줄 고지는 사람 단위로 최초 1회다. 조회가 실패하면 false 라
+    // 고지를 한 번 더 보여주는 쪽으로 실패한다.
+    const disclosureAcknowledged = await hasOnboardingEvent(
+      data.studentId,
+      ONBOARDING_EVENTS.STUDENT_DISCLOSURE_ACK
+    );
+
     return successJson({
       exam,
       session,
@@ -705,6 +875,9 @@ export async function initExamSession(data: {
       sessionStatus: gateState.status,
       gateStarted: gateState.gateStarted,
       sessionReactivated, // 세션 복원 여부 (브라우저 닫기 후 재진입 시)
+      disclosureAcknowledged,
+      // 클라이언트 프로필 게이트가 이걸 보고 데모 소유자를 우회시킨다 (AC-7).
+      demoPreview: isDemoPreviewAttempt,
     });
   } catch (error) {
     logError("[initExamSession] Failed to initialize exam session", error, { path: "/api/supa/session-handlers" });
@@ -768,7 +941,7 @@ export async function submitExam(data: {
     // Validate answers array length against exam question count
     const { data: examForValidation, error: examValError } = await getSupabase()
       .from("exams")
-      .select("questions")
+      .select("questions, is_demo, instructor_id")
       .eq("id", data.examId)
       .single();
 
@@ -844,6 +1017,36 @@ export async function submitExam(data: {
       targetId: data.sessionId,
       details: { examId: data.examId, submissionsCount: submissionsPayload.length },
     });
+    /*
+      데모 답변 마일스톤. (#174)
+
+      DEMO_ANSWERED 는 상수(lib/onboarding-events.ts)와 퍼널 정의
+      (lib/onboarding-funnel.ts)에만 있고 기록 호출부가 저장소 전체에 0개였다.
+      제출 경계에 붙이면 "답은 냈지만 결과는 못 본 교수자" 를 계측할 수 있다.
+
+      데모 소유자 본인일 때만 센다. 일반 학생의 제출은 이 마일스톤이 아니다.
+      판정은 isDemoPreview 가 갖고 있고, 판정 불능(null)이면 기록하지 않는다
+      — #167 과 같은 이유다. '일반 학생' 으로 단정하면 지표가 오염된다.
+
+      기록 실패가 제출을 막지 않는다. recordOnboardingEvent 는 boolean 을
+      반환하고 throw 하지 않는다.
+    */
+    const answeredPreview = isDemoPreview({
+      isDemo: (examForValidation as { is_demo?: unknown } | null)?.is_demo,
+      instructorId: (examForValidation as { instructor_id?: unknown } | null)?.instructor_id,
+      userId: verifiedStudentId,
+    });
+    if (answeredPreview === true) {
+      await recordOnboardingEvent({
+        userId: verifiedStudentId,
+        // 데모 소유자는 교수자다. 학생 퍼널을 오염시키지 않으려면 role 이
+        // 정확해야 한다 — #167 이 바로 그 오염을 고친 이슈다.
+        role: "instructor",
+        event: ONBOARDING_EVENTS.DEMO_ANSWERED,
+        examId: data.examId,
+      });
+    }
+
     if (!auditOk) {
       logError("[submitExam] Audit log failed for session_submit", new Error("auditLog returned false"), {
         path: "/api/supa/session-handlers",

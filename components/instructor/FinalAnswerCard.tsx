@@ -50,14 +50,14 @@ export function FinalAnswerCard({
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-green-600" />
+            <FileText className="w-5 h-5 text-success-text" />
             <CardTitle>{t("finalAnswerCard.cardTitlePlain")}</CardTitle>
           </div>
           <CardDescription>{t("finalAnswerCard.cardDescriptionPlain")}</CardDescription>
         </CardHeader>
         <CardContent>
           {text ? (
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-muted rounded-lg p-4">
               <pre className="text-sm whitespace-pre-wrap break-words font-sans">
                 {text}
               </pre>
@@ -86,7 +86,7 @@ export function FinalAnswerCard({
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-green-600" />
+            <FileText className="w-5 h-5 text-success-text" />
             <CardTitle>{t("finalAnswerCard.cardTitle")}</CardTitle>
           </div>
           <div className="flex items-center gap-2">
@@ -99,7 +99,7 @@ export function FinalAnswerCard({
             {internalLogs.length > 0 && (
               <Badge
                 variant="secondary"
-                className="flex items-center gap-1 bg-blue-100 text-blue-900 hover:bg-blue-200"
+                className="flex items-center gap-1 bg-info-subtle text-info-text hover:bg-info-subtle"
               >
                 <FileText className="w-3 h-3" />
                 {t("finalAnswerCard.badgeInternal", { count: internalLogs.length })}
@@ -113,14 +113,14 @@ export function FinalAnswerCard({
         {submission ? (
           <div className="space-y-3">
             {suspiciousLogs.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-3">
+              <div className="bg-destructive/10 border border-destructive rounded-md p-3">
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-red-800 mb-1">
+                    <p className="text-sm font-semibold text-destructive mb-1">
                       {t("finalAnswerCard.suspiciousTitle")}
                     </p>
-                    <div className="text-xs text-red-700 space-y-1">
+                    <div className="text-xs text-destructive space-y-1">
                       {suspiciousLogs.map((log) => (
                         <p key={log.id}>
                           {t("finalAnswerCard.suspiciousLog", { chars: log.length.toLocaleString(), time: formatTime(log.timestamp, locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" }) })}
@@ -132,14 +132,14 @@ export function FinalAnswerCard({
               </div>
             )}
             {internalLogs.length > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+              <div className="bg-info-surface border border-info-border rounded-md p-3">
                 <div className="flex items-start gap-2">
-                  <FileText className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <FileText className="w-4 h-4 text-info-text flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-blue-800 mb-1">
+                    <p className="text-sm font-semibold text-info-text mb-1">
                       {t("finalAnswerCard.internalTitle")}
                     </p>
-                    <div className="text-xs text-blue-700 space-y-1">
+                    <div className="text-xs text-info-text space-y-1">
                       {internalLogs.map((log) => (
                         <p key={log.id}>
                           {t("finalAnswerCard.internalLog", { chars: log.length.toLocaleString(), time: formatTime(log.timestamp, locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" }) })}
@@ -154,23 +154,23 @@ export function FinalAnswerCard({
               <div className="flex items-center gap-4 text-xs text-muted-foreground px-1">
                 {suspiciousLogs.length > 0 && (
                   <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-3 h-3 rounded bg-red-200" />
+                    <span className="inline-block w-3 h-3 rounded bg-destructive/25" />
                     {t("finalAnswerCard.legendExternal")}
                   </span>
                 )}
                 {internalLogs.length > 0 && (
                   <span className="flex items-center gap-1.5">
-                    <span className="inline-block w-3 h-3 rounded bg-blue-200" />
+                    <span className="inline-block w-3 h-3 rounded bg-info-subtle" />
                     {t("finalAnswerCard.legendInternal")}
                   </span>
                 )}
                 <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-3 h-3 rounded bg-red-100 opacity-60 border border-red-200" />
+                  <span className="inline-block w-3 h-3 rounded bg-destructive/15 opacity-60 border border-destructive" />
                   {t("finalAnswerCard.legendModified")}
                 </span>
               </div>
             )}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-muted rounded-lg p-4">
               <div
                 className="text-sm prose max-w-none whitespace-pre-wrap break-words"
                 dangerouslySetInnerHTML={{

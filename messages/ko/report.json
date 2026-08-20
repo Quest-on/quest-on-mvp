@@ -50,7 +50,7 @@
   "quizResult": {
     "title": "타임어택 퀴즈 결과",
     "score": "점수 {score}/100",
-    "meta": "{totalQuestions}문항 · {timeLimitSeconds}초",
+    "meta": "{totalQuestions}문항, {timeLimitSeconds}초",
     "completedAt": "완료: {date}",
     "correct": "정답",
     "incorrect": "오답",

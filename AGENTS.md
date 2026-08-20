@@ -23,7 +23,7 @@ npx tsc --noEmit && npm run lint
 npx vitest run <바꾼 것과 관련된 파일>
 ```
 
-사람 리뷰어가 없다. PR 본문에 실행한 명령과 실제 출력을 붙인다. "확인했습니다"는 증거가 아니다.
+`staging` PR 은 승인 없이 머지된다. 사람이 안 본다고 가정하고 쓴다 — PR 본문에 실행한 명령과 실제 출력을 붙인다. "확인했습니다"는 증거가 아니다.
 버그 수정은 재현 테스트를 먼저 쓰고 고친다.
 
 ## 이 저장소에서 틀리기 쉬운 것
@@ -38,9 +38,12 @@ npx vitest run <바꾼 것과 관련된 파일>
 
 ## DB 안전 — 멈춤 규칙
 
-Supabase / Prisma / Playwright E2E·API 테스트 / seed·cleanup 헬퍼 / `psql` / 마이그레이션을 건드리는 명령은 아래를 만족하지 않으면 실행하지 않는다.
-DB 백엔드 테스트와 `e2e/helpers/seed.ts::cleanupTestData()` 는 사용자가 **폐기 가능한 로컬 DB**임을 명시 확인하고 URL 이 localhost/127.0.0.1 일 때만 실행한다.
-테스트·검증 명령에 `.env.local` 을 절대 로드하지 않는다. `.env.test` 가 없거나 localhost 가 아니면 멈추고 묻는다.
+DB 백엔드 테스트와 `e2e/helpers/seed.ts::cleanupTestData()` 는 사용자가 **폐기 가능한 로컬 DB**임을 명시 확인하고 URL 이 localhost/127.0.0.1 일 때만 실행한다. 테스트·검증 명령에 `.env.local` 을 절대 로드하지 않는다. `.env.test` 가 없거나 localhost 가 아니면 멈추고 묻는다.
+
+원격 **staging** DDL 은 사용자가 이번 작업에서 적용 대상 migration 을 구체적으로 승인한 경우에만 실행할 수 있다. 실행 전 반드시 (1) Supabase project ref/URL 과 앱의 `NEXT_PUBLIC_APP_ENV=staging` 을 독립적으로 대조하고, (2) 승인된 `database/[NNN]_*.sql` 파일과 적용 순서를 고정하며, (3) `DROP`/`TRUNCATE`/대량 `DELETE` 등 파괴 구문이 없음을 검토하고, (4) production 자격증명이 아님을 확인한다. 자격증명은 임시 파일·환경변수로만 전달하고 즉시 삭제한다. 실행 후 migration 대상 객체·seed 불변식·앱 health·관련 작업의 dry-run을 확인하고 명령과 실제 결과를 이슈/PR에 기록한다.
+
+원격 **production** DB 명령은 사용자가 production 대상과 migration 을 별도로 명시 승인하지 않으면 실행하지 않는다. staging 승인을 production 승인으로 간주하지 않는다. 실제 purge/delete 활성화는 migration 승인과 별개의 운영 승인이다.
+
 사용자가 데이터 손실을 보고하면 모든 DB 명령을 즉시 중단하고 로컬 파일·git 기록만 본다.
 
 ## 어디를 볼 것인가
@@ -52,7 +55,7 @@ DB 백엔드 테스트와 `e2e/helpers/seed.ts::cleanupTestData()` 는 사용자
 | 인증·환경변수·CORS·레이트리밋·입력검증 | `docs/SECURITY.md` |
 | 테스트 명령과 기대치 | `docs/TESTING.md` |
 | 채점/QStash/스위퍼 | `docs/GRADING_PIPELINE_RUNBOOK.md` |
-| 거울 쌍·qIdx·채점 불변식 | `.github/impact-review/rules.md` |
+| 거울 쌍·qIdx·채점 불변식 | `ARCHITECTURE.md` 의 "거울 쌍 · 채점 불변식" |
 | 제품 판단 기준 | `PRODUCT_PHILOSOPHY.md` |
 | 이 프로젝트에서 반복된 실수 | `tasks/lessons.md` |
 | 브랜치·PR 상세 절차 | `CONTRIBUTING.md` |

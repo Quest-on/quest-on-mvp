@@ -61,7 +61,7 @@ export function ExamHeader({
                 variant="outline"
                 size="sm"
                 onClick={onExit}
-                className="text-sm border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+                className="text-sm border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive/50 dark:hover:bg-destructive/10"
               >
                 {t("exam.quit")}
               </Button>

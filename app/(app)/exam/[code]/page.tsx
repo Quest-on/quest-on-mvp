@@ -56,6 +56,7 @@ import { LateEntryWaiting } from "@/components/exam/LateEntryWaiting";
 import { ObjectiveNavBar } from "@/components/exam/ObjectiveNavBar";
 import { seededOptionOrder, examQuestionDisplayOrder } from "@/lib/shuffle";
 import { useObjectiveKeyboardSelect } from "@/hooks/useObjectiveKeyboardSelect";
+import { qk } from "@/lib/query-keys";
 
 interface Question {
   id: string;
@@ -105,6 +106,27 @@ export default function ExamPage() {
   const t = useTranslations("exam");
 
   // --- Shared state owned by the page (used by multiple hooks) ---
+  /**
+   * preflight 오류를 코드로 판정한다.
+   *
+   * 예전에는 errorData.details/message/error 를 순서대로 보간했다 -
+   * 서버 영문이 학생 화면에 그대로 떴다.
+   */
+  const resolvePreflightError = (code?: string): string => {
+    switch (code) {
+      case "EXAM_NOT_FOUND":
+        return t("page.preflightExamNotFound");
+      case "EXAM_NOT_AVAILABLE":
+        return t("page.preflightNotAvailable");
+      case "FORBIDDEN":
+        return t("page.preflightForbidden");
+      case "RATE_LIMITED":
+        return t("page.preflightRateLimited");
+      default:
+        return t("page.unknownError");
+    }
+  };
+
   const [exam, setExam] = useState<Exam | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
@@ -156,6 +178,20 @@ export default function ExamPage() {
     setChatHistory: examChat.setChatHistory,
     saveViaBeacon: autoSave.saveViaBeacon,
   });
+
+  // 응시를 마친 뒤 어디로 보낼 것인가.
+  //
+  // 교수자가 자기 데모를 연습하고 나면 학생 대시보드가 아니라 데모 상세로
+  // 돌아와야 한다. /student 로 버려지면 방금 뭘 한 건지, 다음에 뭘 눌러야
+  // 하는지 알 수 없다 — 온보딩의 다음 단계(AI 재생성 개방 확인·다시 해보기)가
+  // 전부 그 화면에 있다.
+  //
+  // 데모 여부는 서버가 init 응답으로 준 값만 쓴다. 클라이언트가 스스로
+  // 판정하면 남의 데모나 일반 시험까지 이 경로를 타게 된다.
+  const exitDestination =
+    session.demoPreview && session.demoExamId
+      ? `/instructor/${session.demoExamId}`
+      : "/student";
 
   // 4. Submission
   const submission = useExamSubmission({
@@ -410,7 +446,7 @@ export default function ExamPage() {
           const text = await response.text().catch(() => "");
           errorData = { message: text || t("page.unknownError") };
         }
-        toast.error(t("page.preflightError", { detail: errorData.details || errorData.message || errorData.error || t("page.unknownError") }));
+        toast.error(resolvePreflightError(errorData?.error));
       }
     } catch {
       toast.error(t("page.preflightNetworkError"));
@@ -440,17 +476,19 @@ export default function ExamPage() {
     }
 
     if (sessionId) {
-      queryClient.invalidateQueries({ queryKey: ["session-heartbeat", sessionId] });
+      queryClient.invalidateQueries({ queryKey: qk.session.heartbeat(sessionId) });
     }
   };
 
   if (session.isSubmitted) {
-    return <SubmittedScreen examCode={examCode} duration={exam.duration} profile={profile} router={router} />;
+    return <SubmittedScreen examCode={examCode} duration={exam.duration} profile={profile} router={router} exitDestination={exitDestination} />;
   }
 
   if (session.showPreflight) {
     return (
       <>
+        {/* AC-15: AI 사용 고지는 사람 단위 최초 1회만 노출한다. 시험 규칙·시간
+            정책 안내는 매 응시 유지한다 — 그건 시험마다 다르기 때문이다. */}
         <PreflightModal
           open={session.showPreflight && !submission.showPreflightCancelConfirm}
           onAccept={handlePreflightAccept}
@@ -459,6 +497,7 @@ export default function ExamPage() {
           examDuration={exam.duration}
           examDescription={exam.description}
           examHasEssay={examHasEssay}
+          showAiDisclosure={!session.disclosureAcknowledged}
         />
         <AlertDialog open={submission.showPreflightCancelConfirm} onOpenChange={submission.setShowPreflightCancelConfirm}>
           <AlertDialogContent>
@@ -470,7 +509,7 @@ export default function ExamPage() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>{t("page.cancelKeep")}</AlertDialogCancel>
-              <AlertDialogAction onClick={() => router.push("/student")} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              <AlertDialogAction onClick={() => router.push(exitDestination)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                 {t("page.cancelConfirm")}
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -545,6 +584,7 @@ export default function ExamPage() {
           setSessionError={session.setSessionError}
           chatEndRef={chatEndRef}
           currentQuestion={currentQuestion}
+          isDemoPreview={session.demoPreview === true}
         />
       )}
 
@@ -684,7 +724,8 @@ export default function ExamPage() {
       <ExamDialogs
         showExitConfirm={showExitConfirm}
         setShowExitConfirm={setShowExitConfirm}
-        onExitConfirm={async () => { await autoSave.manualSave(); router.push("/student"); }}
+        onExitConfirm={async () => { await autoSave.manualSave(); router.push(exitDestination); }}
+        exitToDemoDetail={Boolean(session.demoPreview && session.demoExamId)}
         unansweredDialog={submission.unansweredDialog}
         setUnansweredDialog={submission.setUnansweredDialog}
         setCurrentQuestion={setCurrentQuestionWithReveal}
@@ -693,7 +734,7 @@ export default function ExamPage() {
         autoSubmitFailed={submission.autoSubmitFailed}
         setAutoSubmitFailed={submission.setAutoSubmitFailed}
         onAutoSubmitRetry={() => { submission.setAutoSubmitFailed(false); submission.handleSubmit(); }}
-        onAutoSubmitExit={async () => { await autoSave.manualSave(); router.push("/student"); }}
+        onAutoSubmitExit={async () => { await autoSave.manualSave(); router.push(exitDestination); }}
         manualSubmitFailed={submission.manualSubmitFailed}
         setManualSubmitFailed={submission.setManualSubmitFailed}
         onManualSubmitRetry={() => { submission.setManualSubmitFailed(false); submission.handleSubmit(); }}
@@ -710,18 +751,21 @@ function SubmittedScreen({
   duration,
   profile,
   router,
+  exitDestination,
 }: {
   examCode: string;
   duration: number;
   profile: { avatarUrl?: string | null; fullName?: string | null; email?: string | null } | null;
   router: ReturnType<typeof useRouter>;
+  /** 5초 뒤 이동할 곳. 데모 미리보기면 데모 상세, 아니면 학생 대시보드. */
+  exitDestination: string;
 }) {
   const t = useTranslations("exam");
   const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
     if (countdown <= 0) {
-      router.push("/student");
+      router.push(exitDestination);
       return;
     }
     const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
@@ -734,10 +778,10 @@ function SubmittedScreen({
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6">
         <Card data-testid="exam-submitted-state" className="max-w-2xl w-full shadow-xl border-0">
           <CardHeader className="text-center space-y-4 pb-6">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-green-500/10 rounded-full flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-10 h-10 sm:w-12 sm:h-12 text-green-600 dark:text-green-400" aria-hidden="true" />
+            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-success-solid/10 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-10 h-10 sm:w-12 sm:h-12 text-success-text" aria-hidden="true" />
             </div>
-            <CardTitle className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">{t("submitted.title")}</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl font-bold text-success-text">{t("submitted.title")}</CardTitle>
             <CardDescription className="text-sm sm:text-base">{t("submitted.description")}</CardDescription>
           </CardHeader>
           <CardContent>
@@ -745,7 +789,7 @@ function SubmittedScreen({
               <p className="text-sm sm:text-base text-muted-foreground">
                 {t("submitted.gradingInfo")}
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="type-hint">
                 <span className="font-semibold text-foreground">{t("submitted.redirectCountdown", { countdown })}</span>
               </p>
             </div>

@@ -335,10 +335,10 @@ export function CaseQuestionGenerator({
                     key={fileName}
                     className={
                       status === "done"
-                        ? "text-emerald-600 dark:text-emerald-400"
+                        ? "text-success-text"
                         : status === "failed"
-                        ? "text-red-500"
-                        : "text-blue-600 dark:text-blue-400"
+                        ? "text-destructive"
+                        : "text-info-text"
                     }
                   >
                     {fileName}
@@ -350,7 +350,7 @@ export function CaseQuestionGenerator({
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         {isDisabled && (
-          <p className="text-xs text-muted-foreground">
+          <p className="type-meta">
             {isAssignmentMode
               ? t("caseQuestionGenerator.disabledHintAssignment")
               : t("caseQuestionGenerator.disabledHintExam")}
@@ -541,23 +541,23 @@ export function CaseQuestionGenerator({
                               className="flex items-center gap-1.5 text-xs"
                             >
                               {status === "done" ? (
-                                <CheckCircle2 className="w-3 h-3 text-green-600 dark:text-green-400" />
+                                <CheckCircle2 className="w-3 h-3 text-success-text" />
                               ) : status === "failed" ? (
-                                <AlertCircle className="w-3 h-3 text-red-500" />
+                                <AlertCircle className="w-3 h-3 text-destructive" />
                               ) : (
-                                <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                                <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                               )}
                               <span
                                 className={
                                   status === "failed"
-                                    ? "text-red-500 line-through"
+                                    ? "text-destructive line-through"
                                     : "text-muted-foreground"
                                 }
                               >
                                 {fileName}
                               </span>
                               {status === "failed" && (
-                                <span className="text-red-500">
+                                <span className="text-destructive">
                                   {t("caseQuestionGenerator.extractionFailed")}
                                 </span>
                               )}
@@ -570,7 +570,7 @@ export function CaseQuestionGenerator({
                               key={fileName}
                               className="flex items-center gap-1.5 text-xs"
                             >
-                              <CheckCircle2 className="w-3 h-3 text-green-600 dark:text-green-400" />
+                              <CheckCircle2 className="w-3 h-3 text-success-text" />
                               <span className="text-muted-foreground">
                                 {fileName}
                               </span>
@@ -611,7 +611,7 @@ export function CaseQuestionGenerator({
               )}
             </div>
             {isDisabled && (
-              <p className="text-xs text-muted-foreground">
+              <p className="type-meta">
                 {isAssignmentMode
                   ? t("caseQuestionGenerator.disabledHintAssignmentCard")
                   : t("caseQuestionGenerator.disabledHintExamCard")}

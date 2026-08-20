@@ -25,19 +25,19 @@ function formatProgress(correct: number, total: number): string {
 function dashboardStatusClass(status: ReturnType<typeof dashboardStatus>): string {
   switch (status) {
     case "graded":
-      return "bg-blue-100 text-blue-800 text-xs";
+      return "bg-info-subtle text-info-text text-xs";
     case "proposed-ready":
-      return "bg-indigo-100 text-indigo-800 text-xs";
+      return "bg-info-subtle text-info-text text-xs";
     case "grading":
-      return "bg-amber-100 text-amber-800 text-xs";
+      return "bg-warning-subtle text-warning-text text-xs";
     case "failed":
-      return "bg-red-100 text-red-800 text-xs";
+      return "bg-destructive/15 text-destructive text-xs";
     case "pending":
-      return "bg-orange-100 text-orange-800 text-xs";
+      return "bg-warning-subtle text-warning-text text-xs";
     case "in-progress":
-      return "bg-yellow-100 text-yellow-800 text-xs";
+      return "bg-warning-subtle text-warning-text text-xs";
     default:
-      return "bg-gray-100 text-gray-800 text-xs";
+      return "bg-secondary text-secondary-foreground text-xs";
   }
 }
 
@@ -70,7 +70,7 @@ export function ExamStudentRow({
   const locale = useLocale() as "ko" | "en";
   const subInfo = [student.studentNumber, student.school]
     .filter(Boolean)
-    .join(" · ");
+    .join(", ");
   const primaryGradingHref =
     student.caseProgress.total > 0
       ? `/instructor/${examId}/grade/${student.sessionId}?questionType=case`
@@ -147,7 +147,7 @@ export function ExamStudentRow({
         {overallScoreLabel(student)}
       </div>
 
-      <div className="text-xs text-muted-foreground">
+      <div className="type-meta">
         {student.submittedAt
           ? formatDateTime(student.submittedAt, locale, {
               month: "short",
@@ -168,7 +168,7 @@ export function ExamStudentRow({
             <Button
               size="sm"
               variant="outline"
-              className="text-green-600 border-green-600 hover:bg-green-50 h-7 px-2 text-xs"
+              className="text-primary border-primary hover:bg-primary/10 h-7 px-2 text-xs"
               onClick={() => onLiveMonitoring(student)}
             >
               <Radio size={14} className="mr-1" />
@@ -182,7 +182,7 @@ export function ExamStudentRow({
               <Button
                 size="sm"
                 variant="outline"
-                className="text-blue-600 border-blue-600 hover:bg-blue-50 h-7 px-2 text-xs"
+                className="text-primary border-primary hover:bg-primary/10 h-7 px-2 text-xs"
               >
                 <ClipboardCheck size={14} className="mr-1" />
                 {student.overallStatus === "manually_graded" ? t("examStudentRow.buttonRegrade") : t("examStudentRow.buttonGrade")}

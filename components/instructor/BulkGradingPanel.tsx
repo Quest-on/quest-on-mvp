@@ -56,7 +56,7 @@ import {
 type PermissionKey = "review_before_commit" | "no_precheck" | "ai_default";
 
 const EXAMPLE_CRITERIA = [
-  "논리 40 · 완성도 30 · 개념 30",
+  "논리 40, 완성도 30, 개념 30",
   "핵심 개념 중심, 표현 실수는 관대하게",
   "요구사항 충족을 최우선",
 ];
@@ -423,7 +423,7 @@ export function BulkGradingPanel({
         identity.email ?? summary?.email,
       ]
         .filter(Boolean)
-        .join(" · ");
+        .join(", ");
 
       return {
         sessionId: identity.sessionId,
@@ -440,7 +440,7 @@ export function BulkGradingPanel({
       if (rows.some((row) => row.sessionId === summary.sessionId)) continue;
       const studentMeta = [summary.studentNumber, summary.email]
         .filter(Boolean)
-        .join(" · ");
+        .join(", ");
       rows.push({
         sessionId: summary.sessionId,
         studentName: summary.name,
@@ -451,7 +451,7 @@ export function BulkGradingPanel({
     }
 
     return rows;
-  }, [data?.students, finalSummaries, finalSummariesBySessionId]);
+  }, [data?.students, finalSummaries, finalSummariesBySessionId, t]);
 
   const startGradingMutation = useMutation({
     mutationFn: async () => {
@@ -534,7 +534,7 @@ export function BulkGradingPanel({
       const student = studentEntry?.student;
       const studentMeta = [student?.studentNumber, student?.email]
         .filter(Boolean)
-        .join(" · ");
+        .join(", ");
       for (const [qIdxStr, { score, comment }] of Object.entries(qMap)) {
         rows.push({
           sessionId,
@@ -816,7 +816,7 @@ export function BulkGradingPanel({
         render: () => (
           <p
             key="status-grading"
-            className="text-xs text-muted-foreground"
+            className="type-meta"
             aria-live="polite"
           >
             {t("bulkGrading.gradingStatusLabel", { gradeNoun, processed: processedCount, total: progress?.total ?? 0 })}
@@ -834,7 +834,7 @@ export function BulkGradingPanel({
         render: () => (
           <p
             key="status-failure"
-            className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-300"
+            className="flex items-start gap-1.5 text-xs text-warning-text"
           >
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>
@@ -967,8 +967,8 @@ export function BulkGradingPanel({
     return (
       <Collapsible defaultOpen className="rounded-xl border bg-card text-card-foreground shadow-sm">
         <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-3 text-left">
-          <span className="text-sm font-medium">{title}</span>
-          <span className="text-xs text-muted-foreground">{t("bulkGrading.resultCount", { count })}</span>
+          <span className="type-field-label">{title}</span>
+          <span className="type-meta">{t("bulkGrading.resultCount", { count })}</span>
           {statusBadge}
           <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground transition-transform [[data-state=open]_&]:rotate-180" />
         </CollapsibleTrigger>
@@ -979,7 +979,7 @@ export function BulkGradingPanel({
               <span>
                 {t("bulkGrading.progressProcessed", { processed: processedCount, total: progress.total })}
                 {progress.failed > 0
-                  ? ` · ${t("bulkGrading.progressDetail", { completed: progress.completed, failed: progress.failed })}`
+                  ? ` ${t("bulkGrading.progressDetail", { completed: progress.completed, failed: progress.failed })}`
                   : ""}
               </span>
               <span>{progressPercent}%</span>
@@ -998,11 +998,11 @@ export function BulkGradingPanel({
             {/* (a) Missing students first — no-silent-drop behavior preserved. */}
             {missingStudents.length > 0 && (
               <div
-                className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30"
+                className="space-y-2 rounded-md border border-warning-border bg-warning-surface p-3"
                 data-testid="bulk-grade-missing-students"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-200">
+                  <div className="flex items-center gap-2 text-sm font-medium text-warning-text">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     <span>
                       {isGrading
@@ -1041,14 +1041,14 @@ export function BulkGradingPanel({
                       <div className="min-w-0 truncate">
                         <span className="font-medium text-foreground">{s.studentName}</span>
                         {s.studentMeta && (
-                          <span className="ml-1 text-muted-foreground">· {s.studentMeta}</span>
+                          <span className="ml-1 text-muted-foreground">{s.studentMeta}</span>
                         )}
                       </div>
                       <span
                         className={cn(
                           "shrink-0 rounded px-1.5 py-0.5 text-[11px]",
                           s.failed
-                            ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                            ? "bg-destructive/15 text-destructive"
                             : "bg-muted text-muted-foreground",
                         )}
                       >
@@ -1058,7 +1058,7 @@ export function BulkGradingPanel({
                   ))}
                 </ul>
                 {!isGrading && !committed && (
-                  <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                  <p className="text-[11px] text-warning-text">
                     {t("bulkGrading.regradeWarning")}
                   </p>
                 )}
@@ -1068,7 +1068,7 @@ export function BulkGradingPanel({
             {/* (b) editable grade table OR (c) committed final summary. */}
             {committed ? (
               <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">{t("bulkGrading.committedNote")}</p>
+                <p className="type-meta">{t("bulkGrading.committedNote")}</p>
                 {finalSummariesLoading ? (
                   <div className="flex items-center justify-center rounded-md border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1180,7 +1180,7 @@ export function BulkGradingPanel({
                           rel="noopener noreferrer"
                           aria-label={t("bulkGrading.individualGradeAriaLabel", { studentName: row.studentName, number: row.qIdx + 1 })}
                           data-testid={`bulk-grade-row-link-${row.sessionId}-${row.qIdx}`}
-                          className="inline-flex items-center gap-0.5 whitespace-nowrap text-blue-600 hover:underline"
+                          className="inline-flex items-center gap-0.5 whitespace-nowrap text-info-text hover:underline"
                         >
                           {t("bulkGrading.individualGradeLink")}
                           <ExternalLink className="h-3 w-3" aria-hidden="true" />
@@ -1192,7 +1192,7 @@ export function BulkGradingPanel({
               </table>
             ) : (
               !isGrading && (
-                <p className="text-sm text-muted-foreground">
+                <p className="type-hint">
                   {t("bulkGrading.noProposedGrades")}
                 </p>
               )
@@ -1273,7 +1273,7 @@ export function BulkGradingPanel({
           ) : !hasThreadContent ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
+              <p className="type-hint">
                 {t("bulkGrading.preparingMsg")}
               </p>
             </div>
@@ -1289,7 +1289,7 @@ export function BulkGradingPanel({
                 <div key={item.key}>{item.render()}</div>
               ))}
               {data?.warning && (
-                <p className="text-xs text-amber-600">{data.warning}</p>
+                <p className="text-xs text-warning-text">{data.warning}</p>
               )}
             </div>
           )}
@@ -1327,7 +1327,7 @@ export function BulkGradingPanel({
         )}
 
         {regradeArmed && (
-          <div className="mb-2 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="mb-2 flex items-center gap-2 rounded-md border border-warning-border bg-warning-surface px-3 py-1.5 text-xs text-warning-text">
             <span className="flex-1">
               {t("bulkGrading.regradeArmedNotice")}
             </span>
@@ -1459,7 +1459,7 @@ export function BulkGradingPanel({
                     <DropdownMenuRadioItem key={key} value={key} className="items-start">
                       <div className="flex flex-col">
                         <span className="text-sm">{PERMISSION_LABELS[key]}</span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="type-meta">
                           {PERMISSION_DESCRIPTIONS[key]}
                         </span>
                       </div>

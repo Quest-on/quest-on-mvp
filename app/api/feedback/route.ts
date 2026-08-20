@@ -8,6 +8,7 @@ import { successJson, errorJson } from "@/lib/api-response";
 import { auditLog } from "@/lib/audit";
 import { logError } from "@/lib/logger";
 import { triggerGradingIfNeeded } from "@/lib/grading-trigger";
+import { isDemoPreview } from "@/lib/demo-completion";
 
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Validate exam submission from Supabase
     const { data: exam, error: examError } = await getSupabase()
       .from("exams")
-      .select("id, code, status, duration")
+      .select("id, code, status, duration, is_demo, instructor_id")
       .eq("code", examCode)
       .single();
 
@@ -188,7 +189,57 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          // Race-safe: upsert with ignoreDuplicates prevents duplicate sessions
+          // 이 경로도 같은 원자 연산을 거친다 (이슈 #84).
+          //
+          // 제출 시점에 세션이 없으면 여기서 만드는데, 직접 upsert 하면 학생이
+          // 입장을 건너뛰고 제출만 보내 발행·학생 한도를 우회할 수 있다.
+          // 한도는 한 문(門)으로만 지나가야 한다.
+          const { data: admission, error: admitError } = await getSupabase().rpc(
+            "admit_exam_session",
+            {
+              p_exam_id: exam.id,
+              p_student_id: verifiedStudentId,
+              p_status: "in_progress",
+              p_fingerprint: null,
+            }
+          );
+
+          if (admitError) {
+            // fail-open. 한도 계산 장애로 제출이 막히면 그게 더 큰 사고다.
+            logError("[feedback] quota_fail_open", admitError, {
+              path: "/api/feedback",
+              additionalData: { examId: exam.id, reason: "admit_rpc_failed" },
+            });
+          }
+
+          const verdict = Array.isArray(admission) ? admission[0] : admission;
+          if (verdict && verdict.admitted === false) {
+            return errorJson(
+              verdict.denial_reason === "publish_limit"
+                ? "PUBLISH_LIMIT_REACHED"
+                : "STUDENT_LIMIT_REACHED",
+              "This exam is not accepting new students",
+              403
+            );
+          }
+
+          // RPC 가 세션을 만들었으면 그걸 읽고, 장애로 못 만들었으면(fail-open)
+          // 여기서 만든다. 그때 발행 시각도 함께 남긴다 — 안 남기면 그 시험은
+          // 장애가 끝난 뒤에도 영영 "미발행"이라 발행 한도가 조용히 샌다.
+          if (admitError && (exam as { is_demo?: unknown }).is_demo !== true) {
+            const { error: publicationError } = await getSupabase()
+              .from("exams")
+              .update({ first_published_at: new Date().toISOString() })
+              .eq("id", exam.id)
+              .is("first_published_at", null);
+            if (publicationError) {
+              logError("[feedback] quota_fail_open publication", publicationError, {
+                path: "/api/feedback",
+                additionalData: { examId: exam.id },
+              });
+            }
+          }
+
           const { data: newSession, error: createError } = await getSupabase()
             .from("sessions")
             .upsert(
@@ -349,15 +400,31 @@ export async function POST(request: NextRequest) {
       }
 
       // Atomic student_count increment (race-safe via RPC)
-      const { error: rpcError } = await getSupabase().rpc(
-        "increment_student_count",
-        { p_exam_id: exam.id }
-      );
-      if (rpcError) {
-        logError("Failed to increment student_count via RPC", rpcError, {
-          path: "/api/feedback",
-          additionalData: { examId: exam.id },
-        });
+      //
+      // 교수자가 자기 데모를 학생 시점으로 겪는 경우는 세지 않는다(#167).
+      // 안 그러면 데모 상세에 교수자 자신이 학생 1명으로 잡히고, 데모의
+      // student_count 가 올라간다 — 데모는 목록·통계·한도 어디에도 나타나면
+      // 안 된다는 AC-17 과 정면으로 어긋난다.
+      //
+      // 판정 불능(null)이면 세지 않는다. "일반 학생"으로 단정하는 순간 오염이
+      // 다시 시작되고, 이 카운터는 #84 의 학생 5명 상한이 읽는 값이다.
+      const preview = isDemoPreview({
+        isDemo: (exam as { is_demo?: unknown }).is_demo,
+        instructorId: (exam as { instructor_id?: unknown }).instructor_id,
+        userId: verifiedStudentId,
+      });
+
+      if (preview === false) {
+        const { error: rpcError } = await getSupabase().rpc(
+          "increment_student_count",
+          { p_exam_id: exam.id }
+        );
+        if (rpcError) {
+          logError("Failed to increment student_count via RPC", rpcError, {
+            path: "/api/feedback",
+            additionalData: { examId: exam.id },
+          });
+        }
       }
 
       await triggerGradingIfNeeded(finalSessionId, "feedback");

@@ -35,32 +35,32 @@ function getStatusConfig(status: ExtractionStatus, labels: Record<ExtractionStat
       return {
         label: labels.uploading,
         barWidth: "w-2/5",
-        barColor: "bg-amber-400",
-        textColor: "text-amber-600 dark:text-amber-400",
+        barColor: "bg-warning-solid",
+        textColor: "text-warning-text",
         pulse: true,
       };
     case "extracting":
       return {
         label: labels.extracting,
         barWidth: "w-3/4",
-        barColor: "bg-blue-500",
-        textColor: "text-blue-600 dark:text-blue-400",
+        barColor: "bg-primary",
+        textColor: "text-info-text",
         pulse: true,
       };
     case "done":
       return {
         label: labels.done,
         barWidth: "w-full",
-        barColor: "bg-emerald-500",
-        textColor: "text-emerald-600 dark:text-emerald-400",
+        barColor: "bg-success-solid",
+        textColor: "text-success-text",
         pulse: false,
       };
     case "failed":
       return {
         label: labels.failed,
         barWidth: "w-full",
-        barColor: "bg-red-500",
-        textColor: "text-red-600 dark:text-red-400",
+        barColor: "bg-destructive/100",
+        textColor: "text-destructive",
         pulse: false,
       };
   }
@@ -143,7 +143,7 @@ export function FileUpload({
           <div
             className={`text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg transition-all duration-200 ${
               isDragOver
-                ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400"
+                ? "border-info-border bg-info-surface text-info-text"
                 : canAddMoreFiles
                 ? "border-border cursor-pointer hover:border-muted-foreground hover:bg-muted/50"
                 : "border-muted cursor-not-allowed bg-muted/50 text-muted-foreground"
@@ -155,11 +155,11 @@ export function FileUpload({
           >
             <div className="flex flex-col items-center gap-2">
               {isDragOver ? (
-                <FolderOpen className="w-8 h-8 text-blue-500" />
+                <FolderOpen className="w-8 h-8 text-info-solid" />
               ) : (
                 <Upload className="w-8 h-8 text-muted-foreground" />
               )}
-              <div className="text-sm font-medium">
+              <div className="type-field-label">
                 {isDragOver
                   ? t("fileUpload.dropHint")
                   : t("fileUpload.uploadHint")}
@@ -171,8 +171,8 @@ export function FileUpload({
         {(existingFiles.length > 0 || files.length > 0) && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">{t("fileUpload.uploadedFilesLabel")}</Label>
-              <span className="text-xs text-muted-foreground">
+              <Label className="type-field-label">{t("fileUpload.uploadedFilesLabel")}</Label>
+              <span className="type-meta">
                 {t("fileUpload.totalSize", { size: (totalSize / 1024 / 1024).toFixed(1) })}
               </span>
             </div>
@@ -181,12 +181,12 @@ export function FileUpload({
               {existingFiles.map((file) => (
                 <div
                   key={file.index}
-                  className="flex items-center justify-between p-2 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800"
+                  className="flex items-center justify-between p-2 rounded-md bg-info-surface border border-info-border"
                 >
                   <div className="flex items-center gap-2">
                     {getFileIcon(file.name)}
-                    <span className="text-sm font-medium">{file.name}</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="type-field-label">{file.name}</span>
+                    <span className="type-meta">
                       {t("fileUpload.existingFile")}
                     </span>
                   </div>
@@ -215,11 +215,11 @@ export function FileUpload({
                     key={index}
                     className={`rounded-md overflow-hidden border transition-colors duration-300 ${
                       isDisabled
-                        ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+                        ? "bg-destructive/10 border-destructive"
                         : status === "done"
-                        ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800"
+                        ? "bg-success-surface border-success-border"
                         : status === "failed"
-                        ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+                        ? "bg-destructive/10 border-destructive"
                         : isInProgress
                         ? "bg-muted/30 border-border"
                         : "bg-muted/50 border-transparent"
@@ -233,9 +233,9 @@ export function FileUpload({
                           {isInProgress ? (
                             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                           ) : status === "done" ? (
-                            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                            <CheckCircle2 className="w-5 h-5 text-success-solid" />
                           ) : status === "failed" ? (
-                            <XCircle className="w-5 h-5 text-red-500" />
+                            <XCircle className="w-5 h-5 text-destructive" />
                           ) : (
                             getFileIcon(file.name)
                           )}
@@ -244,7 +244,7 @@ export function FileUpload({
                         <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                           <span
                             className={`text-sm font-medium truncate ${
-                              isDisabled ? "text-red-600 dark:text-red-400" : ""
+                              isDisabled ? "text-destructive" : ""
                             }`}
                           >
                             {file.name}
@@ -253,7 +253,7 @@ export function FileUpload({
                             ({(file.size / 1024 / 1024).toFixed(1)}MB)
                           </span>
                           {isDisabled && (
-                            <span className="text-xs text-red-500 font-medium shrink-0">
+                            <span className="text-xs text-destructive font-medium shrink-0">
                               {t("fileUpload.disabledFile")}
                             </span>
                           )}

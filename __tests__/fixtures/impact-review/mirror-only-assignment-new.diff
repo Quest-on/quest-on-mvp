@@ -1,7 +1,0 @@
-diff --git a/app/(app)/instructor/assignment/new/page.tsx b/app/(app)/instructor/assignment/new/page.tsx
---- a/app/(app)/instructor/assignment/new/page.tsx
-+++ b/app/(app)/instructor/assignment/new/page.tsx
-@@ -111,3 +111,3 @@ export default function CreateAssignment() {
--      const emptyIndices = questions.map((q, i) => (isQuestionContentEmpty(q.text) ? i + 1 : -1)).filter((i) => i !== -1);
-+      const emptyIndices = questions.map((q, i) => (isQuestionContentEmpty(q.text) || !q.text ? i + 1 : -1)).filter((i) => i !== -1);
-       if (emptyIndices.length > 0) {

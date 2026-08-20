@@ -18,6 +18,9 @@ import {
   loadCalibrationSampleData,
   loadExamMetaOnly,
   selectCalibrationSampleSessionIds,
+  estimateTokenCount,
+  exceedsPromptBudget,
+  PROMPT_TOKEN_BUDGET,
 } from "@/lib/bulk-grading";
 import {
   assistantMessageIdFromClientMessageId,
@@ -605,6 +608,32 @@ export async function POST(
       }),
       buildDiscussionOnlyPhaseInstructions(gradingSession, examMeta.examLanguage),
     ].join("\n\n");
+
+    /*
+      컨텍스트 초과 가드. #180 이전에는 estimateTokenCount 가 정의만 되어
+      있고 아무도 부르지 않았다 — doc 주석만 '오버플로 감지에 쓴다' 고
+      적혀 있었다. 재지 않으면 초과는 조용히 일어난다.
+
+      막지 않고 기록만 한다. 표본 축소는 별도 판단이고, 여기서 요청을
+      거절하면 채점이 멈춘다. 과대 추정 쪽으로 틀리게 잡아뒀으니
+      경고가 먼저 뜨고 그다음에 실제 초과가 온다.
+    */
+    const promptTokens = estimateTokenCount(systemPrompt);
+    if (exceedsPromptBudget(systemPrompt)) {
+      void logError(
+        "[bulkGradeChat] prompt_token_budget_exceeded",
+        new Error("prompt exceeds token budget"),
+        {
+          path: "/api/exam/[examId]/bulk-grade/chat",
+          additionalData: {
+            examId,
+            estimatedTokens: promptTokens,
+            budget: PROMPT_TOKEN_BUDGET,
+            sampleStudentCount: sampleStudentsWithPrompts.length,
+          },
+        }
+      );
+    }
 
     const openAiMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
       { role: "system", content: systemPrompt },

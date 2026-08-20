@@ -2,7 +2,12 @@
   "home": {
     "greeting": "안녕하세요, {name}님",
     "loadingTitle": "강사 대시보드를 불러오는 중...",
-    "loadingDesc": "시험 목록과 폴더 구조를 순차적으로 준비하고 있습니다."
+    "loadingDesc": "시험 목록과 폴더 구조를 순차적으로 준비하고 있습니다.",
+    "nextStepTitle": "다음 걸음",
+    "nextStepDemo": "만든 데모를 학생 화면으로 한 번 겪어 보세요. 학생이 무엇을 보는지 알아야 문제를 다듬을 수 있습니다.",
+    "nextStepDemoCta": "데모 열기",
+    "nextStepFirstExam": "첫 시험을 만들어 보세요. 자료를 올리면 AI 가 그걸 근거로 문제를 만듭니다.",
+    "nextStepFirstExamCta": "시험 만들기"
   },
   "nav": {
     "dashboard": "대시보드",
@@ -25,7 +30,10 @@
     "folderLoading": "로딩 중...",
     "folderEmpty": "폴더 없음",
     "nodeEmpty": "비어 있음",
-    "noDueDate": "기한 없음"
+    "noDueDate": "기한 없음",
+    "folderError": "불러오지 못했습니다",
+    "folderRetry": "다시 시도",
+    "todoTitle": "할 일"
   },
   "footer": {
     "profile": "프로필",
@@ -38,7 +46,27 @@
   },
   "fileTree": {
     "loading": "로딩 중...",
-    "noFolders": "폴더가 없습니다"
+    "noFolders": "폴더가 없습니다",
+    "loadError": "불러오지 못했습니다"
+  },
+  "course": {
+    "label": "과목",
+    "optional": "선택",
+    "placeholder": "과목 선택",
+    "none": "과목 없음",
+    "itemWithTerm": "{name}, {term}",
+    "loading": "과목 목록을 불러오는 중",
+    "loadError": "과목 목록을 불러오지 못했습니다.",
+    "addButton": "과목 만들기",
+    "nameLabel": "과목 이름",
+    "namePlaceholder": "예: 자료구조",
+    "termLabel": "학기",
+    "termPlaceholder": "예: 2026-1",
+    "createSubmit": "과목 추가",
+    "creating": "추가하는 중...",
+    "cancel": "취소",
+    "createError": "과목을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    "tooltip": "같은 과목의 시험과 과제를 한데 묶어 봅니다. 지정하지 않아도 시험은 정상 출제됩니다."
   },
   "examDetail": {
     "error": "오류 발생",
@@ -84,7 +112,7 @@
       "committed": "CASE 채점 결과",
       "done": "CASE 제안 점수 생성 완료",
       "idle": "CASE AI 가채점하기",
-      "descInProgress": "백그라운드 가채점 중 · {processed}/{total}명 처리",
+      "descInProgress": "백그라운드 가채점 중, {processed}/{total}명 처리",
       "descFailed": "실패 원인을 확인하고 다시 채점을 시작할 수 있습니다",
       "descCommitted": "확정된 결과와 가채점 대화 기록을 확인합니다",
       "descDone": "제안 점수를 검토한 뒤 확정해주세요",
@@ -97,7 +125,10 @@
     },
     "exportFail": "내보내기에 실패했습니다.",
     "exportError": "내보내기 중 오류가 발생했습니다.",
-    "bulkGradeLoadFail": "일괄 채점 상태를 불러오지 못했습니다."
+    "bulkGradeLoadFail": "일괄 채점 상태를 불러오지 못했습니다.",
+    "tryAsStudent": "학생 시점으로 해보기",
+    "retryAsStudent": "데모 다시 풀기",
+    "retryAsStudentHint": "다시 풀면 이전 답안과 AI 대화, 채점 결과가 모두 사라집니다."
   },
   "assignmentDetail": {
     "error": "오류 발생",
@@ -147,7 +178,7 @@
       "committed": "과제 채점 결과",
       "done": "과제 제안 점수 생성 완료",
       "idle": "과제 AI 가채점하기",
-      "descInProgress": "백그라운드 가채점 중 · {processed}/{total}명 처리",
+      "descInProgress": "백그라운드 가채점 중, {processed}/{total}명 처리",
       "descFailed": "실패 원인을 확인하고 다시 채점을 시작할 수 있습니다",
       "descCommitted": "확정된 결과와 가채점 대화 기록을 확인합니다",
       "descDone": "제안 점수를 검토한 뒤 확정해주세요",
@@ -162,7 +193,6 @@
   },
   "newExam": {
     "pageTitle": "새로운 시험 만들기",
-    "pageDesc": "문제와 설정으로 새로운 시험을 구성하세요",
     "backToDashboard": "대시보드",
     "backToDemo": "데모로 돌아가기",
     "backLabel": "대시보드로 돌아가기",
@@ -184,7 +214,7 @@
     "dialogDuration": "시험 시간: {duration}분",
     "dialogDurationUnlimited": "시험 시간: 무제한 (과제형)",
     "dialogSummaryQuestions": "문제 {questions}개",
-    "dialogSummaryMaterials": " · 자료 {materials}개",
+    "dialogSummaryMaterials": ", 자료 {materials}개",
     "dialogConfirm": "확인",
     "signUpDialogTitle": "회원가입이 필요합니다",
     "signUpDialogDesc": "시험을 출제하려면 회원가입이 필요합니다.",
@@ -245,7 +275,6 @@
   },
   "newAssignment": {
     "pageTitle": "새로운 과제 만들기",
-    "pageDesc": "AI 리서치 채팅 기반 과제를 구성하세요",
     "backToDashboard": "대시보드",
     "cancel": "취소",
     "submit": "과제 출제하기",
@@ -376,7 +405,11 @@
     "colorRed": "빨강",
     "colorPurple": "보라",
     "colorPink": "핑크",
-    "colorGray": "회색"
+    "colorGray": "회색",
+    "toastExamCodeBlocked": "발행 한도에 도달해 지금은 코드를 복사할 수 없습니다. 계정 인증 후 다시 시도해 주세요.",
+    "loadError": "목록을 불러오지 못했습니다.",
+    "folderItems": "{count}개",
+    "folderEmpty": "비어 있음"
   },
   "new": {
     "createExamFailed": "시험 생성에 실패했습니다"

@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
-import { invalidAppEnvDeclaration } from "./lib/app-env";
+import { getAppEnv, invalidAppEnvDeclaration } from "./lib/app-env";
+import { parseConsentGateMode } from "./lib/consent-gate-mode";
 
 // 오타난 NEXT_PUBLIC_APP_ENV 로 배포하면 스테이징이 프로덕션으로 오인된다(색인 허용,
 // 프로덕션 오리진 기본값 적용). 조용히 폴백하지 말고 빌드를 깬다.
@@ -9,7 +10,34 @@ if (appEnvError) {
   throw new Error(appEnvError);
 }
 
+// Runtime fail-closed alone is too late: a missing mode would let Vercel mark the
+// deployment READY and only crash authenticated routes. Reject it during build.
+if (process.env.VERCEL === "1") {
+  parseConsentGateMode(process.env.CONSENT_GATE_MODE, getAppEnv());
+}
+
 const withNextIntl = createNextIntlPlugin("./lib/i18n/request.ts");
+
+function localSupabaseConnectSources(): string {
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!rawUrl) return "";
+
+  try {
+    const url = new URL(rawUrl);
+    if (url.hostname !== "localhost" && url.hostname !== "127.0.0.1") return "";
+
+    const websocketProtocol = url.protocol === "https:" ? "wss:" : "ws:";
+    return ` ${url.origin} ${websocketProtocol}//${url.host}`;
+  } catch {
+    return "";
+  }
+}
+
+const localSupabaseSources = localSupabaseConnectSources();
+
+function developmentEvalSource(): string {
+  return process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'";
+}
 
 const nextConfig: NextConfig = {
   // Legacy route redirects.
@@ -54,11 +82,11 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://va.vercel-scripts.com",
+              `script-src 'self' 'unsafe-inline'${developmentEvalSource()} https://challenges.cloudflare.com https://va.vercel-scripts.com`,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://*.supabase.co",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://va.vercel-scripts.com",
+              `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://va.vercel-scripts.com${localSupabaseSources}`,
               "frame-src 'self' https://challenges.cloudflare.com https://www.youtube.com",
               "worker-src 'self' blob:",
             ].join("; "),

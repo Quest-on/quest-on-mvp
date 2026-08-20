@@ -18,7 +18,8 @@
       "description": "강사 승인 요청이 있습니다. 검토 후 승인해주세요.",
       "noName": "이름 없음",
       "appliedAt": "신청일: {date}",
-      "approve": "승인"
+      "approve": "승인",
+      "noSchool": "소속 미기재"
     },
     "userManagement": {
       "title": "사용자 관리",
@@ -38,6 +39,15 @@
       "aiLoadFail": "AI 사용량 정보를 불러오는데 실패했습니다.",
       "roleChangeFail": "역할 변경에 실패했습니다.",
       "serverError": "서버 오류가 발생했습니다."
+    },
+    "publishing": {
+      "title": "교수자 발행 현황",
+      "description": "무료 한도(발행 3회, 시험당 학생 5명)를 얼마나 쓰고 있는지 봅니다. 데모 시험은 한도에 포함되지 않습니다.",
+      "empty": "아직 교수자 계정이 없습니다.",
+      "publishedCount": "발행 {count}건",
+      "lastPublishedAt": "최근 발행: {date}",
+      "neverPublished": "아직 발행 없음",
+      "loadFailed": "발행 현황을 불러오지 못했습니다. 데이터가 없는 것이 아니라 조회가 실패한 것입니다."
     }
   },
   "login": {
@@ -163,7 +173,9 @@
   },
   "nav": {
     "dashboard": "대시보드",
-    "aiUsage": "AI 사용량"
+    "aiUsage": "AI 사용량",
+    "aiConfig": "AI 설정",
+    "onboarding": "온보딩 퍼널"
   },
   "agent": {
     "errors": {
@@ -197,7 +209,7 @@
     },
     "running": {
       "stopping": "중단 중…",
-      "statusLabel": "에이전트 실행 중 · ESC로 중단",
+      "statusLabel": "에이전트 실행 중, ESC로 중단",
       "stopAriaLabel": "에이전트 실행 중단"
     },
     "done": {
@@ -231,5 +243,54 @@
       "pending": "에이전트가 작업 중…",
       "noSteps": "아직 단계가 없습니다."
     }
+  },
+  "aiConfig": {
+    "title": "AI 설정",
+    "description": "태스크별 모델과 호출 파라미터를 관리합니다. 저장하면 새 버전이 만들어지고 production 라벨이 옮겨집니다.",
+    "currentVersion": "현재 버전",
+    "source": "출처",
+    "inherit": "상속",
+    "none": "없음",
+    "reason": "변경 사유",
+    "reasonPlaceholder": "무엇을 왜 바꾸는지 적으세요",
+    "save": "저장",
+    "saving": "저장 중…",
+    "saved": "저장됐습니다",
+    "loadError": "설정을 불러오지 못했습니다",
+    "saveError": "저장하지 못했습니다",
+    "fields": {
+      "model": "모델",
+      "timeoutMs": "타임아웃(ms)",
+      "maxRetries": "재시도",
+      "maxTokens": "토큰 상한",
+      "temperature": "temperature",
+      "reasoningEffort": "추론 강도"
+    },
+    "sources": {
+      "code": "코드 기본값",
+      "global_env": "전역 환경변수",
+      "task_env": "태스크 환경변수",
+      "admin": "관리자 설정"
+    }
+  },
+  "onboardingFunnel": {
+    "title": "온보딩 퍼널",
+    "scope": "집계 대상",
+    "noSample": "표본 없음",
+    "proxyMetric": "대리 지표",
+    "start": "시작",
+    "noPrev": "직전 없음",
+    "prevRate": "직전 {rate}",
+    "subtitle": "교수자가 가입 후 실제 학생 제출까지 가는 길에서 어디가 막히는지 봅니다.",
+    "proxyNote": "데모 완주는 대리 지표이고, 첫 학생 제출이 진짜 지표입니다.",
+    "loadFailed": "퍼널을 불러오지 못했습니다.",
+    "capped": "조회 상한에 걸려 일부만 집계했습니다. 아래 숫자는 실제보다 작습니다.",
+    "medianLabel": "데모 생성 → AI 채점 열람 (중앙값)",
+    "within15m": "기준 15분 이내",
+    "trueMetric": "진짜 지표",
+    "biggestDrop": "이탈이 가장 큰 구간은 {from} → {to} 입니다 ({count}명). 여기부터 고치는 게 효율이 가장 높습니다.",
+    "intakeSkipTitle": "intake 건너뜀",
+    "intakeSkipNote": "건너뛰면 과목을 모른 채 고정 템플릿이 나간다. 자기 과목과 무관한 데모는 거기서 이탈한다.",
+    "intakeSkipValue": "{skipped}명 / {total}명"
   }
 }

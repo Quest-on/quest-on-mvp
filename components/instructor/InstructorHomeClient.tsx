@@ -1,7 +1,7 @@
 "use client";
+import { resolveCodeGate, type InstructorQuotaResponse } from "@/components/instructor/ExamCode";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -33,10 +33,12 @@ import {
   ChevronDown,
   ChevronUp,
   Palette,
+  AlertCircle,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import {
   Dialog,
   DialogContent,
@@ -113,6 +115,10 @@ interface ExamNode {
     type?: string | null;
     deadline?: string | null;
     open_at?: string | null;
+    /** 발행 한도 판정용 (이슈 #84). 데모는 한도를 소모하지 않는다. */
+    is_demo?: boolean;
+    /** 이미 학생을 받은 시험에는 발행 한도를 재적용하지 않는다. */
+    first_published_at?: string | null;
     created_at: string;
     updated_at: string;
   } | null;
@@ -184,6 +190,8 @@ export default function InstructorHome() {
     hasNextPage,
     isFetchingNextPage,
     isLoading,
+    isError: isExamListError,
+    refetch: refetchExamList,
   } = useInfiniteQuery({
     queryKey: qk.drive.folderContents(currentFolderId, user?.id),
     queryFn: async ({ pageParam, signal }: { pageParam: number; signal: AbortSignal }) => {
@@ -304,6 +312,22 @@ export default function InstructorHome() {
     );
   }, [allExamNodes, searchQuery]);
 
+  // 온보딩이 만든 데모. 있으면 착지 화면이 그걸 다음 걸음으로 가리킨다(#212).
+  //
+  // 예전에는 examNodes 에서 찾았는데, 드라이브 조회가 AC-17 때문에
+  // .eq("exams.is_demo", false) 로 데모를 걸러낸다(drive-handlers.ts:141).
+  // 그래서 이 안내는 한 번도 뜬 적이 없는 죽은 코드였다. 목록에 끼우는
+  // 대신 id 만 따로 받는다.
+  const { data: demoStatus } = useQuery({
+    queryKey: qk.instructor.demoStatus(),
+    queryFn: async () => {
+      const res = await fetch("/api/onboarding/demo/status");
+      if (!res.ok) return null;
+      return (await res.json()) as { examId: string | null } | null;
+    },
+  });
+  const demoExamId = demoStatus?.examId ?? null;
+
   const filteredExamNodes = useMemo(() => {
     if (examFilter === "all") {
       return examNodes;
@@ -383,9 +407,25 @@ export default function InstructorHome() {
     [locale]
   );
 
-  const handleCopyExamCode = async (code?: string) => {
+  // 발행 한도. 교수자가 코드를 건네기 전에 알아야 한다(이슈 #84).
+  const { data: quotaData } = useQuery<InstructorQuotaResponse>({
+    queryKey: qk.instructor.quota(),
+    queryFn: async ({ signal }) => {
+      const response = await fetch("/api/instructor/quota", { signal });
+      if (!response.ok) throw new Error("quota");
+      return response.json() as Promise<InstructorQuotaResponse>;
+    },
+  });
+
+  const handleCopyExamCode = async (code?: string, gateBlocked?: boolean) => {
     if (!code) {
       toast.error(t("drive.toastExamCodeMissing"));
+      return;
+    }
+    // 발행 한도에 도달한 미발행 시험의 코드는 복사시키지 않는다 (이슈 #84).
+    // 복사해 수업 자료에 붙인 뒤에 막으면, 수업 중에 학생 전원이 튕긴다.
+    if (gateBlocked) {
+      toast.error(t("drive.toastExamCodeBlocked"));
       return;
     }
     try {
@@ -393,7 +433,7 @@ export default function InstructorHome() {
       toast.success(t("drive.toastExamCodeCopied"), {
         id: "copy-exam-code", // 중복 방지
       });
-    } catch (error) {
+    } catch {
       toast.error(t("drive.toastExamCodeCopyFail"), {
         id: "copy-exam-code-error",
       });
@@ -526,20 +566,20 @@ export default function InstructorHome() {
 
       if (deadline && now > deadline) {
         return (
-          <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-slate-200 text-slate-700 dark:bg-slate-700/40 dark:text-slate-300">
+          <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-secondary text-secondary-foreground">
             {t("drive.statusDeadlinePassed")}
           </span>
         );
       }
       if (!openAt || now >= openAt) {
         return (
-          <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+          <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-success-subtle text-success-text dark:text-success-solid">
             {t("drive.statusActive")}
           </span>
         );
       }
       return (
-        <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+        <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-warning-subtle text-warning-text dark:text-warning-solid">
           {t("drive.statusScheduled")}
         </span>
       );
@@ -559,8 +599,8 @@ export default function InstructorHome() {
 
     const badgeClasses =
       node.exams.status === "active"
-        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-        : "bg-slate-200 text-slate-700 dark:bg-slate-700/40 dark:text-slate-300";
+        ? "bg-success-subtle text-success-text dark:text-success-solid"
+        : "bg-secondary text-secondary-foreground";
 
     return (
       <span
@@ -577,7 +617,7 @@ export default function InstructorHome() {
     }
     const studentCount = node.student_count ?? 0;
     return (
-      <span className="text-xs text-muted-foreground">
+      <span className="type-meta">
         {t("drive.studentCount", { count: studentCount })}
       </span>
     );
@@ -754,7 +794,16 @@ export default function InstructorHome() {
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();
-                handleCopyExamCode(node.exams?.code);
+                // 발행 한도에 걸린 미발행 시험은 코드를 복사시키지 않는다.
+                // 이 인자를 안 넘기면 게이트가 있어도 없는 것과 같다.
+                handleCopyExamCode(
+                  node.exams?.code,
+                  resolveCodeGate({
+                    isDemo: node.exams?.is_demo,
+                    alreadyPublished: !!node.exams?.first_published_at,
+                    publishesRemaining: quotaData?.publishesRemaining ?? null,
+                  }) === "blocked"
+                );
               }}
             >
               <Copy className="w-4 h-4 mr-2" aria-hidden="true" />
@@ -1245,12 +1294,22 @@ export default function InstructorHome() {
               <p className="font-semibold text-foreground truncate text-sm w-full text-center px-2">
                 {node.name}
               </p>
+              {/*
+                이름만으로는 구분이 안 된다. 실제 계정에 "새 폴더" 가 10개 있었다.
+                child_count 는 서버가 이미 세어 보낸다(drive-handlers.ts:194).
+              */}
+              <p className="type-hint text-center">
+                {(node.child_count ?? 0) > 0
+                  ? t("drive.folderItems", { count: node.child_count ?? 0 })
+                  : t("drive.folderEmpty")}
+              </p>
             </div>
           </div>
         </div>
       );
     },
     [
+      t,
       formatDate,
       handleNodeClick,
       renderNodeActions,
@@ -1296,7 +1355,7 @@ export default function InstructorHome() {
             )}
             {/* Type badge for exams/assignments */}
             {!isFolder && node.exams?.type && node.exams.type !== "exam" && (
-              <span className="absolute left-2 top-2 inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+              <span className="absolute left-2 top-2 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
                 {t("drive.assignmentBadge")}
               </span>
             )}
@@ -1315,13 +1374,25 @@ export default function InstructorHome() {
             </h3>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {isFolder ? (
-                <span>{t("drive.folderLabel")} · {formatDate(node.updated_at)}</span>
+                <>
+                  {/*
+                    폴더 이름만으로는 구분이 안 된다. 실제 계정에 "새 폴더" 가 10개
+                    있었다. 안에 몇 개가 들었는지가 유일하게 남는 단서다.
+                    child_count 는 서버가 이미 세어 보내는데 화면이 안 썼다.
+                  */}
+                  <span>
+                    {(node.child_count ?? 0) > 0
+                      ? t("drive.folderItems", { count: node.child_count ?? 0 })
+                      : t("drive.folderEmpty")}
+                  </span>
+                  <span aria-hidden="true">,</span>
+                  <span>{formatDate(node.updated_at)}</span>
+                </>
               ) : (
                 <>
                   {node.exams?.code && (
                     <span className="exam-code font-mono">{node.exams.code}</span>
                   )}
-                  <span>·</span>
                   {node.exams?.type && node.exams.type !== "exam" && node.exams?.deadline ? (
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
@@ -1372,7 +1443,12 @@ export default function InstructorHome() {
       onFileClick: (examId: string) => void;
       level?: number;
     }) => {
-      const { data: children = [], isLoading } = useQuery({
+      const {
+        data: children = [],
+        isLoading,
+        isError,
+        refetch,
+      } = useQuery({
         queryKey: qk.drive.folderContents(folder.id, userId),
         queryFn: async ({ signal }) => {
           const response = await fetch("/api/supa", {
@@ -1434,6 +1510,17 @@ export default function InstructorHome() {
                 <div className="py-1 text-xs text-muted-foreground">
                   {t("sidebar.folderLoading")}
                 </div>
+              ) : isError ? (
+                /* 오류일 때 빈 트리를 조용히 그리면 자료가 없는 것처럼 보인다. (#241) */
+                <button
+                  type="button"
+                  onClick={() => refetch()}
+                  className="flex w-full items-center gap-1.5 py-1 text-xs text-destructive"
+                >
+                  <AlertCircle className="size-3.5" />
+                  <span>{t("fileTree.loadError")}</span>
+                  <span className="ml-auto underline">{t("sidebar.folderRetry")}</span>
+                </button>
               ) : (
                 <>
                   {level === 0
@@ -1465,7 +1552,7 @@ export default function InstructorHome() {
                             <FileIcon>
                               <FileText className="size-4 opacity-50" />
                             </FileIcon>
-                            <FileLabel className="text-xs text-muted-foreground">
+                            <FileLabel className="type-meta">
                               ...
                             </FileLabel>
                           </FilesFile>
@@ -1509,7 +1596,12 @@ export default function InstructorHome() {
       onFolderClick: (folderId: string) => void;
       onFileClick: (examId: string) => void;
     }) => {
-      const { data: children = [], isLoading } = useQuery({
+      const {
+        data: children = [],
+        isLoading,
+        isError,
+        refetch,
+      } = useQuery({
         queryKey: qk.drive.folderContents(folderId, userId),
         queryFn: async ({ signal }) => {
           const response = await fetch("/api/supa", {
@@ -1540,6 +1632,21 @@ export default function InstructorHome() {
           <div className="pl-12 py-2 text-xs text-muted-foreground">
             {t("sidebar.folderLoading")}
           </div>
+        );
+      }
+
+      // 오류를 빈 상태로 보여주면 안 된다. (#241)
+      if (isError) {
+        return (
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="flex w-full items-center gap-1.5 pl-12 py-2 text-xs text-destructive"
+          >
+            <AlertCircle className="size-3.5" />
+            <span>{t("fileTree.loadError")}</span>
+            <span className="ml-auto underline">{t("sidebar.folderRetry")}</span>
+          </button>
         );
       }
 
@@ -1639,7 +1746,7 @@ export default function InstructorHome() {
                     </p>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <span>{formatDate(node.updated_at)}</span>
-                      <span>· {t("drive.folderLabel")}</span>
+                      <span>{t("drive.folderLabel")}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1686,7 +1793,7 @@ export default function InstructorHome() {
         >
           <div className="flex items-center gap-4 flex-1">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-background/80">
-              <FileText className="w-5 h-5 text-blue-500" />
+              <FileText className="w-5 h-5 text-muted-foreground" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -1694,7 +1801,7 @@ export default function InstructorHome() {
                   {node.name}
                 </p>
                 {node.exams?.type && node.exams.type !== "exam" && (
-                  <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 shrink-0">
+                  <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground shrink-0">
                     {t("drive.assignmentBadge")}
                   </span>
                 )}
@@ -1703,10 +1810,10 @@ export default function InstructorHome() {
                 {node.exams?.code && <span>{node.exams.code}</span>}
                 {node.exams?.type && node.exams.type !== "exam" && node.exams?.deadline ? (
                   <span className="flex items-center gap-1">
-                    · <Clock className="w-3 h-3" /> {t("drive.deadline", { date: formatDate(node.exams.deadline) })}
+                    <Clock className="w-3 h-3" /> {t("drive.deadline", { date: formatDate(node.exams.deadline) })}
                   </span>
                 ) : (
-                  <span>· {t("drive.created", { date: formatDate(node.created_at) })}</span>
+                  <span>{t("drive.created", { date: formatDate(node.created_at) })}</span>
                 )}
               </div>
             </div>
@@ -1746,13 +1853,38 @@ export default function InstructorHome() {
                     {t("home.greeting", { name: profile?.fullName || "강사" })}
                   </p>
 
+                  {/*
+                    착지 후 다음 걸음. 온보딩을 막 끝낸 사람에게 화면이 다음 할 일을
+                    말해주지 않으면 만든 데모가 어디 있는지도 모른 채 멈춘다. (#212)
+                  */}
+                  {demoExamId ? (
+                    <div className="rounded-lg border border-info-border bg-info-surface p-4">
+                      <p className="type-field-label text-info-text">{t("home.nextStepTitle")}</p>
+                      <p className="type-hint mt-1">{t("home.nextStepDemo")}</p>
+                      <Link href={`/instructor/${demoExamId}`}>
+                        <Button variant="outline" size="sm" className="mt-3">
+                          {t("home.nextStepDemoCta")}
+                        </Button>
+                      </Link>
+                    </div>
+                  ) : null}
+
                   {/* 시험 관리 */}
                   <section className="space-y-4 min-w-0 overflow-x-hidden">
                     {/* Toolbar: new + search + view toggle — single row */}
                     <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:flex-nowrap">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button size="sm" className="gap-1.5 shrink-0">
+                          {/*
+                            주 행동은 하나여야 한다. 빈 화면에서는 아래 "시험 만들기"
+                            CTA 가 다음 할 일이고, 이 드롭다운은 상시 보이는 보조
+                            진입점이다. 둘 다 강조하면 눈이 갈라진다. (#212)
+                          */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 shrink-0"
+                          >
                             <Plus className="w-4 h-4" />
                             <span className="hidden sm:inline">{t("drive.newItem")}</span>
                           </Button>
@@ -1885,6 +2017,20 @@ export default function InstructorHome() {
                             )}
                           </div>
                         </>
+                      ) : isExamListError && !hasResults ? (
+                        /*
+                          오류는 "보여줄 게 없을 때" 만 낸다. React Query 는 재조회가
+                          실패해도 이전 data 를 들고 있으므로, hasResults 가 true 면
+                          가진 목록을 계속 보여주는 편이 낫다 - 있는 데이터를 오류로
+                          덮으면 사용자는 더 잃는다.
+
+                          반대로 가진 게 없는데 실패하면 "아직 시험이나 폴더가
+                          없습니다" 가 떠서 출제한 시험이 사라진 것처럼 읽힌다. (#241)
+                        */
+                        <ErrorAlert
+                          message={t("drive.loadError")}
+                          onRetry={() => refetchExamList()}
+                        />
                       ) : !hasResults ? (
                         <div className="text-center py-16 border-2 border-dashed border-muted-foreground/20 rounded-2xl bg-card/40">
                           <Folder className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -1943,7 +2089,7 @@ export default function InstructorHome() {
                               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 {t("drive.sectionFolders")}
                               </p>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="type-meta">
                                 {t("drive.folderCount", { count: folderNodes.length })}
                               </span>
                             </div>
@@ -1984,7 +2130,7 @@ export default function InstructorHome() {
                               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 {t("drive.sectionExamsAssignments")}
                               </p>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="type-meta">
                                 {t("drive.examCount", { count: filteredExamNodes.length })}
                               </span>
                             </div>

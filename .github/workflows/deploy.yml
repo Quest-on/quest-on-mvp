@@ -2,57 +2,79 @@ name: Deploy
 
 # Vercel Git 연동 대신 CI 에서 배포한다.
 #
+# 브랜치 → Vercel 프로젝트 매핑 (프로젝트가 2개다):
+#   main    → quest-on          → quest-on.app
+#   staging → quest-on-staging  → 스테이징 도메인
+#
+# 양쪽 다 `--prod` 로 배포한다. 스테이징 프로젝트의 "프로덕션"이 staging 브랜치이기 때문이다.
+# preview 로 두면 Vercel Cron 이 돌지 않아 grading-sweep / agent-sweeper /
+# assignment-deadline-sweep 이 실행되지 않고, 채점 파이프라인을 검증할 수 없다.
+#
 # 왜 Git 연동을 안 쓰는가:
 #   Git 연동 배포는 "커밋한 사람의 Vercel 계정"에 배포 권한이 있어야 한다.
-#   팀원이 늘거나 바뀔 때마다 seat($20/월/인)를 사야 하고, 권한 없는 사람이 커밋하면
+#   팀원이 바뀔 때마다 seat($20/월/인)를 사야 하고, 권한 없는 사람이 커밋하면
 #   배포가 조용히 멈춘다. 실제로 그 상태였다. 배포 주체를 사람에서 CI 로 옮겼다.
 #
 # 왜 `--prebuilt` 를 쓰지 않는가:
-#   `vercel build` 로 CI 에서 빌드하려면 `vercel pull` 로 **프로덕션 환경변수 전량을
-#   GitHub 러너에 내려받아야 한다**. DATABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
-#   OPENAI_API_KEY, QSTASH_TOKEN 이 배포마다 러너 디스크에 떨어진다는 뜻이다.
-#   빌드는 Vercel 에서 수행하고, 프로덕션 시크릿은 Vercel 밖으로 나가지 않는다.
-#   코드의 빌드 가능 여부는 CI 의 `Build` job 이 더미 값으로 이미 검증한다.
+#   `vercel build` 로 CI 에서 빌드하려면 `vercel pull` 로 프로덕션 환경변수 전량을
+#   GitHub 러너에 내려받아야 한다. DATABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+#   QSTASH_TOKEN 이 배포마다 러너 디스크에 떨어진다는 뜻이다.
+#   빌드는 Vercel 에서 하고 프로덕션 시크릿은 Vercel 밖으로 내보내지 않는다.
 #
 # 왜 `--scope` 를 매번 넘기는가:
 #   VERCEL_ORG_ID 를 줘도 CLI 는 토큰의 기본 계정 컨텍스트로 붙는다. 팀 스코프 토큰이라도
-#   --scope 없이는 개인 계정으로 해석되어 "You don't have permission to create a
-#   Production Deployment" 로 실패한다. 실제로 이 함정을 밟았다.
-#
-# 필요한 설정:
-#   - secret  VERCEL_TOKEN       Vercel → Settings → Tokens (스코프: Quest-On 팀)
-#   - var     VERCEL_ORG_ID / VERCEL_PROJECT_ID / VERCEL_TEAM_SLUG
+#   --scope 없이는 개인 계정으로 해석되어 권한 오류로 실패한다. 실제로 이 함정을 밟았다.
 
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
-    branches: [main]
+    branches: [main, staging]
   workflow_dispatch:
     inputs:
+      environment:
+        description: "배포 대상 환경"
+        type: choice
+        options: [staging, production]
+        default: staging
       target:
-        description: "배포 대상 (자격증명 점검은 preview 로)"
+        description: "Vercel 타깃 (자격증명 점검은 preview 로)"
         type: choice
         options: [preview, production]
         default: preview
 
 concurrency:
-  group: deploy-${{ github.event.inputs.target || 'production' }}
+  group: deploy-${{ github.event.workflow_run.head_branch || github.event.inputs.environment }}
   cancel-in-progress: false
 
 jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    # CI 가 초록일 때만 배포한다. main 에 들어왔다는 사실만으로는 배포하지 않는다.
+    # 빌드는 Vercel 에서 돌고 CLI 는 대기만 한다. 정상 범위는 2~3분이다.
+    timeout-minutes: 20
+    # CI 가 초록일 때만 배포한다. 브랜치에 들어왔다는 사실만으로는 배포하지 않는다.
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     env:
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       SCOPE: ${{ vars.VERCEL_TEAM_SLUG }}
+      BRANCH: ${{ github.event.workflow_run.head_branch || github.event.inputs.environment }}
       TARGET: ${{ github.event.inputs.target || 'production' }}
     steps:
+      - name: Resolve environment
+        id: env
+        run: |
+          # main 은 프로덕션 프로젝트, 그 외(staging)는 스테이징 프로젝트로 보낸다.
+          if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "production" ]; then
+            echo "project_id=${{ vars.VERCEL_PROJECT_ID }}" >> "$GITHUB_OUTPUT"
+            echo "name=production" >> "$GITHUB_OUTPUT"
+            echo "url=https://quest-on.app" >> "$GITHUB_OUTPUT"
+          else
+            echo "project_id=${{ vars.VERCEL_PROJECT_ID_STAGING }}" >> "$GITHUB_OUTPUT"
+            echo "name=staging" >> "$GITHUB_OUTPUT"
+            echo "url=https://quest-on-staging.vercel.app" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
         with:
           # workflow_run 은 기본적으로 기본 브랜치 최신을 체크아웃한다.
@@ -68,23 +90,29 @@ jobs:
         # 계정/팀 이름만 찍히고 토큰 값은 노출되지 않는다.
         run: |
           echo "인증 주체: $(vercel whoami --scope "$SCOPE" --token="$VERCEL_TOKEN")"
-          echo "배포 대상: $TARGET"
+          echo "브랜치=$BRANCH  환경=${{ steps.env.outputs.name }}  타깃=$TARGET"
       - name: Deploy
         id: deploy
+        env:
+          VERCEL_PROJECT_ID: ${{ steps.env.outputs.project_id }}
         run: |
+          if [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "::error::${{ steps.env.outputs.name }} 프로젝트 ID 변수가 비어 있다"
+            exit 1
+          fi
           if [ "$TARGET" = "production" ]; then
             url=$(vercel deploy --prod --yes --scope "$SCOPE" --token="$VERCEL_TOKEN")
           else
             url=$(vercel deploy --yes --scope "$SCOPE" --token="$VERCEL_TOKEN")
           fi
           echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "배포 완료($TARGET): $url"
+          echo "배포 완료(${{ steps.env.outputs.name }}/$TARGET): $url"
       - name: Summary
         run: |
           {
-            echo "### 배포 완료 — $TARGET"
+            echo "### 배포 완료 — ${{ steps.env.outputs.name }} / $TARGET"
             echo ""
             echo "- 커밋: \`${{ github.event.workflow_run.head_sha || github.sha }}\`"
             echo "- 배포 URL: ${{ steps.deploy.outputs.url }}"
-            if [ "$TARGET" = "production" ]; then echo "- 도메인: https://quest-on.app"; fi
+            echo "- 도메인: ${{ steps.env.outputs.url }}"
           } >> "$GITHUB_STEP_SUMMARY"

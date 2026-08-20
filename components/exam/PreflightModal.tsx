@@ -28,6 +28,8 @@ interface PreflightModalProps {
   examDuration?: number;
   examDescription?: string;
   examHasEssay: boolean;
+  /** 이 학생이 아직 AI 사용 고지를 확인하지 않았는가 (AC-15) */
+  showAiDisclosure?: boolean;
 }
 
 export function PreflightModal({
@@ -38,13 +40,29 @@ export function PreflightModal({
   examDuration,
   examDescription,
   examHasEssay,
+  showAiDisclosure = true,
 }: PreflightModalProps) {
   const t = useTranslations("exam");
   const [rulesAccepted, setRulesAccepted] = useState(false);
   const [aiLogAccepted, setAiLogAccepted] = useState(false);
 
+  /**
+   * AI 최초 고지 묶음을 이번 응시에 보여줄 것인가 (AC-14 / AC-15).
+   *
+   * `examHasEssay` — 채팅이 아예 없는 MCQ/OX 전용 시험에서 "AI에게 질문하세요"를
+   * 안내하면 고지가 거짓이 된다.
+   * `showAiDisclosure` — 이미 확인한 학생에게 매 시험 같은 걸 다시 읽히면 그때부터
+   * 안 읽는다. AC-15 가 재노출을 금지하는 이유다.
+   *
+   * 3줄 블록만 숨기고 동의 체크박스를 남기면 "확인을 다시 받는" 것이라 재노출
+   * 금지가 반쪽이 된다. 최초 확인 묶음(3줄 + 로그 공지 + 동의 체크박스 + 수락
+   * 조건)을 하나의 게이트로 묶는다. 시험 규칙·시간 정책은 시험마다 다르므로
+   * 이 게이트 밖에 그대로 둔다.
+   */
+  const showFirstRunAiConsent = examHasEssay && showAiDisclosure;
+
   const handleAccept = () => {
-    const canAccept = examHasEssay
+    const canAccept = showFirstRunAiConsent
       ? rulesAccepted && aiLogAccepted
       : rulesAccepted;
     if (canAccept) {
@@ -92,13 +110,17 @@ export function PreflightModal({
               대학생 54%가 시험에서 AI 사용을 부정행위로 인식한다. 우리 제품은
               AI에게 묻는 것이 시험의 일부이고 질문 자체가 채점 대상인데,
               학생이 그걸 모르면 겁먹고 질문을 안 해 점수가 낮게 나온다.
-              그래서 감시("기록됩니다") 프레임이 아니라 허용·투명성 프레임으로 쓴다.
+              그래서 감시("기록됩니다") 프레임이 아니라 허용, 투명성 프레임으로 쓴다.
 
               단 examHasEssay 로 게이팅한다. MCQ/OX 전용 시험은
               exam/[code]/page.tsx 가 !isCurrentObjective 일 때만 ExamChatSidebar 를
               렌더하므로 채팅 자체가 없다. 없는 기능을 쓰라고 안내하면 고지가
-              거짓이 되고, 신뢰를 얻으려던 문구가 반대로 신뢰를 깎는다. */}
-          {examHasEssay && (
+              거짓이 되고, 신뢰를 얻으려던 문구가 반대로 신뢰를 깎는다.
+
+              showAiDisclosure 는 사람 단위 최초 1회 게이팅이다 (AC-15). 이미 확인한
+              학생에게 매 시험 같은 3줄을 다시 읽히면 그때부터는 안 읽는다. 확인
+              사실은 onboarding_events(student_disclosure_ack)에 남는다. */}
+          {showFirstRunAiConsent && (
             <div className="border rounded-lg p-4 bg-muted/30">
               <h3 className="font-semibold mb-2 flex items-center gap-2">
                 <Shield className="h-4 w-4 text-primary" />
@@ -226,17 +248,17 @@ export function PreflightModal({
                     {t("preflight.aiPolicySectionTitle")}
                   </h3>
                   <div className="space-y-2">
-                    <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
-                      <span className="text-blue-600 font-bold mt-0.5 text-sm">1</span>
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-info-surface border border-info-border">
+                      <span className="text-info-text font-bold mt-0.5 text-sm">1</span>
                       <div>
-                        <p className="font-semibold text-sm text-blue-700 dark:text-blue-400">{t("preflight.aiPolicyItem1Title")}</p>
+                        <p className="font-semibold text-sm text-info-text">{t("preflight.aiPolicyItem1Title")}</p>
                         <p className="text-muted-foreground text-xs mt-0.5">{t("preflight.aiPolicyItem1Description")}</p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
-                      <span className="text-red-600 font-bold mt-0.5 text-sm">2</span>
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+                      <span className="text-destructive font-bold mt-0.5 text-sm">2</span>
                       <div>
-                        <p className="font-semibold text-sm text-red-700 dark:text-red-400">{t("preflight.aiPolicyItem2Title")}</p>
+                        <p className="font-semibold text-sm text-destructive">{t("preflight.aiPolicyItem2Title")}</p>
                         <p className="text-muted-foreground text-xs mt-0.5">{t("preflight.aiPolicyItem2Description")}</p>
                       </div>
                     </div>
@@ -254,7 +276,7 @@ export function PreflightModal({
           </Collapsible>
 
           {/* AI 로그 공지 */}
-          {examHasEssay && (
+          {showFirstRunAiConsent && (
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
@@ -287,7 +309,7 @@ export function PreflightModal({
                 {t("preflight.rulesCheckLabel")}
               </label>
             </div>
-            {examHasEssay && (
+            {showFirstRunAiConsent && (
               <div className="flex items-start gap-3">
                 <Checkbox
                   id="ai-log"
@@ -315,7 +337,7 @@ export function PreflightModal({
           </Button>
           <Button
             onClick={handleAccept}
-            disabled={examHasEssay ? (!rulesAccepted || !aiLogAccepted) : !rulesAccepted}
+            disabled={showFirstRunAiConsent ? (!rulesAccepted || !aiLogAccepted) : !rulesAccepted}
             data-testid="preflight-accept-btn"
           >
             {t("preflight.acceptButton")}

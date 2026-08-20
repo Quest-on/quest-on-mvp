@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { currentUser } from "@/lib/get-current-user";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { successJson, errorJson } from "@/lib/api-response";
@@ -35,7 +35,7 @@ export async function GET() {
     }
 
     return successJson({ profile: profile || null });
-  } catch (error) {
+  } catch {
     return errorJson("FETCH_PROFILE_FAILED", "Failed to fetch profile", 500);
   }
 }
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     if (error) throw error;
 
     return successJson({ profile });
-  } catch (error) {
+  } catch {
     return errorJson("SAVE_PROFILE_FAILED", "Failed to save profile", 500);
   }
 }

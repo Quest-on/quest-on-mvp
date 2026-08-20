@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 
 export function AdminSidebarFooter() {

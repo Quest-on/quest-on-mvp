@@ -158,7 +158,7 @@ export function ExamControlButtons({
           errorData.message || t("examControlButtons.toastStartFailed")
         );
       }
-    } catch (error) {
+    } catch {
       toast.error(t("examControlButtons.toastStartError"));
     } finally {
       setIsStarting(false);
@@ -182,7 +182,7 @@ export function ExamControlButtons({
           errorData.message || t("examControlButtons.toastEndFailed")
         );
       }
-    } catch (error) {
+    } catch {
       toast.error(t("examControlButtons.toastEndError"));
     } finally {
       setIsEnding(false);
@@ -195,7 +195,7 @@ export function ExamControlButtons({
       case "scheduled":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+            <Badge variant="secondary" className="bg-warning-subtle text-warning-text">
               {t("examControlButtons.statusScheduled")}
             </Badge>
           ),
@@ -203,7 +203,7 @@ export function ExamControlButtons({
             <Button
               onClick={() => setShowStartDialog(true)}
               disabled={isStarting}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-primary hover:bg-primary/90"
             >
               <Play className="h-4 w-4 mr-2" />
               {t("examControlButtons.buttonStart")}
@@ -214,7 +214,7 @@ export function ExamControlButtons({
         // 기본적으로 항상 "시험 시작" 버튼 표시
         return {
           badge: (
-            <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+            <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
               {t("examControlButtons.statusDraft")}
             </Badge>
           ),
@@ -222,7 +222,7 @@ export function ExamControlButtons({
             <Button
               onClick={() => setShowStartDialog(true)}
               disabled={isStarting}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-primary hover:bg-primary/90"
             >
               <Play className="h-4 w-4 mr-2" />
               {t("examControlButtons.buttonStart")}
@@ -232,7 +232,7 @@ export function ExamControlButtons({
       case "joinable":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+            <Badge variant="secondary" className="bg-info-subtle text-info-text">
               {t("examControlButtons.statusJoinable")}
             </Badge>
           ),
@@ -240,7 +240,7 @@ export function ExamControlButtons({
             <Button
               onClick={() => setShowStartDialog(true)}
               disabled={isStarting}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-primary hover:bg-primary/90"
             >
               <Play className="h-4 w-4 mr-2" />
               {t("examControlButtons.buttonStart")}
@@ -250,7 +250,7 @@ export function ExamControlButtons({
       case "running":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-green-100 text-green-800">
+            <Badge variant="secondary" className="bg-success-subtle text-success-text">
               {t("examControlButtons.statusRunning")}
             </Badge>
           ),
@@ -277,7 +277,7 @@ export function ExamControlButtons({
       case "entry_closed":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+            <Badge variant="secondary" className="bg-warning-subtle text-warning-text">
               {t("examControlButtons.statusEntryClosed")}
             </Badge>
           ),
@@ -304,7 +304,7 @@ export function ExamControlButtons({
       case "closed":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+            <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
               {t("examControlButtons.statusClosed")}
             </Badge>
           ),
@@ -313,7 +313,7 @@ export function ExamControlButtons({
       default:
         return {
           badge: (
-            <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+            <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
               {examStatus || t("examControlButtons.statusUnknown")}
             </Badge>
           ),
@@ -344,7 +344,7 @@ export function ExamControlButtons({
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <Users className="h-4 w-4 text-muted-foreground" />
-                  <strong className="text-sm font-medium">
+                  <strong className="type-field-label">
                     {t("examControlButtons.waitingStudentsLabel", { count: waitingStudents?.length ?? 0 })}
                   </strong>
                 </div>
@@ -376,7 +376,7 @@ export function ExamControlButtons({
                             )}
                           </span>
                           {student.school && (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="type-meta">
                               {student.school}
                             </span>
                           )}
@@ -392,7 +392,7 @@ export function ExamControlButtons({
               </div>
 
               <div>
-                <Label htmlFor="close_at" className="text-sm font-medium">
+                <Label htmlFor="close_at" className="type-field-label">
                   {t("examControlButtons.closeAtLabel")}
                 </Label>
                 <Input
@@ -422,7 +422,7 @@ export function ExamControlButtons({
             <AlertDialogAction
               onClick={handleStartExam}
               disabled={isStarting}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {isStarting ? (
                 <>

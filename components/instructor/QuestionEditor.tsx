@@ -144,7 +144,7 @@ function OptionEditor({
                 <Check className="h-3.5 w-3.5" />
               </button>
               {isTrueFalse ? (
-                <span className="text-sm font-medium">{option}</span>
+                <span className="type-field-label">{option}</span>
               ) : (
                 <Input
                   value={option}
@@ -261,7 +261,7 @@ export function QuestionEditor({
             {index + 1}
           </Badge>
           <div className="h-6 w-px bg-border"></div>
-          <span className="text-sm text-muted-foreground">{t("questionEditor.statusDrafting")}</span>
+          <span className="type-hint">{t("questionEditor.statusDrafting")}</span>
         </div>
         <div className="flex items-center gap-1">
           {onAIEdit && (

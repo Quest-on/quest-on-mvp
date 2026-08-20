@@ -28,9 +28,19 @@
     "confirmTitle": "Confirm your role",
     "confirmDescInstructor": "Instructor (exam creator)",
     "confirmDescStudent": "Student (exam taker)",
-    "confirmDescSuffix": "You will continue as {role}. You can change this later in your profile settings.",
+    "confirmDescSuffix": "You will start as {role}. Your role is set once and cannot be changed later.",
     "reSelectBtn": "Choose again",
-    "confirmBtn": "Confirm"
+    "confirmBtn": "Confirm",
+    "intakeTitle": "What subject do you teach?",
+    "intakeSubject_humanities": "Humanities & Social Sciences",
+    "intakeSubject_business": "Business & Economics",
+    "intakeSubject_engineering": "Engineering & Sciences",
+    "intakeSubject_health": "Health & Medicine",
+    "intakeSubject_general": "Other",
+    "intakeSubmitBtn": "Create demo exam",
+    "intakeSkipBtn": "Skip",
+    "intakeCreating": "Creating...",
+    "roleAlreadyDifferent": "This account already has a different role. Please refresh the page."
   },
   "profileSetup": {
     "cardTitle": "Profile setup",
@@ -50,5 +60,19 @@
     "serverError": "A server error occurred.",
     "saving": "Saving...",
     "saveBtn": "Save profile"
+  },
+  "consent": {
+    "title": "Required consent",
+    "ageOver14": {
+      "label": "[Required] I am 14 years of age or older"
+    },
+    "terms": {
+      "label": "[Required] I agree to the Terms of Service",
+      "linkLabel": "View Terms of Service"
+    },
+    "required": "Please confirm all required consent items.",
+    "failed": "We could not record your consent. Please try again.",
+    "notActive": "The current consent policy is being activated. Please try again shortly.",
+    "prefillFailed": "We could not load your existing profile. Submission is disabled to protect your information."
   }
 }

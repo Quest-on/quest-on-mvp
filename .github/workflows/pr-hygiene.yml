@@ -3,8 +3,8 @@ name: pr-hygiene
 # PR 본문이 추적 사슬을 실제로 잇는지 검사한다.
 #
 # 왜 필요한가: `.github/PULL_REQUEST_TEMPLATE.md` 는 `Closes #` 를 기본값으로 두는데,
-# 작성자가 번호를 안 채워도 GitHub 은 PR 을 받아준다. ci.yml 도 impact-review.yml 도
-# 본문을 보지 않는다. 이 저장소는 사람 리뷰어가 없으므로 아무도 못 잡고,
+# 작성자가 번호를 안 채워도 GitHub 은 PR 을 받아준다. ci.yml 은 본문을
+# 보지 않는다. 이 저장소는 사람 리뷰어가 없으므로 아무도 못 잡고,
 # 이슈에 연결되지 않은 변경이 그대로 머지된다. docs/WORKFLOW.md 가 말하는
 # "제목이 아니라 본문의 Closes #<번호> 가 추적의 실체다" 를 강제하는 게이트다.
 

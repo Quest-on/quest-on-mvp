@@ -41,12 +41,20 @@ export async function POST(request: Request) {
     // Verify session ownership
     const { data: session } = await supabase
       .from("sessions")
-      .select("id, student_id")
+      .select("id, student_id, status, submitted_at")
       .eq("id", sessionId)
       .single();
 
     if (!session || session.student_id !== user.id) {
       return errorJson("FORBIDDEN", "Access denied", 403);
+    }
+
+    // 진행 중인 세션에만 기록한다.
+    //
+    // 종료된 세션에 붙여넣기 로그를 계속 넣을 수 있으면 시험 연속성 예외가
+    // 영구 우회가 되고, 응시 후 증적을 덧쓰는 경로도 열린다.
+    if (session.submitted_at || session.status !== "in_progress") {
+      return errorJson("SESSION_CLOSED", "Session is no longer active", 409);
     }
 
     const suspicious = !isInternal;

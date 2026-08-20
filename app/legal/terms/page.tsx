@@ -61,7 +61,7 @@ export default async function TermsPage() {
             <li>{t("terms.section3.item4")}</li>
           </ol>
 
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+          <div className="bg-warning-surface border border-warning-border rounded-lg p-4">
             <p className="text-sm">
               <strong>{t("terms.section3.warningLabel")}</strong> {t("terms.section3.warning")}
             </p>
@@ -129,11 +129,9 @@ export default async function TermsPage() {
           <Link href="/legal/privacy" className="hover:text-foreground transition-colors">
             {t("footerLinks.privacy")}
           </Link>
-          <span>·</span>
           <Link href="/legal/security" className="hover:text-foreground transition-colors">
             {t("footerLinks.security")}
           </Link>
-          <span>·</span>
           <Link href="/legal/cookies" className="hover:text-foreground transition-colors">
             {t("footerLinks.cookies")}
           </Link>

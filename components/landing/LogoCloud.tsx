@@ -11,26 +11,21 @@ const PARTNERS = [
   { name: "경기과학기술대학교", logo: "GTEC" },
 ];
 
-export default function LogoCloud({
-  mode = "light",
-}: {
-  mode?: "light" | "dark";
-}) {
-  const isDark = mode === "dark";
+export default function LogoCloud() {
   const t = useTranslations("landing");
 
   return (
     <section
       id="partners"
       className={`min-h-[400px] lg:min-h-[500px] flex items-center py-12 lg:py-16 ${
-        isDark ? "bg-black" : "bg-white"
+        "bg-background"
       }`}
     >
       <div className="container mx-auto px-4 lg:px-6 w-full">
         <div className="flex flex-col items-center justify-center gap-8">
           <p
             className={`text-xs font-bold uppercase tracking-[0.2em] ${
-              isDark ? "text-zinc-500" : "text-zinc-600"
+              "text-muted-foreground"
             }`}
           >
             {t("logoCloud.caption")}
@@ -43,14 +38,14 @@ export default function LogoCloud({
               >
                 <div
                   className={`text-lg sm:text-xl md:text-2xl font-black tracking-tighter text-center ${
-                    isDark ? "text-white" : "text-[#1F1F1F]"
+                    "text-[#1F1F1F]"
                   }`}
                 >
                   {partner.name}
                 </div>
                 <div
                   className={`text-[10px] font-bold uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity text-center ${
-                    isDark ? "text-zinc-400" : "text-zinc-500"
+                    "text-muted-foreground"
                   }`}
                 >
                   {partner.logo}

@@ -48,7 +48,7 @@ export function ExamCenterToolbar({
             variant="outline"
             size="sm"
             onClick={onToggleQuestion}
-            className="shrink-0 gap-1.5 min-h-[40px] text-blue-600 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-800"
+            className="shrink-0 gap-1.5 min-h-[40px] text-info-text border-primary hover:bg-info-surface"
             aria-label={isQuestionVisible ? t("toolbar.hideQuestion") : t("toolbar.showQuestion")}
             aria-expanded={isQuestionVisible}
           >

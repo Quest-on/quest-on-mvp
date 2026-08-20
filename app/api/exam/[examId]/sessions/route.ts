@@ -27,7 +27,7 @@ export async function GET(
     let user;
     try {
       user = await currentUser();
-    } catch (clerkError) {
+    } catch {
       return errorJson("INTERNAL_ERROR", "Authentication service error", 500);
     }
 

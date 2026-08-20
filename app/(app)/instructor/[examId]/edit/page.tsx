@@ -1,20 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback, use, useRef, useMemo } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  use,
+  useRef,
+  useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { extractErrorMessage, getErrorMessage } from "@/lib/error-messages";
+import { extractErrorMessage,
+  getErrorMessage } from "@/lib/error-messages";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import {
   ArrowLeft,
-  FileText,
-  Presentation,
-  FileSpreadsheet,
-  FileImage,
-  File,
-  ClipboardList,
 } from "lucide-react";
+import { FileTypeIcon } from "@/components/instructor/FileTypeIcon";
 import { SimpleExamAuthoringForm } from "@/components/instructor/SimpleExamAuthoringForm";
 import { useTranslations } from "next-intl";
 import type { Question } from "@/components/instructor/QuestionEditor";
@@ -51,6 +53,8 @@ export default function EditExam({
     materials: [] as File[],
     language: "ko" as "ko" | "en",
   });
+  // 과목은 선택 사항이다. null 이 기본값이며 저장을 막지 않는다.
+  const [courseId, setCourseId] = useState<string | null>(null);
   const [disabledFiles, setDisabledFiles] = useState<Set<number>>(new Set());
   const [canAddMoreFiles, setCanAddMoreFiles] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -61,6 +65,7 @@ export default function EditExam({
   const fileUpload = useFileUpload();
   const isSubmittingRef = useRef(false);
   const initialScoreWeightsRef = useRef<ScoreWeights | null>(null);
+  const initialCourseIdRef = useRef<string | null>(null);
   // 무제한 토글 OFF 시 이전 duration 복원
   const prevDurationRef = useRef<number>(60);
 
@@ -89,6 +94,9 @@ export default function EditExam({
           language: (exam.language === "en" ? "en" : "ko") as "ko" | "en",
         });
         setQuestions(exam.questions || []);
+        const loadedCourseId = exam.course_id ?? null;
+        initialCourseIdRef.current = loadedCourseId;
+        setCourseId(loadedCourseId);
         const loadedWeight = exam.chat_weight ?? null;
         setChatWeight(loadedWeight);
         const loadedScoreWeights = exam.score_weights ?? null;
@@ -216,20 +224,9 @@ export default function EditExam({
   };
   const removeExistingFile = (index: number) => fileUpload.removeExistingUrl(index);
 
-  const getFileIcon = (fileName: string) => {
-    const ext = fileName.split(".").pop()?.toLowerCase();
-    const cls = "w-4 h-4 shrink-0";
-    switch (ext) {
-      case "pdf": return <FileText className={`${cls} text-red-500`} />;
-      case "ppt": case "pptx": return <Presentation className={`${cls} text-orange-500`} />;
-      case "doc": case "docx": return <FileText className={`${cls} text-blue-500`} />;
-      case "xls": case "xlsx": case "csv": return <FileSpreadsheet className={`${cls} text-green-500`} />;
-      case "hwp": case "hwpx": return <ClipboardList className={`${cls} text-sky-500`} />;
-      case "jpg": case "jpeg": case "png": case "gif": case "webp":
-        return <FileImage className={`${cls} text-purple-500`} />;
-      default: return <File className={`${cls} text-muted-foreground`} />;
-    }
-  };
+  const getFileIcon = (fileName: string) => (
+    <FileTypeIcon fileName={fileName} />
+  );;
 
   const getFileNameFromUrl = (url: string) => {
     try { return decodeURIComponent(new URL(url).pathname.split("/").pop() || t("editExam.filenameFallback")); }
@@ -297,6 +294,7 @@ export default function EditExam({
         questions: Question[];
         chat_weight: number | null;
         score_weights?: ScoreWeights | null;
+        course_id?: string | null;
         materials: string[];
         materials_text: Array<{ url: string; text: string; fileName: string }>;
         language: "ko" | "en";
@@ -314,6 +312,9 @@ export default function EditExam({
       };
       if (!shouldOmitAutoDefaultScoreWeights) {
         updateData.score_weights = scoreWeights;
+      }
+      if (courseId !== initialCourseIdRef.current) {
+        updateData.course_id = courseId;
       }
       const response = await fetch("/api/supa", {
         method: "POST",
@@ -334,7 +335,7 @@ export default function EditExam({
       setIsLoading(false);
       isSubmittingRef.current = false;
     }
-  }, [examData, questions, chatWeight, scoreWeights, hasSessions, fileUpload, resolvedParams.examId]);
+  }, [examData, questions, chatWeight, scoreWeights, courseId, hasSessions, fileUpload, resolvedParams.examId, t]);
 
   // ── 제출 사유 ─────────────────────────────────────────────────────────────
   const submitReasons = useMemo(() => {
@@ -357,7 +358,7 @@ export default function EditExam({
         questions.map((q) => q.type)
       ),
     ].filter(Boolean) as string[];
-  }, [examData.title, examData.duration, questions, canAddMoreFiles, scoreWeights]);
+  }, [examData.title, examData.duration, questions, canAddMoreFiles, scoreWeights, t]);
 
   // ── 로딩 스피너 ───────────────────────────────────────────────────────────
   if (isLoadingExam) {
@@ -412,6 +413,9 @@ export default function EditExam({
               setExamData((p) => ({ ...p, duration: v === 0 ? 0 : v || prevDurationRef.current }));
             }}
             onLanguageChange={(v) => setExamData((p) => ({ ...p, language: v }))}
+            // ── 과목 (선택) ─────────────────────────────────────────────────
+            courseId={courseId}
+            onCourseChange={setCourseId}
             // ── 파일 업로드 ─────────────────────────────────────────────────
             files={examData.materials}
             disabledFiles={disabledFiles}

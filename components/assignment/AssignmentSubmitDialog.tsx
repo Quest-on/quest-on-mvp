@@ -41,7 +41,7 @@ export function AssignmentSubmitDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <AlertTriangle className="w-5 h-5 text-warning-text" />
             {t("submitDialog.title")}
           </DialogTitle>
           <DialogDescription>
@@ -52,7 +52,7 @@ export function AssignmentSubmitDialog({
         {trimmed && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">{t("submitDialog.finalAnswerPreview")}</span>
+              <span className="type-field-label">{t("submitDialog.finalAnswerPreview")}</span>
               {onEditFinalAnswer && (
                 <Button
                   type="button"

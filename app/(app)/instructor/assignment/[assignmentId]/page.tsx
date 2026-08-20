@@ -5,6 +5,7 @@ import { useAppUser } from "@/components/providers/AppAuthProvider";
 import React, { useState, useEffect, use } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { ExamCode } from "@/components/instructor/ExamCode";
 import Link from "next/link";
 import { QuestionsListCard } from "@/components/instructor/QuestionsListCard";
 import {
@@ -73,28 +74,28 @@ function getStatusBadge(
   autoSubmitted?: boolean
 ) {
   if (isGraded) {
-    return <Badge className="bg-blue-100 text-blue-800 text-xs">{t("assignmentDetail.statusGraded")}</Badge>;
+    return <Badge className="bg-info-subtle text-info-text text-xs">{t("assignmentDetail.statusGraded")}</Badge>;
   }
   if (status === "completed" && submittedAt && autoSubmitted) {
     return (
-      <Badge className="bg-amber-100 text-amber-800 text-xs">{t("assignmentDetail.statusAutoSubmitted")}</Badge>
+      <Badge className="bg-warning-subtle text-warning-text text-xs">{t("assignmentDetail.statusAutoSubmitted")}</Badge>
     );
   }
   if (status === "completed" && submittedAt) {
-    return <Badge className="bg-green-100 text-green-800 text-xs">{t("assignmentDetail.statusSubmitted")}</Badge>;
+    return <Badge className="bg-success-subtle text-success-text text-xs">{t("assignmentDetail.statusSubmitted")}</Badge>;
   }
   if (status === "in-progress") {
     return (
-      <Badge className="bg-yellow-100 text-yellow-800 text-xs">
+      <Badge className="bg-warning-subtle text-warning-text text-xs">
         <span className="relative flex h-2 w-2 mr-1.5">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-600 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-600"></span>
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning-solid opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-warning-solid"></span>
         </span>
         {t("assignmentDetail.statusInProgress")}
       </Badge>
     );
   }
-  return <Badge className="bg-gray-100 text-gray-800 text-xs">{t("assignmentDetail.statusNotSubmitted")}</Badge>;
+  return <Badge className="bg-secondary text-secondary-foreground text-xs">{t("assignmentDetail.statusNotSubmitted")}</Badge>;
 }
 
 export default function AssignmentDashboard({
@@ -280,7 +281,7 @@ export default function AssignmentDashboard({
     return (
       <div className="container mx-auto p-6">
         <div className="text-center py-12">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">{t("assignmentDetail.error")}</h2>
+          <h2 className="text-xl font-semibold text-destructive mb-2">{t("assignmentDetail.error")}</h2>
           <p className="text-muted-foreground">
             {error || t("assignmentDetail.loadFail")}
           </p>
@@ -302,21 +303,21 @@ export default function AssignmentDashboard({
 
     if (deadline && now > deadline) {
       return (
-        <Badge variant="outline" className="border-gray-500 text-gray-700">
+        <Badge variant="outline" className="border-border text-foreground">
           {t("assignmentDetail.statusClosed")}
         </Badge>
       );
     }
     if (start && now >= start) {
       return (
-        <Badge variant="outline" className="border-green-500 text-green-700">
+        <Badge variant="outline" className="border-success-border text-success-text">
           {t("assignmentDetail.statusActive")}
         </Badge>
       );
     }
     if (start && now < start) {
       return (
-        <Badge variant="outline" className="border-yellow-500 text-yellow-700">
+        <Badge variant="outline" className="border-warning-border text-warning-text">
           {t("assignmentDetail.statusScheduled")}
         </Badge>
       );
@@ -338,9 +339,7 @@ export default function AssignmentDashboard({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="min-w-0">
                 <h1 className="text-2xl sm:text-3xl font-bold">{exam.title}</h1>
-                <p className="text-muted-foreground">
-                  {t("assignmentDetail.assignmentCode")} <span className="exam-code">{exam.code}</span>
-                </p>
+                <ExamCode code={exam.code} className="mt-1" />
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 {assignmentStatusBadge}
@@ -391,11 +390,12 @@ export default function AssignmentDashboard({
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigator.clipboard.writeText(exam.code);
+                            // 과제 코드도 같은 게이트를 탄다. 코드 렌더는 ExamCode 가 맡는다.
+                            navigator.clipboard.writeText(exam.code ?? "");
                             setCodeCopied(true);
                             setTimeout(() => setCodeCopied(false), 2000);
                           }}
-                          className={`text-sm cursor-pointer border-b border-dashed transition-colors ${codeCopied ? "text-green-600 border-green-500" : "text-muted-foreground border-muted-foreground/50 hover:text-foreground hover:border-foreground"}`}
+                          className={`text-sm cursor-pointer border-b border-dashed transition-colors ${codeCopied ? "text-success-text border-success-border" : "text-muted-foreground border-muted-foreground/50 hover:text-foreground hover:border-foreground"}`}
                           title={t("assignmentDetail.copyCode")}
                         >
                           {codeCopied ? t("assignmentDetail.codeCopied") : exam.code}
@@ -429,7 +429,7 @@ export default function AssignmentDashboard({
                         </div>
                       )}
                       {exam.createdAt && (
-                        <div className="text-sm text-muted-foreground">
+                        <div className="type-hint">
                           {t("assignmentDetail.createdAt")}{" "}
                           {formatDate(exam.createdAt, locale)}
                         </div>
@@ -447,7 +447,7 @@ export default function AssignmentDashboard({
                     <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-3">
                         <h3 className="font-semibold">{t("assignmentDetail.viewQuestions")}</h3>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="type-hint">
                           {questionsCount !== null
                             ? t("assignmentDetail.questionsCountLabel", { count: questionsCount })
                             : t("assignmentDetail.questionsLoading")}
@@ -479,25 +479,25 @@ export default function AssignmentDashboard({
           {/* Student Submissions Table */}
           <div className="space-y-4">
             {showBulkGradingCta && (
-              <div className="flex items-center justify-between p-3 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+              <div className="flex items-center justify-between p-3 border border-info-border rounded-lg bg-info-surface">
                 <div className="flex items-center gap-2">
                   {isBulkGrading ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400 shrink-0" aria-hidden="true" />
+                    <Loader2 className="h-4 w-4 animate-spin text-info-text shrink-0" aria-hidden="true" />
                   ) : (
-                    <Bot className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" aria-hidden="true" />
+                    <Bot className="h-4 w-4 text-info-text shrink-0" aria-hidden="true" />
                   )}
                   <div>
-                    <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    <span className="text-sm font-medium text-info-text">
                       {bulkCtaTitle}
                     </span>
-                    <span className="text-xs text-blue-600 dark:text-blue-400 hidden sm:inline ml-2">
+                    <span className="text-xs text-info-text hidden sm:inline ml-2">
                       {bulkCtaDescription}
                     </span>
                   </div>
                 </div>
                 <Button
                   size="sm"
-                  className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white shrink-0"
+                  className="shrink-0"
                   onClick={() => setBulkGradingOpen(true)}
                 >
                   {bulkCtaButtonLabel}
@@ -591,7 +591,7 @@ export default function AssignmentDashboard({
               )}
             </div>
 
-            <div className="text-sm text-muted-foreground">
+            <div className="type-hint">
               {t("assignmentDetail.totalStudents", { count: allStudents.length })}
               {gradedStudents.length > 0 &&
                 ` ${t("assignmentDetail.gradedCount", { count: gradedStudents.length })}`}
@@ -649,7 +649,7 @@ function StudentRow({
       </div>
 
       {/* Submitted at */}
-      <div className="text-xs text-muted-foreground">
+      <div className="type-meta">
         {student.submittedAt
           ? formatDateTime(student.submittedAt, locale, {
               month: "short",
@@ -698,7 +698,7 @@ function StudentRow({
             <Button
               size="sm"
               variant="outline"
-              className="text-blue-600 border-blue-600 hover:bg-blue-50 h-7 px-2 text-xs"
+              className="text-info-text border-info-border hover:bg-info-surface h-7 px-2 text-xs"
             >
               {student.isGraded ? t("assignmentDetail.regrade") : t("assignmentDetail.grade")}
             </Button>
