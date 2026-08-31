@@ -3,10 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { logError } from "@/lib/logger";
 import { successJson, errorJson } from "@/lib/api-response";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
-import {
-  isAiDemoRegenerationUnlocked,
-  isDemoCompleted,
-} from "@/lib/demo-completion";
+import { isDemoCompleted } from "@/lib/demo-completion";
 
 /**
  * GET /api/onboarding/demo/status — 데모 완주와 AI 재생성 개방 상태를 조회한다.
@@ -74,13 +71,12 @@ export async function GET() {
       }
     };
 
-    const [completed, aiRegenerationUnlocked, examId] = await Promise.all([
+    const [completed, examId] = await Promise.all([
       isDemoCompleted(user.id),
-      isAiDemoRegenerationUnlocked(user.id),
       lookupDemoExamId(),
     ]);
 
-    return successJson({ completed, aiRegenerationUnlocked, examId });
+    return successJson({ completed, examId });
   } catch {
     return errorJson("DEMO_STATUS_FAILED", "Failed to fetch demo status", 500);
   }

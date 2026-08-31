@@ -86,14 +86,12 @@ export async function recordDemoGradedViewed({
   });
 }
 
-/** 데모 완주 여부는 채점 결과 열람 마일스톤 하나로 판정한다. */
+/**
+ * 데모 완주 여부는 채점 결과 열람 마일스톤 하나로 판정한다.
+ *
+ * 완주는 계측과 데모 상세의 CTA 라벨에만 쓴다. 여기에 "기능 개방" 의미를
+ * 다시 얹으려면 개방될 기능을 먼저 만들어라 — 이슈 #83 참고.
+ */
 export async function isDemoCompleted(userId: string): Promise<boolean> {
   return hasOnboardingEvent(userId, ONBOARDING_EVENTS.DEMO_GRADED_VIEWED);
-}
-
-/**
- * 호출부를 바꾸지 않고 이후 개방 기준을 확장할 수 있도록 완주 판정과 분리한다.
- */
-export async function isAiDemoRegenerationUnlocked(userId: string): Promise<boolean> {
-  return isDemoCompleted(userId);
 }

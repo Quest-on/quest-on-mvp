@@ -16,7 +16,6 @@ const recordOnboardingEvent = vi.fn(async () => true);
 const hasOnboardingEvent = vi.fn(async () => false);
 const recordDemoGradedViewed = vi.fn(async () => undefined);
 const isDemoCompleted = vi.fn(async () => false);
-const isAiDemoRegenerationUnlocked = vi.fn(async () => false);
 
 vi.mock("@/lib/get-current-user", () => ({
   currentUser: async () => sessionUser,
@@ -29,7 +28,6 @@ vi.mock("@/lib/onboarding-events", () => ({
 vi.mock("@/lib/demo-completion", () => ({
   recordDemoGradedViewed,
   isDemoCompleted,
-  isAiDemoRegenerationUnlocked,
 }));
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimitAsync: async () => ({ allowed: true }),
@@ -126,7 +124,6 @@ beforeEach(() => {
   gradeRows = [{ id: "grade-1", q_idx: 0, score: 90 }];
   recordDemoGradedViewed.mockResolvedValue(undefined);
   isDemoCompleted.mockResolvedValue(false);
-  isAiDemoRegenerationUnlocked.mockResolvedValue(false);
 });
 
 describe("데모 완주 판정 (AC-7)", () => {
@@ -202,22 +199,31 @@ describe("데모 완주 판정 (AC-7)", () => {
   });
 });
 
-describe("데모 재생성 개방 상태 (AC-8)", () => {
-  it("완주 여부에 따라 AI 재생성 개방 상태를 돌려준다", async () => {
+describe("데모 완주 상태 조회", () => {
+  it("완주 여부를 돌려준다", async () => {
     isDemoCompleted.mockResolvedValue(true);
-    isAiDemoRegenerationUnlocked.mockResolvedValue(true);
 
     const result = await callStatus();
 
     expect(result.status).toBe(200);
-    expect(result.body).toMatchObject({ completed: true, aiRegenerationUnlocked: true });
+    expect(result.body).toMatchObject({ completed: true });
   });
 
-  it("미완주면 AI 재생성을 개방하지 않는다", async () => {
+  it("미완주면 completed 가 false 다", async () => {
     const result = await callStatus();
 
     expect(result.status).toBe(200);
-    expect(result.body).toMatchObject({ completed: false, aiRegenerationUnlocked: false });
+    expect(result.body).toMatchObject({ completed: false });
+  });
+
+  // AC-8(데모 완주 → AI 재생성 개방)은 철회됐다. 개방될 기능이 없는데
+  // "개방됨" 을 응답에 실으면 클라이언트에게 거짓말을 하는 것이다. 이슈 #83.
+  it("개방 신호를 응답에 실지 않는다", async () => {
+    isDemoCompleted.mockResolvedValue(true);
+
+    const result = await callStatus();
+
+    expect(result.body).not.toHaveProperty("aiRegenerationUnlocked");
   });
 
   it("비로그인과 비교수자를 거부한다", async () => {
