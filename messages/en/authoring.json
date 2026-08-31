@@ -114,7 +114,7 @@
     "noticeHeading": "[Quest-On] Exam notice",
     "noticeCodeLabel": "Entry code",
     "noticeFooter": "Questions? Contact your instructor.",
-    "toastCodeBlocked": "You have reached the publish limit, so this code cannot be copied yet. Verify your account and try again."
+    "toastCodeBlocked": "To prevent students from misusing instructor accounts, codes cannot be copied after the publish limit is reached. Verify your account and try again."
   },
   "examInfoForm": {
     "cardTitleAssignment": "Assignment Info",

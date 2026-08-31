@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { getDeviceFingerprint } from "@/lib/device-fingerprint";
 import { createSupabaseClient } from "@/lib/supabase-client";
-import { hasAiChatQuestions } from "@/lib/grading-helpers";
 import { qk } from "@/lib/query-keys";
 
 interface Question {
@@ -76,6 +75,7 @@ export function useExamSession({
   saveViaBeacon,
 }: UseExamSessionOptions) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   // 데모 재응시 의도. CTA 가 붙인 `?restartDemo=1` 로만 들어온다.
   const restartDemo = searchParams.get("restartDemo") === "1";
@@ -273,9 +273,7 @@ export function useExamSession({
         "in_progress",
       ]);
       const completedSessionStatuses = new Set(["submitted", "auto_submitted"]);
-      const needsDisclosureAcknowledgement =
-        hasAiChatQuestions(initData.exam.questions) &&
-        !initData.disclosureAcknowledged;
+      const needsDisclosureAcknowledgement = !initData.disclosureAcknowledged;
       if (
         needsPreflightStatuses.has(currentSessionStatus) &&
         !completedSessionStatuses.has(currentSessionStatus) &&
@@ -504,6 +502,16 @@ export function useExamSession({
     setIsSubmitted,
     showPreflight,
     disclosureAcknowledged,
+    acknowledgeDisclosure: () => {
+      // staleTime 이 무한이라 로컬 상태만 바꾸면 재마운트가 이전 init 응답을
+      // 다시 써서 고지가 되살아난다. 서버 확인 직후 캐시도 같은 사실로 맞춘다.
+      setDisclosureAcknowledged(true);
+      queryClient.setQueryData(
+        qk.session.init(examCode, user?.id, restartDemo),
+        (current: typeof initData) =>
+          current?.ok ? { ...current, disclosureAcknowledged: true } : current
+      );
+    },
     // 데모 미리보기 여부와 그 시험 id. 응시를 마친 교수자를 학생 대시보드가
     // 아니라 데모 상세로 돌려보내는 데 쓴다 — 자기 데모를 연습하고 나서
     // /student 로 버려지면 다음에 뭘 해야 할지 알 수 없다.

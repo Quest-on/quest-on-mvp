@@ -194,7 +194,13 @@
     "aiDisclosureTitle": "About using AI",
     "aiDisclosureAllowed": "Stuck? Ask the AI. Asking is not cheating. it is part of the exam.",
     "aiDisclosureGraded": "What you ask is itself graded. Holding back questions works against you.",
-    "aiDisclosureVisible": "Your conversation with the AI is shown to your instructor as-is."
+    "aiDisclosureVisible": "Your conversation with the AI is shown to your instructor as-is.",
+    "aiDisclosureUnavailable": "AI chat is not provided for this exam.",
+    "aiDisclosureExternalAiProhibited": "Do not use external AI tools such as ChatGPT or Claude during the exam.",
+    "aiDisclosureActivityRecorded": "Your exam activity is recorded and may be reviewed by your instructor.",
+    "aiActivityAlertTitle": "Exam activity recording notice",
+    "aiActivityAlertDescription": "To support fair evaluation, activity during this exam is recorded and may be reviewed by your instructor when needed.",
+    "aiActivityCheckLabel": "I understand that AI chat is unavailable, external AI use is prohibited, and exam activity is recorded."
   },
   "waitingRoom": {
     "title": "Waiting Room",

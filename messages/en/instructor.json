@@ -406,7 +406,7 @@
     "colorPurple": "Purple",
     "colorPink": "Pink",
     "colorGray": "Gray",
-    "toastExamCodeBlocked": "You have reached the publish limit, so this code cannot be copied yet. Verify your account and try again.",
+    "toastExamCodeBlocked": "To prevent students from misusing instructor accounts, codes cannot be copied after the publish limit is reached. Verify your account and try again.",
     "loadError": "Could not load your exams.",
     "folderItems": "{count} items",
     "folderEmpty": "Empty"

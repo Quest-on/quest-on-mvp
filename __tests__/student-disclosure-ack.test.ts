@@ -8,7 +8,7 @@
  *
  * 여기서 고정하는 것:
  *   1. preflight 수락이 마일스톤을 남긴다
- *   2. 계측 실패가 응시를 막지 않는다
+ *   2. 확인 기록이 영속되지 않으면 응시를 성공 처리하지 않는다
  *   3. 세션 init 이 "이미 확인했는가"를 실어 보내고, 조회 실패 시 **다시 보여주는**
  *      쪽으로 실패한다
  */
@@ -112,7 +112,7 @@ beforeEach(() => {
     instructor_id: "other-instructor",
   };
   recordOnboardingEvent.mockResolvedValue(true);
-  hasOnboardingEvent.mockResolvedValue(false);
+  hasOnboardingEvent.mockResolvedValue(true);
 });
 
 describe("preflight 수락이 고지 확인을 기록한다 (AC-15)", () => {
@@ -128,9 +128,7 @@ describe("preflight 수락이 고지 확인을 기록한다 (AC-15)", () => {
     });
   });
 
-  // #149: 노출 판정과 기록 판정이 갈라져 있으면, 고지를 한 번도 못 본 학생이
-  // "확인 완료"가 되어 다음 서술형 시험에서 고지가 숨겨진다.
-  it("객관식 전용 시험 수락은 ACK 를 만들지 않는다 — 3줄 고지가 뜨지 않는 시험이다", async () => {
+  it("객관식 전용 시험 수락도 ACK 를 만든다 — AI 미제공 고지를 확인한다", async () => {
     exam = {
       ...exam,
       questions: [
@@ -142,27 +140,34 @@ describe("preflight 수락이 고지 확인을 기록한다 (AC-15)", () => {
     const res = await acceptPreflight();
 
     expect(res.status).toBe(200);
-    expect(recordOnboardingEvent).not.toHaveBeenCalled();
+    expect(recordOnboardingEvent).toHaveBeenCalled();
   });
 
-  it("문항 정보가 없으면 ACK 를 만들지 않는다 — 확인 못 한 것을 확인 처리하지 않는다", async () => {
+  it("문항 정보가 없어도 ACK 를 만든다 — 고지는 시험 유형과 무관하다", async () => {
     exam = { ...exam, questions: null };
 
     const res = await acceptPreflight();
 
     expect(res.status).toBe(200);
-    expect(recordOnboardingEvent).not.toHaveBeenCalled();
+    expect(recordOnboardingEvent).toHaveBeenCalled();
   });
 
-  it("계측이 실패해도 응시는 시작된다", async () => {
-    // recordOnboardingEvent 는 throw 하지 않고 false 를 돌려주도록 설계돼 있다.
-    // 그 계약이 깨져 throw 하더라도 학생이 시험을 못 보면 안 된다.
+  it("확인 기록이 영속되지 않으면 응시를 성공 처리하지 않는다", async () => {
     recordOnboardingEvent.mockResolvedValue(false);
+    hasOnboardingEvent.mockResolvedValue(false);
+
+    const res = await acceptPreflight();
+
+    expect(res.status).toBe(500);
+  });
+
+  it("기록이 이미 있으면 중복 수락도 성공한다", async () => {
+    recordOnboardingEvent.mockResolvedValue(false);
+    hasOnboardingEvent.mockResolvedValue(true);
 
     const res = await acceptPreflight();
 
     expect(res.status).toBe(200);
-    expect(res.body.preflightAcceptedAt).toBeTruthy();
   });
 });
 
