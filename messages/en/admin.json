@@ -11,7 +11,8 @@
     "ai": {
       "cost7d": "AI Cost (Last 7 Days)",
       "requests7d": "AI Requests (Last 7 Days)",
-      "failRate7d": "Failure Rate (Last 7 Days)"
+      "failRate7d": "Failure Rate (Last 7 Days)",
+      "loadFailed": "Could not load AI usage. The displayed zero may not reflect actual usage."
     },
     "pending": {
       "title": "Pending Instructor Approvals ({count})",
@@ -19,7 +20,8 @@
       "noName": "No name",
       "appliedAt": "Applied: {date}",
       "approve": "Approve",
-      "noSchool": "No affiliation"
+      "noSchool": "No affiliation",
+      "loadFailed": "Could not load pending instructor requests."
     },
     "userManagement": {
       "title": "User Management",

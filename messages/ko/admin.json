@@ -11,7 +11,8 @@
     "ai": {
       "cost7d": "최근 7일 AI 비용",
       "requests7d": "최근 7일 AI 요청 수",
-      "failRate7d": "최근 7일 실패율"
+      "failRate7d": "최근 7일 실패율",
+      "loadFailed": "AI 사용량을 불러오지 못했습니다. 표시된 0은 실제 사용량이 아닐 수 있습니다."
     },
     "pending": {
       "title": "승인 대기 강사 ({count}명)",
@@ -19,7 +20,8 @@
       "noName": "이름 없음",
       "appliedAt": "신청일: {date}",
       "approve": "승인",
-      "noSchool": "소속 미기재"
+      "noSchool": "소속 미기재",
+      "loadFailed": "승인 대기 강사 목록을 불러오지 못했습니다."
     },
     "userManagement": {
       "title": "사용자 관리",
