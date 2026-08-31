@@ -817,6 +817,17 @@ export async function initExamSession(data: {
         );
       }
 
+      if (exam.is_demo === false && typeof exam.instructor_id === "string") {
+        // UNIQUE(user_id, event)가 동시 입장에도 최초 발행만 남긴다. 앱에서 먼저
+        // 조회하면 경합으로 누락될 수 있고 불필요한 쿼리만 추가된다.
+        await recordOnboardingEvent({
+          userId: exam.instructor_id,
+          role: "instructor",
+          event: ONBOARDING_EVENTS.FIRST_PUBLISH,
+          examId: exam.id,
+        });
+      }
+
       const { data: upsertedSession, error: upsertError } = await getSupabase()
         .from("sessions")
         .select()
@@ -1020,9 +1031,9 @@ export async function submitExam(data: {
     /*
       데모 답변 마일스톤. (#174)
 
-      DEMO_ANSWERED 는 상수(lib/onboarding-events.ts)와 퍼널 정의
-      (lib/onboarding-funnel.ts)에만 있고 기록 호출부가 저장소 전체에 0개였다.
-      제출 경계에 붙이면 "답은 냈지만 결과는 못 본 교수자" 를 계측할 수 있다.
+      이 action은 /api/supa의 submit_exam으로 여전히 등록돼 있다. 실제 제출은
+      /api/feedback으로도 들어오므로 두 경로가 모두 기록해도 UNIQUE가 중복을
+      막아 "답은 냈지만 결과는 못 본 교수자"를 빠짐없이 계측한다.
 
       데모 소유자 본인일 때만 센다. 일반 학생의 제출은 이 마일스톤이 아니다.
       판정은 isDemoPreview 가 갖고 있고, 판정 불능(null)이면 기록하지 않는다

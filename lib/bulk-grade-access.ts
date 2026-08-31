@@ -1,6 +1,6 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { errorJson } from "@/lib/api-response";
-import { isAssignmentType } from "@/lib/grading-helpers";
+import { isAssignmentType, isGradingOpen } from "@/lib/grading-helpers";
 import type { AppUser } from "@/lib/get-current-user";
 
 export type BulkGradeAccessContext = {
@@ -12,6 +12,7 @@ export type BulkGradeAccessContext = {
 	    description: string | null;
 	    questions: unknown;
 	    language: string;
+	    is_demo: boolean | null;
 	    status: string | null;
 	    type: string | null;
 	    deadline: string | null;
@@ -47,7 +48,7 @@ export async function requireBulkGradeAccess(
 
 	  const { data: exam, error: examError } = await supabase
 	    .from("exams")
-	    .select("id, instructor_id, title, description, questions, language, status, type, deadline")
+	    .select("id, instructor_id, title, description, questions, language, is_demo, status, type, deadline")
 	    .eq("id", examId)
 	    .single();
 
@@ -59,30 +60,24 @@ export async function requireBulkGradeAccess(
 	    return { ok: false, response: errorJson("FORBIDDEN", "Forbidden", 403) };
 	  }
 
-	  if (options.requireGradable) {
-	    if (isAssignmentType(exam.type as string | null)) {
-	      const deadline = (exam.deadline as string | null) ?? null;
-	      const deadlinePassed = deadline ? new Date() > new Date(deadline) : false;
-	      if (!deadlinePassed) {
-	        return {
+	  if (options.requireGradable && !isGradingOpen(exam)) {
+	    return isAssignmentType(exam.type as string | null)
+	      ? {
 	          ok: false,
 	          response: errorJson(
 	            "ASSIGNMENT_NOT_DUE",
 	            "과제 마감 후에 채점을 시작할 수 있습니다.",
 	            409,
 	          ),
+	        }
+	      : {
+	          ok: false,
+	          response: errorJson(
+	            "EXAM_NOT_CLOSED",
+	            "시험 종료 후에 채점을 시작할 수 있습니다.",
+	            409,
+	          ),
 	        };
-	      }
-	    } else if (exam.status !== "closed") {
-	      return {
-	        ok: false,
-	        response: errorJson(
-	          "EXAM_NOT_CLOSED",
-	          "시험 종료 후에 채점을 시작할 수 있습니다.",
-	          409,
-	        ),
-	      };
-	    }
 	  }
 
   return {
@@ -96,6 +91,7 @@ export async function requireBulkGradeAccess(
 	        description: (exam.description as string | null) ?? null,
 	        questions: exam.questions,
 	        language: (exam.language as string) ?? "ko",
+	        is_demo: (exam.is_demo as boolean | null) ?? null,
 	        status: (exam.status as string | null) ?? null,
 	        type: (exam.type as string | null) ?? null,
 	        deadline: (exam.deadline as string | null) ?? null,

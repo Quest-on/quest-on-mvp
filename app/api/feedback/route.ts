@@ -9,6 +9,7 @@ import { auditLog } from "@/lib/audit";
 import { logError } from "@/lib/logger";
 import { triggerGradingIfNeeded } from "@/lib/grading-trigger";
 import { isDemoPreview } from "@/lib/demo-completion";
+import { ONBOARDING_EVENTS, recordOnboardingEvent } from "@/lib/onboarding-events";
 
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 
@@ -223,6 +224,20 @@ export async function POST(request: NextRequest) {
             );
           }
 
+          if (
+            exam.is_demo === false &&
+            typeof exam.instructor_id === "string"
+          ) {
+            // UNIQUE(user_id, event)가 동시 입장에서도 최초 발행만 남긴다. 여기서
+            // 먼저 조회해 판정하면 경합으로 빠질 수 있고 쿼리만 하나 더 늘어난다.
+            await recordOnboardingEvent({
+              userId: exam.instructor_id,
+              role: "instructor",
+              event: ONBOARDING_EVENTS.FIRST_PUBLISH,
+              examId: exam.id,
+            });
+          }
+
           // RPC 가 세션을 만들었으면 그걸 읽고, 장애로 못 만들었으면(fail-open)
           // 여기서 만든다. 그때 발행 시각도 함께 남긴다 — 안 남기면 그 시험은
           // 장애가 끝난 뒤에도 영영 "미발행"이라 발행 한도가 조용히 샌다.
@@ -413,6 +428,22 @@ export async function POST(request: NextRequest) {
         instructorId: (exam as { instructor_id?: unknown }).instructor_id,
         userId: verifiedStudentId,
       });
+
+      if (preview === true) {
+        await recordOnboardingEvent({
+          userId: verifiedStudentId,
+          role: "instructor",
+          event: ONBOARDING_EVENTS.DEMO_ANSWERED,
+          examId: exam.id,
+        });
+      } else if (preview === false && typeof exam.instructor_id === "string") {
+        await recordOnboardingEvent({
+          userId: exam.instructor_id,
+          role: "instructor",
+          event: ONBOARDING_EVENTS.FIRST_STUDENT_SUBMISSION,
+          examId: exam.id,
+        });
+      }
 
       if (preview === false) {
         const { error: rpcError } = await getSupabase().rpc(

@@ -74,7 +74,7 @@ export async function GET(
     // Get exam data
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("id, title, code, instructor_id, questions, rubric, status, score_weights, type, deadline")
+      .select("id, title, code, instructor_id, questions, rubric, is_demo, status, score_weights, type, deadline")
       .eq("id", session.exam_id)
       .single();
 
@@ -495,7 +495,7 @@ export async function POST(
     // Get exam to check instructor and validate q_idx upper bound
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("instructor_id, questions, status, type, deadline")
+      .select("instructor_id, questions, is_demo, status, type, deadline")
       .eq("id", session.exam_id)
       .single();
 
@@ -631,7 +631,7 @@ export async function PUT(
 
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("instructor_id, status, type, deadline")
+      .select("instructor_id, is_demo, status, type, deadline")
       .eq("id", session.exam_id)
       .single();
 
