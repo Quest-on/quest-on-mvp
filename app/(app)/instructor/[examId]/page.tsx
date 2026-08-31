@@ -116,14 +116,14 @@ export default function ExamDetail({
   });
   const {
     data: demoStatus,
-  } = useQuery<{ completed: boolean; aiRegenerationUnlocked: boolean }>({
+  } = useQuery<{ completed: boolean }>({
     queryKey: qk.instructor.onboardingDemoStatus(user?.id),
     queryFn: async ({ signal }) => {
       const response = await fetch("/api/onboarding/demo/status", { signal });
       if (!response.ok) {
         throw new Error("Failed to fetch demo status");
       }
-      return response.json() as Promise<{ completed: boolean; aiRegenerationUnlocked: boolean }>;
+      return response.json() as Promise<{ completed: boolean }>;
     },
     enabled: isDemoExam && isLoaded && !!isSignedIn,
   });
