@@ -1320,6 +1320,7 @@ export async function generateSessionSummaryPhase(
 
   if (!summary) {
     await updateGradingProgress(supabase, sessionId, {
+      status: "failed",
       phase: "session_summary",
       last_error: "generateSummary returned null",
     });

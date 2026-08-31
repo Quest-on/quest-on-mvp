@@ -9,8 +9,15 @@ vi.mock("@/lib/get-current-user", () => ({ currentUser: currentUserMock }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseServer: () => supabaseMock }));
 vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 vi.mock("@/lib/onboarding-events", () => ({
-  ONBOARDING_EVENTS: { STUDENT_DISCLOSURE_ACK: "student_disclosure_ack" },
+  ONBOARDING_EVENTS: {
+    STUDENT_DISCLOSURE_ACK: "student_disclosure_ack",
+    FIRST_PUBLISH: "first_publish",
+  },
   hasOnboardingEvent: vi.fn(async () => false),
+  // 입장 경계가 first_publish 마일스톤을 남긴다. 이 파일의 supabase 모킹은
+  // 테이블명별 큐를 쓰므로 계측 호출까지 큐에 넣으면 수명주기 검증과 무관한
+  // 사전 지식이 테스트에 쌓인다. 계측은 모킹으로 끊고 여기서는 세션 상태만 본다.
+  recordOnboardingEvent: vi.fn(async () => true),
 }));
 
 import { initExamSession } from "@/app/api/supa/handlers/session-handlers";
