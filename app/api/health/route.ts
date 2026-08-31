@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { verifyAdminToken } from "@/lib/admin-auth";
 import { getAppEnv } from "@/lib/app-env";
 import { auditEnv, isEnvAuditHealthy } from "@/lib/env-manifest";
+import { auditSchema, isSchemaAuditHealthy } from "@/lib/schema-manifest";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,15 @@ export async function GET() {
   // Admin-only: full diagnostic checks
   const checks: Record<
     string,
-    { ok: boolean; latencyMs?: number; error?: string; warning?: string }
+    {
+      ok: boolean;
+      latencyMs?: number;
+      error?: string;
+      warning?: string;
+      missingTables?: string[];
+      missingColumns?: string[];
+      missingFunctions?: string[];
+    }
   > = {};
 
   // 1. Database connectivity check
@@ -68,7 +77,32 @@ export async function GET() {
     }),
   };
 
-  // 4. 배포 식별 + 통합 활성 여부 (스테이징이 프로덕션 자원을 쓰고 있는지 눈으로 확인)
+  // 4. 스키마 감사는 데이터가 아니라 코드가 요구하는 객체 이름만 관리자에게 보인다.
+  const schemaStart = Date.now();
+  try {
+    const schemaAudit = await auditSchema();
+    const missingObjects = [
+      ...schemaAudit.missingTables,
+      ...schemaAudit.missingColumns,
+      ...schemaAudit.missingFunctions,
+    ];
+    checks.schema = {
+      ok: isSchemaAuditHealthy(schemaAudit),
+      latencyMs: Date.now() - schemaStart,
+      ...schemaAudit,
+      ...(missingObjects.length > 0 && {
+        error: `Missing required schema objects: ${missingObjects.join(", ")}`,
+      }),
+    };
+  } catch (err) {
+    checks.schema = {
+      ok: false,
+      latencyMs: Date.now() - schemaStart,
+      error: err instanceof Error ? err.message : "Unknown schema audit error",
+    };
+  }
+
+  // 5. 배포 식별 + 통합 활성 여부 (스테이징이 프로덕션 자원을 쓰고 있는지 눈으로 확인)
   const runtimeInfo = {
     appEnv,
     vercelEnv: process.env.VERCEL_ENV ?? null,
