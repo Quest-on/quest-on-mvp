@@ -16,8 +16,6 @@ vi.mock("@/lib/supabase-server", () => ({
 }));
 
 import {
-  canAdmitStudent,
-  canPublish,
   clearPlanLimitsCache,
   getPlanLimits,
   rowToPlanLimits,
@@ -42,45 +40,6 @@ beforeEach(() => {
   clearPlanLimitsCache();
   maybeSingle.mockReset();
   supabaseMock.from.mockClear();
-});
-
-describe("canPublish (AC-9, AC-11)", () => {
-  it("free 등급은 한도 미만이면 허용한다", () => {
-    expect(canPublish(free, 0)).toBe(true);
-    expect(canPublish(free, 2)).toBe(true);
-  });
-
-  it("free 등급은 한도에 도달하면 차단한다 — 4번째 발행이 막힌다", () => {
-    expect(canPublish(free, 3)).toBe(false);
-    expect(canPublish(free, 4)).toBe(false);
-  });
-
-  it("maxPublishes 가 null 이면 무제한이다", () => {
-    expect(canPublish(verified, 0)).toBe(true);
-    expect(canPublish(verified, 9999)).toBe(true);
-  });
-});
-
-describe("canAdmitStudent (AC-10, AC-10a)", () => {
-  it("정원 미만의 신규 학생은 입장한다", () => {
-    expect(canAdmitStudent(free, 0, false)).toBe(true);
-    expect(canAdmitStudent(free, 4, false)).toBe(true);
-  });
-
-  it("정원이 차면 6번째 신규 학생을 차단한다", () => {
-    expect(canAdmitStudent(free, 5, false)).toBe(false);
-    expect(canAdmitStudent(free, 6, false)).toBe(false);
-  });
-
-  // 이 케이스가 없으면 정원이 찬 뒤 기존 학생이 재접속할 때 튕긴다 = 시험 도중 사고.
-  it("기존 학생은 정원이 찼어도 항상 재입장한다 (AC-10a)", () => {
-    expect(canAdmitStudent(free, 5, true)).toBe(true);
-    expect(canAdmitStudent(free, 999, true)).toBe(true);
-  });
-
-  it("maxStudents 가 null 이면 무제한이다", () => {
-    expect(canAdmitStudent(verified, 9999, false)).toBe(true);
-  });
 });
 
 describe("rowToPlanLimits", () => {
@@ -147,7 +106,6 @@ describe("getPlanLimits", () => {
     const limits = await getPlanLimits("free");
     expect(limits.maxPublishes).toBeNull();
     expect(limits.maxStudents).toBeNull();
-    expect(canPublish(limits, 9999)).toBe(true);
   });
 
   it("없는 등급도 폴백으로 처리하고 plan 이름은 보존한다", async () => {

@@ -10,6 +10,7 @@ import { logError } from "@/lib/logger";
 import { triggerGradingIfNeeded } from "@/lib/grading-trigger";
 import { isDemoPreview } from "@/lib/demo-completion";
 import { ONBOARDING_EVENTS, recordOnboardingEvent } from "@/lib/onboarding-events";
+import { isQuotaGateMissing } from "@/lib/plan-limits";
 
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 
@@ -207,10 +208,22 @@ export async function POST(request: NextRequest) {
 
           if (admitError) {
             // fail-open. 한도 계산 장애로 제출이 막히면 그게 더 큰 사고다.
-            logError("[feedback] quota_fail_open", admitError, {
-              path: "/api/feedback",
-              additionalData: { examId: exam.id, reason: "admit_rpc_failed" },
-            });
+            const gateMissing = isQuotaGateMissing(admitError);
+            logError(
+              gateMissing
+                ? "[quota] quota_gate_missing"
+                : "[quota] quota_fail_open",
+              admitError,
+              {
+                path: "/api/feedback",
+                additionalData: {
+                  examId: exam.id,
+                  reason: "admit_rpc_failed",
+                  gateMissing,
+                  errorCode: admitError.code,
+                },
+              }
+            );
           }
 
           const verdict = Array.isArray(admission) ? admission[0] : admission;

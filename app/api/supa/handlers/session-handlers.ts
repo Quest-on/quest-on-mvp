@@ -13,6 +13,7 @@ import {
   recordOnboardingEvent,
 } from "@/lib/onboarding-events";
 import { isDemoPreview } from "@/lib/demo-completion";
+import { isQuotaGateMissing } from "@/lib/plan-limits";
 
 /** 5-second grace period for network latency (shared across heartbeat/initExamSession/feedback) */
 const GRACE_PERIOD_MS = 5_000;
@@ -761,10 +762,22 @@ export async function initExamSession(data: {
       // 로그만 남기고 넘어가면 fail-open 이 아니다 — RPC 가 세션을 못 만들었으니
       // 아래 조회가 비어 500 이 된다. 그래서 여기서 직접 만들어 준다.
       if (admitError) {
-        logError("[initExamSession] quota_fail_open", admitError, {
-          path: "/api/supa/session-handlers",
-          additionalData: { examId: exam.id, reason: "admit_rpc_failed" },
-        });
+        const gateMissing = isQuotaGateMissing(admitError);
+        logError(
+          gateMissing
+            ? "[quota] quota_gate_missing"
+            : "[quota] quota_fail_open",
+          admitError,
+          {
+            path: "/api/supa/session-handlers",
+            additionalData: {
+              examId: exam.id,
+              reason: "admit_rpc_failed",
+              gateMissing,
+              errorCode: admitError.code,
+            },
+          }
+        );
 
         const { error: fallbackError } = await getSupabase()
           .from("sessions")

@@ -4,6 +4,9 @@ import { getSupabaseServer } from "@/lib/supabase-server";
  * 요금제 한도 (Epic #79 / 이슈 #80 / ADR-006).
  *
  * 한도값은 코드 상수가 아니라 `plan_limits` 테이블에서 온다.
+ * 한도 판정의 유일한 지점은 `admit_exam_session` SQL 함수다. 이 모듈은 표시용
+ * 잔여량 계산과 한도 조회만 맡는다. 판정식을 TypeScript에 다시 넣으면 SQL과
+ * 갈라져 어느 한쪽에서만 학생을 막거나 통과시키게 된다.
  * 사고로 정상 교수자가 차단되면 복구 수단이 revert 뿐이어서는 안 된다 —
  * CI 전 계열을 거쳐 배포되는 동안 모든 free 교수자가 막히기 때문이다.
  * 테이블이면 `UPDATE plan_limits SET max_publishes = NULL` 한 줄로 즉시 해제된다.
@@ -81,32 +84,17 @@ export async function getPlanLimits(plan: string): Promise<PlanLimits> {
 }
 
 /**
- * 발행 한도 판정 (AC-9, AC-11).
+ * RPC 가 일시적으로 실패한 것이 아니라 아예 존재하지 않는가.
  *
- * `publishedCount` 는 `first_published_at IS NOT NULL AND is_demo = false` 인
- * exam 개수다. 이미 학생이 들어왔던 exam 에 다시 들어오는 것은 카운트를 늘리지
- * 않으므로(`first_published_at` 은 COALESCE 로 최초 1회만 기록) 재발행은 무료다.
+ * migration을 `database/[NNN]_*.sql`로 수기 적용하는 운영에서 028/030 누락으로
+ * ai_events 기록과 자동 채점이 20일간 멈춘 전례가 있다. 게이트 RPC도 같은 방식으로
+ * 사라질 수 있으므로, PGRST202(함수·시그니처 미발견)와 PGRST204(스키마 캐시의
+ * 객체 미발견)는 잠깐의 장애가 아니라 한도 기능이 꺼진 상태로 따로 관측한다.
  */
-export function canPublish(limits: PlanLimits, publishedCount: number): boolean {
-  if (limits.maxPublishes === null) return true;
-  return publishedCount < limits.maxPublishes;
-}
-
-/**
- * 학생 입장 한도 판정 (AC-10, AC-10a).
- *
- * ⚠️ `isExistingStudent` 가 true 면 **정원이 찼어도 항상 통과한다.**
- * 이게 없으면 정원이 찬 뒤 기존 학생이 재접속할 때 튕기고, 그건 시험 도중 사고다.
- * 상한은 "서로 다른 학생 수" 기준이며 재입장에는 적용되지 않는다.
- */
-export function canAdmitStudent(
-  limits: PlanLimits,
-  distinctStudentCount: number,
-  isExistingStudent: boolean
-): boolean {
-  if (isExistingStudent) return true;
-  if (limits.maxStudents === null) return true;
-  return distinctStudentCount < limits.maxStudents;
+export function isQuotaGateMissing(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const code = (error as { code?: unknown }).code;
+  return code === "PGRST202" || code === "PGRST204";
 }
 
 /**
