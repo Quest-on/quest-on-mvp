@@ -123,6 +123,7 @@ export default function AdminDashboard() {
   const {
     data: aiSummary,
     isLoading: isAiSummaryLoading,
+    isError: isAiSummaryError,
     refetch: refetchAiSummary,
   } = useQuery<AiSummaryResponse | null>({
     queryKey: qk.admin.aiUsageSummary({ range: "7d" }),
@@ -142,11 +143,15 @@ export default function AdminDashboard() {
     retry: false,
   });
 
-  const { data: pendingInstructors, refetch: refetchPending } = useQuery({
+  const {
+    data: pendingInstructors,
+    isError: isPendingInstructorsError,
+    refetch: refetchPending,
+  } = useQuery({
     queryKey: qk.admin.pendingInstructors(),
     queryFn: async () => {
       const res = await fetch("/api/admin/instructors/pending");
-      if (!res.ok) return [];
+      if (!res.ok) throw new Error("PENDING_INSTRUCTORS_FETCH_FAILED");
       const data = await res.json();
       return data.instructors || [];
     },
@@ -352,7 +357,13 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {pendingInstructors && pendingInstructors.length > 0 && (
+      {isAiSummaryError && (
+        <ErrorAlert message={t("dashboard.ai.loadFailed")} />
+      )}
+
+      {isPendingInstructorsError ? (
+        <ErrorAlert message={t("dashboard.pending.loadFailed")} />
+      ) : pendingInstructors && pendingInstructors.length > 0 ? (
         <Card className="border-warning-border bg-warning-surface">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-warning-text">
@@ -400,7 +411,7 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -490,6 +501,7 @@ export default function AdminDashboard() {
               onClick={() => {
                 refetch();
                 refetchAiSummary();
+                refetchPending();
                 refetchPublishing();
               }}
               variant="outline"

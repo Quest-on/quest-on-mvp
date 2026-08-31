@@ -59,6 +59,12 @@ export interface TrackedOpenAIResult<T> {
   estimatedCostUsdMicros: number;
 }
 
+export type AiTrackingFailure = {
+  at: string;
+  code: string | null;
+  schemaDrift: boolean;
+};
+
 type AiEventInsert = {
   provider: string;
   endpoint: AiEndpoint;
@@ -88,6 +94,13 @@ type AiEventInsert = {
   config_version?: string | null;
   metadata: JsonRecord;
 };
+
+let lastAiTrackingFailure: AiTrackingFailure | null = null;
+
+/** 직전 ai_events 기록 실패. 없으면 null. */
+export function getLastAiTrackingFailure(): AiTrackingFailure | null {
+  return lastAiTrackingFailure;
+}
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null;
@@ -227,6 +240,17 @@ function getOpenAIErrorCode(error: unknown): string | null {
   return null;
 }
 
+function getTrackingErrorCode(error: unknown): string | null {
+  if (isRecord(error) && typeof error.code === "string") {
+    return error.code;
+  }
+  return null;
+}
+
+function isAiTrackingSchemaDrift(code: string | null): boolean {
+  return code === "PGRST204" || code === "PGRST205" || code === "42703";
+}
+
 async function insertAiEvent(event: AiEventInsert): Promise<void> {
   const supabase = getSupabaseServer();
   const { error } = await supabase.from("ai_events").insert(event);
@@ -264,15 +288,32 @@ function buildFailure(error: unknown): OpenAIRequestFailure {
 async function persistAiEvent(event: AiEventInsert, route: string): Promise<void> {
   try {
     await insertAiEvent(event);
+    lastAiTrackingFailure = null;
   } catch (trackingError) {
-    await logError("Failed to insert ai_events row", trackingError, {
-      path: route,
-      additionalData: {
-        feature: event.feature,
-        endpoint: event.endpoint,
-        model: event.model,
-      },
-    });
+    const code = getTrackingErrorCode(trackingError);
+    const schemaDrift = isAiTrackingSchemaDrift(code);
+    lastAiTrackingFailure = {
+      at: new Date().toISOString(),
+      code,
+      schemaDrift,
+    };
+
+    await logError(
+      schemaDrift
+        ? "AI event tracking schema drift"
+        : "Failed to insert ai_events row",
+      trackingError,
+      {
+        path: route,
+        additionalData: {
+          feature: event.feature,
+          endpoint: event.endpoint,
+          model: event.model,
+          trackingErrorCode: code,
+          schemaDrift,
+        },
+      }
+    );
   }
 }
 
