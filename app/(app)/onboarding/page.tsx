@@ -77,16 +77,17 @@ export default function OnboardingPage() {
   // Profile fields (shared)
   const [name, setName] = useState("");
   const [school, setSchool] = useState("");
-  const [schoolSearchQuery, setSchoolSearchQuery] = useState("");
   const [schoolSuggestions, setSchoolSuggestions] = useState<University[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  // 제안을 골라서 질의가 바뀐 것인지 구분한다.
+  // 사용자 타이핑이 아닌 값 변경은 검색하지 않는다.
   //
-  // handleSchoolSelect 가 schoolSearchQuery 를 대학 전체 이름으로 세팅하면
-  // 아래 검색 effect 가 그걸 새 입력으로 보고 같은 검색을 다시 돌린다. 목록을
-  // 방금 닫았는데 300ms 뒤 되살아나서, 동의 체크박스와 제출 버튼을 덮는다.
-  // 학교를 고른 사용자가 다음 칸으로 못 넘어간다.
-  const justSelectedRef = useRef(false);
+  // 제안 선택과 기존 프로필 prefill 은 사용자가 새로 입력한 것이 아니다. 이를
+  // 검색하면 방금 닫은 목록이 되살아나 동의 체크박스와 완료 버튼을 덮는다.
+  //
+  // boolean 플래그가 아니라 "검색을 건너뛸 값" 을 들고 있는다. 플래그는 값이
+  // 실제로 바뀌지 않았을 때(prefill 이 사용자 입력에 밀려 무시된 경우) 소비되지
+  // 않고 남아서, 다음에 사용자가 직접 친 질의를 대신 삼킨다.
+  const suppressSearchForRef = useRef<string | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -135,8 +136,10 @@ export default function OnboardingPage() {
         if (!p || cancelled) return;
 
         setName((prev) => prev || p.name || "");
+        if (p.school) {
+          suppressSearchForRef.current = p.school;
+        }
         setSchool((prev) => prev || p.school || "");
-        setSchoolSearchQuery((prev) => prev || p.school || "");
         if (role === "student") {
           setStudentNumber((prev) => prev || p.student_number || "");
         }
@@ -188,13 +191,13 @@ export default function OnboardingPage() {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    // 선택으로 바뀐 질의는 다시 검색하지 않는다.
-    if (justSelectedRef.current) {
-      justSelectedRef.current = false;
+    // 사용자 타이핑이 아닌 값 변경은 다시 검색하지 않는다.
+    if (suppressSearchForRef.current === school) {
+      suppressSearchForRef.current = null;
       return;
     }
 
-    if (schoolSearchQuery.trim().length === 0) {
+    if (school.trim().length === 0) {
       setSchoolSuggestions([]);
       return;
     }
@@ -203,7 +206,7 @@ export default function OnboardingPage() {
     searchTimeoutRef.current = setTimeout(async () => {
       try {
         const response = await fetch(
-          `/api/universities/search?q=${encodeURIComponent(schoolSearchQuery)}`
+          `/api/universities/search?q=${encodeURIComponent(school)}`
         );
         if (response.ok) {
           const data = await response.json();
@@ -221,7 +224,7 @@ export default function OnboardingPage() {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [schoolSearchQuery]);
+  }, [school]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -243,9 +246,8 @@ export default function OnboardingPage() {
   }, []);
 
   const handleSchoolSelect = (university: University) => {
-    justSelectedRef.current = true;
+    suppressSearchForRef.current = university.fullName;
     setSchool(university.fullName);
-    setSchoolSearchQuery(university.fullName);
     setSchoolSuggestions([]);
   };
 
@@ -664,13 +666,8 @@ export default function OnboardingPage() {
                         ? t("schoolPlaceholderStudent")
                         : t("schoolPlaceholderInstructor")
                     }
-                    value={schoolSearchQuery}
-                    onChange={(e) => {
-                      setSchoolSearchQuery(e.target.value);
-                      if (e.target.value !== school) {
-                        setSchool("");
-                      }
-                    }}
+                    value={school}
+                    onChange={(e) => setSchool(e.target.value)}
                     required
                   />
                   {isSearching && (
@@ -699,11 +696,6 @@ export default function OnboardingPage() {
                     </div>
                   )}
                 </div>
-                {school && (
-                  <p className="type-hint">
-                    {t("selectedSchool", { school })}
-                  </p>
-                )}
               </div>
 
               {/*
