@@ -49,8 +49,6 @@ export function PreflightModal({
   /**
    * AI 최초 고지 묶음을 이번 응시에 보여줄 것인가 (AC-14 / AC-15).
    *
-   * `examHasEssay` — 채팅이 아예 없는 MCQ/OX 전용 시험에서 "AI에게 질문하세요"를
-   * 안내하면 고지가 거짓이 된다.
    * `showAiDisclosure` — 이미 확인한 학생에게 매 시험 같은 걸 다시 읽히면 그때부터
    * 안 읽는다. AC-15 가 재노출을 금지하는 이유다.
    *
@@ -59,7 +57,7 @@ export function PreflightModal({
    * 조건)을 하나의 게이트로 묶는다. 시험 규칙·시간 정책은 시험마다 다르므로
    * 이 게이트 밖에 그대로 둔다.
    */
-  const showFirstRunAiConsent = examHasEssay && showAiDisclosure;
+  const showFirstRunAiConsent = showAiDisclosure;
 
   const handleAccept = () => {
     const canAccept = showFirstRunAiConsent
@@ -112,10 +110,9 @@ export function PreflightModal({
               학생이 그걸 모르면 겁먹고 질문을 안 해 점수가 낮게 나온다.
               그래서 감시("기록됩니다") 프레임이 아니라 허용, 투명성 프레임으로 쓴다.
 
-              단 examHasEssay 로 게이팅한다. MCQ/OX 전용 시험은
-              exam/[code]/page.tsx 가 !isCurrentObjective 일 때만 ExamChatSidebar 를
-              렌더하므로 채팅 자체가 없다. 없는 기능을 쓰라고 안내하면 고지가
-              거짓이 되고, 신뢰를 얻으려던 문구가 반대로 신뢰를 깎는다.
+              MCQ/OX 전용 시험은 채팅 권유 대신 외부 AI 금지와 기록 범위를
+              안내한다. 시험 유형과 무관하게 최초 확인을 받아야 다음 시험에서
+              고지를 건너뛰는 일이 없다.
 
               showAiDisclosure 는 사람 단위 최초 1회 게이팅이다 (AC-15). 이미 확인한
               학생에게 매 시험 같은 3줄을 다시 읽히면 그때부터는 안 읽는다. 확인
@@ -127,9 +124,19 @@ export function PreflightModal({
                 {t("preflight.aiDisclosureTitle")}
               </h3>
               <ul className="space-y-1.5 text-sm">
-                <li>{t("preflight.aiDisclosureAllowed")}</li>
-                <li>{t("preflight.aiDisclosureGraded")}</li>
-                <li>{t("preflight.aiDisclosureVisible")}</li>
+                {examHasEssay ? (
+                  <>
+                    <li>{t("preflight.aiDisclosureAllowed")}</li>
+                    <li>{t("preflight.aiDisclosureGraded")}</li>
+                    <li>{t("preflight.aiDisclosureVisible")}</li>
+                  </>
+                ) : (
+                  <>
+                    <li>{t("preflight.aiDisclosureUnavailable")}</li>
+                    <li>{t("preflight.aiDisclosureExternalAiProhibited")}</li>
+                    <li>{t("preflight.aiDisclosureActivityRecorded")}</li>
+                  </>
+                )}
               </ul>
             </div>
           )}
@@ -281,9 +288,11 @@ export function PreflightModal({
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
                 <div className="space-y-2">
-                  <p className="font-semibold">{t("preflight.aiLogAlertTitle")}</p>
+                  <p className="font-semibold">
+                    {t(examHasEssay ? "preflight.aiLogAlertTitle" : "preflight.aiActivityAlertTitle")}
+                  </p>
                   <p className="text-sm">
-                    {t("preflight.aiLogAlertDescription")}
+                    {t(examHasEssay ? "preflight.aiLogAlertDescription" : "preflight.aiActivityAlertDescription")}
                   </p>
                 </div>
               </AlertDescription>
@@ -324,7 +333,7 @@ export function PreflightModal({
                   htmlFor="ai-log"
                   className="text-sm leading-relaxed cursor-pointer"
                 >
-                  {t("preflight.aiLogCheckLabel")}
+                  {t(examHasEssay ? "preflight.aiLogCheckLabel" : "preflight.aiActivityCheckLabel")}
                 </label>
               </div>
             )}

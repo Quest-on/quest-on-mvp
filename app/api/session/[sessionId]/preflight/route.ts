@@ -13,9 +13,9 @@ import {
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import {
   ONBOARDING_EVENTS,
+  hasOnboardingEvent,
   recordOnboardingEvent,
 } from "@/lib/onboarding-events";
-import { hasAiChatQuestions } from "@/lib/grading-helpers";
 import { isDemoPreview } from "@/lib/demo-completion";
 
 /**
@@ -163,18 +163,6 @@ export async function POST(
     // 학생이 처음으로 고지를 확인한 시점은 세션이 아니라 사람 단위이므로
     // 마일스톤으로 남긴다.
     //
-    // ⚠️ 조건이 핵심이다. 3줄 고지는 AI 채팅이 실제로 뜨는 시험에서만 노출된다
-    // (`PreflightModal` 의 `examHasEssay` 게이트). 그런데 수락을 무조건 ACK 로
-    // 승격하면, **객관식 전용 시험만 본 학생이 고지를 한 번도 안 보고 확인 완료가
-    // 된다.** 그 학생의 다음 서술형 시험에서는 고지가 숨겨진다 — 고지를 못 받은
-    // 채로 AI 시험에 들어가는 것이다(#149).
-    //
-    // 그래서 노출 판정과 기록 판정은 같은 함수여야 하고, 그 판정을 서버가
-    // 소유한다. 클라이언트가 무엇을 렌더했는지는 신뢰 근거가 못 된다.
-    const disclosureWasShown = hasAiChatQuestions(
-      exam.questions as ReadonlyArray<{ type?: string }> | null
-    );
-
     // 교수자가 자기 데모를 학생 시점으로 겪는 경우는 기록하지 않는다(#167).
     //
     // #166 이 그 경로를 열면서, 데모 템플릿이 전부 서술형이라 위 판정이 참이
@@ -190,15 +178,26 @@ export async function POST(
       userId: user.id,
     });
 
-    if (disclosureWasShown && preview === false) {
-      // await 하되 실패해도 무시한다 — 이 함수는 throw 하지 않고 boolean 만
-      // 돌려준다. 계측 때문에 응시 시작이 막히면 그게 더 큰 사고다.
-      await recordOnboardingEvent({
+    if (preview === false) {
+      const recorded = await recordOnboardingEvent({
         userId: user.id,
         role: "student",
         event: ONBOARDING_EVENTS.STUDENT_DISCLOSURE_ACK,
         examId: session.exam_id,
       });
+
+      // 재노출 방지의 근거가 이 기록이다. 영속되지 않은 채 수락을 성공으로
+      // 돌려주면 확인 시각 없는 응시가 생긴다.
+      //
+      // recordOnboardingEvent 가 true 면 새 행이 실제로 들어간 것이라 그 자체가
+      // 영속 증거다. false 는 "이미 도달"과 "저장 실패"를 구분하지 않으므로,
+      // 그때만 한 번 읽어 가른다. 정상 경로에 왕복을 더 붙이지 않는다.
+      if (
+        !recorded &&
+        !(await hasOnboardingEvent(user.id, ONBOARDING_EVENTS.STUDENT_DISCLOSURE_ACK))
+      ) {
+        return errorJson("INTERNAL_ERROR", "Failed to record disclosure acknowledgement", 500);
+      }
     }
 
     const gateState = buildGateStatePayload(reconciledSession, exam, nowTime);

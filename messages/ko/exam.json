@@ -194,7 +194,13 @@
     "aiDisclosureTitle": "AI 사용 안내",
     "aiDisclosureAllowed": "막히면 AI에게 질문하세요. 질문은 부정행위가 아니라 시험의 일부입니다.",
     "aiDisclosureGraded": "질문한 내용 자체도 평가 대상입니다. 질문을 아끼면 오히려 손해입니다.",
-    "aiDisclosureVisible": "AI와 나눈 대화는 교수자에게 그대로 공개됩니다."
+    "aiDisclosureVisible": "AI와 나눈 대화는 교수자에게 그대로 공개됩니다.",
+    "aiDisclosureUnavailable": "이 시험에서는 AI 채팅을 제공하지 않습니다.",
+    "aiDisclosureExternalAiProhibited": "시험 중 ChatGPT, Claude 등 외부 AI 도구를 사용하지 마세요.",
+    "aiDisclosureActivityRecorded": "시험 활동은 기록되며, 교수자가 확인할 수 있습니다.",
+    "aiActivityAlertTitle": "시험 활동 기록 안내",
+    "aiActivityAlertDescription": "공정한 평가를 위해 시험 중 활동이 기록되며, 필요할 때 교수자가 확인할 수 있습니다.",
+    "aiActivityCheckLabel": "AI 채팅 미제공, 외부 AI 사용 금지 및 시험 활동 기록 안내를 확인했습니다."
   },
   "waitingRoom": {
     "title": "대기실",

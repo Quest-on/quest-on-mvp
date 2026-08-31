@@ -418,6 +418,7 @@ export default function ExamPage() {
       const response = await fetch(`/api/session/${sessionId}/preflight`, { method: "POST" });
       if (response.ok) {
         const body = await response.json();
+        session.acknowledgeDisclosure();
         session.setShowPreflight(false);
 
         if (body.status) {

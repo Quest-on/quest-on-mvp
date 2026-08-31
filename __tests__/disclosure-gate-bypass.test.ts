@@ -86,11 +86,11 @@ describe("지각 입장 고지 게이트 (#150)", () => {
     expect(update.mock.calls[0][0]).not.toHaveProperty("preflight_accepted_at");
   });
 
-  it("AI 채팅 시험에서 사람 단위 ACK가 없으면 preflight를 다시 띄운다", () => {
+  it("시험 유형과 무관하게 사람 단위 ACK가 없으면 preflight를 다시 띄운다", () => {
     const hook = readFileSync("hooks/useExamSession.ts", "utf8");
 
-    expect(hook).toMatch(/hasAiChatQuestions\(initData\.exam\.questions\)/);
-    expect(hook).toMatch(/!initData\.disclosureAcknowledged/);
+    expect(hook).toMatch(/const needsDisclosureAcknowledgement = !initData\.disclosureAcknowledged;/);
+    expect(hook).not.toMatch(/hasAiChatQuestions\(initData\.exam\.questions\)/);
     expect(hook).toMatch(/\|\| needsDisclosureAcknowledgement/);
     expect(hook).toMatch(/"late_pending"/);
   });

@@ -76,14 +76,15 @@ export function ExamDetailsCard({
         examTitle,
         codeLabel: t("examDetailsCard.noticeCodeLabel"),
         examCode,
-        // MCQ/OX 전용 시험은 학생 화면에 AI 채팅이 아예 렌더되지 않는다
-        // (exam/[code]/page.tsx 가 !isCurrentObjective 일 때만 ExamChatSidebar 노출).
-        // 그런 시험의 공지문에 "AI에게 질문하세요"를 넣으면 문구 자체가 거짓이 된다.
-        // 판정은 studentNoticePolicyLines 가 갖고 있고 테스트로 고정돼 있다.
+        // MCQ/OX 전용 시험에는 채팅을 권하지 않고, 외부 AI 금지와 기록 범위를
+        // 알려야 학생이 AI 정책 없이 시험에 들어가는 일이 없다.
         policyLines: studentNoticePolicyLines(aiChatAvailable, {
           allowed: tExam("preflight.aiDisclosureAllowed"),
           graded: tExam("preflight.aiDisclosureGraded"),
           visible: tExam("preflight.aiDisclosureVisible"),
+          unavailable: tExam("preflight.aiDisclosureUnavailable"),
+          externalAiProhibited: tExam("preflight.aiDisclosureExternalAiProhibited"),
+          activityRecorded: tExam("preflight.aiDisclosureActivityRecorded"),
         }),
         footer: t("examDetailsCard.noticeFooter"),
       });
