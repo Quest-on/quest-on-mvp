@@ -641,7 +641,7 @@ function StudentRow({
             {student.student_number && <span>{student.student_number}</span>}
             {student.student_number && student.school && <span> &bull; </span>}
             {student.school && <span>{student.school}</span>}
-            {!student.student_number && !student.school && (
+            {!student.student_number && !student.school && student.email && (
               <span>{student.email}</span>
             )}
           </div>

@@ -35,7 +35,12 @@ export interface ExamStudentSummary {
   name: string;
   studentNumber?: string;
   school?: string;
-  email?: string;
+  /**
+   * 모르면 `null` 이다. 날조하지 않는다 — 예전에는 `<uuid>@example.com` 을
+   * 만들어 넣어서 교수자가 그걸 실제 주소로 읽었다(RFC 2606 예약 도메인이라
+   * 전송도 안 된다). 없는 값은 없다고 말한다.
+   */
+  email?: string | null;
   status: ExamStudentSessionStatus;
   submittedAt?: string;
   mcq: QuestionCountPair;

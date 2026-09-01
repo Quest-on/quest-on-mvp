@@ -67,8 +67,6 @@ describe("AI 고지 적용 범위 (#325)", () => {
         "aiDisclosureUnavailable",
         "aiDisclosureExternalAiProhibited",
         "aiDisclosureActivityRecorded",
-        "aiActivityAlertTitle",
-        "aiActivityAlertDescription",
         "aiActivityCheckLabel",
       ]) {
         expect(exam[locale].preflight[key], `${locale}.exam.preflight.${key}`).toBeTruthy();
@@ -96,5 +94,32 @@ describe("AI 고지 적용 범위 (#325)", () => {
     expect(preflightSource).toMatch(
       /examHasEssay \? "preflight\.aiLogCheckLabel" : "preflight\.aiActivityCheckLabel"/
     );
+  });
+
+  it("AI 기록 고지를 한 화면에서 반복하지 않는다", () => {
+    // 예전에는 같은 사실이 네 곳에 있었다: 요약 박스 · AI 사용 안내 ·
+    // 별도 Alert · 확인 체크박스. 반복은 고지를 강하게 만들지 않고 희석시킨다.
+    // 고지(AC-14)와 명시 확인(체크박스)만 남긴다.
+    expect(preflightSource).not.toContain("preflight.aiLogAlertTitle");
+    expect(preflightSource).not.toContain("preflight.aiActivityAlertTitle");
+
+    // 재응시(고지 묶음을 안 보는 학생)에서는 요약 줄이 유일한 안내라 남아야 한다.
+    expect(preflightSource).toMatch(/examHasEssay && !showFirstRunAiConsent/);
+  });
+
+  it("쓰이지 않게 된 Alert 문구 키를 메시지에 남기지 않는다", () => {
+    for (const locale of ["ko", "en"] as const) {
+      for (const key of [
+        "aiLogAlertTitle",
+        "aiLogAlertDescription",
+        "aiActivityAlertTitle",
+        "aiActivityAlertDescription",
+      ]) {
+        expect(
+          exam[locale].preflight[key],
+          `${locale}.exam.preflight.${key} 가 살아 있다`
+        ).toBeUndefined();
+      }
+    }
   });
 });

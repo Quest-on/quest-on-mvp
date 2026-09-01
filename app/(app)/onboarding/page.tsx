@@ -98,8 +98,8 @@ export default function OnboardingPage() {
   // JTBD 2문항 (AC-4). 프로필 수집이 아니라 데모 템플릿 선택 입력이다 —
   // 즉시 소비되지 않는 질문은 온보딩에 둘 이유가 없다.
   const [subject, setSubject] = useState<
-    "humanities" | "business" | "engineering" | "health" | "general"
-  >("general");
+    "humanities" | "business" | "engineering" | "health" | "general" | null
+  >(null);
 
   // AC-1: 가입 시점의 역할 의도를 해석할 수 있으면 역할 단계를 건너뛴다.
   // 해석할 수 없으면(예: OAuth 쿠키 소실) 역할 단계를 그대로 보여준다 —
@@ -114,7 +114,13 @@ export default function OnboardingPage() {
     if (resolved) {
       setRole(resolved);
       setRoleRestored(true);
-      setStep("profile");
+      // 역할 단계에 멈췐 있을 때만 앞으로 보낸다.
+      //
+      // 이 effect 는 profile 이 바뀜 때마다 다시 돌고, 프로필을 저장하면
+      // 바뀜다. 무조건 setStep("profile") 을 하면 방금 intake 로 넘어간
+      // 사용자를 프로필 단계로 다시 끌어내린다. 실제로 데모 생성 직후
+      // 화면이 프로필로 되돌아오는 버그가 여기서 나왔다.
+      setStep((prev) => (prev === "role" ? "profile" : prev));
     }
   }, [isLoaded, user, profile]);
 
@@ -423,7 +429,7 @@ export default function OnboardingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...(skipped ? {} : { subject }),
+          ...(skipped || !subject ? {} : { subject }),
           skipped,
           language: locale === "en" ? "en" : "ko",
         }),
@@ -439,9 +445,11 @@ export default function OnboardingPage() {
     // 목록·통계·발행 카운트 어디에도 나타나지 않는다)과 정면으로 부딪힌다 —
     // 목록에서 숨기는 순간 데모가 도달 불가능해지기 때문이다. 링크로 보내면
     // 둘 다 성립한다.
+    // 역할 복원 effect가 페이지가 살아 있는 동안 profile 단계로 되돌릴 수 있다.
+    // 데모 생성 직후에는 그 상태를 이어받지 않고 새 경로에서 다시 시작해야 한다.
     // 라우터로 이동한다. window.location.href 는 전체 페이지를 다시 띄워서
     // 흰 화면을 거치고, 방금 만든 데모와 도착 화면 사이의 연결이 시각적으로
-    // 끊긴다. 여기는 역할 변경처럼 세션을 새로 읽어야 하는 경우가 아니다.
+    // 끊긴다(#212). 여기는 역할 변경처럼 세션을 새로 읽어야 하는 경우가 아니다.
     router.push(examId ? `/instructor/${examId}` : "/instructor");
   };
 
@@ -535,7 +543,7 @@ export default function OnboardingPage() {
 
             <div className="space-y-3">
               <RadioGroup
-                value={subject}
+                value={subject ?? ""}
                 onValueChange={(value) =>
                   setSubject(
                     value as
@@ -582,7 +590,7 @@ export default function OnboardingPage() {
               <Button
                 type="button"
                 className="flex-1 min-h-[48px]"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !subject}
                 onClick={() => createDemo(false)}
               >
                 {isSubmitting ? (
@@ -754,18 +762,20 @@ export default function OnboardingPage() {
               {error && <ErrorAlert message={error} />}
 
               <div className="flex gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setStep("role")}
-                  disabled={isSubmitting}
-                >
-                  <ArrowLeft className="w-4 h-4 mr-1" />
-                  {t("backBtn")}
-                </Button>
+                {!roleRestored && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStep("role")}
+                    disabled={isSubmitting}
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-1" />
+                    {t("backBtn")}
+                  </Button>
+                )}
                 <Button
                   type="submit"
-                  className="flex-1"
+                  className={roleRestored ? "w-full" : "flex-1"}
                   disabled={
                     isSubmitting ||
                     prefillFailed ||

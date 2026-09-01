@@ -45,10 +45,6 @@ function syntheticAppUserName(studentId: string): string {
   return `User ${studentId.slice(0, 8)}`;
 }
 
-function syntheticAppUserEmail(studentId: string): string {
-  return `${studentId}@example.com`;
-}
-
 function realAppUserName(info: UserInfo | undefined, studentId: string): string | undefined {
   if (!info?.name || info.name === syntheticAppUserName(studentId)) {
     return undefined;
@@ -56,11 +52,8 @@ function realAppUserName(info: UserInfo | undefined, studentId: string): string 
   return info.name;
 }
 
-function realAppUserEmail(info: UserInfo | undefined, studentId: string): string | undefined {
-  if (!info?.email || info.email === syntheticAppUserEmail(studentId)) {
-    return undefined;
-  }
-  return info.email;
+function realAppUserEmail(info: UserInfo | undefined): string | undefined {
+  return info?.email ?? undefined;
 }
 
 function realProfileName(profile: BulkGradeStudentProfile | undefined): string | undefined {
@@ -92,7 +85,7 @@ export function buildBulkGradeStudentIdentities(
       name,
       studentNumber: profile?.student_number || undefined,
       school: profile?.school || undefined,
-      email: realAppUserEmail(appUser, studentId),
+      email: realAppUserEmail(appUser),
       submittedAt: session.submitted_at,
     };
   });

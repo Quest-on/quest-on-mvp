@@ -97,9 +97,11 @@ export function ExamStudentRow({
         </Avatar>
         <div className="min-w-0">
           <div className="font-medium text-sm truncate">{student.name}</div>
-          <div className="text-xs text-muted-foreground truncate">
-            {subInfo || student.email || ""}
-          </div>
+          {(subInfo || student.email) && (
+            <div className="text-xs text-muted-foreground truncate">
+              {subInfo || student.email}
+            </div>
+          )}
         </div>
       </div>
 

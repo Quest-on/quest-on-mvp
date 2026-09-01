@@ -70,9 +70,16 @@ describe("착지 후 다음 걸음", () => {
 
   it("데모가 없으면 그 블록이 뜨지 않는다", () => {
     // 데모 없는 사람에게 "데모 열기" 를 보여주면 막다른 길이다.
-    const idx = HOME.indexOf("{demoExamId ? (");
+    const MARKER = "{demoExamId ? (";
+    const idx = HOME.indexOf(MARKER);
     expect(idx).toBeGreaterThan(-1);
-    expect(HOME.slice(idx, idx + 800)).toMatch(/\) : null\}/);
+
+    // 창 크기를 고정하면 안내 문구가 한 줄 늘 때마다 깨진다. 고정할 계약은
+    // "블록 전체가 demoExamId 조건 안에 들어 있고, 닫는 분기가 null 이다" 이다.
+    const end = HOME.indexOf(") : null}", idx);
+    expect(end).toBeGreaterThan(idx);
+    // 중첩된 또 다른 demoExamId 조건이 사이에 끼어있지 않아야 짝이 맞는다.
+    expect(HOME.slice(idx + MARKER.length, end)).not.toContain(MARKER);
   });
 
   it("ko/en 문구가 있다", () => {
