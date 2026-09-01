@@ -68,6 +68,11 @@ describe("온보딩 페이지 배선", () => {
   it("리다이렉트 목적지를 safeInternalPath 로 좁힌 뒤에만 이동한다", () => {
     expect(source).toContain("safeInternalPath(redirectUrl)");
     expect(source).not.toMatch(/redirectUrl\.startsWith\("\/"\)/);
-    expect(source).toContain("window.location.href = redirectTarget");
+    // 검증되지 않은 원본(redirectUrl)으로 직접 이동하면 안 된다.
+    // 이동 수단(router 냐 location 이냐)은 계약이 아니다 — #338 에서
+    // 프로필 갱신 후 router 이동으로 바뀌었다. 고정할 것은 "좁힌 값으로만
+    // 이동한다" 이다.
+    expect(source).toMatch(/(router\.push|window\.location\.href =)\(?redirectTarget\)?/);
+    expect(source).not.toMatch(/(router\.push|window\.location\.href =)\(?redirectUrl\)?/);
   });
 });

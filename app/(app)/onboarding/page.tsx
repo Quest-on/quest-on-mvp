@@ -44,7 +44,7 @@ interface University {
 export default function OnboardingPage() {
   const t = useTranslations("onboarding.page");
   const locale = useLocale();
-  const { user, profile, isLoaded } = useAppUser();
+  const { user, profile, isLoaded, refreshProfile } = useAppUser();
   const tConsent = useTranslations("onboarding.consent");
   const router = useRouter();
 
@@ -395,14 +395,19 @@ export default function OnboardingPage() {
 
       const redirectTarget = safeInternalPath(redirectUrl);
 
+      // 여기서 이미 역할과 프로필을 기록했다. 인증 컨텍스트는 그걸 모르므로
+      // 이동 전에 한 번 갱신한다. 안 하면 도착한 레이아웃이 role 을 null 로 읽고
+      // 다시 온보딩으로 되돌린다 (#338).
+      await refreshProfile();
+
       if (redirectTarget) {
-        window.location.href = redirectTarget;
+        router.push(redirectTarget);
       } else if (role === "instructor") {
         setStep("intake");
         setIsSubmitting(false);
       } else {
         sessionStorage.setItem("profile-setup-complete", "true");
-        window.location.href = "/student";
+        router.push("/student");
       }
     } catch {
       setError(t("saveFailed"));
@@ -441,15 +446,23 @@ export default function OnboardingPage() {
     } catch {
       // 무시하고 진행한다 — 아래 이동은 항상 일어난다.
     }
+    // 이동 전에 인증 컨텍스트의 프로필을 새로 읽는다 (#338).
+    //
+    // AppAuthProvider 는 세션이 잡힐 때 한 번만 profiles 를 읽는다. 온보딩은
+    // 그 뒤에 POST /api/user/role 로 role 을 쓰므로, 갱신하지 않으면 이 세션의
+    // 컨텍스트는 계속 role: null 이다. 그 상태로 넘어가면 instructor 레이아웃이
+    // 그걸 '역할 없음' 으로 읽고 곧바로 /onboarding 으로 되돌린다 — 데모까지
+    // 갔다가 튕겨 나오는 것이 정확히 이 경로였다.
+    await refreshProfile();
+
     // 데모 상세로 직접 보낸다. 드라이브 목록을 거쳐 찾게 하면 AC-17(데모는
     // 목록·통계·발행 카운트 어디에도 나타나지 않는다)과 정면으로 부딪힌다 —
     // 목록에서 숨기는 순간 데모가 도달 불가능해지기 때문이다. 링크로 보내면
     // 둘 다 성립한다.
-    // 역할 복원 effect가 페이지가 살아 있는 동안 profile 단계로 되돌릴 수 있다.
-    // 데모 생성 직후에는 그 상태를 이어받지 않고 새 경로에서 다시 시작해야 한다.
+    //
     // 라우터로 이동한다. window.location.href 는 전체 페이지를 다시 띄워서
     // 흰 화면을 거치고, 방금 만든 데모와 도착 화면 사이의 연결이 시각적으로
-    // 끊긴다(#212). 여기는 역할 변경처럼 세션을 새로 읽어야 하는 경우가 아니다.
+    // 끊긴다(#212). 프로필을 위에서 갱신했으므로 전체 리로드가 필요 없다.
     router.push(examId ? `/instructor/${examId}` : "/instructor");
   };
 
