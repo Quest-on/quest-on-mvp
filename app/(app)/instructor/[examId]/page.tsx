@@ -497,6 +497,7 @@ export default function ExamDetail({
                   examId={exam.id}
                   examStatus={exam.status || "draft"}
                   hasGateFields={!!(exam.open_at || exam.close_at)}
+                  isDemo={isDemoExam}
                   onStatusChange={(newStatus, startedAt) => {
                     setExam((prev) => {
                       if (!prev) return prev;

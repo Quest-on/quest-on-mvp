@@ -221,7 +221,7 @@ export async function GET(
         studentProfile?.name ||
         clerkStudentInfo?.name ||
         `Student ${session.student_id.slice(0, 8)}`,
-      email: clerkStudentInfo?.email || `${session.student_id}@example.com`,
+      email: clerkStudentInfo?.email ?? null,
       student_number: studentProfile?.student_number,
       school: studentProfile?.school,
     };

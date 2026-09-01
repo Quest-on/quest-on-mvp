@@ -129,7 +129,7 @@ export async function GET(
     // Batch fetch all student info from Clerk (single API call)
     const clerkUserMap = await batchGetUserInfo(uniqueStudentIds);
 
-    const studentInfoMap = new Map<string, { name: string; email: string; student_number?: string; school?: string }>();
+    const studentInfoMap = new Map<string, { name: string; email: string | null; student_number?: string; school?: string }>();
     for (const studentId of uniqueStudentIds) {
       const info = clerkUserMap.get(studentId);
       const profile = studentProfileMap.get(studentId);
@@ -151,7 +151,7 @@ export async function GET(
       const studentId = session?.student_id || "";
       const studentInfo = studentInfoMap.get(studentId) || {
         name: `Student ${studentId.slice(0, 8)}`,
-        email: `${studentId}@example.com`,
+        email: null,
       };
 
       // Decompress content if needed

@@ -323,10 +323,14 @@ export default function InstructorHome() {
     queryFn: async () => {
       const res = await fetch("/api/onboarding/demo/status");
       if (!res.ok) return null;
-      return (await res.json()) as { examId: string | null } | null;
+      return (await res.json()) as {
+        completed: boolean;
+        examId: string | null;
+      } | null;
     },
   });
   const demoExamId = demoStatus?.examId ?? null;
+  const isDemoCompleted = demoStatus?.completed === true;
 
   const filteredExamNodes = useMemo(() => {
     if (examFilter === "all") {
@@ -1860,10 +1864,16 @@ export default function InstructorHome() {
                   {demoExamId ? (
                     <div className="rounded-lg border border-info-border bg-info-surface p-4">
                       <p className="type-field-label text-info-text">{t("home.nextStepTitle")}</p>
-                      <p className="type-hint mt-1">{t("home.nextStepDemo")}</p>
-                      <Link href={`/instructor/${demoExamId}`}>
+                      <p className="type-hint mt-1">
+                        {isDemoCompleted
+                          ? t("home.nextStepAfterDemo")
+                          : t("home.nextStepDemo")}
+                      </p>
+                      <Link href={isDemoCompleted ? "/instructor/new" : `/instructor/${demoExamId}`}>
                         <Button variant="outline" size="sm" className="mt-3">
-                          {t("home.nextStepDemoCta")}
+                          {isDemoCompleted
+                            ? t("home.nextStepAfterDemoCta")
+                            : t("home.nextStepDemoCta")}
                         </Button>
                       </Link>
                     </div>
@@ -2037,12 +2047,16 @@ export default function InstructorHome() {
                           <p className="text-muted-foreground mb-2">
                             {isFiltering
                               ? t("drive.noResults")
-                              : t("drive.empty")}
+                              : demoExamId
+                                ? t("home.demoOnlyEmpty")
+                                : t("drive.empty")}
                           </p>
                           <p className="text-sm text-muted-foreground mb-6">
                             {isFiltering
                               ? t("drive.noResultsHint")
-                              : t("drive.emptyHint")}
+                              : demoExamId
+                                ? t("home.demoOnlyEmptyHint")
+                                : t("drive.emptyHint")}
                           </p>
                           {!isFiltering && (
                             <div className="flex items-center justify-center space-x-2">

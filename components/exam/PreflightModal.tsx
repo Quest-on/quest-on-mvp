@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Collapsible,
   CollapsibleContent,
@@ -95,7 +94,13 @@ export function PreflightModal({
                   <span>{t("preflight.aiOnly")}</span>
                 </li>
               )}
-              {examHasEssay && (
+              {/* 최초 고지 묶음이 뜼는 회차에는 이 줄을 뺀다.
+
+                  "기록된다" 를 여기서 한 번, 아래 AI 사용 안내에서 한 번,
+                  확인 체크박스에서 또 한 번 말하면 세 번째부터는 아무도 안 읽는다.
+                  고지를 반복해서 강하게 만들 수는 없고, 반복은 희석시킨다.
+                  재응시(고지 묶음을 이미 본 학생)에는 이 줄이 유일한 안내이므로 남긴다. */}
+              {examHasEssay && !showFirstRunAiConsent && (
                 <li className="flex items-start gap-2">
                   <AlertTriangle className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                   <span>{t("preflight.aiLogged")}</span>
@@ -282,24 +287,11 @@ export function PreflightModal({
             </CollapsibleContent>
           </Collapsible>
 
-          {/* AI 로그 공지 */}
-          {showFirstRunAiConsent && (
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                <div className="space-y-2">
-                  <p className="font-semibold">
-                    {t(examHasEssay ? "preflight.aiLogAlertTitle" : "preflight.aiActivityAlertTitle")}
-                  </p>
-                  <p className="text-sm">
-                    {t(examHasEssay ? "preflight.aiLogAlertDescription" : "preflight.aiActivityAlertDescription")}
-                  </p>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
+          {/* 확인 체크박스.
 
-          {/* 확인 체크박스 */}
+              여기에 있던 "AI 로그 공지" Alert 은 걷었다. 바로 아래 체크박스가
+              같은 사실을 말하고 거기서 명시적 확인까지 받는다. 같은 문장을 두 번
+              연속으로 놓으면 확인이 의례가 된다. */}
           <div className="space-y-3 border-t pt-4">
             <div className="flex items-start gap-3">
               <Checkbox

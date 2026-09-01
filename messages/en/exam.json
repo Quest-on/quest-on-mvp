@@ -185,8 +185,6 @@
     "aiPolicyItem2Description": "Using tools such as ChatGPT or Claude may result in your submission being voided.",
     "aiPolicyItem3Title": "Reasoning is what matters",
     "aiPolicyItem3Description": "Logical thinking, effective AI use, and critical analysis are the core evaluation criteria.",
-    "aiLogAlertTitle": "AI chat logging notice",
-    "aiLogAlertDescription": "All conversations with the AI during this exam are recorded automatically and may be used in your evaluation.",
     "rulesCheckLabel": "I have read and agree to follow the time policy and exam rules above.",
     "aiLogCheckLabel": "I understand that AI chat logs are recorded and will honestly indicate where I received AI assistance.",
     "cancelButton": "Cancel",
@@ -198,8 +196,6 @@
     "aiDisclosureUnavailable": "AI chat is not provided for this exam.",
     "aiDisclosureExternalAiProhibited": "Do not use external AI tools such as ChatGPT or Claude during the exam.",
     "aiDisclosureActivityRecorded": "Your exam activity is recorded and may be reviewed by your instructor.",
-    "aiActivityAlertTitle": "Exam activity recording notice",
-    "aiActivityAlertDescription": "To support fair evaluation, activity during this exam is recorded and may be reviewed by your instructor when needed.",
     "aiActivityCheckLabel": "I understand that AI chat is unavailable, external AI use is prohibited, and exam activity is recorded."
   },
   "waitingRoom": {

@@ -19,7 +19,7 @@ import { formatDate } from "@/lib/i18n/format";
 interface Student {
   id: string; // session ID
   name: string;
-  email: string;
+  email: string | null;
   status: "not-started" | "in-progress" | "completed";
   score?: number;
   submittedAt?: string;
@@ -180,9 +180,11 @@ export function StudentProgressCard({
                           : t("studentProgress.statusNotStarted")}
                       </Badge>
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {student.email}
-                    </div>
+                    {student.email && (
+                      <div className="text-sm text-muted-foreground mt-1">
+                        {student.email}
+                      </div>
+                    )}
                     {(student.student_number || student.school) && (
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                         {student.student_number && (

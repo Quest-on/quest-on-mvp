@@ -4,9 +4,13 @@
     "loadingTitle": "Loading instructor dashboard...",
     "loadingDesc": "Preparing your exams and folder structure.",
     "nextStepTitle": "Next step",
-    "nextStepDemo": "Try the demo you created from the student side. You need to see what students see before refining questions.",
+    "nextStepDemo": "Take the demo you created from the student's side. Seeing exactly what students get makes your questions much easier to refine.",
     "nextStepDemoCta": "Open demo",
-    "nextStepFirstExam": "Create your first exam. Upload materials and AI will build questions from them.",
+    "nextStepAfterDemo": "You're done with the demo. Now create a real exam and share the entry code with your students.",
+    "nextStepAfterDemoCta": "Create exam",
+    "demoOnlyEmpty": "No exams yet.",
+    "demoOnlyEmptyHint": "Look around with the demo above, or go straight to your first exam.",
+    "nextStepFirstExam": "Create your first exam. Upload your course materials and AI will build questions from them.",
     "nextStepFirstExamCta": "Create exam"
   },
   "nav": {
