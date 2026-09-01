@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useMemo,
 } from "react";
 import { createSupabaseClient } from "@/lib/supabase-client";
 import { isAuthBypassAllowedEnv } from "@/lib/app-env";
@@ -26,11 +27,28 @@ type AppAuthState = {
   isSignedIn: boolean;
 };
 
-const AuthContext = createContext<AppAuthState>({
+type AppAuthContextValue = AppAuthState & {
+  /**
+   * `profiles` 를 다시 읽어 컨텍스트를 갱신한다.
+   *
+   * 프로필은 세션이 잡힐 때 한 번만 읽는다. 그런데 온보딩은 그 뒤에
+   * `POST /api/user/role` 로 `profiles.role` 을 쓴다. 갱신 수단이 없으면
+   * 그 세션의 컨텍스트는 여전히 `role: null` 이고, `/instructor` 레이아웃이
+   * 그걸 '역할 없음' 으로 읽어 온보딩으로 되돌린다 (이슈 #338).
+   *
+   * 전체 네비게이션으로 프로바이더를 다시 마운트하면 해결되지만, 그건
+   * 흰 화면을 거치게 돼 #212 가 금지한 방식이다. 쓴 쪽이 명시적으로
+   * 갱신한다.
+   */
+  refreshProfile: () => Promise<void>;
+};
+
+const AuthContext = createContext<AppAuthContextValue>({
   user: null,
   profile: null,
   isLoaded: false,
   isSignedIn: false,
+  refreshProfile: async () => {},
 });
 
 // 테스트 바이패스: E2E 브라우저 테스트에서 Supabase 세션 없이 인증 제공
@@ -146,8 +164,20 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [loadProfile]);
 
+  // state.user 를 직접 읽는다. 별도 세션 조회를 하면 왕복이 하나 더 붙고,
+  // 호출부는 이미 로그인된 상태에서만 부른다.
+  const refreshProfile = useCallback(async () => {
+    if (!state.user) return;
+    await loadProfile(state.user);
+  }, [loadProfile, state.user]);
+
+  const value = useMemo(
+    () => ({ ...state, refreshProfile }),
+    [state, refreshProfile]
+  );
+
   return (
-    <AuthContext.Provider value={state}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
   );
 }
 
