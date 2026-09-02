@@ -186,17 +186,32 @@ export async function POST(
         examId: session.exam_id,
       });
 
-      // 재노출 방지의 근거가 이 기록이다. 영속되지 않은 채 수락을 성공으로
-      // 돌려주면 확인 시각 없는 응시가 생긴다.
+      // 기록이 안 됐다고 응시를 막지는 않는다.
       //
-      // recordOnboardingEvent 가 true 면 새 행이 실제로 들어간 것이라 그 자체가
-      // 영속 증거다. false 는 "이미 도달"과 "저장 실패"를 구분하지 않으므로,
-      // 그때만 한 번 읽어 가른다. 정상 경로에 왕복을 더 붙이지 않는다.
+      // 지켜야 할 불변식은 "쓰지도 않은 기록을 근거로 고지를 숨기지 않는다" 이고,
+      // 그건 이미 읽기 쪽이 보장한다 — hasOnboardingEvent 는 조회 장애에
+      // false 를 돌려주고(lib/onboarding-events.ts), init 은 그걸 받아 preflight 를
+      // 다시 열어 고지를 한 번 더 보여준다. 기록이 실패하면 다음번에 또 묻는다.
+      //
+      // 반면 여기서 500 을 돌려주면 onboarding_events 가 잠시 흔들리는 것만으로
+      // **모든 학생이 모든 시험에 입장하지 못한다.** 계측·기록 장애를 시험
+      // 중단으로 바꾸는 거래다. 이 저장소는 또 같은 자리에서 같은 판단을 했다 —
+      // admit_exam_session 이 깨져도 학생을 들여보낸다(fail-open).
+      //
+      // 다만 조용히 사라지게 두지는 않는다. #324 가 정확히 그 무음 때문에
+      // 20일간 관측을 잃은 사고였다.
       if (
         !recorded &&
         !(await hasOnboardingEvent(user.id, ONBOARDING_EVENTS.STUDENT_DISCLOSURE_ACK))
       ) {
-        return errorJson("INTERNAL_ERROR", "Failed to record disclosure acknowledgement", 500);
+        logError(
+          "[preflight] disclosure_ack_not_persisted",
+          new Error("student_disclosure_ack write and read both failed"),
+          {
+            path: `/api/session/${sessionId}/preflight`,
+            additionalData: { examId: session.exam_id },
+          }
+        );
       }
     }
 
