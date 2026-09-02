@@ -62,19 +62,46 @@ export function isDemoPreview(params: {
   return params.isDemo && params.instructorId === params.userId;
 }
 
+/**
+ * 화면에 보여줄 채점 결과가 실제로 있는가.
+ *
+ * `grades` 행만 보면 안 된다. 데모 템플릿은 전부 CASE 1문항이고, CASE 의 AI
+ * 채점 결과는 `grades` 가 아니라 `sessions.ai_summary` 에 들어 있다. `grades` 행은
+ * 교수자가 점수를 확정해야 생긴다. 그래서 열람 시점에는 항상 비어 있었고, 완주가
+ * "AI 채점 결과를 봤다" 가 아니라 "점수를 저장했다" 로 밀렸다 (이슈 #335).
+ * 데모를 둘러보는 교수자가 굳이 점수를 저장할 이유가 없으므로 즉시 지표가
+ * 실제 활성화 순간을 놓친다.
+ *
+ * `ai_summary` 는 존재만으로는 부족하다. 채점 실패 폴백도 같은 컬럼에 들어가고
+ * (`{ grading_status: "failed", ... }`), 그건 보여줄 결과가 아니다. 실제 summary
+ * 문자열이 차 있는지를 본다 — grading-sweep 이 "진짜 요약이 있는가" 를
+ * 판정하는 기준과 같다.
+ */
+export function hasViewableGradingResult(params: {
+  grades: unknown;
+  aiSummary: unknown;
+}): boolean {
+  if (Array.isArray(params.grades) && params.grades.length > 0) return true;
+
+  const summary = (params.aiSummary as { summary?: unknown } | null | undefined)
+    ?.summary;
+  return typeof summary === "string" && summary.trim().length > 0;
+}
+
 type RecordDemoGradedViewedParams = {
   userId: string;
   examId: string;
-  hasGrades: boolean;
+  /** 화면에 보일 채점 결과가 있는가. `hasViewableGradingResult` 로 구한다. */
+  hasGradedResult: boolean;
 };
 
 /** 채점 결과가 실제로 열린 데모만 완주 마일스톤으로 남긴다. */
 export async function recordDemoGradedViewed({
   userId,
   examId,
-  hasGrades,
+  hasGradedResult,
 }: RecordDemoGradedViewedParams): Promise<void> {
-  if (!hasGrades || !(await isDemoExam(examId))) {
+  if (!hasGradedResult || !(await isDemoExam(examId))) {
     return;
   }
 
