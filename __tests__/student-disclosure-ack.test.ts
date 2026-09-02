@@ -18,6 +18,7 @@ import { readFileSync } from "node:fs";
 const USER_ID = "student-1";
 const SESSION_ID = "3f1d4b2a-1111-4111-8111-111111111111";
 
+const logError = vi.fn();
 const recordOnboardingEvent = vi.fn(async () => true);
 const hasOnboardingEvent = vi.fn(async () => false);
 
@@ -36,7 +37,7 @@ vi.mock("@/lib/rate-limit", () => ({
   RATE_LIMITS: { sessionRead: { limit: 30, windowSec: 60 } },
 }));
 
-vi.mock("@/lib/logger", () => ({ logError: () => {} }));
+vi.mock("@/lib/logger", () => ({ logError }));
 
 const session = {
   id: SESSION_ID,
@@ -152,13 +153,37 @@ describe("preflight 수락이 고지 확인을 기록한다 (AC-15)", () => {
     expect(recordOnboardingEvent).toHaveBeenCalled();
   });
 
-  it("확인 기록이 영속되지 않으면 응시를 성공 처리하지 않는다", async () => {
+  // 이 단언은 한 번 뒤집혔다.
+  //
+  // 예전에는 기록이 영속되지 않으면 500 을 돌려줘서 "확인 시각 없는 응시" 를
+  // 막았다. 그런데 그러면 onboarding_events 가 잠시 흔들리는 것만으로
+  // **모든 학생이 모든 시험에 입장하지 못한다.** 계측 장애를 시험 중단으로
+  // 바꾸는 거래고, 이 저장소는 admit_exam_session 에서 같은 상황을 이미
+  // fail-open 으로 판단했다.
+  //
+  // 진짜 불변식은 "쓰지도 않은 기록을 근거로 고지를 숨기지 않는다" 이고,
+  // 그건 아래 "고지 재노출 차단 배선" describe 가 지키는 읽기 경로의 일이다.
+  it("확인 기록이 영속되지 않아도 응시를 막지 않는다", async () => {
     recordOnboardingEvent.mockResolvedValue(false);
     hasOnboardingEvent.mockResolvedValue(false);
 
     const res = await acceptPreflight();
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(200);
+  });
+
+  it("그래도 조용히 지나가지는 않는다", async () => {
+    // #324: 기록 실패가 무음이면 관측을 잃었는지도 모른 채 몇 주가 간다.
+    recordOnboardingEvent.mockResolvedValue(false);
+    hasOnboardingEvent.mockResolvedValue(false);
+
+    await acceptPreflight();
+
+    expect(logError).toHaveBeenCalledWith(
+      "[preflight] disclosure_ack_not_persisted",
+      expect.any(Error),
+      expect.objectContaining({ additionalData: expect.objectContaining({ examId: "exam-1" }) })
+    );
   });
 
   it("기록이 이미 있으면 중복 수락도 성공한다", async () => {
