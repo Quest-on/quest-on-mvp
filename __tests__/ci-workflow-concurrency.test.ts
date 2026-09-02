@@ -76,10 +76,27 @@ describe("ci.yml — 중복 트리거를 건너뛴다", () => {
     }
   });
 
+  // 배포 잡은 push + refs/heads/staging 에서만 돌기 때문에 PR 에서 아예 안 돌고,
+  // 따라서 중복도 생길 수 없다. pull_request.head.ref 가드를 더 달면 조건만
+  // 겹쳐 읽기 어려진다. 대신 "정말 push 에서만 도는가" 를 아래에서 따로 본다.
+  const PUSH_ONLY_JOBS = ["deploy-staging"];
+
   it("가드 대상 잡 목록이 실제 잡 목록과 일치한다", () => {
     const { jobs } = loadWorkflow();
-    // 잡이 새로 생기면 가드도 같이 달아야 한다. 빠뜨리면 그 잡만 두 벌 돈다.
-    expect(Object.keys(jobs ?? {}).sort()).toEqual([...GUARDED_JOBS].sort());
+    // 잡이 새로 생기면 가드도 같이 달아야 한다. 빠뜨리면 그 잡만 두 벌 돌다.
+    expect(Object.keys(jobs ?? {}).sort()).toEqual(
+      [...GUARDED_JOBS, ...PUSH_ONLY_JOBS].sort()
+    );
+  });
+
+  it("가드 면제 잡은 push 에서만 돌아야 면제된다", () => {
+    const { jobs } = loadWorkflow();
+    for (const job of PUSH_ONLY_JOBS) {
+      const condition = jobs?.[job]?.if;
+      expect(condition, `${job} 에 조건이 없다`).toBeTruthy();
+      // pull_request 에서 돌 수 없음을 조건 자체가 보장해야 면제가 성립한다.
+      expect(condition).toMatch(/github\.event_name\s*==\s*'push'/);
+    }
   });
 });
 
