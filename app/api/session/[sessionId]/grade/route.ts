@@ -20,7 +20,10 @@ import {
 } from "@/lib/grade-utils";
 import { hasQuestionWithQIdx } from "@/lib/case-grade-access";
 import { gradeObjectiveAnswer, isObjectiveQuestion, isGradingOpen, isAssignmentType } from "@/lib/grading-helpers";
-import { recordDemoGradedViewed } from "@/lib/demo-completion";
+import {
+  hasViewableGradingResult,
+  recordDemoGradedViewed,
+} from "@/lib/demo-completion";
 
 // Auto-grading (PUT) calls AI_MODEL_HEAVY multiple times — needs 300s
 export const maxDuration = 300;
@@ -425,7 +428,10 @@ export async function GET(
       await recordDemoGradedViewed({
         userId: exam.instructor_id,
         examId: exam.id,
-        hasGrades: Array.isArray(grades) && grades.length > 0,
+        hasGradedResult: hasViewableGradingResult({
+          grades,
+          aiSummary: session.ai_summary,
+        }),
       });
     } catch (error) {
       // 계측 장애가 실제 채점 결과 열람을 500으로 바꾸면 완주보다 더 큰 학습 흐름이 끊긴다.

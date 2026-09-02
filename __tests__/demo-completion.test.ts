@@ -25,10 +25,12 @@ vi.mock("@/lib/onboarding-events", () => ({
   recordOnboardingEvent,
   hasOnboardingEvent,
 }));
-vi.mock("@/lib/demo-completion", () => ({
-  recordDemoGradedViewed,
-  isDemoCompleted,
-}));
+// 기록함수만 스터브하고 판정함수(hasViewableGradingResult)는 실제 구현을 쓴다.
+// 판정까지 목하면 라우트가 "어떤 신호로 완주를 판정하는가" 를 검증하지 못한다.
+vi.mock("@/lib/demo-completion", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/demo-completion")>();
+  return { ...actual, recordDemoGradedViewed, isDemoCompleted };
+});
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimitAsync: async () => ({ allowed: true }),
   RATE_LIMITS: { sessionRead: { limit: 30, windowSec: 60 } },
@@ -37,6 +39,10 @@ vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 vi.mock("@/lib/app-users", () => ({
   batchGetUserInfo: async () => new Map(),
 }));
+
+// ai_summary 는 테스트마다 바뀐다. CASE 데모의 AI 채점 결과가 여기 들어가고,
+// 그게 완주 판정의 두 신호 중 하나다 (#335).
+let aiSummary: unknown = null;
 
 const session = {
   id: SESSION_ID,
@@ -47,7 +53,9 @@ const session = {
   created_at: "2026-08-10T00:00:00Z",
   compressed_session_data: null,
   compression_metadata: null,
-  ai_summary: null,
+  get ai_summary() {
+    return aiSummary;
+  },
   auto_submitted: false,
   grading_progress: null,
   final_answer: null,
@@ -122,6 +130,7 @@ beforeEach(() => {
   isDemo = true;
   isDemoLookupError = null;
   gradeRows = [{ id: "grade-1", q_idx: 0, score: 90 }];
+  aiSummary = null;
   recordDemoGradedViewed.mockResolvedValue(undefined);
   isDemoCompleted.mockResolvedValue(false);
 });
@@ -130,7 +139,7 @@ describe("데모 완주 판정 (AC-7)", () => {
   it("채점 결과가 있는 데모 조회는 demo_graded_viewed를 기록한다", async () => {
     const { recordDemoGradedViewed: record } = await actualDemoCompletion();
 
-    await record({ userId: INSTRUCTOR_ID, examId: EXAM_ID, hasGrades: true });
+    await record({ userId: INSTRUCTOR_ID, examId: EXAM_ID, hasGradedResult: true });
 
     expect(recordOnboardingEvent).toHaveBeenCalledWith({
       userId: INSTRUCTOR_ID,
@@ -143,7 +152,7 @@ describe("데모 완주 판정 (AC-7)", () => {
   it("채점 결과가 없는 데모 조회는 기록하지 않는다", async () => {
     const { recordDemoGradedViewed: record } = await actualDemoCompletion();
 
-    await record({ userId: INSTRUCTOR_ID, examId: EXAM_ID, hasGrades: false });
+    await record({ userId: INSTRUCTOR_ID, examId: EXAM_ID, hasGradedResult: false });
 
     expect(recordOnboardingEvent).not.toHaveBeenCalled();
   });
@@ -152,7 +161,7 @@ describe("데모 완주 판정 (AC-7)", () => {
     isDemo = false;
     const { recordDemoGradedViewed: record } = await actualDemoCompletion();
 
-    await record({ userId: INSTRUCTOR_ID, examId: EXAM_ID, hasGrades: true });
+    await record({ userId: INSTRUCTOR_ID, examId: EXAM_ID, hasGradedResult: true });
 
     expect(recordOnboardingEvent).not.toHaveBeenCalled();
   });
@@ -161,7 +170,7 @@ describe("데모 완주 판정 (AC-7)", () => {
     isDemoLookupError = new Error("column exams.is_demo does not exist");
     const { recordDemoGradedViewed: record } = await actualDemoCompletion();
 
-    await expect(record({ userId: INSTRUCTOR_ID, examId: EXAM_ID, hasGrades: true })).resolves.toBeUndefined();
+    await expect(record({ userId: INSTRUCTOR_ID, examId: EXAM_ID, hasGradedResult: true })).resolves.toBeUndefined();
     expect(recordOnboardingEvent).not.toHaveBeenCalled();
   });
 
@@ -172,7 +181,7 @@ describe("데모 완주 판정 (AC-7)", () => {
     expect(recordDemoGradedViewed).toHaveBeenCalledWith({
       userId: INSTRUCTOR_ID,
       examId: EXAM_ID,
-      hasGrades: true,
+      hasGradedResult: true,
     });
   }, 10_000);
 
@@ -185,7 +194,40 @@ describe("데모 완주 판정 (AC-7)", () => {
     expect(recordDemoGradedViewed).toHaveBeenCalledWith({
       userId: INSTRUCTOR_ID,
       examId: EXAM_ID,
-      hasGrades: false,
+      hasGradedResult: false,
+    });
+  });
+
+  // #335: CASE 데모의 AI 채점 결과는 grades 가 아니라 sessions.ai_summary 에 있다.
+  // grades 행은 교수자가 점수를 확정해야 생기므로, grades 만 보면 완주가
+  // "AI 채점 결과를 봤다" 가 아니라 "점수를 저장했다" 로 밀린다.
+  it("grades 가 비어도 AI 요약이 있으면 완주로 기록한다", async () => {
+    gradeRows = [];
+    aiSummary = { summary: "답안은 stale read 를 정확히 짚었다.", keyQuotes: [] };
+
+    const result = await callGrade();
+
+    expect(result.status).toBe(200);
+    expect(recordDemoGradedViewed).toHaveBeenCalledWith({
+      userId: INSTRUCTOR_ID,
+      examId: EXAM_ID,
+      hasGradedResult: true,
+    });
+  }, 10_000);
+
+  it("채점 실패 폴백은 완주로 세지 않는다", async () => {
+    // 실패 폴백도 같은 컬럼에 들어간다(lib/grading.ts). 존재만으로 판정하면
+    // 채점이 깨진 세션이 완주로 잡힌다.
+    gradeRows = [];
+    aiSummary = { grading_status: "failed", grading_failed_questions: [0] };
+
+    const result = await callGrade();
+
+    expect(result.status).toBe(200);
+    expect(recordDemoGradedViewed).toHaveBeenCalledWith({
+      userId: INSTRUCTOR_ID,
+      examId: EXAM_ID,
+      hasGradedResult: false,
     });
   });
 
@@ -232,5 +274,36 @@ describe("데모 완주 상태 조회", () => {
 
     sessionUser = { id: "student-1", role: "student" };
     await expect(callStatus()).resolves.toMatchObject({ status: 403 });
+  });
+});
+
+describe("hasViewableGradingResult (#335)", () => {
+  it("grade 행이 있으면 true", async () => {
+    const { hasViewableGradingResult } = await actualDemoCompletion();
+    expect(hasViewableGradingResult({ grades: [{ q_idx: 0 }], aiSummary: null })).toBe(true);
+  });
+
+  it("grade 가 없어도 실제 summary 문자열이 있으면 true", async () => {
+    const { hasViewableGradingResult } = await actualDemoCompletion();
+    expect(hasViewableGradingResult({ grades: [], aiSummary: { summary: "종합 의견" } })).toBe(true);
+  });
+
+  it("summary 가 빈 문자열이거나 공백뿐이면 false", async () => {
+    const { hasViewableGradingResult } = await actualDemoCompletion();
+    expect(hasViewableGradingResult({ grades: [], aiSummary: { summary: "" } })).toBe(false);
+    expect(hasViewableGradingResult({ grades: [], aiSummary: { summary: "   " } })).toBe(false);
+  });
+
+  it("실패 폴백(summary 없음)은 false", async () => {
+    const { hasViewableGradingResult } = await actualDemoCompletion();
+    expect(
+      hasViewableGradingResult({ grades: [], aiSummary: { grading_status: "failed" } })
+    ).toBe(false);
+  });
+
+  it("둘 다 없으면 false", async () => {
+    const { hasViewableGradingResult } = await actualDemoCompletion();
+    expect(hasViewableGradingResult({ grades: [], aiSummary: null })).toBe(false);
+    expect(hasViewableGradingResult({ grades: null, aiSummary: undefined })).toBe(false);
   });
 });
