@@ -287,3 +287,33 @@ jobs:
         run: |
           shopt -s nullglob
           node scripts/ci-test-summary.mjs junit/*.xml
+
+  # 스테이징 자동 배포 (이슈 #209).
+  #
+  # deploy.yml 을 workflow_run 으로 걸면 기본 브랜치(main)의 파일 기준으로
+  # 트리거가 등록되는데, main 은 staging 보다 379 커밋 뒤처져 있고 그쪽
+  # deploy.yml 은 branches: [main] 이다. 그래서 자동 배포가 한 번도 걸린 적이
+  # 없었고, 배포 12건이 전부 수동 dispatch 였다.
+  #
+  # push 는 그 브랜치의 워크플로 파일을 쓴다. 여기서 직접 부르면 main 을
+  # 건드리지 않고(= 프로덕션 재배포를 유발하지 않고) 자동화가 산다.
+  #
+  # needs 로 모든 검사를 앞에 세운다. "CI 가 초록일 때만 배포한다" 는 원칙이
+  # conclusion 을 나중에 읽는 것보다 강하게 지켜진다 — 순서 자체가 강제된다.
+  deploy-staging:
+    name: Deploy (staging)
+    needs:
+      - quality
+      - build
+      - unit-test
+      - api-integration-test
+      - browser-e2e-test
+      - consent-flow-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: staging
+      # 스테이징 프로젝트의 "프로덕션"이 staging 브랜치다. preview 로 두면
+      # Vercel Cron 이 돌지 않아 채점 스위퍼를 검증할 수 없다.
+      target: production
+    secrets: inherit
