@@ -72,6 +72,7 @@ const REGISTRY: Record<string, { kind: Classification; why: string }> = {
   "app/api/session/[sessionId]/grade/route.ts": { kind: "single-exam", why: "세션의 exam 로드" },
   "app/api/session/[sessionId]/live-messages/route.ts": { kind: "single-exam", why: "세션의 exam 로드" },
   "app/api/session/[sessionId]/preflight/route.ts": { kind: "single-exam", why: "세션의 exam 로드" },
+  "app/api/session/[sessionId]/gate/route.ts": { kind: "single-exam", why: "세션의 exam 로드" },
   "app/api/session/[sessionId]/route.ts": { kind: "single-exam", why: "세션의 exam 로드" },
   "app/api/student/assignment/[code]/review/route.ts": { kind: "single-exam", why: "code 로 단건 조회" },
   "app/api/student/session/[sessionId]/report/route.ts": { kind: "single-exam", why: "세션의 exam 로드" },

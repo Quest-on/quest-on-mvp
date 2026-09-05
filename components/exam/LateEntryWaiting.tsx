@@ -98,23 +98,20 @@ export function LateEntryWaiting({
 
     const poll = async () => {
       try {
-        const response = await fetch("/api/supa", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "check_gate_status", data: { sessionId } }),
-        });
+        // 예전에는 POST /api/supa {action:"check_gate_status"} 를 불렀는데 그 액션은
+        // 서버에 등록된 적이 없어 항상 400 이었다. 즉 이 폴백은 존재하지
+        // 않았고, 아래 catch 가 조용히 삼켜서 드러나지도 않았다 (이슈 #344).
+        const response = await fetch(`/api/session/${sessionId}/gate`);
         if (!response.ok) return;
-        const result = await response.json();
-        const status = result?.session?.status ?? result?.status;
+        // successJson 은 봉투로 감싸지 않고 최상위에 펼친다(lib/api-response.ts).
+        const gate = await response.json();
+        const status = gate?.status;
 
         if (status === "in_progress") {
           onGateStartRef.current?.({
             sessionStatus: "in_progress",
-            sessionStartTime:
-              result?.session?.attempt_timer_started_at ??
-              result?.session?.started_at ??
-              null,
-            timeRemaining: null,
+            sessionStartTime: gate?.sessionStartTime ?? null,
+            timeRemaining: gate?.timeRemaining ?? null,
           });
         } else if (status === "denied") {
           setIsDenied(true);
