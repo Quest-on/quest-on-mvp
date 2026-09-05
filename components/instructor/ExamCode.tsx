@@ -1,10 +1,11 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Copy, Check, ShieldAlert, AlertTriangle } from "lucide-react";
+import { Copy, Check, ShieldAlert, AlertTriangle, Mail } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { supportMailto } from "@/lib/contact";
 
 /**
  * 시험 코드를 화면에 내보내는 **유일한** 컴포넌트 (이슈 #84).
@@ -117,6 +118,15 @@ export function ExamCode({ code, quota, className, copyable = true }: ExamCodePr
           <div className="space-y-1">
             <p className="text-sm font-medium text-destructive">{t("blockedTitle")}</p>
             <p className="type-meta">{t("blockedBody")}</p>
+            {/* 막았으면 나갈 길을 같은 화면에 둔다. "계정을 인증하세요" 는 상태
+                서술이지 방법이 아니었다 — 어디서 어떻게 인증하는지 어느 화면에도 없었다. */}
+            <a
+              href={supportMailto(t("blockedMailSubject"))}
+              className="inline-flex items-center gap-1 text-xs font-medium text-destructive underline underline-offset-2"
+            >
+              <Mail className="h-3.5 w-3.5 shrink-0" />
+              {t("blockedCta")}
+            </a>
           </div>
         </div>
       </div>

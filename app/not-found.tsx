@@ -6,6 +6,7 @@ import { Home, ArrowLeft, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
+import { supportMailto } from "@/lib/contact";
 
 export default function NotFound() {
   const t = useTranslations("auth.notFound");
@@ -120,7 +121,7 @@ export default function NotFound() {
                 {t("signUp")}
               </Link>
               <a
-                href={`mailto:questonkr@gmail.com?subject=${t("mailtoSubject")}`}
+                href={supportMailto(t("mailtoSubject"))}
                 className="text-sm font-medium text-primary hover:underline flex items-center gap-2"
               >
                 <Search className="w-4 h-4" />

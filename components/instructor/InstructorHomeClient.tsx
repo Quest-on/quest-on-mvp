@@ -61,6 +61,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { SUPPORT_EMAIL } from "@/lib/contact";
 import toast from "react-hot-toast";
 import { extractErrorMessage, getErrorMessage } from "@/lib/error-messages";
 import {
@@ -429,7 +430,7 @@ export default function InstructorHome() {
     // 발행 한도에 도달한 미발행 시험의 코드는 복사시키지 않는다 (이슈 #84).
     // 복사해 수업 자료에 붙인 뒤에 막으면, 수업 중에 학생 전원이 튕긴다.
     if (gateBlocked) {
-      toast.error(t("drive.toastExamCodeBlocked"));
+      toast.error(t("drive.toastExamCodeBlocked", { email: SUPPORT_EMAIL }));
       return;
     }
     try {

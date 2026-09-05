@@ -114,7 +114,7 @@
     "noticeHeading": "[퀘스트온] 시험 안내",
     "noticeCodeLabel": "입장 코드",
     "noticeFooter": "문의는 담당 교수자에게 해주세요.",
-    "toastCodeBlocked": "학생의 교수자 계정 오용을 막기 위해 발행 한도에 도달하면 코드를 복사할 수 없습니다. 계정을 인증한 뒤 다시 시도해 주세요."
+    "toastCodeBlocked": "학생의 교수자 계정 오용을 막기 위해 발행 한도에 도달하면 코드를 복사할 수 없습니다. {email} 으로 메일 주시면 풀어 드립니다."
   },
   "examInfoForm": {
     "cardTitleAssignment": "과제 정보",
@@ -409,7 +409,9 @@
     "copyAria": "시험 코드 복사",
     "warning": "무료 등급에서 앞으로 {remaining}개 시험까지 학생을 받을 수 있습니다.",
     "blockedTitle": "코드를 배포하기 전에 계정 인증이 필요합니다",
-    "blockedBody": "무료 등급의 발행 한도에 도달했습니다. 지금 코드를 배포하면 학생이 입장하지 못합니다. 인증을 마치면 코드가 다시 표시됩니다."
+    "blockedBody": "무료 플랜의 발행 한도에 도달했습니다. 지금 코드를 공유해도 학생이 입장하지 못합니다. 아래로 메일 주시면 한도를 풀어 드립니다.",
+    "blockedCta": "한도 해제 요청",
+    "blockedMailSubject": "[퀘스트온] 발행 한도 해제 요청"
   },
   "examDetail": {
     "restartConfirmTitle": "이 데모를 다시 풀까요?",

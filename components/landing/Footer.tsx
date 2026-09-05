@@ -3,6 +3,7 @@
 import { Mail, Phone } from "lucide-react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
+import { SUPPORT_EMAIL, supportMailto } from "@/lib/contact";
 
 // 라이트 값만 쓴다. dark 항목이 있었지만 mode 가 항상 "light" 라 도달하지 않는
 // 죽은 코드였다 - 호출부(app/page.tsx)가 mode="light" 만 넘겼다. (#204)
@@ -40,7 +41,7 @@ const FOOTER_LINKS_CONFIG = [
   //       { labelKey: "blog", href: "/blog" },
   //       { labelKey: "careers", href: "/careers" },
   //       { labelKey: "partnership", href: "/partners" },
-  //       { labelKey: "contact", href: "mailto:questonkr@gmail.com" },
+  //       { labelKey: "contact", href: `mailto:${SUPPORT_EMAIL}` },
   //     ],
   //   },
   {
@@ -60,7 +61,7 @@ export default function Footer() {
   const tc = useTranslations("common");
 
   const handleContactClick = () => {
-    window.location.href = "mailto:questonkr@gmail.com?subject=문의사항";
+    window.location.href = supportMailto("문의사항");
   };
 
   return (
@@ -138,11 +139,11 @@ export default function Footer() {
               >
                 <Mail className="w-4 h-4 font-bold" />:{" "}
                 <a
-                  href="mailto:questonkr@gmail.com"
+                  href={`mailto:${SUPPORT_EMAIL}`}
                   className="hover:underline"
                   style={{ color: colors.text }}
                 >
-                  questonkr@gmail.com
+                  {SUPPORT_EMAIL}
                 </a>
               </p>
               <p

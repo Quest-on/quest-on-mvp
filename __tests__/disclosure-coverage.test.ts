@@ -14,9 +14,14 @@ const instructor = {
   ko: readJson("ko", "instructor.json") as { drive: Record<string, string> },
   en: readJson("en", "instructor.json") as { drive: Record<string, string> },
 };
+type AuthoringMessages = {
+  examDetailsCard: Record<string, string>;
+  examCode: Record<string, string>;
+};
+
 const authoring = {
-  ko: readJson("ko", "authoring.json") as { examDetailsCard: Record<string, string> },
-  en: readJson("en", "authoring.json") as { examDetailsCard: Record<string, string> },
+  ko: readJson("ko", "authoring.json") as AuthoringMessages,
+  en: readJson("en", "authoring.json") as AuthoringMessages,
 };
 const preflightSource = readFileSync(
   path.join(root, "components", "exam", "PreflightModal.tsx"),
@@ -74,17 +79,55 @@ describe("AI 고지 적용 범위 (#325)", () => {
     }
   });
 
-  it("발행 한도 안내는 사유와 계정 인증 방법을 함께 설명한다", () => {
+  it("발행 한도 안내는 사유와 해제 방법을 함께 설명한다", () => {
     for (const locale of ["ko", "en"] as const) {
       const messages = [
         instructor[locale].drive.toastExamCodeBlocked,
         authoring[locale].examDetailsCard.toastCodeBlocked,
       ];
       for (const message of messages) {
+        // 사유
         expect(message).toMatch(locale === "ko" ? /학생.*교수자 계정.*오용/ : /students.*misusing.*instructor accounts/i);
-        expect(message).toMatch(locale === "ko" ? /계정.*인증/ : /verify your account/i);
+        // 해제 방법.
+        //
+        // 예전에는 "계정을 인증하세요" 를 요구했는데, 그건 **상태 서술이지
+        // 방법이 아니다.** 어디서 어떻게 인증하는지가 제품 어느 화면에도 없었다
+        // — 승인 게이트와 함께 /instructor-pending 이 사라졌기 때문이다.
+        // 실제 해제 경로는 메일이므로 그 주소가 문구에 들어 있어야 한다.
+        expect(message).toContain("{email}");
       }
     }
+  });
+
+  it("한도 해제 경로가 실제로 화면에 있다", () => {
+    // 문구에 이메일을 적는 것만으로는 부족하다. 토스트는 사라지고 링크도 없다.
+    // 코드가 차단된 카드에 눌러서 메일을 여는 CTA 가 있어야 나갈 길이 된다.
+    const examCode = readFileSync(
+      path.join(root, "components", "instructor", "ExamCode.tsx"),
+      "utf8"
+    );
+    expect(examCode).toContain("supportMailto");
+    expect(examCode).toMatch(/t\("blockedCta"\)/);
+
+    for (const locale of ["ko", "en"] as const) {
+      const examCodeMessages = authoring[locale].examCode;
+      expect(examCodeMessages.blockedCta?.trim()).toBeTruthy();
+      expect(examCodeMessages.blockedMailSubject?.trim()).toBeTruthy();
+    }
+  });
+
+  it("연락처가 한 곳에서만 온다", () => {
+    // 랜딩 푸터·404·문의 버튼에 각각 하드코딩돼 있었다. 한도 안내까지 적으면
+    // 다섯 번째가 되고, 주소가 바뀌는 날 네 곳은 고치고 한 곳은 잊는다.
+    const offenders = [
+      ["app", "not-found.tsx"],
+      ["components", "landing", "Footer.tsx"],
+      ["components", "landing", "FeatureSection.tsx"],
+    ].filter((parts) =>
+      readFileSync(path.join(root, ...parts), "utf8").includes("questonkr@gmail.com")
+    );
+
+    expect(offenders.map((p) => p.join("/"))).toEqual([]);
   });
 
   it("PreflightModal은 시험 유형과 무관하게 최초 고지를 게이팅한다", () => {

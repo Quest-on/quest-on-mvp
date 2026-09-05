@@ -114,7 +114,7 @@
     "noticeHeading": "[Quest-On] Exam notice",
     "noticeCodeLabel": "Entry code",
     "noticeFooter": "Questions? Contact your instructor.",
-    "toastCodeBlocked": "To prevent students from misusing instructor accounts, codes cannot be copied after the publish limit is reached. Verify your account and try again."
+    "toastCodeBlocked": "To prevent students from misusing instructor accounts, codes cannot be copied once the publish limit is reached. Email {email} and we will lift it."
   },
   "examInfoForm": {
     "cardTitleAssignment": "Assignment Info",
@@ -409,7 +409,9 @@
     "copyAria": "Copy exam code",
     "warning": "Your free plan can admit students to {remaining} more exam(s).",
     "blockedTitle": "Verify your account before sharing this code",
-    "blockedBody": "You have reached the free plan publish limit. Students cannot enter if you share this code now. The code reappears once your account is verified."
+    "blockedBody": "You have reached the free plan publish limit. Students cannot enter even if you share this code. Email us below and we will lift it.",
+    "blockedCta": "Request a higher limit",
+    "blockedMailSubject": "[Quest-On] Request to lift the publish limit"
   },
   "examDetail": {
     "restartConfirmTitle": "Restart this demo?",
