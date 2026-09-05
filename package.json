@@ -16,8 +16,8 @@
     "test:e2e": "playwright test --project=browser-e2e --config=e2e/playwright.config.ts",
     "test:browser": "playwright test --project=browser-e2e --project=browser-flows --config=e2e/playwright.config.ts",
     "mock-server": "tsx scripts/start-mock-server.ts",
-    "impact-review": "tsx scripts/impact-review.ts",
-    "env:check": "tsx scripts/check-env.ts"
+    "env:check": "tsx scripts/check-env.ts",
+    "dev:verify": "node scripts/dev-verify.mjs"
   },
   "dependencies": {
     "@base-ui-components/react": "^1.0.0-rc.0",
@@ -80,7 +80,7 @@
     "mammoth": "^1.11.0",
     "marked": "^17.0.5",
     "motion": "^12.27.1",
-    "next": "^16.0.7",
+    "next": "16.2.11",
     "next-intl": "^4.13.1",
     "next-themes": "^0.4.6",
     "openai": "^5.15.0",
@@ -120,7 +120,7 @@
     "@vitest/coverage-v8": "^4.0.18",
     "dotenv": "^17.3.1",
     "eslint": "^9",
-    "eslint-config-next": "^16.0.7",
+    "eslint-config-next": "16.2.11",
     "express": "^5.2.1",
     "prisma": "^6.19.2",
     "tailwindcss": "^4",

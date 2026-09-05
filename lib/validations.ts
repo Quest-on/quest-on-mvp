@@ -235,13 +235,21 @@ export const bulkGradeChatPostSchema = z.union([
   }),
 ]);
 
-export const bulkGradeWorkerSchema = z.object({
-  gradingSessionId: z.string().uuid("Invalid gradingSessionId"),
-  studentSessionId: z.string().uuid("Invalid studentSessionId"),
-  examId: z.string().uuid("Invalid examId"),
-  scope: z.enum(["sample", "full"]).default("full"),
-  attemptId: z.string().uuid("Invalid attemptId").optional(),
-});
+export const bulkGradeWorkerSchema = z
+  .object({
+    gradingSessionId: z.string().uuid("Invalid gradingSessionId"),
+    studentSessionId: z.string().uuid("Invalid studentSessionId"),
+    examId: z.string().uuid("Invalid examId"),
+    scope: z.enum(["sample", "full"]).default("full"),
+    attemptId: z.string().uuid("Invalid attemptId").optional(),
+    // 이슈 #118 컷오버 sentinel. 신규 발행 작업은 항상 둘을 함께 싣는다.
+    pinRequired: z.literal(true).optional(),
+    configVersionId: z.string().uuid("Invalid configVersionId").optional(),
+  })
+  .refine(
+    (payload) => payload.pinRequired !== true || typeof payload.configVersionId === "string",
+    { message: "pinRequired jobs must carry configVersionId", path: ["configVersionId"] }
+  );
 
 export const bulkGradeCommitSchema = z.object({
   grades: z
@@ -273,8 +281,9 @@ export const createExamSchema = z.object({
   title: sanitizedString(z.string().min(1, "Title is required").max(500)),
   code: z.string().min(1).max(20),
   duration: z.number().int().min(0),
-  chat_weight: z.number().min(0).max(100).nullable().optional(),
+  chat_weight: z.number().int().min(0).max(100).nullable().optional(),
   score_weights: scoreWeightsSchema.nullable().optional(),
+  course_id: z.string().uuid("Invalid course ID").nullable().optional(),
   questions: z.array(z.object({
     id: z.string(),
     text: z.string(),
@@ -355,8 +364,9 @@ export const updateExamSchema = z.object({
     })).optional(),
     status: z.string().optional(),
     code: z.string().min(1).max(20).optional(),
-    chat_weight: z.number().min(0).max(100).nullable().optional(),
+    chat_weight: z.number().int().min(0).max(100).nullable().optional(),
     score_weights: scoreWeightsSchema.nullable().optional(),
+    course_id: z.string().uuid("Invalid course ID").nullable().optional(),
     open_at: z.string().nullable().optional(),
     close_at: z.string().nullable().optional(),
     started_at: z.string().nullable().optional(),
@@ -372,6 +382,10 @@ export const initExamSessionSchema = z.object({
   examCode: z.string().min(1, "Exam code is required").max(20),
   studentId: z.string().min(1, "Student ID is required"),
   deviceFingerprint: z.string().optional(),
+  // 데모 재응시 요청 (에픽 #79). 클라이언트가 보내는 "의도"일 뿐이고 서버는
+  // 이 값을 신뢰하지 않는다 — 데모 소유자일 때만 실제로 초기화한다.
+  // 스키마에서 빠지면 zod 가 필드를 떨어뜨려 재응시가 조용히 무시된다.
+  restartDemoAttempt: z.boolean().optional(),
 });
 
 export const createOrGetSessionSchema = z.object({
@@ -441,7 +455,8 @@ export const createAssignmentSchema = z.object({
   title: sanitizedString(z.string().min(1, "Title is required").max(500)),
   code: z.string().min(1).max(20),
   deadline: z.string().min(1, "Deadline is required"), // ISO datetime string
-  chat_weight: z.number().min(0).max(100).nullable().optional(),
+  chat_weight: z.number().int().min(0).max(100).nullable().optional(),
+  course_id: z.string().uuid("Invalid course ID").nullable().optional(),
   questions: z.array(z.object({
     id: z.string(),
     text: z.string(),
@@ -491,6 +506,7 @@ export const updateAssignmentSchema = z.object({
     title: z.string().min(1).max(500).optional(),
     questions: z.unknown().optional(),
     language: z.enum(["ko", "en"]).optional(),
+    course_id: z.string().uuid("Invalid course ID").nullable().optional(),
     deadline: z.string().nullable().optional(),
     close_at: z.string().nullable().optional(),
     updated_at: z.string().optional(),

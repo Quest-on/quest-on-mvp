@@ -45,7 +45,7 @@ export function SessionQuizResultsCard({
     <Card>
       <CardHeader className={compact ? "pb-2" : undefined}>
         <CardTitle className="flex items-center gap-2 text-base">
-          <ShieldQuestion className="w-5 h-5 text-amber-600" />
+          <ShieldQuestion className="w-5 h-5 text-warning-solid" />
           {t("sessionQuiz.title")}
         </CardTitle>
       </CardHeader>
@@ -53,7 +53,7 @@ export function SessionQuizResultsCard({
         <div className="flex flex-wrap items-center gap-2">
           <Badge
             variant="outline"
-            className="bg-amber-500/10 text-amber-700 dark:text-amber-400"
+            className="bg-warning-solid/10 text-warning-text"
           >
             {t("sessionQuiz.scoreBadge", { score: quiz.score ?? 0 })}
           </Badge>
@@ -61,7 +61,7 @@ export function SessionQuizResultsCard({
             {t("sessionQuiz.metaBadge", { questions: quiz.total_questions, seconds: quiz.time_limit_seconds })}
           </Badge>
           {quiz.submitted_at && (
-            <span className="text-xs text-muted-foreground">
+            <span className="type-meta">
               {t("sessionQuiz.completedLabel")}{" "}
               {formatDateTime(quiz.submitted_at, locale, {
                 month: "short",
@@ -90,8 +90,8 @@ export function SessionQuizResultsCard({
                       variant="outline"
                       className={
                         isCorrect
-                          ? "bg-green-500/10 text-green-700 dark:text-green-400 shrink-0"
-                          : "bg-red-500/10 text-red-700 dark:text-red-400 shrink-0"
+                          ? "bg-success-solid/10 text-success-text shrink-0"
+                          : "bg-destructive/100/10 text-destructive shrink-0"
                       }
                     >
                       {isCorrect ? t("sessionQuiz.badgeCorrect") : t("sessionQuiz.badgeWrong")}
@@ -105,7 +105,7 @@ export function SessionQuizResultsCard({
                     : t("sessionQuiz.noAnswer")}
                 </p>
                 {typeof correctIndex === "number" && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="type-meta">
                     {t("sessionQuiz.answerLabel")} {question.options[correctIndex]}
                   </p>
                 )}

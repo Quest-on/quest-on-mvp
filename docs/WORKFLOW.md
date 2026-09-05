@@ -1,6 +1,6 @@
 # 개발 워크플로
 
-템플릿은 양식이고, 이 문서는 **추적 규칙**이다. 사람 리뷰어가 없으므로 추적이 유일한 안전장치다.
+템플릿은 양식이고, 이 문서는 **추적 규칙**이다. `staging` PR 에는 승인 게이트가 없으므로 추적이 유일한 안전장치다.
 
 ## 0. 코드가 SSOT다
 
@@ -55,10 +55,11 @@ status:needs-spec  →  status:ready  →  status:in-progress  →  (PR 머지�
 
 - 작업 PR의 base는 `staging`이다. 스택 PR을 포함한 모든 PR에 CI와 `pr-hygiene`이 적용된다.
 - `staging`에서 배포·QA를 통과한 변경만 `staging` → `main` 승격 PR로 프로덕션에 올린다.
+- **게이트는 `main` 한 곳이다.** `main` 은 ruleset 으로 PR·승인 1개·CI 초록·스레드 해결을 강제하고, 조직 관리자만 장애 대응용으로 우회한다. `staging` 에는 서버 측 protection 이 없다 — 장애 시 손이 묶이지 않기 위해서다. 그래도 **작업은 PR 로 올린다.** 규칙이 아니라 관행으로 지킨다.
 - 제목이 아니라 본문의 `Closes #<번호>` 가 추적의 실체다. 반드시 넣는다. **`pr-hygiene` 워크플로가 이를 검사한다** — 번호 없는 `Closes #` 를 그대로 두면 PR 이 막힌다. 이슈 없이 가야 하는 예외는 본문에 `No issue: <이유>` 를 적어 명시적으로 선언한다.
 - **실행한 명령과 실제 출력을 붙인다.** 사람이 안 보므로 "확인했습니다"는 아무 의미가 없다.
-- CI의 Lint & Type Check, Build, Unit Tests, API Integration Tests, Browser E2E Tests(뼈대 smoke/a11y/CSP/error-boundary만), impact-review, pr-hygiene가 전부 초록이어야 머지한다. browser flows는 로컬·수동 검증 대상이다.
-- 이슈 범위 밖으로 나간 파일이 있으면 PR 본문에 이유와 함께 적는다. 조용히 섞으면 리뷰가 없는 이 저장소에서는 아무도 못 잡는다.
+- CI의 Lint & Type Check, Build, Unit Tests, API Integration Tests, Browser E2E Tests(뼈대 smoke/a11y/CSP/error-boundary만), pr-hygiene가 전부 초록이어야 머지한다. browser flows는 로컬·수동 검증 대상이다.
+- 이슈 범위 밖으로 나간 파일이 있으면 PR 본문에 이유와 함께 적는다. 조용히 섞으면 아무도 못 잡는다.
 
 ## 스프린트 종료
 

@@ -5,13 +5,24 @@ import { successJson, errorJson } from "@/lib/api-response";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { z } from "zod";
 
-const PatchSchema = z.object({
-  role: z.enum(["instructor", "student"]).optional(),
-  status: z.enum(["pending", "approved"]).optional(),
-  display_name: z.string().max(100).optional(),
-  school: z.string().max(100).optional(),
-  student_id: z.string().max(50).optional(),
-});
+/**
+ * 인가 사실(`role`·`status`·`plan`)은 여기서 받지 않는다 (이슈 #87 / AC-20).
+ *
+ * 예전 스키마는 `role` 과 `status` 를 클라이언트에서 받아 service_role 로 썼다.
+ * 로그인한 아무나 `{"role":"instructor","status":"approved"}` 한 번이면 승인된
+ * 교수자가 됐다. 조용히 무시하지 않고 `.strict()` 로 **거부**한다 — 무시하면
+ * 호출부는 성공했다고 믿고, 권한이 올라간 줄 아는 클라이언트가 남는다.
+ *
+ * 역할은 `POST /api/user/role` 이 최초 1회만, `status`·`plan` 은 관리자
+ * 엔드포인트만 바꾼다.
+ */
+const PatchSchema = z
+  .object({
+    display_name: z.string().max(100).optional(),
+    school: z.string().max(100).optional(),
+    student_id: z.string().max(50).optional(),
+  })
+  .strict();
 
 // 현재 유저의 프로필 업데이트 (온보딩 + 프로필 수정)
 export async function PATCH(request: NextRequest) {
@@ -35,19 +46,11 @@ export async function PATCH(request: NextRequest) {
       return errorJson("INVALID_INPUT", "Invalid input", 400);
     }
 
-    const { role, status, display_name, school, student_id } = parsed.data;
+    const { display_name, school, student_id } = parsed.data;
 
     const updateData: Record<string, string> = {
       updated_at: new Date().toISOString(),
     };
-
-    if (role !== undefined) {
-      updateData.role = role;
-      // role 설정 시 status 자동 결정 (명시적 status가 없으면)
-      updateData.status = status ?? (role === "instructor" ? "pending" : "approved");
-    } else if (status !== undefined) {
-      updateData.status = status;
-    }
 
     if (display_name !== undefined) updateData.display_name = display_name;
     if (school !== undefined) updateData.school = school;

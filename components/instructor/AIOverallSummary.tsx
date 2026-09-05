@@ -76,24 +76,24 @@ export function AIOverallSummary({
             <h4 className="font-semibold mb-2 text-sm text-muted-foreground uppercase tracking-wider">
               {t("aiOverallSummary.overallOpinion")}
             </h4>
-            <p className="text-base leading-relaxed text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+            <p className="text-base leading-relaxed text-foreground whitespace-pre-wrap">
               {summary.summary}
             </p>
           </div>
 
           {summary.keyQuotes && summary.keyQuotes.length > 0 && (
-            <div className="bg-yellow-50/50 p-4 rounded-lg border border-yellow-100">
-              <h4 className="font-semibold text-yellow-700 mb-3 flex items-center gap-2 text-sm">
+            <div className="bg-warning-surface/50 p-4 rounded-lg border border-warning-border">
+              <h4 className="font-semibold text-warning-text mb-3 flex items-center gap-2 text-sm">
                 <Quote className="w-4 h-4" /> {t("aiOverallSummary.keyQuotes")}
               </h4>
               <ul className="space-y-3">
                 {summary.keyQuotes.map((quote, i) => (
-                  <li key={i} className="relative pl-4 italic text-gray-700">
-                    <span className="absolute left-0 top-0 text-yellow-400 text-xl font-serif">
+                  <li key={i} className="relative pl-4 italic text-foreground">
+                    <span className="absolute left-0 top-0 text-warning-solid text-xl font-serif">
                       &quot;
                     </span>
                     {quote}
-                    <span className="text-yellow-400 text-xl font-serif ml-1">
+                    <span className="text-warning-solid text-xl font-serif ml-1">
                       &quot;
                     </span>
                   </li>
@@ -111,28 +111,28 @@ export function AIOverallSummary({
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
-            <h4 className="font-semibold text-blue-700 mb-3 flex items-center gap-2">
+          <div className="bg-info-surface/50 p-4 rounded-lg border border-info-border">
+            <h4 className="font-semibold text-info-text mb-3 flex items-center gap-2">
               <Plus className="w-4 h-4" /> {t("aiOverallSummary.strengths")}
             </h4>
             <ul className="space-y-2 text-sm">
               {(summary.strengths ?? []).map((item, i) => (
                 <li key={i} className="flex items-start gap-2">
-                  <span className="text-blue-400 mt-1">•</span>
+                  <span className="text-info-solid mt-1">•</span>
                   <span>{item}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="bg-orange-50/50 p-4 rounded-lg border border-orange-100">
-            <h4 className="font-semibold text-orange-700 mb-3 flex items-center gap-2">
+          <div className="bg-warning-surface/50 p-4 rounded-lg border border-warning-border">
+            <h4 className="font-semibold text-warning-text mb-3 flex items-center gap-2">
               <Minus className="w-4 h-4" /> {t("aiOverallSummary.weaknesses")}
             </h4>
             <ul className="space-y-2 text-sm">
               {(summary.weaknesses ?? []).map((item, i) => (
                 <li key={i} className="flex items-start gap-2">
-                  <span className="text-orange-400 mt-1">•</span>
+                  <span className="text-warning-text mt-1">•</span>
                   <span>{item}</span>
                 </li>
               ))}

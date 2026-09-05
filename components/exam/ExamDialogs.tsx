@@ -22,6 +22,8 @@ interface ExamDialogsProps {
   showExitConfirm: boolean;
   setShowExitConfirm: (open: boolean) => void;
   onExitConfirm: () => void;
+  /** 이탈 후 데모 상세로 돌아가는가. 문구가 실제 목적지와 달라 혼란을 준다(#174). */
+  exitToDemoDetail?: boolean;
   unansweredDialog: { open: boolean; indices: number[] };
   setUnansweredDialog: (value: { open: boolean; indices: number[] }) => void;
   setCurrentQuestion: (idx: number) => void;
@@ -42,6 +44,7 @@ export function ExamDialogs({
   showExitConfirm,
   setShowExitConfirm,
   onExitConfirm,
+  exitToDemoDetail = false,
   unansweredDialog,
   setUnansweredDialog,
   setCurrentQuestion,
@@ -101,7 +104,7 @@ export function ExamDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle>{t("dialogs.exitTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("dialogs.exitDescription")}
+              {t(exitToDemoDetail ? "dialogs.exitDescriptionDemo" : "dialogs.exitDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

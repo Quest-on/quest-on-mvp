@@ -1,0 +1,415 @@
+import { describe, expect, it } from "vitest";
+import fs from "fs";
+import path from "path";
+
+/**
+ * AC-D1 / AC-D2 / AC-D3 — 개인정보처리방침 메시지 계약.
+ *
+ * 처리방침은 법적 문서다. 여기 적힌 내용과 실제 처리가 다르면 그 자체가 위반이다.
+ * 그래서 "빠지면 안 되는 것"과 "있으면 안 되는 것"을 둘 다 고정한다.
+ */
+
+const ROOT = path.resolve(__dirname, "..");
+
+const ko = JSON.parse(
+  fs.readFileSync(path.join(ROOT, "messages", "ko", "legal.json"), "utf8"),
+);
+const en = JSON.parse(
+  fs.readFileSync(path.join(ROOT, "messages", "en", "legal.json"), "utf8"),
+);
+const privacyPage = fs.readFileSync(
+  path.join(ROOT, "app", "legal", "privacy", "page.tsx"),
+  "utf8",
+);
+
+/** 중첩 객체를 `a.b.c` 형태의 leaf 경로 집합으로 편다. */
+function leafPaths(value: unknown, prefix = ""): string[] {
+  if (typeof value !== "object" || value === null) return [prefix];
+  return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) =>
+    leafPaths(child, prefix ? `${prefix}.${key}` : key),
+  );
+}
+
+function leafValues(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (typeof value !== "object" || value === null) return [];
+  return Object.values(value as Record<string, unknown>).flatMap(leafValues);
+}
+
+function get(root: unknown, dotted: string): unknown {
+  return dotted
+    .split(".")
+    .reduce<unknown>((acc, key) => (acc as Record<string, unknown>)?.[key], root);
+}
+
+describe("legal messages — AC-D1 leaf 계약 (명세 원문)", () => {
+  // 명세가 leaf 이름을 정확히 못박고 있다. 별칭으로 대체하면 계약 위반이다.
+  const REQUIRED_LEAVES = [
+    "privacy.section1.legalBasis",
+    "privacy.section1.contract.items",
+    "privacy.section1.contract.purpose",
+    "privacy.section1.contract.retention",
+    "privacy.section4.thirdParty.recipient",
+    "privacy.section4.thirdParty.items",
+    "privacy.section4.thirdParty.purpose",
+    "privacy.section4.thirdParty.retention",
+    "privacy.section4.thirdParty.legalBasis",
+    "privacy.section4.thirdParty.reasonableRelation.originalPurpose",
+    "privacy.section4.thirdParty.reasonableRelation.predictability",
+    "privacy.section4.thirdParty.reasonableRelation.dataSubjectImpact",
+    "privacy.section4.thirdParty.reasonableRelation.safeguards",
+    "privacy.section5.recipientName",
+    "privacy.section5.recipientContact",
+    "privacy.section5.countryValue",
+    "privacy.section5.timing",
+    "privacy.section5.method",
+    "privacy.section5.itemsValue",
+    "privacy.section5.purposeValue",
+    "privacy.section5.retentionValue",
+    "privacy.section5.legalBasis",
+    "privacy.section5.optOutMethod",
+    "privacy.section5.optOutEffect",
+    "privacy.section3.consentRecords.purpose",
+    "privacy.section3.consentRecords.retention",
+    "privacy.section3.consentRecords.form",
+    "privacy.section3.consentRecords.separation",
+    "privacy.section3.consentRecords.destruction",
+    "privacy.section3.consentRecords.rights",
+    "privacy.section8.officerNameOrDepartment",
+    "privacy.section8.email",
+  ] as const;
+
+  it("명세가 지정한 leaf 가 ko/en 모두 non-empty 다", () => {
+    for (const [locale, doc] of [
+      ["ko", ko],
+      ["en", en],
+    ] as const) {
+      for (const leaf of REQUIRED_LEAVES) {
+        const value = get(doc, leaf);
+        expect(typeof value, `${locale} 에 ${leaf} 가 없다`).toBe("string");
+        expect((value as string).trim(), `${locale}.${leaf} 가 비었다`).not.toBe("");
+      }
+    }
+  });
+
+  it("합리적 관련성 네 값이 모두 별개다", () => {
+    for (const doc of [ko, en]) {
+      const rr = doc.privacy.section4.thirdParty.reasonableRelation;
+      expect(
+        new Set([
+          rr.originalPurpose,
+          rr.predictability,
+          rr.dataSubjectImpact,
+          rr.safeguards,
+        ]).size,
+      ).toBe(4);
+    }
+  });
+
+  it("모든 수탁자 행에 name·task·retention 이 있다", () => {
+    for (const doc of [ko, en]) {
+      const rows = doc.privacy.section4.processing.rows as Record<
+        string,
+        Record<string, string>
+      >;
+      for (const [key, row] of Object.entries(rows)) {
+        for (const field of ["name", "task", "retention"] as const) {
+          expect((row[field] ?? "").trim(), `${key}.${field} 가 비었다`).not.toBe("");
+        }
+      }
+    }
+  });
+
+  it("국외이전 수령자 연락처가 email 또는 URL 형식이다", () => {
+    for (const doc of [ko, en]) {
+      expect(doc.privacy.section5.recipientContact).toMatch(/@|https?:\/\//);
+    }
+  });
+
+  it("lastModified 가 있다", () => {
+    expect((ko.lastModified ?? "").trim()).not.toBe("");
+    expect((en.lastModified ?? "").trim()).not.toBe("");
+  });
+});
+
+describe("legal messages — ko/en 대칭", () => {
+  it("privacy 하위 leaf 경로 집합이 정확히 같다", () => {
+    const koPaths = leafPaths(ko.privacy).sort();
+    const enPaths = leafPaths(en.privacy).sort();
+    expect(koPaths).toEqual(enPaths);
+  });
+
+  it("모든 privacy leaf 가 non-empty 문자열이다", () => {
+    for (const [locale, doc] of [
+      ["ko", ko],
+      ["en", en],
+    ] as const) {
+      for (const value of leafValues(doc.privacy)) {
+        expect(value.trim(), `${locale} 에 빈 문구가 있다`).not.toBe("");
+      }
+    }
+  });
+});
+
+describe("legal messages — 금지 문구", () => {
+  // 이 문자열들은 전부 실제 처리와 어긋나거나 법 적용을 왜곡한다.
+  const FORBIDDEN_KO = [
+    "제3자에게 제공하지 않습니다", // 교수자에게 성적과 대화 전문을 제공한다. 거짓이다.
+    "기관 계약 종료", // 기관 계약 개념이 코드에 없다. 보존 기준으로 쓸 수 없다.
+    "TBD",
+    "준비 중",
+  ];
+
+  it("ko privacy 에 금지 문구가 없다", () => {
+    const joined = leafValues(ko.privacy).join("\n");
+    for (const forbidden of FORBIDDEN_KO) {
+      expect(joined, `금지 문구가 남아 있다: ${forbidden}`).not.toContain(forbidden);
+    }
+  });
+
+  it("보존 데이터를 익명이라고 주장하지 않는다", () => {
+    // 해시는 익명이 아니라 가명이다. 익명이라 쓰면 법 적용 자체가 달라진다.
+    // 다만 "익명정보가 아니라 가명정보" 처럼 명시적으로 부정하는 문장은
+    // 오히려 정확한 고지이므로 통과시켜야 한다. 단정 표현만 잡는다.
+    for (const value of leafValues(ko.privacy)) {
+      if (!value.includes("익명")) continue;
+      expect(value, `익명이라고 주장하는 문구가 있다: ${value}`).toMatch(
+        /익명[^.]*아니/,
+      );
+    }
+    expect(leafValues(ko.privacy).join("\n")).not.toMatch(/익명(화|처리)/);
+  });
+
+  it("수탁자 표기에 플레이스홀더가 없다", () => {
+    for (const doc of [ko, en]) {
+      const rows = doc.privacy.section4.processing.rows as Record<
+        string,
+        { name: string }
+      >;
+      for (const row of Object.values(rows)) {
+        expect(row.name).not.toMatch(/provider|vendor|TBD/i);
+        // 범주명(예: "클라우드 호스팅 업체")은 수탁자 공개 의무를 충족하지 못한다.
+        expect(row.name).not.toMatch(/업체|제공사/);
+      }
+    }
+  });
+});
+
+describe("legal messages — 수탁자 법인명 (AC-D2)", () => {
+  const EXPECTED = [
+    "OpenAI OpCo, LLC",
+    "Supabase Pte. Ltd",
+    "Vercel Inc.",
+    "Upstash, Inc.",
+  ] as const;
+
+  it("ko/en 모두 정확히 네 법인명을 쓴다", () => {
+    for (const doc of [ko, en]) {
+      const names = Object.values(
+        doc.privacy.section4.processing.rows as Record<string, { name: string }>,
+      ).map((row) => row.name);
+      expect(names.sort()).toEqual([...EXPECTED].sort());
+    }
+  });
+
+  it("국외이전 블록도 같은 법인명을 쓴다", () => {
+    for (const doc of [ko, en]) {
+      const recipients = doc.privacy.section5.recipientValue as string;
+      for (const name of EXPECTED) {
+        expect(recipients).toContain(name);
+      }
+    }
+  });
+
+  it("공식 DPA의 이전 국가와 privacy 연락처를 수탁자별로 공개한다", () => {
+    for (const doc of [ko, en]) {
+      expect(doc.privacy.section5.countryValue).toContain("Supabase Pte. Ltd");
+      expect(doc.privacy.section5.countryValue).toMatch(/Singapore|싱가포르/);
+      expect(doc.privacy.section5.countryValue).toContain("OpenAI OpCo, LLC");
+      expect(doc.privacy.section5.countryValue).toMatch(/United States|미국/);
+      expect(doc.privacy.section5.recipientContact).toContain("privacy@upstash.com");
+      expect(doc.privacy.section5.recipientContact).not.toContain("support@upstash.com");
+    }
+  });
+});
+
+describe("legal messages — 국외이전 공개항목 (제28조의8②)", () => {
+  const REQUIRED_KEYS = [
+    "recipientValue",
+    "contactValue",
+    "countryValue",
+    "timingValue",
+    "methodValue",
+    "itemsValue",
+    "purposeValue",
+    "retentionValue",
+    "basisValue",
+    "optOutValue",
+    "optOutEffectValue",
+  ] as const;
+
+  it("공개항목이 전부 있고 거부 방법과 거부 효과가 분리돼 있다", () => {
+    for (const [locale, doc] of [
+      ["ko", ko],
+      ["en", en],
+    ] as const) {
+      for (const key of REQUIRED_KEYS) {
+        const value = doc.privacy.section5[key];
+        expect(typeof value, `${locale}.section5.${key} 가 없다`).toBe("string");
+        expect((value as string).trim()).not.toBe("");
+      }
+      // 거부해도 아무 일 없다는 식이면 고지가 아니다.
+      expect(doc.privacy.section5.optOutValue).not.toBe(
+        doc.privacy.section5.optOutEffectValue,
+      );
+    }
+  });
+
+  it("법적 근거로 제28조의8①3호를 명시한다", () => {
+    expect(ko.privacy.section5.basisValue).toContain("제28조의8");
+    expect(en.privacy.section5.basisValue).toContain("28-8");
+  });
+});
+
+describe("legal messages — 수집·이용 근거 (제15조①4호)", () => {
+  it("법적 근거를 명시하고 최소수집 입증책임을 밝힌다", () => {
+    // 수집 항목만 나열하고 근거를 안 적으면 어떤 자격으로 처리하는지가 빠진다.
+    expect(ko.privacy.section1.legalBasis).toContain("제15조제1항제4호");
+    expect(en.privacy.section1.legalBasis).toContain("15(1)4");
+    expect(ko.privacy.section1.legalBasisDetail.minimal).toContain("제16조제1항");
+  });
+
+  it("선택 항목은 동의 기반이며 거부해도 이용에 제한이 없음을 밝힌다", () => {
+    for (const doc of [ko, en]) {
+      expect(doc.privacy.section1.legalBasisDetail.consent.trim()).not.toBe("");
+    }
+  });
+
+  it("항목별 목적·보유기간 매핑이 네 범주 모두 있다", () => {
+    // 법적 근거만 적고 매핑을 빼면 "무엇을 왜 얼마나" 가 남지 않는다.
+    for (const [locale, doc] of [
+      ["ko", ko],
+      ["en", en],
+    ] as const) {
+      const rows = doc.privacy.section1.mapping.rows;
+      for (const key of ["account", "exam", "ai", "access"] as const) {
+        for (const field of ["items", "purpose", "retention"] as const) {
+          const value = rows[key]?.[field];
+          expect(
+            typeof value,
+            `${locale}.section1.mapping.rows.${key}.${field} 가 없다`,
+          ).toBe("string");
+          expect((value as string).trim()).not.toBe("");
+        }
+      }
+    }
+  });
+});
+
+describe("legal messages — 제3자 제공 (제17조④)", () => {
+  it("시행령 제14조의2 네 판단기준이 별개 값으로 존재한다", () => {
+    for (const [locale, doc] of [
+      ["ko", ko],
+      ["en", en],
+    ] as const) {
+      const tp = doc.privacy.section4.thirdParty;
+      const criteria = [tp.criteria1, tp.criteria2, tp.criteria3, tp.criteria4];
+      for (const [index, value] of criteria.entries()) {
+        expect(typeof value, `${locale} criteria${index + 1} 가 없다`).toBe("string");
+        expect((value as string).trim()).not.toBe("");
+      }
+      // 하나로 뭉뚱그리면 판단기준을 각각 공개한 게 아니다.
+      expect(new Set(criteria).size).toBe(4);
+    }
+  });
+
+  it("법적 근거로 제17조④를 명시한다", () => {
+    expect(ko.privacy.section4.thirdParty.basis).toContain("제17조제4항");
+    expect(en.privacy.section4.thirdParty.basis).toContain("17(4)");
+  });
+});
+
+describe("legal messages — 파기 절차", () => {
+  it("탈퇴 후 보존을 가명정보로 명시한다", () => {
+    expect(ko.privacy.section3.pseudonymized.nature).toContain("가명정보");
+    expect(en.privacy.section3.pseudonymized.nature).toContain("pseudonymized");
+  });
+
+  it("미완료 계정 파기 leaf 3개가 ko/en 모두 있다", () => {
+    for (const [locale, doc] of [
+      ["ko", ko],
+      ["en", en],
+    ] as const) {
+      for (const key of ["scope", "retention", "destruction"] as const) {
+        const value = doc.privacy.section3.incompleteAccounts[key];
+        expect(
+          typeof value,
+          `${locale}.section3.incompleteAccounts.${key} 가 없다`,
+        ).toBe("string");
+        expect((value as string).trim()).not.toBe("");
+      }
+    }
+  });
+});
+
+describe("legal messages — 보호책임자와 개정일", () => {
+  it("담당 부서를 표기한다", () => {
+    expect(ko.privacy.section8.department.trim()).not.toBe("");
+    expect(en.privacy.section8.department.trim()).not.toBe("");
+  });
+
+  it("lastModified 가 개정일로 갱신됐다", () => {
+    expect(ko.lastModified).toBe("2026-08-10");
+    expect(en.lastModified).toBe("2026-08-10");
+  });
+});
+
+describe("legal messages — terms subtree 불변 (canonical hash 입력)", () => {
+  it("ko/en terms 가 완전히 동일한 구조를 유지한다", () => {
+    // terms 는 정책 릴리스 content_hash 의 입력이다. 한 글자만 바뀌어도
+    // database/020 의 해시와 불일치해 CI 와 배포가 실패한다.
+    expect(leafPaths(ko.terms).sort()).toEqual(leafPaths(en.terms).sort());
+    expect(leafValues(ko.terms).every((v) => v.trim() !== "")).toBe(true);
+  });
+});
+
+describe("privacy page — 추가 leaf 가 실제로 렌더된다 (AC-D3)", () => {
+  const MUST_RENDER = [
+    "privacy.section3.pseudonymized.nature",
+    "privacy.section3.pseudonymized.separation",
+    "privacy.section3.incompleteAccounts.scope",
+    "privacy.section3.incompleteAccounts.retention",
+    "privacy.section3.incompleteAccounts.destruction",
+    "privacy.section4.thirdParty.recipient",
+    "privacy.section4.thirdParty.basis",
+    "privacy.section4.thirdParty.criteria1",
+    "privacy.section4.thirdParty.criteria4",
+    "privacy.section4.processing.rows.hosting.name",
+    "privacy.section4.processing.rows.cache.name",
+    "privacy.section5.recipientValue",
+    "privacy.section5.contactValue",
+    "privacy.section5.timingValue",
+    "privacy.section5.methodValue",
+    "privacy.section5.basisValue",
+    "privacy.section5.optOutEffectValue",
+    "privacy.section8.department",
+  ] as const;
+
+  it("JSON 에만 넣고 페이지가 안 읽는 leaf 가 없다", () => {
+    for (const key of MUST_RENDER) {
+      expect(privacyPage, `${key} 가 페이지에서 렌더되지 않는다`).toContain(key);
+      // 메시지 자체도 존재해야 한다.
+      expect(get(ko, key), `ko 에 ${key} 가 없다`).toBeTypeOf("string");
+      expect(get(en, key), `en 에 ${key} 가 없다`).toBeTypeOf("string");
+    }
+  });
+
+  it("삭제된 옛 키를 페이지가 더 이상 참조하지 않는다", () => {
+    for (const stale of [
+      "privacy.section4.processing.rows.email",
+      "privacy.section5.countryValue\")}</li>\n            <li><strong>{t(\"privacy.section5.items",
+    ]) {
+      expect(privacyPage).not.toContain(stale);
+    }
+  });
+});

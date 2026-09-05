@@ -383,9 +383,42 @@ export function hasGradesForEveryExpectedQuestion(
 
 // ─── estimateTokenCount ───────────────────────────────────────────────────────
 
-/** Rough token estimate (chars / 4). Used to detect context overflow risk. */
+/**
+ * 컨텍스트 초과 위험을 재기 위한 토큰 추정.
+ *
+ * 예전에는 `chars / 4` 였다. 영어에는 맞지만(약 4.9자/토큰) 한국어에서는
+ * 실제의 2.4배 과소 추정한다 — FLORES-200 devtest 한국어 1,012문장 기준
+ * 0.600 토큰/자(= 1.667 자/토큰)다. 이 저장소의 프롬프트는 대부분
+ * 한국어라 그 오차가 그대로 위험이 된다.
+ *
+ * 한글 음절 비율로 가중한다. 추정은 **과대 방향으로만** 틀려야 한다 —
+ * 과소 추정은 조용한 초과로 이어지고, 과대 추정은 불필요한 분할로만
+ * 이어진다. 그래서 계수를 실측값보다 살짝 높게 잡는다.
+ *
+ * 공백도 센다. 실제 토크나이저가 공백을 소비하므로, 빼면 띄어쓰기 있는
+ * 한국어가 없는 것보다 낮게 추정되는 역전이 생긴다.
+ */
+export const TOKENS_PER_HANGUL_CHAR = 0.65;
+export const TOKENS_PER_OTHER_CHAR = 0.25;
+
 export function estimateTokenCount(text: string): number {
-  return Math.ceil(text.length / 4);
+  if (!text) return 0;
+  const hangul = (text.match(/[\uac00-\ud7a3\u1100-\u11ff\u3130-\u318f]/g) ?? []).length;
+  const other = text.length - hangul;
+  return Math.ceil(hangul * TOKENS_PER_HANGUL_CHAR + other * TOKENS_PER_OTHER_CHAR);
+}
+
+/**
+ * 모델 컨텍스트에서 프롬프트에 허용할 상한.
+ *
+ * 정확한 창 크기는 모델마다 다르고 런타임에 바뀐다. 여기서는 보수적인
+ * 하한을 쓴다 — 초과를 놓치는 것보다 일찍 경고하는 편이 낫다.
+ */
+export const PROMPT_TOKEN_BUDGET = 100_000;
+
+/** 프롬프트가 예산을 넘었는지. 넘으면 표본을 줄여야 한다. */
+export function exceedsPromptBudget(text: string): boolean {
+  return estimateTokenCount(text) > PROMPT_TOKEN_BUDGET;
 }
 
 // ─── loadExamMetaOnly ─────────────────────────────────────────────────────────

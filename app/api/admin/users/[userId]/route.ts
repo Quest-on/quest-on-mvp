@@ -3,6 +3,12 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { successJson, errorJson } from "@/lib/api-response";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
+import { z } from "zod";
+import { validateUUID } from "@/lib/validate-params";
+
+const RoleSchema = z
+  .object({ role: z.enum(["instructor", "student"]) })
+  .strict();
 
 export async function PATCH(
   request: NextRequest,
@@ -18,11 +24,16 @@ export async function PATCH(
     }
 
     const { userId } = await params;
-    const { role } = await request.json();
+    const invalidId = validateUUID(userId, "userId");
+    if (invalidId) return invalidId;
 
-    if (!role || !["instructor", "student"].includes(role)) {
-      return errorJson("BAD_REQUEST", "Invalid role. Must be 'instructor' or 'student'", 400);
+    // .strict() 가 없으면 role 외 필드가 그대로 통과한다. 관리자 경로라
+    // 모르는 키를 조용히 삼키면 안 된다.
+    const parsed = RoleSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return errorJson("INVALID_INPUT", "Invalid input", 400);
     }
+    const { role } = parsed.data;
 
     const supabase = getSupabaseServer();
 

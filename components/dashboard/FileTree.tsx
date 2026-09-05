@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -19,7 +20,7 @@ import {
   FileIcon,
   FileLabel,
 } from "@/components/animate-ui/primitives/radix/files";
-import { Folder as FolderIconLucide, FolderOpen, FileText } from "lucide-react";
+import { Folder as FolderIconLucide, FolderOpen, FileText, AlertCircle } from "lucide-react";
 import { qk } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
@@ -88,7 +89,12 @@ function FolderTreeItem({
   level?: number;
 }) {
   const t = useTranslations("instructor");
-  const { data: children = [], isLoading } = useQuery({
+  const {
+    data: children = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: qk.drive.folderContents(folder.id, userId),
     queryFn: async ({ signal }) => {
       const response = await fetch("/api/supa", {
@@ -325,6 +331,16 @@ function FolderTreeItem({
             <div className="py-1 text-xs text-muted-foreground pl-2">
               {t("fileTree.loading")}
             </div>
+          ) : isError ? (
+            /* 오류일 때 빈 트리를 조용히 그리면 자료가 없는 것처럼 보인다. (#241) */
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="flex w-full items-center gap-1.5 py-1 pl-2 text-xs text-destructive"
+            >
+              <AlertCircle className="size-3.5" />
+              <span>{t("fileTree.loadError")}</span>
+            </button>
           ) : (
             <>
               {/* 파일들을 먼저 표시 */}
@@ -422,7 +438,12 @@ export function FileTree({
   const [dragOverNodeId, setDragOverNodeId] = useState<string | null>(null);
   const [isMoving, setIsMoving] = useState(false);
 
-  const { data: rootNodes = [], isLoading } = useQuery({
+  const {
+    data: rootNodes = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: qk.drive.folderContents(null, effectiveUserId),
     queryFn: async ({ signal }) => {
       const response = await fetch("/api/supa", {
@@ -608,6 +629,19 @@ export function FileTree({
     return (
       <div className={cn("p-4 text-sm text-muted-foreground", className)}>
         {t("fileTree.loading")}
+      </div>
+    );
+  }
+
+  // 오류를 빈 상태로 보여주면 안 된다. isError 를 안 보면 조회 실패가
+  // "폴더 없음" 으로 렌더돼 자료가 사라진 것처럼 읽힌다. (#241)
+  if (isError) {
+    return (
+      <div className={cn("p-4", className)}>
+        <ErrorAlert
+          message={t("fileTree.loadError")}
+          onRetry={() => refetch()}
+        />
       </div>
     );
   }

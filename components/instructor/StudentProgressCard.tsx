@@ -19,7 +19,7 @@ import { formatDate } from "@/lib/i18n/format";
 interface Student {
   id: string; // session ID
   name: string;
-  email: string;
+  email: string | null;
   status: "not-started" | "in-progress" | "completed";
   score?: number;
   submittedAt?: string;
@@ -36,13 +36,13 @@ interface StudentProgressCardProps {
 const getStudentStatusColor = (status: string) => {
   switch (status) {
     case "completed":
-      return "bg-green-100 text-green-800";
+      return "bg-success-subtle text-success-text";
     case "in-progress":
-      return "bg-yellow-100 text-yellow-800";
+      return "bg-warning-subtle text-warning-text";
     case "not-started":
-      return "bg-gray-100 text-gray-800";
+      return "bg-secondary text-secondary-foreground";
     default:
-      return "bg-gray-100 text-gray-800";
+      return "bg-secondary text-secondary-foreground";
   }
 };
 
@@ -106,7 +106,7 @@ function ElapsedTime({ createdAt }: { createdAt: string | undefined }) {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [createdAt]);
+  }, [createdAt, t]);
 
   if (!elapsedTime) return null;
 
@@ -169,8 +169,8 @@ export function StudentProgressCard({
                       >
                         {student.status === "in-progress" && (
                           <span className="relative flex h-2 w-2 mr-1.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-600 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-600"></span>
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning-solid opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-warning-solid"></span>
                           </span>
                         )}
                         {student.status === "completed"
@@ -180,9 +180,11 @@ export function StudentProgressCard({
                           : t("studentProgress.statusNotStarted")}
                       </Badge>
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {student.email}
-                    </div>
+                    {student.email && (
+                      <div className="text-sm text-muted-foreground mt-1">
+                        {student.email}
+                      </div>
+                    )}
                     {(student.student_number || student.school) && (
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                         {student.student_number && (
@@ -206,13 +208,13 @@ export function StudentProgressCard({
                         </span>
                         {student.status === "completed" &&
                           student.submittedAt && (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="type-meta">
                               {formatDate(student.submittedAt, locale)}
                             </span>
                           )}
                         {student.status === "in-progress" &&
                           student.createdAt && (
-                            <div className="text-xs text-muted-foreground">
+                            <div className="type-meta">
                               <ElapsedTime createdAt={student.createdAt} />
                             </div>
                           )}
@@ -221,7 +223,7 @@ export function StudentProgressCard({
                     {student.status === "in-progress" &&
                       student.score === undefined &&
                       student.createdAt && (
-                        <div className="text-xs text-muted-foreground">
+                        <div className="type-meta">
                           <ElapsedTime createdAt={student.createdAt} />
                         </div>
                       )}
@@ -232,7 +234,7 @@ export function StudentProgressCard({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-green-600 border-green-600 hover:bg-green-50 h-8"
+                        className="text-primary border-primary hover:bg-primary/10 h-8"
                         onClick={() => handleLiveMonitoring(student)}
                       >
                         <Activity className="w-3.5 h-3.5 mr-1" />
@@ -243,7 +245,7 @@ export function StudentProgressCard({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-blue-600 border-blue-600 hover:bg-blue-50 h-8"
+                        className="text-info-text border-info-border hover:bg-info-surface h-8"
                         onClick={() =>
                           (window.location.href = `/instructor/${examId}/grade/${student.id}`)
                         }

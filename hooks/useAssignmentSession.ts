@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 interface Exam {
   id: string;
@@ -28,10 +29,29 @@ interface Session {
 export function useAssignmentSession(code: string) {
   const { user, profile, isLoaded, isSignedIn } = useAppUser();
   const router = useRouter();
+  const t = useTranslations("assignment.page");
   const [exam, setExam] = useState<Exam | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // 서버 오류 코드를 사용자 문구로 옮긴다.
+  //
+  // 예전에는 errData.message 를 그대로 던져서 한도 오류가 영문 원문으로
+  // 화면에 떴다. 코드를 아는 만큼만 번역하고 나머지는 기본 문구로 간다.
+  const resolveErrorMessage = useCallback(
+    (code: unknown): string => {
+      const known: Record<string, string> = {
+        ENTRY_WINDOW_NOT_OPEN: t("entryWindowNotOpen"),
+        EXAM_NOT_AVAILABLE: t("examNotAvailable"),
+        EXAM_NOT_FOUND: t("examNotFound"),
+        PUBLISH_LIMIT_REACHED: t("publishLimitReached"),
+        STUDENT_LIMIT_REACHED: t("studentLimitReached"),
+      };
+      return (typeof code === "string" && known[code]) || t("sessionInitError");
+    },
+    [t]
+  );
 
   const initSession = useCallback(async () => {
     if (!isLoaded || !isSignedIn || !user) return;
@@ -48,8 +68,10 @@ export function useAssignmentSession(code: string) {
       });
 
       if (!examRes.ok) {
+        // 서버 message 를 그대로 화면에 올리면 영문 원문이 노출된다.
+        // 코드로 문구를 고르고, 모르는 코드는 기본 문구로 떨어뜨린다.
         const errData = await examRes.json().catch(() => ({}));
-        throw new Error(errData.message || "과제를 찾을 수 없습니다.");
+        throw new Error(resolveErrorMessage(errData?.error));
       }
 
       const examData = await examRes.json();
@@ -79,13 +101,7 @@ export function useAssignmentSession(code: string) {
           router.replace(`/assignment/${code}/review`);
           return null;
         }
-        const errorMessages: Record<string, string> = {
-          ENTRY_WINDOW_NOT_OPEN: "아직 과제가 시작되지 않았습니다.",
-          EXAM_NOT_AVAILABLE: "과제가 종료되었거나 비공개 상태입니다.",
-          EXAM_NOT_FOUND: "과제를 찾을 수 없습니다.",
-        };
-        const friendlyMsg = errorMessages[errData.error] || errData.message || "세션 생성에 실패했습니다.";
-        throw new Error(friendlyMsg);
+        throw new Error(resolveErrorMessage(errData?.error));
       }
 
       const sessionData = await sessionRes.json();
@@ -120,7 +136,7 @@ export function useAssignmentSession(code: string) {
 
       return { sessionId, existingMessages: [] };
     } catch (err) {
-      setError(err instanceof Error ? err.message : "오류가 발생했습니다.");
+      setError(err instanceof Error ? err.message : t("sessionInitError"));
       return null;
     } finally {
       setIsLoading(false);

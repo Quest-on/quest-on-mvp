@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { qk } from "@/lib/query-keys";
 import type { InstructorExam, InstructorStudent } from "@/lib/types/exam";
@@ -195,6 +195,8 @@ export function useExamDetail({
           deadline: examResult.exam.deadline || null,
           assignment_prompt: examResult.exam.assignment_prompt || null,
           grades_released: examResult.exam.grades_released || false,
+          is_demo: examResult.exam.is_demo === true,
+          first_published_at: examResult.exam.first_published_at ?? null,
         } as InstructorExam,
         questionsCount: questionsArray.length,
         questionsRaw: questionsArray as Question[],

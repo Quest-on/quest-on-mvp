@@ -1,0 +1,28 @@
+# 줄바꿈 고정.
+#
+# 이 저장소는 인덱스에 이미 LF 로 저장돼 있는데, Windows 개발자의 `core.autocrlf=true`
+# 가 체크아웃 시 워킹트리를 CRLF 로 바꿨다. 그러면 줄바꿈에 민감한 코드가 로컬에서만
+# 깨진다 — CI(ubuntu)는 LF 라 통과하므로 아무도 못 본다. 실제로 그 상태에서
+# 018 마이그레이션 가드(#120)가 오진됐다.
+#
+# 아래 선언으로 워킹트리도 LF 로 고정한다. 저장 내용은 이미 LF 이므로 파일 내용은 안 바뀐다.
+* text=auto eol=lf
+
+# 실행 권한·해시 문제를 피하려면 스크립트와 훅은 반드시 LF 여야 한다.
+*.sh text eol=lf
+.githooks/* text eol=lf
+
+# 마이그레이션은 적용 결과가 줄바꿈에 물리므로 고정한다.
+*.sql text eol=lf
+
+# 바이너리는 Git 이 손대지 않게 한다.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+*.xlsx binary

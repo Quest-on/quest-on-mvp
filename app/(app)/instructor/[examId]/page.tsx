@@ -7,6 +7,7 @@ import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ExamDetailHeader } from "@/components/instructor/ExamDetailHeader";
+import { resolveCodeGate, type InstructorQuotaResponse } from "@/components/instructor/ExamCode";
 import { ExamDetailsCard } from "@/components/instructor/ExamDetailsCard";
 import { QuestionsListCard } from "@/components/instructor/QuestionsListCard";
 import { ExamControlButtons } from "@/components/instructor/ExamControlButtons";
@@ -98,6 +99,38 @@ export default function ExamDetail({
     isSignedIn,
     userId: user?.id,
   });
+
+  const isDemoExam = exam?.is_demo === true;
+
+  // 발행 한도. 교수자가 **코드를 건네기 전에** 알아야 한다 — 최종 강제는
+  // 세션 생성 시 DB 가 하지만, 그때는 이미 코드를 배포한 뒤다.
+  // 데모는 한도를 소모하지 않으므로 조회하지 않는다.
+  const { data: quotaData } = useQuery<InstructorQuotaResponse>({
+    queryKey: qk.instructor.quota(user?.id),
+    queryFn: async ({ signal }) => {
+      const response = await fetch("/api/instructor/quota", { signal });
+      if (!response.ok) throw new Error("Failed to fetch quota");
+      return response.json() as Promise<InstructorQuotaResponse>;
+    },
+    enabled: !!user?.id && !isDemoExam,
+  });
+  const {
+    data: demoStatus,
+  } = useQuery<{ completed: boolean }>({
+    queryKey: qk.instructor.onboardingDemoStatus(user?.id),
+    queryFn: async ({ signal }) => {
+      const response = await fetch("/api/onboarding/demo/status", { signal });
+      if (!response.ok) {
+        throw new Error("Failed to fetch demo status");
+      }
+      return response.json() as Promise<{ completed: boolean }>;
+    },
+    enabled: isDemoExam && isLoaded && !!isSignedIn,
+  });
+
+  // 데모 완주는 학생 시점 채점 결과를 열어야 기록된다. 여기까지 닫아 두면
+  // 데모를 끝낼 수 없으므로 데모만 종료 상태와 관계없이 채점 결과를 연다.
+  const canOpenGrading = exam?.status === "closed" || isDemoExam;
 
   const hasGradingInProgress = useMemo(
     () => exam?.status === "closed",
@@ -351,7 +384,7 @@ export default function ExamDetail({
     return (
       <div className="container mx-auto p-6">
         <div className="text-center py-12">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">{t("examDetail.error")}</h2>
+          <h2 className="text-xl font-semibold text-destructive mb-2">{t("examDetail.error")}</h2>
           <p className="text-muted-foreground">
             {error || t("examDetail.loadFail")}
           </p>
@@ -376,6 +409,34 @@ export default function ExamDetail({
             title={exam.title}
             code={exam.code}
             examId={exam.id}
+            isDemo={isDemoExam}
+            quota={{
+              isDemo: isDemoExam,
+              alreadyPublished: !!exam.first_published_at,
+              publishesRemaining: quotaData?.publishesRemaining ?? null,
+              // 이 시험이 실제로 몇 명을 받았는지 알고 있으므로 잔여를 계산해
+              // 넘긴다. 상한을 모르면 null 이고, 그러면 안 막는다.
+              studentsRemaining:
+                quotaData?.studentsRemaining === null ||
+                quotaData?.studentsRemaining === undefined
+                  ? null
+                  : Math.max(
+                      0,
+                      quotaData.studentsRemaining - (bulkGradeStatus?.studentCount ?? 0)
+                    ),
+            }}
+            demoPreviewLabel={t("examDetail.tryAsStudent")}
+            // 완주한 데모는 이미 제출본이 있어 그냥 들어가면 읽기 전용 화면만
+            // 뜬다. 연습용이므로 다시 풀 수 있어야 한다 — 라벨이 있으면 CTA 가
+            // 재응시를 요청한다.
+            demoRestartLabel={
+              demoStatus?.completed ? t("examDetail.retryAsStudent") : undefined
+            }
+            demoRestartHint={
+              demoStatus?.completed
+                ? t("examDetail.retryAsStudentHint")
+                : undefined
+            }
             extraActions={
               <>
                 {process.env.NODE_ENV === "development" && (
@@ -389,7 +450,7 @@ export default function ExamDetail({
                     <span className={!allStudentsManuallyGraded ? "cursor-not-allowed" : undefined}>
                       <Button
                         size="sm"
-                        className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 focus-visible:ring-emerald-500"
+                        variant="outline"
                         onClick={() => handleDownload("excel")}
                         disabled={!allStudentsManuallyGraded || isExporting !== null}
                       >
@@ -436,6 +497,7 @@ export default function ExamDetail({
                   examId={exam.id}
                   examStatus={exam.status || "draft"}
                   hasGateFields={!!(exam.open_at || exam.close_at)}
+                  isDemo={isDemoExam}
                   onStatusChange={(newStatus, startedAt) => {
                     setExam((prev) => {
                       if (!prev) return prev;
@@ -457,6 +519,7 @@ export default function ExamDetail({
             }
           />
 
+
           <div className="space-y-3 mt-6 mb-6">
             <div id="exam-info-section">
               <Collapsible open={examInfoOpen} onOpenChange={setExamInfoOpen}>
@@ -465,8 +528,11 @@ export default function ExamDetail({
                     <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-3">
                         <h3 className="font-semibold">{t("examDetail.examInfo")}</h3>
-                        <span className="text-sm text-muted-foreground">
-                          {exam.duration}분 &bull; {exam.code}
+                        <span className="type-hint">
+                          {/* 코드는 헤더의 ExamCode 가 이미 내보낸다. 여기서
+                              한 번 더 그리면 게이트를 우회하는 두 번째 표면이
+                              된다 — 소요 시간만 남긴다. */}
+                          {exam.duration}분
                         </span>
                       </div>
                       {examInfoOpen ? (
@@ -479,6 +545,15 @@ export default function ExamDetail({
                   <CollapsibleContent>
                     <div className="px-4 pb-4">
                       <ExamDetailsCard
+                        // 발행 한도에 걸린 미발행 시험은 이 카드에서도 코드를
+                        // 반출하면 안 된다. 헤더만 막으면 카드가 우회로가 된다.
+                        codeGateBlocked={
+                          resolveCodeGate({
+                            isDemo: isDemoExam,
+                            alreadyPublished: !!exam.first_published_at,
+                            publishesRemaining: quotaData?.publishesRemaining ?? null,
+                          }) === "blocked"
+                        }
                         description={exam.description}
                         duration={exam.duration}
                         createdAt={exam.createdAt}
@@ -499,7 +574,7 @@ export default function ExamDetail({
                     <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
                       <div className="flex items-center gap-3">
                         <h3 className="font-semibold">{t("examDetail.viewQuestions")}</h3>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="type-hint">
                           {questionsCount !== null
                             ? t("examDetail.questionsCountLabel", { count: questionsCount })
                             : t("examDetail.questionsLoading")}
@@ -538,11 +613,11 @@ export default function ExamDetail({
             <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
               <div className="flex items-center gap-2">
                 {exam.grades_released ? (
-                  <Eye className="h-4 w-4 text-green-600" />
+                  <Eye className="h-4 w-4 text-success-text" />
                 ) : (
                   <EyeOff className="h-4 w-4 text-muted-foreground" />
                 )}
-                <span className="text-sm font-medium">
+                <span className="type-field-label">
                   {exam.grades_released ? t("examDetail.gradesPublic") : t("examDetail.gradesHidden")}
                 </span>
                 <span className="text-xs text-muted-foreground hidden sm:inline">
@@ -553,7 +628,19 @@ export default function ExamDetail({
               </div>
               <Button
                 size="sm"
-                variant={exam.grades_released ? "outline" : "default"}
+                variant={
+                  // 공개할 성적이 없으면 다음 행동이 아니다.
+                  //
+                  // 갓 만든 데모에는 응시자가 0명이다. 그런데도 이 버튼이 강조돼서
+                  // 착지 화면에 강조 CTA 가 셋(학생 시점 / 시험 시작 / 성적 공개)이나
+                  // 떴다. 온보딩 직후 첫 걸음은 학생 시점 하나다 - 데모를 겪어 보는
+                  // 게 목적이고 나머지 둘은 그 뒤 행동이다.
+                  exam.grades_released ||
+                  showBulkCaseGradingCta ||
+                  (bulkGradeStatus?.studentCount ?? 0) === 0
+                    ? "outline"
+                    : "default"
+                  }
                 disabled={releaseGradesMutation.isPending}
                 onClick={handleToggleGradesRelease}
               >
@@ -569,25 +656,25 @@ export default function ExamDetail({
             </div>
 
             {showBulkCaseGradingCta && (
-              <div className="flex items-center justify-between p-3 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+              <div className="flex items-center justify-between p-3 border border-info-border rounded-lg bg-info-surface">
                 <div className="flex items-center gap-2">
                   {isBulkGrading ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400 shrink-0" aria-hidden="true" />
+                    <Loader2 className="h-4 w-4 animate-spin text-info-text shrink-0" aria-hidden="true" />
                   ) : (
-                    <Bot className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" aria-hidden="true" />
+                    <Bot className="h-4 w-4 text-info-text shrink-0" aria-hidden="true" />
                   )}
                   <div>
-                    <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    <span className="text-sm font-medium text-info-text">
                       {bulkCtaTitle}
                     </span>
-                    <span className="text-xs text-blue-600 dark:text-blue-400 hidden sm:inline ml-2">
+                    <span className="text-xs text-info-text hidden sm:inline ml-2">
                       {bulkCtaDescription}
                     </span>
                   </div>
                 </div>
                 <Button
                   size="sm"
-                  className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-400 text-white shrink-0"
+                  className="shrink-0"
                   onClick={() => setBulkGradingOpen(true)}
                 >
                   {bulkCtaButtonLabel}
@@ -638,7 +725,7 @@ export default function ExamDetail({
               </Button>
             </div>
 
-            <p className="text-sm text-muted-foreground">
+            <p className="type-hint">
               {t("examDetail.totalStudents", { count: filteredAndSortedStudents.length })}
             </p>
 
@@ -697,7 +784,7 @@ export default function ExamDetail({
                         student={student}
                         rowNumber={index + 1}
                         examId={exam.id}
-                        canOpenGrading={exam.status === "closed"}
+                        canOpenGrading={canOpenGrading}
                         onLiveMonitoring={handleLiveMonitoring}
                       />
                     ),

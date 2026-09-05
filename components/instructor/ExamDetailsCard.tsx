@@ -7,12 +7,15 @@ import { Copy, Megaphone } from "lucide-react";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { buildStudentNotice, studentNoticePolicyLines } from "@/lib/student-notice";
+import { SUPPORT_EMAIL } from "@/lib/contact";
 
 interface ExamDetailsCardProps {
   description: string;
   duration: number;
   createdAt: string;
   examCode: string;
+  /** 발행 한도에 걸려 코드 반출을 막아야 하는가 (이슈 #84). */
+  codeGateBlocked?: boolean;
   examTitle?: string;
   /**
    * 이 시험에서 학생이 AI 채팅을 쓸 수 있는가(= 서술형/CASE 문항이 있는가).
@@ -29,12 +32,21 @@ export function ExamDetailsCard({
   duration,
   createdAt,
   examCode,
+  codeGateBlocked,
   examTitle = "",
   aiChatAvailable,
 }: ExamDetailsCardProps) {
   const t = useTranslations("authoring");
   const tExam = useTranslations("exam");
   const handleCopyCode = async () => {
+    // 발행 한도에 걸린 미발행 시험의 코드는 복사시키지 않는다 (이슈 #84).
+    // 복사해 수업 자료에 붙인 뒤에 막으면 수업 중에 학생 전원이 튕긴다.
+    if (codeGateBlocked) {
+      toast.error(t("examDetailsCard.toastCodeBlocked", { email: SUPPORT_EMAIL }), {
+        id: "copy-exam-code-blocked",
+      });
+      return;
+    }
     try {
       await navigator.clipboard.writeText(examCode);
       toast.success(t("examDetailsCard.toastCodeCopied"), {
@@ -51,20 +63,29 @@ export function ExamDetailsCard({
   // "알아서 공지하세요"라고 하면 대부분 안 하고, 그러면 학생은 AI 질문을
   // 부정행위로 오해한 채 시험을 본다. 대학생 54%가 그렇게 인식한다.
   const handleCopyNotice = async () => {
+    // 공지문에도 시험 코드가 들어간다. 코드 복사만 막고 여기를 열어 두면
+    // 그대로 우회로가 된다.
+    if (codeGateBlocked) {
+      toast.error(t("examDetailsCard.toastCodeBlocked"), {
+        id: "copy-notice-blocked",
+      });
+      return;
+    }
     try {
       const notice = buildStudentNotice({
         heading: t("examDetailsCard.noticeHeading"),
         examTitle,
         codeLabel: t("examDetailsCard.noticeCodeLabel"),
         examCode,
-        // MCQ/OX 전용 시험은 학생 화면에 AI 채팅이 아예 렌더되지 않는다
-        // (exam/[code]/page.tsx 가 !isCurrentObjective 일 때만 ExamChatSidebar 노출).
-        // 그런 시험의 공지문에 "AI에게 질문하세요"를 넣으면 문구 자체가 거짓이 된다.
-        // 판정은 studentNoticePolicyLines 가 갖고 있고 테스트로 고정돼 있다.
+        // MCQ/OX 전용 시험에는 채팅을 권하지 않고, 외부 AI 금지와 기록 범위를
+        // 알려야 학생이 AI 정책 없이 시험에 들어가는 일이 없다.
         policyLines: studentNoticePolicyLines(aiChatAvailable, {
           allowed: tExam("preflight.aiDisclosureAllowed"),
           graded: tExam("preflight.aiDisclosureGraded"),
           visible: tExam("preflight.aiDisclosureVisible"),
+          unavailable: tExam("preflight.aiDisclosureUnavailable"),
+          externalAiProhibited: tExam("preflight.aiDisclosureExternalAiProhibited"),
+          activityRecorded: tExam("preflight.aiDisclosureActivityRecorded"),
         }),
         footer: t("examDetailsCard.noticeFooter"),
       });
@@ -87,17 +108,17 @@ export function ExamDetailsCard({
       <CardContent className="space-y-4">
         <div>
           <Label className="font-medium">{t("examDetailsCard.labelDescription")}</Label>
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="type-hint">{description}</p>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label className="font-medium">{t("examDetailsCard.labelTime")}</Label>
-            <p className="text-sm text-muted-foreground">{t("examDetailsCard.durationMin", { duration })}</p>
+            <p className="type-hint">{t("examDetailsCard.durationMin", { duration })}</p>
           </div>
         </div>
         <div>
           <Label className="font-medium">{t("examDetailsCard.labelCreatedAt")}</Label>
-          <p className="text-sm text-muted-foreground">
+          <p className="type-hint">
             {new Date(createdAt).toLocaleDateString()}
           </p>
         </div>
@@ -105,7 +126,9 @@ export function ExamDetailsCard({
           <Label className="font-medium">{t("examDetailsCard.labelExamCode")}</Label>
           <div className="flex items-center gap-2 mt-1">
             <p className="text-sm text-muted-foreground exam-code">
-              {examCode}
+              {/* 차단 상태에서는 코드 자체를 내보내지 않는다. 보여주고
+                  "쓰지 마세요"라고 적는 건 소용없다 — 이미 복사한 뒤다. */}
+              {codeGateBlocked ? t("examCode.blockedTitle") : examCode}
             </p>
             <Button
               variant="outline"

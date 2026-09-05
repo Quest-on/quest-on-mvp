@@ -27,7 +27,7 @@ export async function GET(
     let user;
     try {
       user = await currentUser();
-    } catch (clerkError) {
+    } catch {
       return errorJson("INTERNAL_ERROR", "Authentication service error", 500);
     }
 
@@ -159,7 +159,7 @@ export async function GET(
 
     const studentInfoMap = new Map<
       string,
-      { name: string; email: string; student_number?: string; school?: string }
+      { name: string; email: string | null; student_number?: string; school?: string }
     >();
     for (const studentId of uniqueStudentIds) {
       const info = clerkUserMap.get(studentId);
@@ -205,7 +205,7 @@ export async function GET(
       // Get student info from map
       const studentInfo = studentInfoMap.get(session.student_id) || {
         name: `Student ${session.student_id.slice(0, 8)}`,
-        email: `${session.student_id}@example.com`,
+        email: null,
         student_number: undefined,
         school: undefined,
       };

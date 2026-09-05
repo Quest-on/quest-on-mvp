@@ -43,7 +43,7 @@
     "stats": {
       "totalExams": "Total exams",
       "completionRate": "{rate}% completion rate",
-      "thisMonth": "· {count} this month",
+      "thisMonth": "{count} this month",
       "completedAndInProgress": "{completed} completed, {inProgress} in progress",
       "todo": "To-do",
       "unsubmittedAssignments": "{count} unsubmitted {count, plural, one {assignment} other {assignments}}",
@@ -87,7 +87,8 @@
       "startFirst": "Start your first exam",
       "noResults": "No results found",
       "noResultsHint": "Try a different keyword or filter.",
-      "resetSearch": "Clear search"
+      "resetSearch": "Clear search",
+      "loadError": "Could not load your exams."
     },
     "session": {
       "statusAria": "Status: {status}",

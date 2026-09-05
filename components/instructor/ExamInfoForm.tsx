@@ -3,7 +3,6 @@
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -31,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CourseSelectField } from "@/components/instructor/CourseSelectField";
 import { HelpCircle, AlertTriangle, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { ko, enUS } from "date-fns/locale";
@@ -53,6 +53,10 @@ interface ExamInfoFormProps {
   deadlineError?: string;
   language?: "ko" | "en";
   onLanguageChange?: (value: "ko" | "en") => void;
+  /** 선택된 과목 id. null 이 기본값이고 "과목 없음"을 뜻한다 — 출제를 막지 않는다. */
+  courseId?: string | null;
+  /** 넘기지 않으면 과목 선택기를 렌더링하지 않는다(기존 호출부 무영향). */
+  onCourseChange?: (courseId: string | null) => void;
   /** AI 에이전트 체화 애니메이션이 가리킬 제목 입력 DOM 요소 ref. */
   titleRef?: React.Ref<HTMLInputElement>;
   /**
@@ -77,6 +81,8 @@ export function ExamInfoForm({
   deadlineError,
   language = "ko",
   onLanguageChange,
+  courseId,
+  onCourseChange,
   titleRef,
   codeReadOnly = false,
 }: ExamInfoFormProps) {
@@ -166,7 +172,6 @@ export function ExamInfoForm({
     <Card>
       <CardHeader>
         <CardTitle>{mode === "assignment" ? t("examInfoForm.cardTitleAssignment") : t("examInfoForm.cardTitleExam")}</CardTitle>
-        <CardDescription>{mode === "assignment" ? t("examInfoForm.cardDescriptionAssignment") : t("examInfoForm.cardDescriptionExam")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
@@ -191,10 +196,10 @@ export function ExamInfoForm({
               onChange={(e) => onTitleChange(e.target.value)}
               placeholder={t("examInfoForm.placeholderTitle")}
               required
-              className={titleError ? "border-red-500 focus-visible:ring-red-500" : ""}
+              className={titleError ? "border-destructive focus-visible:ring-destructive" : ""}
             />
             {titleError && (
-              <p className="text-xs text-red-500 mt-1">{titleError}</p>
+              <p className="text-xs text-destructive mt-1">{titleError}</p>
             )}
           </div>
           <div className="space-y-2">
@@ -229,6 +234,15 @@ export function ExamInfoForm({
             </div>
           </div>
         </div>
+
+        {/* 과목 — 선택 사항. 제목·코드 바로 아래가 "무엇을/어디에" 순서다. */}
+        {onCourseChange && (
+          <CourseSelectField
+            value={courseId ?? null}
+            onChange={onCourseChange}
+            variant="compact"
+          />
+        )}
 
         {onLanguageChange && (
           <div className="space-y-2">
@@ -280,7 +294,7 @@ export function ExamInfoForm({
                 <Button
                   type="button"
                   variant="outline"
-                  className={`w-full max-w-xs justify-start font-normal ${!deadline ? "text-muted-foreground" : ""} ${deadlineError ? "border-red-500" : ""}`}
+                  className={`w-full max-w-xs justify-start font-normal ${!deadline ? "text-muted-foreground" : ""} ${deadlineError ? "border-destructive" : ""}`}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {deadline ? formatDate(new Date(deadline), locale) : t("examInfoForm.deadlinePlaceholder")}
@@ -302,7 +316,7 @@ export function ExamInfoForm({
               </PopoverContent>
             </Popover>
             {deadlineError && (
-              <p className="text-xs text-red-500 mt-1">{deadlineError}</p>
+              <p className="text-xs text-destructive mt-1">{deadlineError}</p>
             )}
           </div>
         ) : (
@@ -330,7 +344,7 @@ export function ExamInfoForm({
               />
               <Label
                 htmlFor="unlimited"
-                className="text-sm font-medium cursor-pointer"
+                className="type-field-label cursor-pointer"
               >
                 {t("examInfoForm.unlimitedLabel")}
               </Label>
@@ -351,7 +365,7 @@ export function ExamInfoForm({
                   placeholder={isUnlimited ? t("examInfoForm.placeholderUnlimited") : t("examInfoForm.placeholderMinutes")}
                   className="w-20 text-center"
                 />
-                <span className="text-sm text-muted-foreground">{t("examInfoForm.unitMinutes")}</span>
+                <span className="type-hint">{t("examInfoForm.unitMinutes")}</span>
               </div>
               <Slider
                 min={1}
@@ -392,7 +406,7 @@ export function ExamInfoForm({
               ))}
             </div>
             {showDurationWarning && (
-              <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+              <div className="flex items-center gap-1.5 text-warning-text">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 <span className="text-sm">{t("examInfoForm.durationWarning")}</span>
               </div>

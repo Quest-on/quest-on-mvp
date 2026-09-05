@@ -1,159 +1,46 @@
 ---
 alwaysApply: true
-name: "tanstack-query-and-data-fetching",
-description: "Next.js + Clerk + Supabase + GPT API + Vercel 환경에서 tanstack-query 사용 규칙",
+name: "tanstack-query-and-data-fetching"
+description: "Quest-On 서버 상태/데이터 패칭 규칙 — 코드가 SSOT다"
 ---
 
-# TanStack Query (React Query)
+# 데이터 패칭 (Quest-On)
 
-> TanStack Query(React Query)는 서버 상태 관리를 위한 데이터 패칭 라이브러리로, 캐싱·동기화·백그라운드 업데이트·stale 데이터 관리까지 대신 처리해 준다. Next.js App Router, Supabase, Clerk, GPT API와 함께 사용할 때 **서버 상태 = TanStack Query, 로컬 상태 = React useState/useReducer** 를 기본 원칙으로 한다. :contentReference[oaicite:0]{index=0}
+**이 파일보다 `AGENTS.md` 가 우선한다. 둘이 어긋나면 `AGENTS.md` 를, `AGENTS.md` 와 코드가 어긋나면 코드를 따른다.**
 
-## Overview
+## 인증
 
-- [TanStack Query Overview](https://tanstack.com/query/v5/docs/react/overview): 서버 상태와 캐싱, 동기화 개념 정리. :contentReference[oaicite:1]{index=1}
-- [React Query Docs (Framework: React)](https://tanstack.com/query/v5/docs/framework/react): 설치, 기본 개념, 가이드 전체 목차. :contentReference[oaicite:2]{index=2}
-- [Installation](https://tanstack.com/query/v5/docs/react/installation): `@tanstack/react-query` 설치 방법. :contentReference[oaicite:3]{index=3}
-- [Queries / Mutations / Invalidation](https://tanstack.com/query/v5/docs/react/quick-start): 쿼리/뮤테이션/쿼리 무효화 기본 패턴. :contentReference[oaicite:4]{index=4}
-- [SSR & Next.js App Router](https://tanstack.com/query/v5/docs/react/guides/ssr): 서버 렌더링과 Hydration, Prefetching 가이드. :contentReference[oaicite:5]{index=5}
-- [React Query + Supabase + Next.js App Router](https://supabase.com/blog/react-query-nextjs-app-router-cache-helpers): Supabase 캐시 헬퍼, App Router 통합 예시. :contentReference[oaicite:6]{index=6}
+- 인증은 **Supabase Auth** 다. Clerk 은 이 저장소에서 제거됐다. `@clerk/*` 를 import 하는 코드를 쓰지 않는다.
+- 서버: `lib/supabase-auth.ts` 의 `currentUser()` (`lib/get-current-user.ts` 가 재수출한다).
+- 클라이언트: `components/providers/AppAuthProvider.tsx` 가 제공하는 컨텍스트.
 
----
+## 서버 상태
 
-## Project Conventions (Next.js + Clerk + Supabase + GPT API + Vercel)
+- 서버에서 오는 비동기 데이터는 전부 `useQuery` / `useInfiniteQuery`. `useEffect + fetch` 로 직접 호출하지 않는다.
+- Provider 는 `components/providers/QueryProvider.tsx`. 새로 만들지 않는다.
+- 쿼리 키는 **반드시 `lib/query-keys.ts` 의 `qk` 에서 가져온다.** 문자열 배열을 컴포넌트에 하드코딩하지 않는다. 새 키가 필요하면 `qk` 에 추가한다.
+- 쓰기는 `useMutation` + `queryClient.invalidateQueries({ queryKey: qk... })`.
 
-- **서버 상태는 전부 TanStack Query로 관리**
-  - Supabase SELECT, REST API 호출, GPT API 결과 등 “서버에서 오는 비동기 데이터”는 모두 `useQuery` / `useInfiniteQuery` 사용.
-  - `useEffect + fetch`로 직접 호출하지 않고, 가능하면 TanStack Query 훅으로 래핑.
-- **비즈니스 로직 분리**
-  - 실제 호출 함수는 `/lib/api/**`, `/lib/supabase/**`, `/lib/gpt/**` 등에 **순수 함수**로 정의.
-  - 컴포넌트에서는 `useQuery`, `useMutation` 등 훅만 사용해서 데이터를 읽고 쓴다.
-- **폴더 구조 (권장 예시)**
-  - `lib/query-client.ts` – `QueryClient` 생성 및 기본 옵션.
-  - `app/providers/query-provider.tsx` – `QueryClientProvider`, `HydrationBoundary` 설정.
-  - `lib/query-keys.ts` – 자주 쓰는 쿼리 키 상수 정의.
-  - `lib/supabase/queries.ts`, `lib/supabase/mutations.ts` – Supabase 전용 쿼리/뮤테이션 함수.
-  - `lib/gpt/client.ts` – GPT API를 호출하는 서버/클라이언트 래퍼 함수.
+## DB 접근
 
----
+- 런타임 DB 접근은 **`getSupabaseServer()` (`lib/supabase-server.ts`) 뿐이다.** Route Handler 안에서만 호출한다.
+- **Prisma 를 런타임에 import 하지 않는다.** `prisma/schema.prisma` 는 introspection 전용이고, DDL 의 원천은 `database/[NNN]_*.sql` 이다.
+- 라우트에 raw SQL 을 넣지 않는다.
+- 클라이언트에서 Supabase 를 직접 호출하지 않는다. 권한·소유권 확인은 서버에서 한다.
 
-## Setup & Providers
+## 라우트 핸들러
 
-- `@tanstack/react-query`는 React 18+에서 동작하며 Next.js App Router와 함께 사용할 수 있다. :contentReference[oaicite:7]{index=7}
-- `QueryClient`는 **클라이언트 컴포넌트**에서 생성하고, Next.js App Router에서는 보통 아래 패턴을 따른다: :contentReference[oaicite:8]{index=8}
-  - `app/(providers)/query-provider.tsx` (클라이언트)
-    - `QueryClient` 생성
-    - `QueryClientProvider`, `ReactQueryDevtools` 설정
-  - `app/layout.tsx` (서버)
-    - `QueryProvider`로 전체 앱 감싸기
-- 레이아웃 전체가 클라이언트 컴포넌트가 되는 것을 피하기 위해, **최상단 레이아웃이 아니라 별도의 `providers.tsx`** 파일을 만들어 `use client`를 선언한 뒤, 레이아웃에서 그 컴포넌트만 감싼다. :contentReference[oaicite:9]{index=9}
+`app/api/CLAUDE.md` 가 이 저장소의 라우트 계약이다. 요약:
 
----
+- 순서: 인증 → 레이트리밋(`lib/rate-limit.ts`) → Zod 검증 → 소유권 확인 → 로직 → 응답.
+- 응답은 `lib/api-response.ts` 의 `successJson` / `errorJson`.
+- 인증·서명 검증 **전에** 데이터에 접근하지 않는다.
 
-## Query Keys
+## AI 호출
 
-- 쿼리 키는 **반드시 배열**로 정의한다. 예:
-  - `['user', userId]`
-  - `['exam', examId, 'questions']`
-  - `['gpt-suggestion', examId, attemptId]`
-- 쿼리 함수에서 사용하는 모든 파라미터는 쿼리 키에 포함한다.
-  - 예: `getExam(id, userId)` → `['exam', id, userId]`
-- 공통 키는 `lib/query-keys.ts`에 상수로 정의:
-  - `export const qk = { me: ['me'] as const, exams: (userId) => ['user', userId, 'exams'] as const, ... }`
-- Supabase 필터(예: status, tag, page)도 쿼리 키에 포함해서 캐시 충돌을 방지한다. :contentReference[oaicite:10]{index=10}
+- OpenAI 를 직접 부르지 않는다. `lib/ai-tracking.ts` 를 거쳐 `ai_events` 에 토큰·지연·비용이 기록돼야 한다.
+- 클라이언트에서 OpenAI 를 호출하지 않는다.
 
----
+## 사용자 노출 문구
 
-## Supabase Integration
-
-- Supabase 읽기(SELECT):
-  - `/lib/supabase/queries.ts`에 `async function getExams(userId: string)` 같은 **순수 함수**로 정의.
-  - 컴포넌트에서는 `useQuery({ queryKey: qk.exams(userId), queryFn: () => getExams(userId) })` 패턴 사용.
-- Supabase 쓰기(INSERT/UPDATE/DELETE):
-  - `/lib/supabase/mutations.ts`에 `createExam`, `updateExam`, `deleteExam` 등 정의.
-  - 컴포넌트에서는 `useMutation` + `queryClient.invalidateQueries` 또는 `setQueryData` 사용.
-- RLS / 권한:
-  - 가능한 한 서버(서버 컴포넌트, Route Handler, Edge Function)에서 userId를 읽고 Supabase 쿼리 수행.
-  - 클라이언트에서는 userId, payload만 넘기고 **권한 체크는 서버에서** 처리. :contentReference[oaicite:11]{index=11}
-
----
-
-## Clerk Auth 연동 규칙
-
-- 클라이언트:
-  - `@clerk/nextjs`의 `useUser`, `useAuth`로 `userId`를 가져오고, 쿼리 키에 포함.
-  - 인증 필요 쿼리는 `enabled: !!userId` 옵션을 주어, 로그인 전에는 실행하지 않는다.
-- 서버(App Router / Route Handlers):
-  - `auth()` 또는 Clerk 서버 SDK에서 `userId`를 가져와 Supabase/비즈니스 로직에 전달.
-  - 동일 userId를 쿼리 키에 사용해서 클라이언트와 서버가 동일한 캐시 키를 공유하도록 한다.
-
----
-
-## GPT API (OpenAI 등) 연동
-
-- GPT 호출은 **직접 클라이언트에서 OpenAI를 호출하지 않고**, 다음 중 하나로만 수행:
-  - `app/api/**/route.ts` (Route Handler)
-  - `/lib/api/gpt.ts` (서버 전용 헬퍼, 내부에서 OpenAI SDK 호출)
-- 단발성 요청:
-  - 사용자가 버튼을 눌러 “해설 생성”, “힌트 생성” 같은 액션 → `useMutation` 사용.
-  - `onSuccess`에서 Supabase에 결과를 저장하거나, React 상태에만 보관.
-- 캐시 가능한 GPT 결과:
-  - 동일 입력에 대해 재사용 가능한 결과 (예: “문항 요약”)는 `useQuery`로 감싸고, key는 `['gpt-summary', examId, questionId]` 처럼 정의.
-- GPT + Supabase 조합:
-  - 가능하면 **하나의 서버 API**에서 GPT 응답 생성 → 바로 Supabase에 저장 → 저장 결과를 반환하도록 구성해서, 클라이언트에서는 단일 `useMutation`만 호출.
-
----
-
-## Next.js App Router & SSR / Prefetching
-
-- SSR이 중요한 페이지(SEO, 초기 렌더 속도)는:
-  - 서버 컴포넌트에서 Supabase를 직접 호출하거나, React Query `QueryClient`를 생성해서 `dehydrate` 사용.
-  - 클라이언트에서 동일한 쿼리 키로 `useQuery`를 사용하면, 이미 Hydrate 된 데이터를 그대로 재사용. :contentReference[oaicite:12]{index=12}
-- 완전 클라이언트 사이드 페이지:
-  - `use client` 컴포넌트에서 `useQuery`만 사용하고 SSR은 생략.
-- 규칙:
-  - **같은 데이터**는 서버와 클라이언트에서 **반드시 같은 쿼리 키**를 사용한다.
-  - App Router에서 전체 `layout.tsx`를 클라이언트로 만들지 않고, `app/providers.tsx` 등 별도 파일에 `QueryClientProvider`를 두고 레이아웃에서 감싼다. :contentReference[oaicite:13]{index=13}
-
----
-
-## Mutations & Cache Invalidation
-
-- 모든 “쓰기” 작업은 `useMutation` 사용:
-  - 예: `const mutation = useMutation({ mutationFn: createExam, onSuccess: () => queryClient.invalidateQueries(qk.exams(userId)) })`
-- 빠른 UX가 필요한 경우:
-  - Optimistic Update (`onMutate`, `onError`, `onSettled`) 패턴 사용해서 로컬 캐시 먼저 업데이트.
-  - 실패 시 롤백 처리.
-- Supabase Trigger/Webhook과 조합:
-  - 나중에 실시간 연동이 필요하면 Supabase Realtime 또는 Webhook으로 변경 내용을 받아와 `queryClient.invalidateQueries` 또는 `setQueryData`로 동기화.
-
----
-
-## Error & Loading Handling
-
-- 각 쿼리에서 `isLoading`, `isError`, `error`를 명시적으로 처리:
-  - 로딩: Skeleton / Spinner 컴포넌트 사용 (shadcn/ui의 `Skeleton`, `Spinner` 등).
-  - 에러: 공통 `useToast` / `Alert` 컴포넌트로 메시지 표시.
-- 글로벌 에러 패턴:
-  - 공통 훅 `useQueryErrorHandler`, `useMutationToast` 등을 만들어 재사용.
-  - 서버 에러 메시지는 가능한 한 **사용자 친화적 메시지**로 변환 후 노출.
-
----
-
-## Vercel 배포 관점
-
-- 서버 호출 최소화:
-  - 여러 개의 Supabase 쿼리가 한 화면에서 동시에 필요하면, 서버 라우트(예: `app/api/dashboard/route.ts`) 하나로 묶어서 호출 후 React Query로 캐싱.
-- Revalidation & ISR:
-  - 거의 변하지 않는 공용 데이터(예: 공지, FAQ)는 Next.js의 `revalidate`와 조합해 정적 페이지 + React Query로 점진적 갱신.
-- Observability:
-  - Vercel Analytics / Logs, Supabase Logs를 참고해서 쿼리 횟수, 속도를 모니터링하고, 필요시 쿼리 키/캐시 전략을 재조정. :contentReference[oaicite:14]{index=14}
-
----
-
-## 규칙 요약
-
-- 서버 상태는 **무조건 TanStack Query**로 관리하고, `useEffect + fetch` 패턴은 점점 제거한다.
-- Supabase / GPT / 외부 API 호출 로직은 **lib 레이어**에 놓고, 컴포넌트는 쿼리/뮤테이션 훅만 사용한다.
-- Next.js App Router에서는 `providers.tsx` 스타일로 Query Provider를 분리해, 서버 컴포넌트의 장점을 유지한다.
-- 쿼리 키는 배열 + 모든 파라미터 포함을 원칙으로 하고, 공통 키는 `lib/query-keys.ts`에 정리한다.
-- Clerk userId, examId, attemptId 등 식별자 단위로 쿼리 키를 잘게 나누어 재사용성과 캐시 효율을 높인다.
+- 하드코딩된 한국어/영어 문자열 금지. next-intl 메시지를 쓴다.

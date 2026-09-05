@@ -56,6 +56,15 @@ interface AiSummaryResponse {
   };
 }
 
+interface PublishingRow {
+  instructorId: string;
+  name: string | null;
+  school: string | null;
+  plan: string;
+  publishedCount: number;
+  lastPublishedAt: string | null;
+}
+
 type AdminUsersResponse =
   | { unauthorized: true }
   | {
@@ -93,7 +102,7 @@ export default function AdminDashboard() {
     error: queryError,
     refetch,
   } = useQuery<AdminUsersResponse>({
-    queryKey: ["admin-users"],
+    queryKey: qk.admin.users(),
     queryFn: async () => {
       const response = await fetch("/api/admin/users");
 
@@ -114,6 +123,7 @@ export default function AdminDashboard() {
   const {
     data: aiSummary,
     isLoading: isAiSummaryLoading,
+    isError: isAiSummaryError,
     refetch: refetchAiSummary,
   } = useQuery<AiSummaryResponse | null>({
     queryKey: qk.admin.aiUsageSummary({ range: "7d" }),
@@ -133,11 +143,34 @@ export default function AdminDashboard() {
     retry: false,
   });
 
-  const { data: pendingInstructors, refetch: refetchPending } = useQuery({
-    queryKey: ["admin-pending-instructors"],
+  const {
+    data: pendingInstructors,
+    isError: isPendingInstructorsError,
+    refetch: refetchPending,
+  } = useQuery({
+    queryKey: qk.admin.pendingInstructors(),
     queryFn: async () => {
       const res = await fetch("/api/admin/instructors/pending");
-      if (!res.ok) return [];
+      if (!res.ok) throw new Error("PENDING_INSTRUCTORS_FETCH_FAILED");
+      const data = await res.json();
+      return data.instructors || [];
+    },
+  });
+
+  // 발행 현황 (#86 / AC-19). 승인이 한도로 바뀐 뒤 plan 승격 판단의 근거는
+  // 대기열이 아니라 "누가 얼마나 쓰고 있는가"다.
+  const {
+    data: publishing,
+    refetch: refetchPublishing,
+    isError: publishingError,
+  } = useQuery({
+    queryKey: qk.admin.instructorPublishing(),
+    queryFn: async (): Promise<PublishingRow[]> => {
+      const res = await fetch("/api/admin/instructors/publishing");
+      // 장애를 빈 목록으로 위장하지 않는다. 018 미적용이나 DB 오류로 500 이
+      // 나도 `[]` 를 돌려주면 관리자는 "발행한 교수자가 없다"로 읽는다.
+      // 아무도 안 쓰는 것과 화면이 고장 난 것은 완전히 다른 판단을 부른다.
+      if (!res.ok) throw new Error("PUBLISHING_FETCH_FAILED");
       const data = await res.json();
       return data.instructors || [];
     },
@@ -178,6 +211,7 @@ export default function AdminDashboard() {
     if (res.ok) {
       refetchPending();
       refetch();
+      refetchPublishing();
     }
   };
 
@@ -247,7 +281,7 @@ export default function AdminDashboard() {
       <div className="grid gap-6 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("dashboard.stats.totalUsers")}</CardTitle>
+            <CardTitle className="type-field-label">{t("dashboard.stats.totalUsers")}</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -256,7 +290,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("dashboard.stats.instructors")}</CardTitle>
+            <CardTitle className="type-field-label">{t("dashboard.stats.instructors")}</CardTitle>
             <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -265,7 +299,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("dashboard.stats.students")}</CardTitle>
+            <CardTitle className="type-field-label">{t("dashboard.stats.students")}</CardTitle>
             <UserX className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -276,7 +310,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("dashboard.stats.noRole")}</CardTitle>
+            <CardTitle className="type-field-label">{t("dashboard.stats.noRole")}</CardTitle>
             <Settings className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -288,7 +322,7 @@ export default function AdminDashboard() {
       <div className="grid gap-6 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("dashboard.ai.cost7d")}</CardTitle>
+            <CardTitle className="type-field-label">{t("dashboard.ai.cost7d")}</CardTitle>
             <Bot className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -299,7 +333,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("dashboard.ai.requests7d")}</CardTitle>
+            <CardTitle className="type-field-label">{t("dashboard.ai.requests7d")}</CardTitle>
             <Bot className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -310,7 +344,7 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("dashboard.ai.failRate7d")}</CardTitle>
+            <CardTitle className="type-field-label">{t("dashboard.ai.failRate7d")}</CardTitle>
             <Bot className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -323,10 +357,16 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {pendingInstructors && pendingInstructors.length > 0 && (
-        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+      {isAiSummaryError && (
+        <ErrorAlert message={t("dashboard.ai.loadFailed")} />
+      )}
+
+      {isPendingInstructorsError ? (
+        <ErrorAlert message={t("dashboard.pending.loadFailed")} />
+      ) : pendingInstructors && pendingInstructors.length > 0 ? (
+        <Card className="border-warning-border bg-warning-surface">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+            <CardTitle className="flex items-center gap-2 text-warning-text">
               <Clock className="w-5 h-5" />
               {t("dashboard.pending.title", { count: pendingInstructors.length })}
             </CardTitle>
@@ -340,23 +380,28 @@ export default function AdminDashboard() {
                 id: string;
                 name: string;
                 email: string;
+                school: string | null;
                 created_at: string;
               }) => (
                 <div
                   key={instructor.id}
-                  className="flex items-center justify-between rounded-lg border border-amber-200 bg-white dark:bg-amber-950/30 p-4"
+                  className="flex items-center justify-between rounded-lg border border-warning-border bg-background p-4"
                 >
                   <div>
                     <p className="font-medium">{instructor.name || t("dashboard.pending.noName")}</p>
-                    <p className="text-sm text-muted-foreground">{instructor.email}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="type-hint">{instructor.email}</p>
+                    {/* AC-19: 소속이 승인 판단의 근거다. 없으면 판단할 게 없다. */}
+                    <p className="type-hint">
+                      {instructor.school || t("dashboard.pending.noSchool")}
+                    </p>
+                    <p className="type-meta">
                       {t("dashboard.pending.appliedAt", { date: formatDateTime(instructor.created_at, locale, { year: "numeric", month: "short", day: "numeric" }) })}
                     </p>
                   </div>
                   <Button
                     size="sm"
                     onClick={() => approveInstructor(instructor.id)}
-                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                    className="bg-warning-surface hover:bg-warning-surface text-white"
                   >
                     <UserCheck className="w-4 h-4 mr-1" />
                     {t("dashboard.pending.approve")}
@@ -366,7 +411,63 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            {t("dashboard.publishing.title")}
+          </CardTitle>
+          <CardDescription>{t("dashboard.publishing.description")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {publishingError ? (
+            <ErrorAlert message={t("dashboard.publishing.loadFailed")} />
+          ) : !publishing || publishing.length === 0 ? (
+            <p className="type-hint">
+              {t("dashboard.publishing.empty")}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {publishing.map((row) => (
+                <div
+                  key={row.instructorId}
+                  className="flex items-center justify-between gap-4 rounded-lg border p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">
+                      {row.name || t("dashboard.pending.noName")}
+                    </p>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {row.school || t("dashboard.pending.noSchool")}
+                    </p>
+                    <p className="type-meta">
+                      {row.lastPublishedAt
+                        ? t("dashboard.publishing.lastPublishedAt", {
+                            date: formatDateTime(row.lastPublishedAt, locale, {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            }),
+                          })
+                        : t("dashboard.publishing.neverPublished")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <Badge variant="secondary">{row.plan}</Badge>
+                    <span className="text-sm">
+                      {t("dashboard.publishing.publishedCount", {
+                        count: row.publishedCount,
+                      })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -400,6 +501,8 @@ export default function AdminDashboard() {
               onClick={() => {
                 refetch();
                 refetchAiSummary();
+                refetchPending();
+                refetchPublishing();
               }}
               variant="outline"
             >
@@ -450,8 +553,8 @@ export default function AdminDashboard() {
                                 : t("dashboard.userManagement.noRole")}
                           </Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="type-hint">{user.email}</p>
+                        <p className="type-meta">
                           {t("dashboard.userManagement.joinedAt", { date: formatDate(user.createdAt) })}
                         </p>
                       </div>

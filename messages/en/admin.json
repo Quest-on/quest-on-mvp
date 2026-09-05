@@ -11,14 +11,17 @@
     "ai": {
       "cost7d": "AI Cost (Last 7 Days)",
       "requests7d": "AI Requests (Last 7 Days)",
-      "failRate7d": "Failure Rate (Last 7 Days)"
+      "failRate7d": "Failure Rate (Last 7 Days)",
+      "loadFailed": "Could not load AI usage. The displayed zero may not reflect actual usage."
     },
     "pending": {
       "title": "Pending Instructor Approvals ({count})",
       "description": "Instructor approval requests are waiting. Please review and approve.",
       "noName": "No name",
       "appliedAt": "Applied: {date}",
-      "approve": "Approve"
+      "approve": "Approve",
+      "noSchool": "No affiliation",
+      "loadFailed": "Could not load pending instructor requests."
     },
     "userManagement": {
       "title": "User Management",
@@ -38,6 +41,15 @@
       "aiLoadFail": "Failed to load AI usage information.",
       "roleChangeFail": "Failed to change role.",
       "serverError": "A server error occurred."
+    },
+    "publishing": {
+      "title": "Instructor publishing",
+      "description": "How much of the free tier (3 publishes, 5 students per exam) each instructor uses. Demo exams do not count.",
+      "empty": "No instructor accounts yet.",
+      "publishedCount": "{count} published",
+      "lastPublishedAt": "Last published: {date}",
+      "neverPublished": "Never published",
+      "loadFailed": "Failed to load publishing data. This is a fetch error, not an empty result."
     }
   },
   "login": {
@@ -163,7 +175,9 @@
   },
   "nav": {
     "dashboard": "Dashboard",
-    "aiUsage": "AI Usage"
+    "aiUsage": "AI Usage",
+    "aiConfig": "AI config",
+    "onboarding": "Onboarding funnel"
   },
   "agent": {
     "errors": {
@@ -197,7 +211,7 @@
     },
     "running": {
       "stopping": "Stopping…",
-      "statusLabel": "Agent running · Press ESC to stop",
+      "statusLabel": "Agent running, Press ESC to stop",
       "stopAriaLabel": "Stop agent"
     },
     "done": {
@@ -231,5 +245,54 @@
       "pending": "Agent is working…",
       "noSteps": "No steps yet."
     }
+  },
+  "aiConfig": {
+    "title": "AI config",
+    "description": "Manage the model and request parameters per task. Saving creates a new immutable version and moves the production label.",
+    "currentVersion": "Current version",
+    "source": "Source",
+    "inherit": "Inherit",
+    "none": "None",
+    "reason": "Change reason",
+    "reasonPlaceholder": "Describe what you are changing and why",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "loadError": "Failed to load config",
+    "saveError": "Failed to save",
+    "fields": {
+      "model": "Model",
+      "timeoutMs": "Timeout (ms)",
+      "maxRetries": "Retries",
+      "maxTokens": "Token cap",
+      "temperature": "Temperature",
+      "reasoningEffort": "Reasoning effort"
+    },
+    "sources": {
+      "code": "Code default",
+      "global_env": "Global env",
+      "task_env": "Task env",
+      "admin": "Admin setting"
+    }
+  },
+  "onboardingFunnel": {
+    "title": "Onboarding funnel",
+    "scope": "Scope",
+    "noSample": "No sample",
+    "proxyMetric": "Proxy metric",
+    "start": "Start",
+    "noPrev": "No previous step",
+    "prevRate": "Previous {rate}",
+    "subtitle": "See where instructors get stuck on the way from sign-up to a real student submission.",
+    "proxyNote": "Demo completion is a proxy metric; the first student submission is the real one.",
+    "loadFailed": "Could not load the funnel.",
+    "capped": "The query hit its cap, so this is partial. The numbers below undercount.",
+    "medianLabel": "Demo created → AI grading viewed (median)",
+    "within15m": "Target: within 15 minutes",
+    "trueMetric": "Real metric",
+    "biggestDrop": "The biggest drop-off is {from} → {to} ({count} people). Fixing this first has the highest payoff.",
+    "intakeSkipTitle": "Intake skipped",
+    "intakeSkipNote": "Skipping means we ship a fixed template without knowing the subject. A demo unrelated to their field loses them there.",
+    "intakeSkipValue": "{skipped} of {total}"
   }
 }

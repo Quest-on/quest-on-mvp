@@ -2,7 +2,16 @@
   "home": {
     "greeting": "Hello, {name}",
     "loadingTitle": "Loading instructor dashboard...",
-    "loadingDesc": "Preparing your exams and folder structure."
+    "loadingDesc": "Preparing your exams and folder structure.",
+    "nextStepTitle": "Next step",
+    "nextStepDemo": "Take the demo you created from the student's side. Seeing exactly what students get makes your questions much easier to refine.",
+    "nextStepDemoCta": "Open demo",
+    "nextStepAfterDemo": "You're done with the demo. Now create a real exam and share the entry code with your students.",
+    "nextStepAfterDemoCta": "Create exam",
+    "demoOnlyEmpty": "No exams yet.",
+    "demoOnlyEmptyHint": "Look around with the demo above, or go straight to your first exam.",
+    "nextStepFirstExam": "Create your first exam. Upload your course materials and AI will build questions from them.",
+    "nextStepFirstExamCta": "Create exam"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -25,7 +34,10 @@
     "folderLoading": "Loading...",
     "folderEmpty": "No folders",
     "nodeEmpty": "Empty",
-    "noDueDate": "No due date"
+    "noDueDate": "No due date",
+    "folderError": "Could not load",
+    "folderRetry": "Retry",
+    "todoTitle": "To do"
   },
   "footer": {
     "profile": "Profile",
@@ -38,7 +50,27 @@
   },
   "fileTree": {
     "loading": "Loading...",
-    "noFolders": "No folders"
+    "noFolders": "No folders",
+    "loadError": "Could not load"
+  },
+  "course": {
+    "label": "Course",
+    "optional": "Optional",
+    "placeholder": "Select a course",
+    "none": "No course",
+    "itemWithTerm": "{name}, {term}",
+    "loading": "Loading courses",
+    "loadError": "Could not load courses.",
+    "addButton": "Create course",
+    "nameLabel": "Course name",
+    "namePlaceholder": "e.g. Data Structures",
+    "termLabel": "Term",
+    "termPlaceholder": "e.g. 2026-1",
+    "createSubmit": "Add course",
+    "creating": "Adding...",
+    "cancel": "Cancel",
+    "createError": "Couldn't create the course. Please try again.",
+    "tooltip": "Groups exams and assignments from the same course. Optional. exams work without it."
   },
   "examDetail": {
     "error": "Error",
@@ -84,7 +116,7 @@
       "committed": "CASE Grading Results",
       "done": "CASE Suggested Scores Ready",
       "idle": "CASE AI Pre-grade",
-      "descInProgress": "Pre-grading in background · {processed}/{total} students processed",
+      "descInProgress": "Pre-grading in background, {processed}/{total} students processed",
       "descFailed": "Review the error and restart grading",
       "descCommitted": "View finalized results and pre-grading chat history",
       "descDone": "Review suggested scores and finalize",
@@ -97,7 +129,10 @@
     },
     "exportFail": "Export failed.",
     "exportError": "An error occurred during export.",
-    "bulkGradeLoadFail": "Failed to load bulk grading status."
+    "bulkGradeLoadFail": "Failed to load bulk grading status.",
+    "tryAsStudent": "Try as a student",
+    "retryAsStudent": "Retake the demo",
+    "retryAsStudentHint": "Retaking clears your previous answers, AI conversations, and grading results."
   },
   "assignmentDetail": {
     "error": "Error",
@@ -105,7 +140,7 @@
     "backToList": "Back to list",
     "assignmentCode": "Assignment code:",
     "edit": "Edit",
-    "editDisabledTip": "Cannot edit — students have already joined",
+    "editDisabledTip": "Cannot edit: students have already joined",
     "backToDashboard": "Back to dashboard",
     "backToDashboardShort": "Dashboard",
     "assignmentInfo": "Assignment info",
@@ -147,7 +182,7 @@
       "committed": "Assignment Grading Results",
       "done": "Assignment Suggested Scores Ready",
       "idle": "Assignment AI Pre-grade",
-      "descInProgress": "Pre-grading in background · {processed}/{total} students processed",
+      "descInProgress": "Pre-grading in background, {processed}/{total} students processed",
       "descFailed": "Review the error and restart grading",
       "descCommitted": "View finalized results and pre-grading chat history",
       "descDone": "Review suggested scores and finalize",
@@ -162,7 +197,6 @@
   },
   "newExam": {
     "pageTitle": "Create a New Exam",
-    "pageDesc": "Set up questions and settings for your new exam",
     "backToDashboard": "Dashboard",
     "backToDemo": "Back to demo",
     "backLabel": "Back to dashboard",
@@ -184,7 +218,7 @@
     "dialogDuration": "Duration: {duration} min",
     "dialogDurationUnlimited": "Duration: Unlimited (assignment mode)",
     "dialogSummaryQuestions": "{questions, plural, one {# question} other {# questions}}",
-    "dialogSummaryMaterials": " · {materials, plural, one {# material} other {# materials}}",
+    "dialogSummaryMaterials": ", {materials, plural, one {# material} other {# materials}}",
     "dialogConfirm": "Done",
     "signUpDialogTitle": "Sign up required",
     "signUpDialogDesc": "You need an account to publish an exam.",
@@ -208,7 +242,7 @@
     "toastFileSizeExceeded": "Total file size exceeds 50 MB. Some files have been disabled.",
     "toastUnsupportedFormat": "Unsupported file type. Only PPT, PDF, Word, Excel, HWP, and image files are allowed.",
     "toastFileTooLarge": "File size exceeds 50 MB.",
-    "toastCannotAddMore": "Cannot add more files — total size limit reached.",
+    "toastCannotAddMore": "Cannot add more files: total size limit reached.",
     "toastCreateFail": "Failed to create exam",
     "toastTitleRequired": "Please enter an exam title.",
     "toastCodeRequired": "Please generate an exam code.",
@@ -223,7 +257,7 @@
   },
   "editExam": {
     "backToDashboard": "Dashboard",
-    "titleSuffix": " — Edit",
+    "titleSuffix": "Edit",
     "titleDefault": "Edit Exam",
     "filenameFallback": "File",
     "loadingText": "Loading exam data...",
@@ -240,12 +274,11 @@
     "toastFileSizeExceeded": "Total file size exceeds 50 MB. Some files have been disabled.",
     "toastUnsupportedFormat": "Unsupported file type.",
     "toastFileTooLarge": "File size exceeds 50 MB.",
-    "toastCannotAddMore": "Cannot add more files — total size limit reached.",
+    "toastCannotAddMore": "Cannot add more files: total size limit reached.",
     "submitButtonText": "Save changes"
   },
   "newAssignment": {
     "pageTitle": "Create a New Assignment",
-    "pageDesc": "Set up an AI research chat-based assignment",
     "backToDashboard": "Dashboard",
     "cancel": "Cancel",
     "submit": "Publish assignment",
@@ -258,7 +291,7 @@
     "dialogShare": "Share this code with your students.",
     "dialogSummaryQuestions": "{count, plural, one {# question} other {# questions}}",
     "dialogSummaryDeadline": "Deadline: {date} at 11:59 PM",
-    "dialogSummaryNoDeadline": "Deadline: —",
+    "dialogSummaryNoDeadline": "Deadline:",
     "dialogConfirm": "Done",
     "fieldErrorTitle": "Please enter an assignment title",
     "fieldErrorDeadline": "Please select a submission deadline",
@@ -270,7 +303,7 @@
   },
   "editAssignment": {
     "backToAssignment": "Assignment page",
-    "titleSuffix": " — Edit",
+    "titleSuffix": "Edit",
     "titleDefault": "Edit Assignment",
     "loadingText": "Loading assignment data...",
     "blockedTitle": "Editing disabled",
@@ -376,7 +409,11 @@
     "colorRed": "Red",
     "colorPurple": "Purple",
     "colorPink": "Pink",
-    "colorGray": "Gray"
+    "colorGray": "Gray",
+    "toastExamCodeBlocked": "To prevent students from misusing instructor accounts, codes cannot be copied once the publish limit is reached. Email {email} and we will lift it.",
+    "loadError": "Could not load your exams.",
+    "folderItems": "{count} items",
+    "folderEmpty": "Empty"
   },
   "new": {
     "createExamFailed": "Failed to create exam"

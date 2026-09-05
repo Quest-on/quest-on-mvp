@@ -115,7 +115,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold">{t("heading")}</h1>
+          <h1 className="type-page-title">{t("heading")}</h1>
           <p className="text-muted-foreground mt-2">
             {t("subtitle")}
           </p>
@@ -161,7 +161,7 @@ export default function ProfilePage() {
                     <Mail className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">{t("emailLabel")}</p>
+                    <p className="type-hint">{t("emailLabel")}</p>
                     <p className="font-medium">
                       {user?.email || t("noEmail")}
                     </p>
@@ -173,7 +173,7 @@ export default function ProfilePage() {
                     <Calendar className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">{t("joinedLabel")}</p>
+                    <p className="type-hint">{t("joinedLabel")}</p>
                     <p className="font-medium">
                       {user.created_at
                         ? formatDate(user.created_at, locale)
@@ -198,7 +198,7 @@ export default function ProfilePage() {
                           <User className="w-5 h-5 text-muted-foreground" />
                         </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">{t("nameLabel")}</p>
+                          <p className="type-hint">{t("nameLabel")}</p>
                           <p className="font-medium">
                             {studentProfile.name || t("notEntered")}
                           </p>
@@ -210,7 +210,7 @@ export default function ProfilePage() {
                           <Hash className="w-5 h-5 text-muted-foreground" />
                         </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">{t("studentNumberLabel")}</p>
+                          <p className="type-hint">{t("studentNumberLabel")}</p>
                           <p className="font-medium">
                             {studentProfile.student_number || t("notEntered")}
                           </p>
@@ -222,7 +222,7 @@ export default function ProfilePage() {
                           <GraduationCap className="w-5 h-5 text-muted-foreground" />
                         </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">{t("schoolLabel")}</p>
+                          <p className="type-hint">{t("schoolLabel")}</p>
                           <p className="font-medium">
                             {studentProfile.school || t("notEntered")}
                           </p>
@@ -272,7 +272,7 @@ export default function ProfilePage() {
                     <User className="w-5 h-5 text-muted-foreground" />
                     <div>
                       <p className="font-medium">{t("fullNameLabel")}</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="type-hint">
                         {profile.fullName}
                       </p>
                     </div>
@@ -285,7 +285,7 @@ export default function ProfilePage() {
                   <Shield className="w-5 h-5 text-muted-foreground" />
                   <div>
                     <p className="font-medium">{t("roleLabel")}</p>
-                    <p className="text-sm text-muted-foreground">{roleLabel}</p>
+                    <p className="type-hint">{roleLabel}</p>
                   </div>
                 </div>
               </div>
@@ -306,7 +306,7 @@ export default function ProfilePage() {
                   </div>
                   <div>
                     <p className="font-medium">{t("themeModeLabel")}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="type-hint">
                       {t("themeModeSubtitle")}
                     </p>
                   </div>

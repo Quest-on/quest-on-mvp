@@ -13,7 +13,7 @@ import {
   buildCaseQuestionGenerationPrompt,
   buildObjectiveQuestionGenerationPrompt,
 } from "@/lib/prompts";
-import { getOpenAI, AI_MODEL_HEAVY } from "@/lib/openai";
+import { getOpenAI, AI_MODEL_HEAVY, isOpenAITransportError } from "@/lib/openai";
 import { logError } from "@/lib/logger";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import {
@@ -120,9 +120,11 @@ export async function POST(request: NextRequest) {
               ],
               response_format: { type: "json_object" },
             },
+            // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
+            // 목 헤더가 있으면 결정론을 위해 재시도를 끈다.
             hasMockHeaders
-              ? { headers: mockHeaders, maxRetries: 0 }
-              : undefined
+              ? { headers: mockHeaders, maxRetries: 0, timeout: GENERATION_TIMEOUT_MS }
+              : { maxRetries: 2, timeout: GENERATION_TIMEOUT_MS }
           ),
         {
           feature: "generate_questions",
@@ -141,8 +143,6 @@ export async function POST(request: NextRequest) {
           }),
         },
         {
-          timeoutMs: GENERATION_TIMEOUT_MS,
-          maxAttempts: hasMockHeaders ? 1 : undefined,
           metadataBuilder: (result) =>
             buildAiTextMetadata({
               outputText:
@@ -166,6 +166,12 @@ export async function POST(request: NextRequest) {
     try {
       parsedResponse = await attemptGeneration();
     } catch (firstError) {
+      // 이슈 #118: 재시도는 **파싱 실패**에만 준다. 전송 실패까지 여기서 다시
+      // 시도하면 SDK 요청 옵션의 maxRetries 와 곱해져 최대 6회 전송된다.
+      if (isOpenAITransportError(firstError)) {
+        const msg = firstError instanceof Error ? firstError.message : "AI 응답 생성 실패";
+        return errorJson("AI_GENERATION_FAILED", msg, 500);
+      }
       if (hasMockHeaders) {
         const msg =
           firstError instanceof Error ? firstError.message : "AI 응답 생성 실패";

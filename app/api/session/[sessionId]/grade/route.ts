@@ -20,6 +20,10 @@ import {
 } from "@/lib/grade-utils";
 import { hasQuestionWithQIdx } from "@/lib/case-grade-access";
 import { gradeObjectiveAnswer, isObjectiveQuestion, isGradingOpen, isAssignmentType } from "@/lib/grading-helpers";
+import {
+  hasViewableGradingResult,
+  recordDemoGradedViewed,
+} from "@/lib/demo-completion";
 
 // Auto-grading (PUT) calls AI_MODEL_HEAVY multiple times — needs 300s
 export const maxDuration = 300;
@@ -73,7 +77,7 @@ export async function GET(
     // Get exam data
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("id, title, code, instructor_id, questions, rubric, status, score_weights, type, deadline")
+      .select("id, title, code, instructor_id, questions, rubric, is_demo, status, score_weights, type, deadline")
       .eq("id", session.exam_id)
       .single();
 
@@ -220,7 +224,7 @@ export async function GET(
         studentProfile?.name ||
         clerkStudentInfo?.name ||
         `Student ${session.student_id.slice(0, 8)}`,
-      email: clerkStudentInfo?.email || `${session.student_id}@example.com`,
+      email: clerkStudentInfo?.email ?? null,
       student_number: studentProfile?.student_number,
       school: studentProfile?.school,
     };
@@ -420,6 +424,20 @@ export async function GET(
       ...(decompressionErrors.length > 0 && { decompressionErrors }),
     };
 
+    try {
+      await recordDemoGradedViewed({
+        userId: exam.instructor_id,
+        examId: exam.id,
+        hasGradedResult: hasViewableGradingResult({
+          grades,
+          aiSummary: session.ai_summary,
+        }),
+      });
+    } catch (error) {
+      // 계측 장애가 실제 채점 결과 열람을 500으로 바꾸면 완주보다 더 큰 학습 흐름이 끊긴다.
+      logError("Failed to record demo completion", error, { path });
+    }
+
     return successJson(responseData, {
       headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
     });
@@ -483,7 +501,7 @@ export async function POST(
     // Get exam to check instructor and validate q_idx upper bound
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("instructor_id, questions, status, type, deadline")
+      .select("instructor_id, questions, is_demo, status, type, deadline")
       .eq("id", session.exam_id)
       .single();
 
@@ -619,7 +637,7 @@ export async function PUT(
 
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("instructor_id, status, type, deadline")
+      .select("instructor_id, is_demo, status, type, deadline")
       .eq("id", session.exam_id)
       .single();
 

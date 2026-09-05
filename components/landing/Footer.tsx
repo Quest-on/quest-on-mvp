@@ -3,24 +3,15 @@
 import { Mail, Phone } from "lucide-react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
+import { SUPPORT_EMAIL, supportMailto } from "@/lib/contact";
 
-interface FooterProps {
-  mode?: "light" | "dark";
-}
-
+// 라이트 값만 쓴다. dark 항목이 있었지만 mode 가 항상 "light" 라 도달하지 않는
+// 죽은 코드였다 - 호출부(app/page.tsx)가 mode="light" 만 넘겼다. (#204)
 const COLORS = {
-  light: {
     bg: "#FFFFFF",
     text: "#1F1F1F",
     textSec: "#52525B", // Improved contrast: changed from #6B7280 to #52525B (zinc-600) for better WCAG AA compliance
     border: "#E5E5E5",
-  },
-  dark: {
-    bg: "#0A0A0A",
-    text: "#E4E4E4",
-    textSec: "#A1A1AA",
-    border: "rgba(255, 255, 255, 0.1)",
-  },
 } as const;
 
 const FOOTER_LINKS_CONFIG = [
@@ -50,7 +41,7 @@ const FOOTER_LINKS_CONFIG = [
   //       { labelKey: "blog", href: "/blog" },
   //       { labelKey: "careers", href: "/careers" },
   //       { labelKey: "partnership", href: "/partners" },
-  //       { labelKey: "contact", href: "mailto:questonkr@gmail.com" },
+  //       { labelKey: "contact", href: `mailto:${SUPPORT_EMAIL}` },
   //     ],
   //   },
   {
@@ -64,22 +55,21 @@ const FOOTER_LINKS_CONFIG = [
   },
 ];
 
-export default function Footer({ mode = "light" }: FooterProps) {
-  const colors = COLORS[mode];
-  const isDark = mode === "dark";
+export default function Footer() {
+  const colors = COLORS;
   const t = useTranslations("landing");
   const tc = useTranslations("common");
 
   const handleContactClick = () => {
-    window.location.href = "mailto:questonkr@gmail.com?subject=문의사항";
+    window.location.href = supportMailto("문의사항");
   };
 
   return (
     <footer
       className={`relative w-full py-8 ${
-        isDark
-          ? "bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950/50"
-          : "bg-gradient-to-br from-slate-50 via-white to-slate-50/50"
+        // dark: 변형은 surface-page-gradient-soft 가 이미 갖고 있다.
+          // isDark 로 손수 갈라 두면 유틸리티를 고쳐도 여기만 남는다(#204).
+          "surface-page-gradient-soft"
       }`}
     >
       <div className="container mx-auto px-4 lg:px-8 max-w-7xl">
@@ -149,11 +139,11 @@ export default function Footer({ mode = "light" }: FooterProps) {
               >
                 <Mail className="w-4 h-4 font-bold" />:{" "}
                 <a
-                  href="mailto:questonkr@gmail.com"
+                  href={`mailto:${SUPPORT_EMAIL}`}
                   className="hover:underline"
                   style={{ color: colors.text }}
                 >
-                  questonkr@gmail.com
+                  {SUPPORT_EMAIL}
                 </a>
               </p>
               <p
@@ -207,7 +197,7 @@ export default function Footer({ mode = "light" }: FooterProps) {
                           <a
                             href={link.href}
                             onClick={handleClick}
-                            className="text-sm font-medium transition-all cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+                            className="text-sm font-medium transition-all cursor-pointer hover:text-info-text"
                             style={{ color: colors.textSec }}
                           >
                             {t(`footer.links.${link.labelKey}`)}
@@ -226,12 +216,12 @@ export default function Footer({ mode = "light" }: FooterProps) {
         <div
           className="pt-8 border-t"
           style={{
-            borderColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
+            borderColor: "rgba(0,0,0,0.05)",
           }}
         >
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div
-              className="text-sm font-medium"
+              className="type-field-label"
               style={{ color: colors.textSec }}
             >
               Copyright © {new Date().getFullYear()}{" "}

@@ -53,7 +53,7 @@ export function LoadingMessage({
     <div className="flex flex-col items-center justify-center space-y-3 py-4">
       <div className="flex items-center gap-2 text-muted-foreground animate-pulse">
         <Loader2 className="w-4 h-4 animate-spin" />
-        <span className="text-sm font-medium">
+        <span className="type-field-label">
           {isLongLoading ? resolvedTimeoutMessage : messages[messageIndex]}
         </span>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { ExamCode, type ExamCodeQuota } from "@/components/instructor/ExamCode";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Copy, Clock, Calendar, Eye, Edit, Trash2, Users } from "lucide-react";
@@ -8,10 +9,14 @@ import { useTranslations, useLocale } from "next-intl";
 import { formatDate as fmtDate } from "@/lib/i18n/format";
 
 interface ExamCardProps {
+  /** 발행 한도 상태. 없으면 게이트가 열린 것으로 본다(fail-open). */
+  quota?: ExamCodeQuota;
   exam: {
     id: string;
     title: string;
     code: string;
+    is_demo?: boolean;
+    first_published_at?: string | null;
     status: string;
     duration: number;
     created_at: string;
@@ -25,6 +30,7 @@ interface ExamCardProps {
 }
 
 export function ExamCard({
+  quota,
   exam,
   onCopyCode,
   onEdit,
@@ -69,10 +75,18 @@ export function ExamCard({
           </Badge>
         </div>
         <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          <div className="flex items-center space-x-1">
-            <Copy className={iconSize} />
-            <span className="exam-code">{exam.code}</span>
-          </div>
+          {/* 코드는 ExamCode 만 내보낸다. 목록에서 직접 그리면 발행 한도
+              게이트를 우회하게 되고, 교수자가 배포한 뒤 학생이 튕긴다. */}
+          <ExamCode
+            code={exam.code}
+            copyable={false}
+            quota={{
+              isDemo: exam.is_demo,
+              alreadyPublished: !!exam.first_published_at,
+              publishesRemaining: quota?.publishesRemaining ?? null,
+              studentsRemaining: quota?.studentsRemaining ?? null,
+            }}
+          />
           <div className="flex items-center space-x-1">
             <Clock className={iconSize} />
             <span>{t("examCard.durationMin", { duration: exam.duration })}</span>
@@ -116,7 +130,7 @@ export function ExamCard({
           <Button
             variant="outline"
             size="sm"
-            className="text-red-600 hover:text-red-700"
+            className="text-destructive hover:text-destructive/80"
             onClick={() => onDelete(exam.id)}
           >
             <Trash2 className={`${iconSize} sm:mr-1`} />

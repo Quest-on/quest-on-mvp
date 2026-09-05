@@ -41,11 +41,46 @@
   --secondary: hsl(240 5% 96%);
   --secondary-foreground: hsl(240 6% 10%);
   --muted: hsl(240 5% 96%);
-  --muted-foreground: hsl(240 4% 46%);
+  --muted-foreground: hsl(240 4% 44%);
   --accent: hsl(240 5% 96%);
   --accent-foreground: hsl(240 6% 10%);
-  --destructive: hsl(0 84.2365% 60.1961%);
+  --destructive: hsl(0 84% 48%);
   --destructive-foreground: hsl(0 0% 100%);
+  /* 상태색 — 현재 화면이 쓰던 Tailwind 명도를 그대로 토큰화한다.
+     한 토큰으로 여러 명도를 접으면 화면이 바뀌므로 역할별로 나눈다.
+       surface  연한 배경(50)      subtle   보조 배경(100)
+       border   테두리(200)        solid    아이콘·강조(500/600)
+       text     본문 텍스트(700/800) */
+  --success-surface: hsl(152 81% 96%);
+  --success-subtle: hsl(149 80% 90%);
+  --success-border: hsl(152.4 76.0% 80.4%);
+  --success-solid: hsl(160.1 84.1% 39.4%);
+  --success-text: hsl(163 88.1% 19.8%);
+  --warning-surface: hsl(48 100% 96%);
+  --warning-subtle: hsl(48 97% 89%);
+  --warning-border: hsl(48 97% 77%);
+  --warning-solid: hsl(38 92% 50%);
+  --warning-text: hsl(22 77.8% 26.5%);
+  --info-surface: hsl(214 100% 97%);
+  --info-subtle: hsl(214 95% 93%);
+  --info-border: hsl(213 97% 87%);
+  --info-solid: hsl(217 91% 60%);
+  --info-text: hsl(226 71% 40%);
+  /* danger — destructive 는 버튼 배경 한 겹뿐이라 표면·텍스트 쌍이 없었다.
+     그래서 형광펜처럼 '연한 배경 + 진한 글씨'가 필요한 자리에서 배경과
+     글자가 같은 색이 되어 글씨가 사라졌다(대비 1.00). 나머지 상태색과
+     같은 5단계로 맞춘다. 값은 원래 화면이 쓰던 red 명도 그대로다. */
+  --danger-surface: hsl(0 86% 97%);
+  --danger-subtle: hsl(0 93% 94%);
+  --danger-border: hsl(0 96% 89%);
+  --danger-solid: hsl(0 84% 60%);
+  --danger-text: hsl(0 63% 31%);
+  /* solid 배경 위 전경. --foreground 는 테마에 따라 뒤집혀서 못 쓴다 —
+     solid 는 두 테마에서 명도가 비슷하므로 짝을 따로 고정한다. */
+  --success-solid-foreground: hsl(163 88% 10%);
+  --warning-solid-foreground: hsl(22 78% 16%);
+  --info-solid-foreground: hsl(226 71% 12%);
+  --danger-solid-foreground: hsl(0 63% 11%);
   --border: hsl(220 13.0435% 90.9804%);
   --input: hsl(220 13.0435% 90.9804%);
   --ring: hsl(222 56% 49%);
@@ -105,8 +140,33 @@
   --muted-foreground: hsl(0 0% 63.9216%);
   --accent: hsl(224.4444 64.2857% 32.9412%);
   --accent-foreground: hsl(213.3333 96.9231% 87.2549%);
-  --destructive: hsl(0 84.2365% 60.1961%);
+  --destructive: hsl(0 75% 40%);
   --destructive-foreground: hsl(0 0% 100%);
+  /* 다크 모드 — 같은 역할, 명도 반전. 라이트의 950/900/800/400/300 대역을 쓴다. */
+  --success-surface: hsl(166 91% 9%);
+  --success-subtle: hsl(163 94% 15%);
+  --success-border: hsl(163 88% 20%);
+  --success-solid: hsl(158 64% 52%);
+  --success-text: hsl(152 76% 80%);
+  --warning-surface: hsl(23 83% 12%);
+  --warning-subtle: hsl(28 73% 18%);
+  --warning-border: hsl(26 90% 24%);
+  --warning-solid: hsl(43 96% 56%);
+  --warning-text: hsl(48 97% 77%);
+  --info-surface: hsl(226 57% 12%);
+  --info-subtle: hsl(226 71% 20%);
+  --info-border: hsl(224 64% 33%);
+  --info-solid: hsl(213 94% 68%);
+  --info-text: hsl(213 97% 87%);
+  --danger-surface: hsl(0 63% 12%);
+  --danger-subtle: hsl(0 63% 18%);
+  --danger-border: hsl(0 63% 31%);
+  --danger-solid: hsl(0 84% 60%);
+  --danger-text: hsl(0 96% 89%);
+  --success-solid-foreground: hsl(163 88% 10%);
+  --warning-solid-foreground: hsl(22 78% 16%);
+  --info-solid-foreground: hsl(226 71% 12%);
+  --danger-solid-foreground: hsl(0 63% 11%);
   --border: hsl(0 0% 25.098%);
   --input: hsl(0 0% 25.098%);
   --ring: hsl(222 56% 49%);
@@ -163,6 +223,31 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  /* 상태색 역할 토큰 — surface/subtle/border/solid/text */
+  --color-success-surface: var(--success-surface);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-border: var(--success-border);
+  --color-success-solid: var(--success-solid);
+  --color-success-text: var(--success-text);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-border: var(--warning-border);
+  --color-warning-solid: var(--warning-solid);
+  --color-warning-text: var(--warning-text);
+  --color-info-surface: var(--info-surface);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-border: var(--info-border);
+  --color-info-solid: var(--info-solid);
+  --color-info-text: var(--info-text);
+  --color-danger-surface: var(--danger-surface);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-danger-border: var(--danger-border);
+  --color-danger-solid: var(--danger-solid);
+  --color-danger-text: var(--danger-text);
+  --color-success-solid-foreground: var(--success-solid-foreground);
+  --color-warning-solid-foreground: var(--warning-solid-foreground);
+  --color-info-solid-foreground: var(--info-solid-foreground);
+  --color-danger-solid-foreground: var(--danger-solid-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -204,13 +289,31 @@
   * {
     @apply border-border outline-ring/50;
   }
+
+  /*
+    한글은 음절 단위로 끊기면 안 된다. 기본 word-break 는 '한데 묶어 봅니 /
+    다.' 처럼 단어 중간을 자르고 오른쪽에 빈 공간을 남긴다. keep-all 로
+    어절 경계에서만 끊는다. 영문은 긴 단어가 넘칠 수 있어 그때만 줄바꿈을
+    허용한다.
+  */
+  body {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
   html {
     scroll-behavior: smooth;
     scroll-padding-top: 80px; /* 헤더 높이만큼 오프셋 */
   }
   body {
     @apply bg-background text-foreground;
-    font-size: 15px;
+    /*
+      본문 16px 이 기준이다. 여기가 흔들리면 나머지 위계가 다 흔들린다.
+
+      예전에는 15px 였다. 의도한 결정이 아니라 무관한 커밋에 딸려 들어온
+      값이었고, 두 가지와 어긋났다 — type-body 가 text-base(16px) 를 쓰고,
+      아래 letter-spacing -0.3px 는 16~17px 본문에 맞춘 값이다.
+    */
+    font-size: 16px;
     line-height: 1.6;
     letter-spacing: -0.3px;
     -webkit-font-smoothing: antialiased;
@@ -1148,4 +1251,65 @@
 
 .cl-socialButtonsBlockButton {
   width: 100% !important;
+}
+
+/*
+  타입 스케일.
+
+  text-xs ~ text-4xl 을 화면마다 손으로 고르면 같은 위계의 글자가 화면마다
+  달라진다. 실측 결과 8가지 크기 x 4가지 굵기가 1100건 넘게 흩어져 있었다.
+
+  역할로 부르면 크기를 몰라도 되고, 바꿀 때 한 곳만 고치면 된다.
+  본문 16px 를 기준으로 잡는다.
+*/
+@layer components {
+  /*
+    전면 배경 그라디언트.
+
+    같은 문자열이 8개 파일 10곳에 복제돼 있었다. 한 곳을 고치면 나머지가
+    남아 화면마다 배경이 갈라진다. 실제로 3단 변형이 따로 생겨 있었다.
+
+    slate 원색을 그대로 쓴다 — 이건 상태를 뜻하지 않는 중립 배경이라
+    destructive/success 같은 의미 토큰으로 바꾸면 뜻이 틀어진다. 대신
+    한 곳에 모아 두어 바꿀 때 한 번만 고치게 한다.
+  */
+  .surface-page-gradient {
+    @apply bg-gradient-to-br from-slate-50 to-white dark:from-slate-950 dark:to-slate-900;
+  }
+
+  /* 본문이 긴 문서형 화면. 중간 색을 하나 더 둬서 위아래 대비를 낮춘다. */
+  .surface-page-gradient-soft {
+    @apply bg-gradient-to-br from-slate-50 via-white to-slate-50/50;
+    @apply dark:from-slate-950 dark:via-slate-900 dark:to-slate-950/50;
+  }
+
+  /* 화면 제목. 페이지에 하나. */
+  .type-page-title {
+    @apply text-2xl font-bold tracking-tight sm:text-3xl;
+  }
+
+  /* 카드/섹션 제목. */
+  .type-section-title {
+    @apply text-base font-semibold;
+  }
+
+  /* 폼 필드 라벨. 입력 바로 위. */
+  .type-field-label {
+    @apply text-sm font-medium;
+  }
+
+  /* 본문. 기준 크기다. */
+  .type-body {
+    @apply text-base font-normal;
+  }
+
+  /* 보조 설명. 라벨 아래나 카드 설명. */
+  .type-hint {
+    @apply text-sm text-muted-foreground;
+  }
+
+  /* 메타 정보. 배지·타임스탬프·카운트. 여기보다 작게 쓰지 않는다. */
+  .type-meta {
+    @apply text-xs text-muted-foreground;
+  }
 }

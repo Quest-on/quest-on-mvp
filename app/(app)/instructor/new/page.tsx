@@ -1,19 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { ExamCode, type InstructorQuotaResponse } from "@/components/instructor/ExamCode";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Info,
-  FileText,
-  Presentation,
-  FileSpreadsheet,
-  FileImage,
-  File,
-  ClipboardList,
 } from "lucide-react";
+import { FileTypeIcon } from "@/components/instructor/FileTypeIcon";
 import toast from "react-hot-toast";
 import { extractErrorMessage } from "@/lib/error-messages";
 import { useTranslations, useLocale } from "next-intl";
@@ -71,6 +72,16 @@ export default function CreateExam() {
   const [isSignUpDialogOpen, setIsSignUpDialogOpen] = useState(false);
   const [createdExamCode, setCreatedExamCode] = useState("");
 
+  // 발행 한도. 코드를 건네기 전에 알아야 한다(이슈 #84).
+  const { data: quotaData } = useQuery<InstructorQuotaResponse>({
+    queryKey: qk.instructor.quota(),
+    queryFn: async ({ signal }) => {
+      const response = await fetch("/api/instructor/quota", { signal });
+      if (!response.ok) throw new Error("quota");
+      return response.json() as Promise<InstructorQuotaResponse>;
+    },
+  });
+
   // 데모 모드 체크: 로그인하지 않았거나 데모 페이지에서 온 경우
   const isDemoMode = !isLoaded || !isSignedIn || !user;
   const [examData, setExamData] = useState({
@@ -80,6 +91,8 @@ export default function CreateExam() {
     materials: [] as File[],
     language: "ko" as "ko" | "en",
   });
+  // 과목은 선택 사항이다. null 이 기본값이며 출제를 막지 않는다.
+  const [courseId, setCourseId] = useState<string | null>(null);
   const [disabledFiles, setDisabledFiles] = useState<Set<number>>(new Set());
   const [canAddMoreFiles, setCanAddMoreFiles] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -390,35 +403,9 @@ export default function CreateExam() {
 
   // 파일 업로드 + 텍스트 추출은 useFileUpload hook이 처리
 
-  const getFileIcon = (fileName: string) => {
-    const extension = fileName.split(".").pop()?.toLowerCase();
-    const iconClass = "w-4 h-4 shrink-0";
-    switch (extension) {
-      case "pdf":
-        return <FileText className={`${iconClass} text-red-500`} />;
-      case "ppt":
-      case "pptx":
-        return <Presentation className={`${iconClass} text-orange-500`} />;
-      case "doc":
-      case "docx":
-        return <FileText className={`${iconClass} text-blue-500`} />;
-      case "xls":
-      case "xlsx":
-      case "csv":
-        return <FileSpreadsheet className={`${iconClass} text-green-500`} />;
-      case "hwp":
-      case "hwpx":
-        return <ClipboardList className={`${iconClass} text-sky-500`} />;
-      case "jpg":
-      case "jpeg":
-      case "png":
-      case "gif":
-      case "webp":
-        return <FileImage className={`${iconClass} text-purple-500`} />;
-      default:
-        return <File className={`${iconClass} text-muted-foreground`} />;
-    }
-  };
+  const getFileIcon = (fileName: string) => (
+    <FileTypeIcon fileName={fileName} />
+  );;
 
   const updateQuestion = (
     id: string,
@@ -574,7 +561,7 @@ export default function CreateExam() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.instructor.exams() });
-      queryClient.refetchQueries({ queryKey: ["drive-folder-contents"], type: "all" });
+      queryClient.refetchQueries({ queryKey: qk.drive.folderContentsAll(), type: "all" });
     },
   });
 
@@ -687,6 +674,7 @@ export default function CreateExam() {
         questions: questions,
         chat_weight: chatWeight, // 채점 가중치 (null = 기본값 50)
         score_weights: scoreWeights,
+        ...(courseId !== null ? { course_id: courseId } : {}),
         materials: materialUrls, // Array of file URLs
         materials_text: materialsText, // 추출된 텍스트 배열
         language: examData.language, // AI 시스템 프롬프트 언어 (ko | en)
@@ -729,7 +717,7 @@ export default function CreateExam() {
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2 w-full justify-between">
-              <h1 className="text-3xl font-bold">{t("newExam.pageTitle")}</h1>
+              <h1 className="type-page-title">{t("newExam.pageTitle")}</h1>
               <Button
                 type="button"
                 variant="outline"
@@ -748,9 +736,6 @@ export default function CreateExam() {
                 {isDemoMode ? t("newExam.backToDemo") : t("newExam.backToDashboard")}
               </Button>
             </div>
-            <p className="text-muted-foreground">
-              {t("newExam.pageDesc")}
-            </p>
           </div>
 
           {/* AI 에이전트 작성 중 배너 — 중단(take-over) 컨트롤 포함 */}
@@ -784,18 +769,18 @@ export default function CreateExam() {
 
           {/* 데모 모드 배너 (P0-1) */}
           {isDemoMode && isLoaded && (
-            <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 px-4 py-3">
-              <Info className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="mb-6 flex items-start gap-3 rounded-lg border border-warning-border bg-warning-surface px-4 py-3">
+              <Info className="w-5 h-5 text-warning-text shrink-0 mt-0.5" />
               <div className="text-sm">
-                <p className="font-medium text-amber-800 dark:text-amber-300">
+                <p className="font-medium text-warning-text">
                   {t("newExam.demoBannerTitle")}
                 </p>
-                <p className="text-amber-700 dark:text-amber-400 mt-0.5">
+                <p className="text-warning-text mt-0.5">
                   {t("newExam.demoBannerDesc")}
                   <button
                     type="button"
                     onClick={() => router.push("/sign-up")}
-                    className="underline font-medium hover:text-amber-900 dark:hover:text-amber-200"
+                    className="underline font-medium hover:text-warning-text dark:hover:text-warning-text"
                   >
                     {t("newExam.demoBannerSignUp")}
                   </button>
@@ -833,6 +818,8 @@ export default function CreateExam() {
                 onLanguageChange={(value) =>
                   setExamData((prev) => ({ ...prev, language: value }))
                 }
+                courseId={courseId}
+                onCourseChange={setCourseId}
                 files={examData.materials}
                 disabledFiles={disabledFiles}
                 canAddMoreFiles={canAddMoreFiles}
@@ -857,12 +844,9 @@ export default function CreateExam() {
                     onQuestionsAccepted={(newQuestions) => {
                       const newIds = newQuestions.map((q) => q.id);
                       setQuestions((prev) => {
-                        const nonEmpty = prev.filter((q) => {
-                          const stripped = q.text
-                            .replace(/<[^>]*>/g, "")
-                            .trim();
-                          return stripped !== "";
-                        });
+                        const nonEmpty = prev.filter(
+                          (q) => !isQuestionContentEmpty(q.text),
+                        );
                         return [
                           ...nonEmpty,
                           ...newQuestions.map((q) => ({
@@ -932,24 +916,20 @@ export default function CreateExam() {
                   <div className="py-4">
                     <div className="space-y-3">
                       <div>
-                        <Label className="text-sm font-medium">{t("newExam.dialogExamCode")}</Label>
-                        <div className="flex items-center gap-2 mt-1">
-                          <code className="px-4 py-2 bg-muted rounded-md exam-code text-lg font-semibold">
-                            {createdExamCode}
-                          </code>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              navigator.clipboard.writeText(createdExamCode);
-                              toast.success(t("newExam.dialogCopied"), {
-                                id: "copy-exam-code",
-                              });
+                        <Label className="type-field-label">{t("newExam.dialogExamCode")}</Label>
+                        {/* 코드는 ExamCode 만 내보낸다 (이슈 #84).
+                            여기가 교수자의 최단 경로다 — 생성 직후 이 대화상자에서
+                            코드를 복사해 수업 자료에 붙인다. 여기서 안 막으면
+                            네 번째 시험 코드를 배포한 뒤 수업 중에 학생 전원이
+                            튕긴다. 새로 만든 시험은 항상 미발행이다. */}
+                        <div className="mt-1">
+                          <ExamCode
+                            code={createdExamCode}
+                            quota={{
+                              alreadyPublished: false,
+                              publishesRemaining: quotaData?.publishesRemaining ?? null,
                             }}
-                          >
-                            {t("newExam.dialogCopy")}
-                          </Button>
+                          />
                         </div>
                         <p className="text-sm text-muted-foreground mt-2">
                           {t("newExam.dialogShare")}
@@ -972,7 +952,7 @@ export default function CreateExam() {
                   <DialogFooter>
                     <Button
                       onClick={() => {
-                        queryClient.refetchQueries({ queryKey: ["drive-folder-contents"], type: "all" });
+                        queryClient.refetchQueries({ queryKey: qk.drive.folderContentsAll(), type: "all" });
                         setIsDialogOpen(false);
                         router.push("/instructor");
                       }}
@@ -996,7 +976,7 @@ export default function CreateExam() {
                 </DialogDescription>
               </DialogHeader>
               <div className="py-4">
-                <p className="text-sm text-muted-foreground">
+                <p className="type-hint">
                   {t("newExam.signUpDialogBody")}
                 </p>
               </div>

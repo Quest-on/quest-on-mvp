@@ -8,6 +8,19 @@
 
 export const qk = {
   instructor: {
+    /** 발행 한도 사용량 */
+    quota: (userId?: string) =>
+      userId ? (["instructor-quota", userId] as const) : (["instructor-quota"] as const),
+    /**
+     * 온보딩 데모 상태(완료 여부, AI 재생성 해제, 데모 examId)
+     *
+     * 데모는 드라이브 목록 쿼리에서 제외되므로(AC-17) 목록으로는 찾을 수
+     * 없다. 가리키기 위한 id 는 이 키로 따로 받는다.
+     */
+    demoStatus: () => ["instructor-demo-status"] as const,
+    /** 온보딩 데모 상태(레거시 키 — 화면에서 user 별로 캐시한다) */
+    onboardingDemoStatus: (userId?: string) =>
+      ["onboarding-demo-status", userId] as const,
     /**
      * 강사가 생성한 시험 목록
      * @param userId - 강사 사용자 ID (optional, 부분 매칭 가능)
@@ -17,6 +30,17 @@ export const qk = {
         return ["instructor-exams", userId] as const;
       }
       return ["instructor-exams"] as const;
+    },
+
+    /**
+     * 강사가 개설한 과목 목록
+     * @param userId - 강사 사용자 ID (optional, 부분 매칭 가능)
+     */
+    courses: (userId?: string) => {
+      if (userId) {
+        return ["instructor-courses", userId] as const;
+      }
+      return ["instructor-courses"] as const;
     },
 
     /**
@@ -80,6 +104,14 @@ export const qk = {
   },
 
   student: {
+    /** 학생 프로필 */
+    profile: (userId?: string) =>
+      userId ? (["student-profile", userId] as const) : (["student-profile"] as const),
+    /** 응시 전 프로필 게이트 */
+    profileGate: (userId?: string) => ["student-profile-gate", userId] as const,
+    /** 세션 리포트 */
+    report: (sessionId: string, userId?: string) =>
+      ["student-report", sessionId, userId] as const,
     /**
      * 학생의 시험 세션 목록 (무한 스크롤)
      * @param userId - 학생 사용자 ID (optional, 부분 매칭 가능)
@@ -123,6 +155,12 @@ export const qk = {
   },
 
   session: {
+    /** 응시 세션 초기화 */
+    init: (examCode: string, userId?: string, restartDemo?: boolean) =>
+      ["exam-session-init", examCode, userId, restartDemo] as const,
+    /** 하트비트 */
+    heartbeat: (sessionId?: string | null) =>
+      ["session-heartbeat", sessionId] as const,
     /**
      * 세션별 채점 데이터
      * @param sessionId - 세션 ID (studentId로 사용됨)
@@ -147,6 +185,13 @@ export const qk = {
      * @param folderId - 폴더 ID (null이면 루트)
      * @param userId - 사용자 ID (optional, 부분 매칭 가능)
      */
+    /**
+     * 폴더 목록 전체를 가리키는 접두사.
+     *
+     * invalidate/refetch 는 접두사 매칭이라 folderId 를 몰라도 된다.
+     * folderContents(folderId) 를 인자 없이 부르면 타입이 막는다.
+     */
+    folderContentsAll: () => ["drive-folder-contents"] as const,
     folderContents: (folderId: string | null, userId?: string) => {
       if (userId) {
         return ["drive-folder-contents", folderId, userId] as const;
@@ -187,6 +232,16 @@ export const qk = {
   },
 
   admin: {
+    /** 사용자 목록 */
+    users: () => ["admin-users"] as const,
+    /** 승인 대기 교수자 */
+    pendingInstructors: () => ["admin-pending-instructors"] as const,
+    /** 교수자 발행 현황 */
+    instructorPublishing: () => ["admin-instructor-publishing"] as const,
+    /** 관리자 AI 설정 (이슈 #118). 발행 성공 시 이 키를 무효화한다. */
+    aiConfig: () => ["admin-ai-config"] as const,
+    /** 관리자 온보딩 퍼널 */
+    onboardingFunnel: () => ["admin-onboarding-funnel"] as const,
     aiUsageSummary: (options?: {
       range?: "7d" | "30d" | "90d";
       feature?: string;
@@ -231,5 +286,12 @@ export const qk = {
       }
       return key;
     },
+  },
+  /**
+   * 동의 상태. 온보딩 게이트와 설정 화면이 같은 키를 쓴다.
+   * 사용자별로 갈라야 계정 전환 시 이전 사용자의 상태가 남지 않는다.
+   */
+  consent: {
+    status: (userId: string) => ["consent-status", userId] as const,
   },
 } as const;

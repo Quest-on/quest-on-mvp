@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { decompressData } from "@/lib/compression";
 import { currentUser } from "@/lib/get-current-user";
@@ -106,7 +106,7 @@ export async function GET(
         try {
           const decompressed = decompressData(message.compressed_content);
           content = typeof decompressed === "string" ? decompressed : content;
-        } catch (error) {
+        } catch {
           // Use original content on decompression failure
         }
       }
@@ -132,7 +132,7 @@ export async function GET(
       messages: processedMessages,
       timestamp: new Date().toISOString(),
     });
-  } catch (error) {
+  } catch {
     return errorJson("INTERNAL_ERROR", "Internal server error", 500);
   }
 }

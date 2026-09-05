@@ -11,7 +11,7 @@ import {
   resolveModelPricing,
 } from "@/lib/ai-pricing";
 import {
-  OpenAITimeoutError,
+  isOpenAITimeoutError,
   callOpenAIWithTelemetry,
 } from "@/lib/openai";
 
@@ -27,11 +27,19 @@ interface TrackedRequestContext {
   sessionId?: string | null;
   qIdx?: number | null;
   metadata?: JsonRecord;
+  /**
+   * 이 요청을 만든 AI 설정 버전 (이슈 #118).
+   * 프로필이 통제하는 호출은 반드시 넘겨야 한다 — 없으면 어떤 설정이 이 결과를
+   * 만들었는지 사후에 되짚을 수 없고 마이그레이션 030 의 컬럼이 빈 채로 남는다.
+   */
+  configVersion?: string | null;
 }
 
 interface TrackedRequestOptions<T> {
-  timeoutMs?: number;
-  maxAttempts?: number;
+  // 이슈 #118: `timeoutMs`/`maxAttempts` 는 제거됐다. 이 래퍼는 더 이상 타임아웃과
+  // 재시도를 구현하지 않으므로 여기 남겨 두면 조용히 무시되는 죽은 옵션이 된다.
+  // 타임아웃·재시도는 호출부가 SDK 요청 옵션으로 직접 넘긴다:
+  //   create(params, { timeout, maxRetries, signal })
   metadataBuilder?: (result: T) => JsonRecord | undefined;
 }
 
@@ -51,6 +59,12 @@ export interface TrackedOpenAIResult<T> {
   estimatedCostUsdMicros: number;
 }
 
+export type AiTrackingFailure = {
+  at: string;
+  code: string | null;
+  schemaDrift: boolean;
+};
+
 type AiEventInsert = {
   provider: string;
   endpoint: AiEndpoint;
@@ -61,7 +75,9 @@ type AiEventInsert = {
   exam_id?: string | null;
   session_id?: string | null;
   q_idx?: number | null;
-  status: "success" | "error" | "timeout";
+  // 이슈 #118: 스트리밍 경로는 학생이 탭을 닫는 정상 종료가 있어서
+  // 실패와 구분되는 client_cancelled 가 필요하다.
+  status: "success" | "error" | "timeout" | "client_cancelled";
   attempt_count: number;
   latency_ms: number | null;
   input_tokens: number | null;
@@ -74,8 +90,17 @@ type AiEventInsert = {
   request_id: string | null;
   response_id: string | null;
   error_code: string | null;
+  /** 이 요청이 사용한 AI 설정 버전 (이슈 #118). 마이그레이션 이전 행은 null 이다. */
+  config_version?: string | null;
   metadata: JsonRecord;
 };
+
+let lastAiTrackingFailure: AiTrackingFailure | null = null;
+
+/** 직전 ai_events 기록 실패. 없으면 null. */
+export function getLastAiTrackingFailure(): AiTrackingFailure | null {
+  return lastAiTrackingFailure;
+}
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null;
@@ -203,7 +228,7 @@ export function buildAiTextMetadata(params: {
 }
 
 function getOpenAIErrorCode(error: unknown): string | null {
-  if (error instanceof OpenAITimeoutError) {
+  if (isOpenAITimeoutError(error)) {
     return "timeout";
   }
   if (error instanceof OpenAI.APIError) {
@@ -213,6 +238,17 @@ function getOpenAIErrorCode(error: unknown): string | null {
     return error.name;
   }
   return null;
+}
+
+function getTrackingErrorCode(error: unknown): string | null {
+  if (isRecord(error) && typeof error.code === "string") {
+    return error.code;
+  }
+  return null;
+}
+
+function isAiTrackingSchemaDrift(code: string | null): boolean {
+  return code === "PGRST204" || code === "PGRST205" || code === "42703";
 }
 
 async function insertAiEvent(event: AiEventInsert): Promise<void> {
@@ -252,16 +288,88 @@ function buildFailure(error: unknown): OpenAIRequestFailure {
 async function persistAiEvent(event: AiEventInsert, route: string): Promise<void> {
   try {
     await insertAiEvent(event);
+    lastAiTrackingFailure = null;
   } catch (trackingError) {
-    await logError("Failed to insert ai_events row", trackingError, {
-      path: route,
-      additionalData: {
-        feature: event.feature,
-        endpoint: event.endpoint,
-        model: event.model,
-      },
-    });
+    const code = getTrackingErrorCode(trackingError);
+    const schemaDrift = isAiTrackingSchemaDrift(code);
+    lastAiTrackingFailure = {
+      at: new Date().toISOString(),
+      code,
+      schemaDrift,
+    };
+
+    await logError(
+      schemaDrift
+        ? "AI event tracking schema drift"
+        : "Failed to insert ai_events row",
+      trackingError,
+      {
+        path: route,
+        additionalData: {
+          feature: event.feature,
+          endpoint: event.endpoint,
+          model: event.model,
+          trackingErrorCode: code,
+          schemaDrift,
+        },
+      }
+    );
   }
+}
+
+/**
+ * 스트리밍 호출용 1회성 이벤트 기록기 (이슈 #118).
+ *
+ * SSE 경로는 thunk 래퍼를 쓸 수 없다. 응답이 이터레이터로 흘러나오고 종료 사유가
+ * 넷(정상 완료 / 완료 이벤트 없이 종료 / 예외 / 클라이언트 취소)이나 되기 때문이다.
+ * 그래서 `app/api/assignment-chat` 은 이 함수를 종료 경로에서 **정확히 한 번** 부른다.
+ *
+ * 지금까지 이 경로는 ai_events 에 아무것도 남기지 않았다(인터뷰 f4). 학생 채팅
+ * 트래픽 전체가 비용·지연 관측에서 빠져 있었다는 뜻이다.
+ */
+export async function recordAiStreamEvent(params: {
+  context: Omit<TrackedRequestContext, "endpoint">;
+  status: "success" | "error" | "timeout" | "client_cancelled";
+  latencyMs: number;
+  usage?: AiUsageSnapshot | null;
+  responseId?: string | null;
+  error?: unknown;
+  metadata?: JsonRecord;
+  configVersion?: string | null;
+}): Promise<void> {
+  const { context, status, latencyMs } = params;
+  const usage = params.usage ?? null;
+
+  await persistAiEvent(
+    {
+      provider: "openai",
+      endpoint: "responses",
+      feature: context.feature,
+      route: context.route,
+      model: context.model,
+      user_id: context.userId ?? null,
+      exam_id: context.examId ?? null,
+      session_id: context.sessionId ?? null,
+      q_idx: context.qIdx ?? null,
+      status,
+      // 논리적 SDK 호출 수다 — 스트림이 시작됐으면 1.
+      attempt_count: 1,
+      latency_ms: latencyMs,
+      input_tokens: usage?.inputTokens ?? null,
+      output_tokens: usage?.outputTokens ?? null,
+      cached_input_tokens: usage?.cachedInputTokens ?? null,
+      reasoning_tokens: usage?.reasoningTokens ?? null,
+      total_tokens: usage?.totalTokens ?? null,
+      estimated_cost_usd_micros: calculateEstimatedCostUsdMicros(context.model, usage),
+      pricing_version: AI_PRICING_VERSION,
+      request_id: null,
+      response_id: params.responseId ?? null,
+      error_code: params.error ? getOpenAIErrorCode(params.error) : null,
+      config_version: params.configVersion ?? null,
+      metadata: { ...(context.metadata ?? {}), ...(params.metadata ?? {}) },
+    },
+    context.route
+  );
 }
 
 export async function callTrackedOpenAI<T>(
@@ -270,10 +378,7 @@ export async function callTrackedOpenAI<T>(
   options?: TrackedRequestOptions<T>
 ): Promise<TrackedOpenAIResult<T>> {
   try {
-    const { data, attemptCount, latencyMs } = await callOpenAIWithTelemetry(
-      fn,
-      { timeoutMs: options?.timeoutMs, maxAttempts: options?.maxAttempts }
-    );
+    const { data, attemptCount, latencyMs } = await callOpenAIWithTelemetry(fn);
     const usage = extractUsageFromOpenAIResult(context.endpoint, data);
     const requestId = extractRequestId(data);
     const responseId = extractResponseId(data);
@@ -317,6 +422,7 @@ export async function callTrackedOpenAI<T>(
         request_id: requestId,
         response_id: responseId,
         error_code: null,
+        config_version: context.configVersion ?? null,
         metadata,
       },
       context.route
@@ -334,7 +440,7 @@ export async function callTrackedOpenAI<T>(
   } catch (error) {
     const failure = buildFailure(error);
     const status =
-      failure.error instanceof OpenAITimeoutError ? "timeout" : "error";
+      isOpenAITimeoutError(failure.error) ? "timeout" : "error";
 
     await persistAiEvent(
       {
@@ -360,6 +466,7 @@ export async function callTrackedOpenAI<T>(
         request_id: null,
         response_id: null,
         error_code: getOpenAIErrorCode(failure.error),
+        config_version: context.configVersion ?? null,
         metadata: safeMetadata(context.metadata),
       },
       context.route
