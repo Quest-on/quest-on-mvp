@@ -408,7 +408,7 @@
   "examCode": {
     "copyAria": "Copy exam code",
     "warning": "Your free plan can admit students to {remaining} more exam(s).",
-    "blockedTitle": "Verify your account before sharing this code",
+    "blockedTitle": "Lift the limit before sharing this code",
     "blockedBody": "You have reached the free plan publish limit. Students cannot enter even if you share this code. Email us below and we will lift it.",
     "blockedCta": "Request a higher limit",
     "blockedMailSubject": "[Quest-On] Request to lift the publish limit"
