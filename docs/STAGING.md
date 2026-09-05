@@ -21,7 +21,7 @@
 |---|---|---|
 | Git 브랜치 | `main` | `staging` |
 | Vercel 프로젝트 | quest-on | quest-on-staging (별도 프로젝트) |
-| 도메인 | quest-on.app | staging.quest-on.app |
+| 도메인 | quest-on.app | `quest-on-staging-two.vercel.app` (커스텀 도메인 미연결) |
 | `NEXT_PUBLIC_APP_ENV` | (미설정 또는 `production`) | **`staging` (필수)** |
 | Supabase | 프로덕션 프로젝트 | 스테이징 전용 프로젝트 |
 | Upstash Redis | 프로덕션 DB | 스테이징 전용 DB |
@@ -40,14 +40,22 @@
 ## 배포 흐름
 
 ```
-feat/xxx  ──PR──▶  staging  ──자동배포──▶  staging.quest-on.app  ──QA──▶  PR ──▶  main  ──▶  quest-on.app
+feat/xxx  ──PR──▶  staging  ──자동배포──▶  quest-on-staging-two.vercel.app  ──QA──▶  PR ──▶  main  ──▶  quest-on.app
 ```
 
 - 모든 작업 PR 의 base 는 `staging`.
 - `staging` → `main` 승격 PR 은 "이번 배포에 뭐가 들어가는지" 목록 역할을 한다.
 - 핫픽스도 같은 경로로 간다. `main` 직행은 git hook 이 막는다.
 - **배포는 Vercel Git 연동이 아니라 GitHub Actions 가 수행한다** (`.github/workflows/deploy.yml`).
-  `main` 에서 CI 가 초록이면 그 커밋을 `vercel deploy --prod` 로 올린다.
+- 경로가 브랜치마다 다르다. 같은 `deploy.yml` 을 쓰지만 부르는 방식이 갈린다:
+  - **staging**: `ci.yml` 이 모든 검사를 통과한 뒤 `workflow_call` 로 직접 부른다.
+    staging CI 런 안에 `Deploy (staging)` 잡으로 나타난다.
+  - **main**: `workflow_run` 으로 CI 완료를 받아 실행한다.
+
+  왜 갈랐는가 — `workflow_run` 트리거는 **기본 브랜치(main)의 워크플로 파일 기준**으로
+  등록된다. main 이 뒤처져 있으면 staging 을 아무리 고쳐도 등록되지 않는다. 실제로 그래서
+  자동 배포가 한 번도 걸리지 않았고 배포 60건이 전부 수동 `workflow_dispatch` 였다(이슈 #209).
+  `push`/`workflow_call` 은 그 브랜치의 파일을 쓰므로 main 에 의존하지 않는다.
   Git 연동 배포는 "커밋한 사람의 Vercel 계정에 배포 권한이 있을 것"을 요구해서, 팀원이 바뀔 때마다
   seat 를 사야 하고 권한 없는 사람이 커밋하면 배포가 조용히 멈춘다. 배포 주체를 사람에서 CI 로 옮겼다.
 - **빌드는 Vercel 에서 돈다.** CI 에서 `vercel build --prebuilt` 로 빌드하면 커밋당 빌드가 1회로
@@ -73,7 +81,7 @@ feat/xxx  ──PR──▶  staging  ──자동배포──▶  staging.quest
 - [ ] 같은 Team 에 새 프로젝트 생성, 같은 저장소 연결
 - [ ] Production Branch = `staging` (이 프로젝트의 "프로덕션"이 staging 브랜치다 → 크론이 돈다)
 - [ ] Ignored Build Step 으로 `main` 푸시에 반응하지 않게 정리
-- [ ] 도메인 `staging.quest-on.app` 연결
+- [ ] 도메인 `staging.quest-on.app` 연결 — **아직 안 됨.** 현재는 Vercel 기본 도메인(`quest-on-staging-two.vercel.app`)으로 QA 한다
 - [ ] Deployment Protection: 프로덕션 배포(=staging 브랜치)는 **공개**, preview 는 보호 유지
 - [ ] 환경변수 주입 — `.env.staging.example` 기준. 값 채운 뒤 `npm run env:check -- --env staging --file .env.staging` 로 검증 후 넣는다
 
@@ -94,7 +102,7 @@ feat/xxx  ──PR──▶  staging  ──자동배포──▶  staging.quest
 
 ```bash
 # 1. 공개 헬스체크 (인증 불필요, 상태만)
-curl https://staging.quest-on.app/api/health
+curl https://quest-on-staging-two.vercel.app/api/health
 
 # 2. 상세 진단 — 관리자 로그인 후 (환경/누락 변수/연동 활성 여부)
 #    응답의 runtime.appEnv 가 "staging" 이어야 한다. "production" 이면 즉시 중단하고
@@ -102,10 +110,44 @@ curl https://staging.quest-on.app/api/health
 #    runtime.integrations.authBypass 가 true 면 즉시 키를 제거한다.
 
 # 3. robots — 스테이징은 전면 disallow 여야 한다
-curl https://staging.quest-on.app/robots.txt
+curl https://quest-on-staging-two.vercel.app/robots.txt
 ```
 
-화면 좌하단에 `STAGING` 배지가 보이지 않으면 환경 선언이 잘못된 것이다.
+화면 아래 가운데에 `STAGING` 배지가 보이지 않으면 환경 선언이 잘못된 것이다.
+
+---
+
+## 현재 상태 — main 이 멈춰 있다 (2026-09-03)
+
+이 문서가 설명하는 흐름 중 **`staging → main` 구간이 실제로는 돌지 않고 있다.** 문서를
+믿고 판단하면 틀리므로 사실을 적어 둔다.
+
+| | 상태 |
+|---|---|
+| `main` 마지막 커밋 | 2026-08-09 |
+| `staging` 이 앞선 커밋 | 379 |
+| `deploy.yml` 의 main 배포 실행 | **0건** (전체 60건이 staging) |
+| 승격 PR #119 | 2026-08-09 개설, 계속 열림. 541파일 / +34467 -6350 |
+
+즉 프로덕션은 8/9 자 코드로 돌고 있고, 온보딩 액티베이션(Epic #79) 이후의 모든 작업이
+프로덕션에 반영돼 있지 않다. 프로덕션 자체는 정상이다 — 그 시점 코드는 새 DB 객체를
+참조하지 않으므로(`app/` 에서 `lib/plan-limits`·`lib/onboarding-events`·`lib/demo-completion`
+import 0건) 스테이징을 죽였던 스키마 드리프트가 프로덕션엔 없다.
+
+**승격은 추가 전용이 아니다.** main 이후 쌓인 migration 15건 중 데이터를 바꾸는 것이 있다:
+
+| migration | 프로덕션 데이터에 하는 일 |
+|---|---|
+| `019_profiles_rls` | `profiles` 에 RLS 활성화 + 정책 재생성 |
+| `020_backfill_first_published_at` | `exams` 일괄 UPDATE |
+| `021_clear_pending_status` | `profiles`·`instructor_profiles` 일괄 UPDATE. **대기 중 교수자가 일괄 승인된다** + status 기본값을 `approved` 로 변경 |
+| `022_clean_demo_preview_metrics` | `onboarding_events` DELETE + `exams` 2회 UPDATE |
+
+나머지 11건(`023`~`034`)은 테이블·컬럼·함수 추가이며, 함수 본문 안의 DML 은 호출 시에만 돈다.
+
+승격 순서는 아래 "DDL 변경 순서"를 따르되, **위 4건은 프로덕션 데이터에 미치는 영향을
+개별로 승인받고 진행한다.** 스키마 변경 없이 코드만 올리면 프로덕션이 스테이징과 같은
+방식으로 조용히 죽는다 — 그게 이슈 #324 였다.
 
 ---
 
