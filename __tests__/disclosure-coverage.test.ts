@@ -116,6 +116,15 @@ describe("AI 고지 적용 범위 (#325)", () => {
     }
   });
 
+  it("차단 카드의 제목과 본문이 같은 얘기를 한다", () => {
+    // 본문은 "메일 주시면 풀어 드립니다" 인데 제목만 "계정 인증이 필요합니다" 로
+    // 남아 있었다. 한 카드에서 두 얘기를 하면 사용자는 어느 쪽을 해야 할지 모른다.
+    for (const locale of ["ko", "en"] as const) {
+      const title = authoring[locale].examCode.blockedTitle;
+      expect(title).not.toMatch(locale === "ko" ? /계정.*인증/ : /verify your account/i);
+    }
+  });
+
   it("연락처가 한 곳에서만 온다", () => {
     // 랜딩 푸터·404·문의 버튼에 각각 하드코딩돼 있었다. 한도 안내까지 적으면
     // 다섯 번째가 되고, 주소가 바뀌는 날 네 곳은 고치고 한 곳은 잊는다.
