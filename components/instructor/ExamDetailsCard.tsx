@@ -7,6 +7,7 @@ import { Copy, Megaphone } from "lucide-react";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { buildStudentNotice, studentNoticePolicyLines } from "@/lib/student-notice";
+import { SUPPORT_EMAIL } from "@/lib/contact";
 
 interface ExamDetailsCardProps {
   description: string;
@@ -41,7 +42,7 @@ export function ExamDetailsCard({
     // 발행 한도에 걸린 미발행 시험의 코드는 복사시키지 않는다 (이슈 #84).
     // 복사해 수업 자료에 붙인 뒤에 막으면 수업 중에 학생 전원이 튕긴다.
     if (codeGateBlocked) {
-      toast.error(t("examDetailsCard.toastCodeBlocked"), {
+      toast.error(t("examDetailsCard.toastCodeBlocked", { email: SUPPORT_EMAIL }), {
         id: "copy-exam-code-blocked",
       });
       return;

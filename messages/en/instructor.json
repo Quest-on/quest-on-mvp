@@ -410,7 +410,7 @@
     "colorPurple": "Purple",
     "colorPink": "Pink",
     "colorGray": "Gray",
-    "toastExamCodeBlocked": "To prevent students from misusing instructor accounts, codes cannot be copied after the publish limit is reached. Verify your account and try again.",
+    "toastExamCodeBlocked": "To prevent students from misusing instructor accounts, codes cannot be copied once the publish limit is reached. Email {email} and we will lift it.",
     "loadError": "Could not load your exams.",
     "folderItems": "{count} items",
     "folderEmpty": "Empty"
