@@ -220,9 +220,14 @@ async function applyRouteGuards(
   return response;
 }
 
+// `txt|xml` 은 크롤러가 읽는 파일 때문에 뺀다. 이게 없으면 `/robots.txt` 가
+// 인증 게이트를 타고 `/sign-in` 으로 리다이렉트된다. 크롤러는 언제나
+// 미인증이라 app/robots.ts 의 `Disallow: /` 를 한 번도 못 본다 — 색인
+// 금지 장치가 걸려 있는 것처럼 보이기만 한다(이슈 #352).
+// 확장자가 붙은 API 는 아래 두 번째 matcher 가 다시 잡는다.
 export const config = {
   matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|txt|xml)).*)",
     "/(api|trpc)(.*)",
   ],
 };
