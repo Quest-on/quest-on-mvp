@@ -16,7 +16,7 @@ Quest-on/quest-on-mvp
       │
       ③ base=staging 으로 Pull Request  →  CI 통과  →  Squash 머지
       │
-      ④ staging.quest-on.app 에서 팀 QA
+      ④ quest-on-staging-two.vercel.app 에서 팀 QA
       │
       ⑤ staging → main 승격 PR  →  메인테이너 승인 1개  →  프로덕션 배포
 ```
@@ -65,7 +65,7 @@ Quest-on/quest-on-mvp
 
 ## 작업할 때마다 반복하는 흐름
 
-> 브랜치는 2단계입니다. 작업 PR 은 전부 `staging` 으로 올리고, 스테이징(staging.quest-on.app)에서 QA 를 통과한 것만 `staging` → `main` 승격 PR 로 프로덕션에 나갑니다. 환경 설명은 `docs/STAGING.md`.
+> 브랜치는 2단계입니다. 작업 PR 은 전부 `staging` 으로 올리고, 스테이징(quest-on-staging-two.vercel.app)에서 QA 를 통과한 것만 `staging` → `main` 승격 PR 로 프로덕션에 나갑니다. 환경 설명은 `docs/STAGING.md`.
 
 ### 0) 이슈 확인
 `status:ready` 인 이슈를 하나 잡고 `status:in-progress` 로 옮깁니다. 이슈 없이 가야 하는 예외는 PR 본문에 `No issue: <이유>` 를 적습니다. 규칙은 `docs/WORKFLOW.md`.
@@ -118,7 +118,8 @@ git push -u origin feat/login-button
 - `staging` PR 은 CI 초록이면 승인 없이 머지할 수 있습니다. `main` 승격 PR 은 **승인 1개**가 필요합니다.
 
 ### 7) QA
-`staging` 에 머지되면 자동으로 staging.quest-on.app 에 배포됩니다. 본인 변경이 실제로 동작하는지 여기서 확인하고, 이슈에 결과를 남깁니다.
+`staging` 에 머지되면 CI 가 초록일 때 자동으로 https://quest-on-staging-two.vercel.app 에 배포됩니다. 본인 변경이 실제로 동작하는지 **여기서** 확인하고, 이슈에 결과를 남깁니다.
+`staging.quest-on.app` 은 아직 연결되지 않은 도메인이라 404 가 뜹니다 (`docs/STAGING.md`).
 
 ### 8) 정리
 머지된 브랜치는 삭제합니다.

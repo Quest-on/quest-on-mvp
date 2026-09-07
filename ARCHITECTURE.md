@@ -414,7 +414,7 @@ flowchart LR
 ```mermaid
 flowchart LR
     dev["작업 브랜치"] -->|PR| staging["staging"]
-    staging -->|자동 배포| stagingApp["staging.quest-on.app<br/>Vercel 프로젝트 A"]
+    staging -->|자동 배포| stagingApp["quest-on-staging-two.vercel.app<br/>Vercel 프로젝트 A"]
     stagingApp -->|팀 QA| release["staging → main 승격 PR<br/>승인 1개 · 조직 관리자 우회 가능"]
     release --> main["main"]
     main -->|자동 배포| prod["quest-on.app<br/>Vercel 프로젝트 B"]
