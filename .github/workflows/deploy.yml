@@ -106,7 +106,10 @@ jobs:
           else
             echo "project_id=${{ vars.VERCEL_PROJECT_ID_STAGING }}" >> "$GITHUB_OUTPUT"
             echo "name=staging" >> "$GITHUB_OUTPUT"
-            echo "url=https://quest-on-staging.vercel.app" >> "$GITHUB_OUTPUT"
+            # 커스텀 도메인은 아직 연결되지 않았다. quest-on-staging.vercel.app 은
+            # Clerk 시대 배포가 남은 함정 도메인이라 여기로 안내하면 QA 가 없는
+            # 버그를 본다 (docs/STAGING.md).
+            echo "url=https://quest-on-staging-two.vercel.app" >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/checkout@v4
         with:

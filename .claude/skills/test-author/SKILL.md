@@ -12,8 +12,8 @@ Adding a new test, modifying an existing one, or fixing a flaky test. Bug fix? W
 | Code under test | Tool | Location | Command |
 |---|---|---|---|
 | Pure function, utility, Zod schema, business logic | Vitest | `__tests__/<name>.test.ts` | `npm run test -- --run` |
-| API route end-to-end (auth + DB + response) | Playwright (api project) | `e2e/api/**/<name>.spec.ts` | `npm run test:api` |
-| Browser interaction, page flow, a11y | Playwright (browser project) | `e2e/browser/**/<name>.spec.ts` | `npm run test:e2e` or `npm run test:browser` |
+| API route end-to-end (auth + DB + response) | Playwright (api project) | `e2e/api/**/<name>.spec.ts` | CI 가 돌린다 (로컬 실행 안 함) |
+| Browser interaction, page flow, a11y | Playwright (browser project) | `e2e/browser/**/<name>.spec.ts` | CI 가 돌린다 (로컬 실행 안 함) |
 
 Quick rule: if it touches `request`/`response`/`fetch`, go Playwright. If it's a function you can import and call, go Vitest.
 

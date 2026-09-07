@@ -23,6 +23,8 @@ npx tsc --noEmit && npm run lint
 npx vitest run <바꾼 것과 관련된 파일>
 ```
 
+로컬 검증은 위 셋뿐이다. **DB 가 필요한 Playwright(`test:api`·`test:e2e`·`test:browser`)는 로컬에서 돌리지 않는다** — 로컬 Supabase(Docker) 스택을 세우지 말고 CI 에 맡긴다. 화면 동작 확인은 `staging` 배포(https://quest-on-staging-two.vercel.app)에서 한다. 자세한 건 `docs/TESTING.md`.
+
 `staging` PR 은 승인 없이 머지된다. 사람이 안 본다고 가정하고 쓴다 — PR 본문에 실행한 명령과 실제 출력을 붙인다. "확인했습니다"는 증거가 아니다.
 버그 수정은 재현 테스트를 먼저 쓰고 고친다.
 

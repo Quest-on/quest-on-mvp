@@ -56,11 +56,9 @@ docs/           운영·보안·테스트·스테이징 문서
 ```bash
 npx tsc --noEmit && npm run lint
 npm run test                 # vitest
-npm run test:api             # Playwright API 통합
-npm run test:e2e             # Playwright 브라우저
 ```
 
-DB 를 건드리는 테스트는 **폐기 가능한 로컬 DB** 에서만 돌린다. `.env.local` 을 테스트에 로드하지 않는다. 상세는 `docs/TESTING.md`.
+DB 가 필요한 Playwright(`test:api`·`test:e2e`)는 로컬에서 돌리지 않는다 — CI 가 돌린다. 화면 동작은 staging 배포(`quest-on-staging-two.vercel.app`)에서 확인한다. `.env.local` 을 테스트에 로드하지 않는다. 상세는 `docs/TESTING.md`.
 
 ## 기여
 
