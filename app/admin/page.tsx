@@ -38,6 +38,7 @@ interface User {
   role: string;
   status: string | null;
   createdAt: string;
+  lastSeenAt: string | null;
   avatarUrl: string | null;
 }
 
@@ -556,6 +557,11 @@ export default function AdminDashboard() {
                         <p className="type-hint">{user.email}</p>
                         <p className="type-meta">
                           {t("dashboard.userManagement.joinedAt", { date: formatDate(user.createdAt) })}
+                        </p>
+                        <p className="type-meta">
+                          {user.lastSeenAt
+                            ? t("dashboard.userManagement.lastSeenAt", { date: formatDate(user.lastSeenAt) })
+                            : t("dashboard.userManagement.lastSeenNever")}
                         </p>
                       </div>
                     </div>
