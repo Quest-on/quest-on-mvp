@@ -31,7 +31,9 @@
       "noRole": "Not Set",
       "refresh": "Refresh",
       "emptySearch": "No users match your search.",
-      "joinedAt": "Joined: {date}"
+      "joinedAt": "Joined: {date}",
+      "lastSeenAt": "Last active: {date}",
+      "lastSeenNever": "No activity yet"
     },
     "error": {
       "loadFail": "Failed to load user information.",
