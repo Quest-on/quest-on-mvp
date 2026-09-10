@@ -34,7 +34,9 @@
       "noRole": "미설정",
       "refresh": "새로고침",
       "emptySearch": "검색 조건에 맞는 사용자가 없습니다.",
-      "joinedAt": "가입일: {date}"
+      "joinedAt": "가입일: {date}",
+      "lastSeenAt": "최근 활동: {date}",
+      "lastSeenNever": "활동 기록 없음"
     },
     "error": {
       "loadFail": "사용자 정보를 불러오는데 실패했습니다.",

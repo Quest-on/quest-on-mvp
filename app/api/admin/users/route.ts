@@ -44,11 +44,23 @@ export async function GET(request: NextRequest) {
     if (instructorError) throw instructorError;
     if (studentError) throw studentError;
 
-    const { data: users, error } = await supabase
+    let { data: users, error } = await supabase
       .from("profiles")
-      .select("id, display_name, role, status, avatar_url, created_at")
+      .select("id, display_name, role, status, avatar_url, created_at, last_seen_at")
       .range(offset, offset + limit - 1)
       .order("created_at", { ascending: false });
+
+    // 035 migration 미적용 환경(42703)에서는 last_seen_at 없이 조회한다 (#354).
+    // 배포와 DDL 적용 순서에 무관하게 admin API 가 살아 있어야 한다.
+    if (error?.code === "42703") {
+      const fallback = await supabase
+        .from("profiles")
+        .select("id, display_name, role, status, avatar_url, created_at")
+        .range(offset, offset + limit - 1)
+        .order("created_at", { ascending: false });
+      users = fallback.data?.map((row) => ({ ...row, last_seen_at: null })) ?? null;
+      error = fallback.error;
+    }
 
     if (error) throw error;
 
@@ -74,6 +86,7 @@ export async function GET(request: NextRequest) {
       role: user.role || "student",
       status: user.status,
       avatarUrl: user.avatar_url,
+      lastSeenAt: user.last_seen_at ?? null,
       createdAt: user.created_at,
     }));
 

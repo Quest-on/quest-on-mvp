@@ -53,6 +53,10 @@ vi.mock("next/headers", () => ({
 vi.mock("../lib/supabase-server", () => ({
   getSupabaseServer: () => ({
     from: () => ({
+      // currentUser() 가 last_seen_at 을 찍는 쓰기 (#354). 여기서는 성공으로 둔다.
+      update: () => ({
+        eq: async () => ({ error: null }),
+      }),
       upsert: async (values: Record<string, unknown>, options?: Record<string, unknown>) => {
         upsertCalls.push(values);
         upsertOptions.push(options);
