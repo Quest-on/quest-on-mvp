@@ -21,9 +21,11 @@ Stable official posthog-js/posthog-node versions are pinned in package.json. No 
 
 | Event | Meaning | Source |
 |---|---|---|
-| $pageview | A supported page was viewed | Browser, manual sanitized navigation |
+| $pageview | Any application page template was viewed | Browser, sanitized navigation |
+| $pageleave | Page exit, with SDK duration/scroll metrics when provided | Browser, native SDK |
+| $autocapture | Click or form submission | Browser, native SDK; masked structure and safe internal destination |
 | signup_start | A same-origin signup link was clicked | Browser; intent only |
-| signup_completed | A new instructor account was email-verified and authenticated | Verified Supabase timestamps, server |
+| signup_completed | A new instructor or student account was email-verified and authenticated | Verified Supabase timestamps, server |
 | intake_submitted | Instructor submitted onboarding intake | New native milestone row |
 | demo_created | Instructor demo created | New native milestone row |
 | demo_answered | Demo answer submitted | New native milestone row |
@@ -31,7 +33,7 @@ Stable official posthog-js/posthog-node versions are pinned in package.json. No 
 | first_publish | Native first-publish milestone reached | New native milestone row |
 | first_student_submission | Native first-student-submission reached | New native milestone row |
 
-Signup is exported only for instructor accounts verified within 24 hours of creation and authenticated within 24 hours of verification. Delayed verification, late role selection/consent and pre-existing accounts are not counted as new signups. Native account records remain the complete registration source. Server UUIDs are deterministic per environment, user and event so repeated captures have the same deduplication key.
+Signup is exported for instructor and student accounts verified within 24 hours of creation and authenticated within 24 hours of verification. Delayed verification, late role selection/consent and pre-existing accounts are not counted as new signups. Native account records remain the complete registration source. Server UUIDs are deterministic per environment, user and event so repeated captures have the same deduplication key.
 
 Analytics are best-effort and consented, not a durable business ledger. Milestones export only on the original native insert; denied consent, background jobs without browser consent, ad blockers, network loss or failed ingestion can produce gaps. No queue/outbox or historical backfill is added. Do not infer zero signups or zero usage from an empty analytics report. Native outcomes can be compared in aggregate, but are not silently joined to anonymous visitors.
 
@@ -49,7 +51,11 @@ Only lowercase letters, numbers, underscore and dash, up to 80 characters are ac
 
 The root WebsiteAnalytics component owns the browser SDK. Explicit opt-in is stored in localStorage and a same-origin consent cookie; withdrawal stops capture and clears the prior SDK identity. The supported-page preference control remains accessible. Declining never blocks product features.
 
-Autocapture, pageleave, recordings, surveys, flags requests, automatic exceptions and performance capture are disabled initially. Browser before_send retains an explicit property vocabulary and sanitizes nested person properties. Unknown query fields, fragments, exam IDs/codes, answer text, names and email addresses are omitted. Server exports only event name, auth UUID, instructor role and environment, never arbitrary milestone metadata. The UI must describe this as pseudonymous account-linked analytics, not anonymous data.
+Native click/form-submit autocapture and pageleave are enabled app-wide after consent. Session recordings, copied text, surveys, flags requests, automatic exceptions, heatmaps, dead/rage clicks and performance capture remain disabled. The browser integration is global, not a signup-only funnel.
+
+Page templates cover all App Router application pages, including assignments, grading, settings, profile and admin. Dynamic identifiers become `[id]`; static feature segments remain distinct. Authentication callback transport pages and unknown routes are omitted. A route coverage test fails when a new application page is not represented, preventing silent coverage drift.
+
+Autocapture masks all text and element attributes at SDK initialization. The final filter additionally rebuilds native `$elements_chain` with tag/position and sanitized same-origin destination only: the SDK still adds hrefs and classes with masking enabled. This supports native click/submit analysis without sending form values, user-provided labels, answer/chat text, record IDs or arbitrary DOM attributes. Clicks and submits are intent, not proof that the server saved successfully; use native milestone events for observed successful outcomes. Browser before_send retains an explicit property vocabulary and sanitizes nested person properties. Unknown query fields, fragments, exam IDs/codes, answer text, names and email addresses are omitted. Server exports only event name, auth UUID, instructor role and environment, never arbitrary milestone metadata. The UI must describe this as pseudonymous account-linked analytics, not anonymous data.
 
 ## Dashboard
 
