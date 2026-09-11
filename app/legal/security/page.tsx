@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldCheck, Lock, Eye, Database, AlertTriangle } from "lucide-react";
+import { ShieldCheck, Lock, Database, AlertTriangle } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 export default async function SecurityPage() {
@@ -15,9 +15,9 @@ export default async function SecurityPage() {
       </header>
 
       <section className="mb-12">
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+        <div className="bg-info-surface border border-info-border rounded-lg p-6">
           <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
-            <ShieldCheck className="w-6 h-6 text-blue-600" />
+            <ShieldCheck className="w-6 h-6 text-info-text" />
             {t("security.principles.heading")}
           </h2>
           <p>
@@ -123,7 +123,7 @@ export default async function SecurityPage() {
               {t("security.reporting.process")}
             </p>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="type-hint">
             {t("security.reporting.disclosure")}
           </p>
         </div>
@@ -134,11 +134,9 @@ export default async function SecurityPage() {
           <Link href="/legal/terms" className="hover:text-foreground transition-colors">
             {t("footerLinks.terms")}
           </Link>
-          <span>·</span>
           <Link href="/legal/privacy" className="hover:text-foreground transition-colors">
             {t("footerLinks.privacy")}
           </Link>
-          <span>·</span>
           <Link href="/legal/cookies" className="hover:text-foreground transition-colors">
             {t("footerLinks.cookies")}
           </Link>

@@ -15,6 +15,7 @@ export type CaseGradeAccessContext = {
     instructor_id: string;
     questions: unknown;
     language?: string | null;
+    is_demo?: boolean | null;
     status?: string | null;
     type?: string | null;
     deadline?: string | null;
@@ -74,7 +75,7 @@ export async function requireCaseGradeAccess(
 
   const { data: exam, error: examError } = await supabase
     .from("exams")
-    .select("instructor_id, questions, language, status, type, deadline")
+    .select("instructor_id, questions, language, is_demo, status, type, deadline")
     .eq("id", session.exam_id)
     .single();
 

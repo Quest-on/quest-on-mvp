@@ -34,22 +34,6 @@ export function questionTypeKey(type: string): string {
   }
 }
 
-/** 하위 호환용 래퍼 — 훅 외부에서 정적 라벨이 필요한 경우만 사용. */
-export function questionTypeLabel(type: string): string {
-  switch (type) {
-    case "essay":
-      return "서술형 문제";
-    case "short-answer":
-      return "단답형 문제";
-    case "multiple-choice":
-      return "객관식 문제";
-    case "true-false":
-      return "O/X 문제";
-    default:
-      return "문제";
-  }
-}
-
 interface QuestionPanelProps {
   question: Question;
   questionNumber: number;

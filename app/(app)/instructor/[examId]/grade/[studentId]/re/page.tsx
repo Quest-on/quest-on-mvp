@@ -74,14 +74,14 @@ export default function RegradePage() {
     };
 
     triggerRegrade();
-  }, [examId, studentId, user, isLoaded, router]);
+  }, [examId, studentId, user, isLoaded, router, t]);
 
   if (!isLoaded) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="text-center space-y-4">
           <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-          <p className="text-sm text-muted-foreground">{t("regradePage.loading")}</p>
+          <p className="type-hint">{t("regradePage.loading")}</p>
         </div>
       </div>
     );
@@ -111,7 +111,7 @@ export default function RegradePage() {
               <Loader2 className="w-16 h-16 animate-spin text-primary" />
             )}
             {status === "success" && (
-              <CheckCircle2 className="w-16 h-16 text-green-600" />
+              <CheckCircle2 className="w-16 h-16 text-success-text" />
             )}
             {(status === "error" || status === "no-session") && (
               <AlertCircle className="w-16 h-16 text-destructive" />
@@ -127,7 +127,7 @@ export default function RegradePage() {
         <CardContent className="text-center">
           <CardDescription className="mb-4">{message}</CardDescription>
           {status === "success" && (
-            <p className="text-sm text-muted-foreground">
+            <p className="type-hint">
               {t("regradePage.redirecting")}
             </p>
           )}

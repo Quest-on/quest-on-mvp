@@ -76,7 +76,7 @@ export function StudentLiveMonitoring({
           parsed.forEach((msg: LiveMessage) => {
             messagesMapRef.current.set(msg.id, msg);
           });
-        } catch (e) {
+        } catch {
           // Ignore parse errors
         }
       }
@@ -112,7 +112,7 @@ export function StudentLiveMonitoring({
           }
         }, 0);
       }
-    } catch (error) {
+    } catch {
       // Ignore load errors
     } finally {
       setIsLoading(false);
@@ -161,7 +161,7 @@ export function StudentLiveMonitoring({
             try {
               const decompressed = decompressData(newMessage.compressed_content);
               content = typeof decompressed === "string" ? decompressed : content;
-            } catch (error) {
+            } catch {
               // Use original content on decompression failure
             }
           }
@@ -265,7 +265,7 @@ export function StudentLiveMonitoring({
                   <div
                     key={message.id}
                     className={`border rounded-lg p-4 hover:bg-muted/50 transition-colors ${
-                      message.role === "ai" ? "bg-blue-50/50 dark:bg-blue-950/20" : ""
+                      message.role === "ai" ? "bg-info-surface/50" : ""
                     }`}
                   >
                     <div className="flex items-start justify-between mb-2">
@@ -275,7 +275,7 @@ export function StudentLiveMonitoring({
                             variant={message.role === "ai" ? "default" : "outline"}
                             className={`text-xs ${
                               message.role === "ai"
-                                ? "bg-blue-500 text-white"
+                                ? "bg-info-solid text-white"
                                 : ""
                             }`}
                           >
@@ -296,7 +296,7 @@ export function StudentLiveMonitoring({
                     <div
                       className={`rounded-md p-3 ${
                         message.role === "ai"
-                          ? "bg-blue-100/50 dark:bg-blue-900/30"
+                          ? "bg-info-subtle/50"
                           : "bg-muted/50"
                       }`}
                     >

@@ -53,7 +53,7 @@ export function QuestionsListCard({ questions }: QuestionsListCardProps) {
                 </div>
                 <RichTextViewer
                   content={question.text}
-                  className="text-sm text-muted-foreground"
+                  className="type-hint"
                 />
               </div>
             ))

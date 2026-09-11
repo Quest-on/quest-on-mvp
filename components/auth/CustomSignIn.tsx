@@ -7,10 +7,13 @@ import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { createSupabaseClient } from "@/lib/supabase-client";
+import { getAuthCallbackUrl } from "@/lib/auth-redirect";
+import { safeInternalPath } from "@/lib/safe-redirect";
 import { useTranslations } from "next-intl";
+import { useOAuthProviders } from "@/lib/use-oauth-providers";
+import { isProviderUnavailable } from "@/lib/oauth-providers";
 
 export function CustomSignIn() {
   const t = useTranslations("auth.signIn");
@@ -20,6 +23,8 @@ export function CustomSignIn() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+  const providers = useOAuthProviders();
+  const googleUnavailable = isProviderUnavailable(providers, "google");
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +43,14 @@ export function CustomSignIn() {
       return;
     }
 
-    router.push("/");
+    // 로그인 전에 가려던 곳으로 되돌린다.
+    //
+    // redirect 는 URL 쿼리(= 사용자 입력)라 그대로 믿으면 안 된다.
+    // startsWith("/") 만으로는 //evil.com 이 통과해 외부로 튕긴다.
+    const redirect = safeInternalPath(
+      new URLSearchParams(window.location.search).get("redirect")
+    );
+    router.push(redirect ?? "/");
     router.refresh();
   };
 
@@ -46,18 +58,25 @@ export function CustomSignIn() {
     if (oauthLoading) return;
     setOauthLoading(provider);
     const supabase = createSupabaseClient();
-    await supabase.auth.signInWithOAuth({
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: getAuthCallbackUrl(window.location.origin),
       },
     });
+
+    // 성공하면 브라우저가 이미 떠났으므로 여기 안 온다. 여기 왔다는 건
+    // 실패했다는 뜻이다. 로딩만 걸어두면 버튼이 영영 도는 채로 남는다.
+    if (oauthError) {
+      setOauthLoading(null);
+      setError(t("providerUnavailable"));
+    }
   };
 
   return (
     <div className="flex min-h-screen">
       {/* Left Section - Sign In Form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-white dark:bg-gray-950 relative">
+      <div className="flex-1 flex items-center justify-center p-8 bg-background relative">
         {/* 로고 - 왼쪽 상단 */}
         <Link
           href="/"
@@ -71,17 +90,17 @@ export function CustomSignIn() {
             className="w-8 h-8"
             priority
           />
-          <span className="text-lg font-bold text-gray-900 dark:text-white">
+          <span className="text-lg font-bold text-foreground dark:text-white">
             Quest-On
           </span>
         </Link>
 
         <div className="w-full max-w-md space-y-8">
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            <h1 className="text-3xl font-bold text-foreground dark:text-white">
               {t("welcome")}
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-muted-foreground">
               {t("subtitle")}
             </p>
           </div>
@@ -93,7 +112,7 @@ export function CustomSignIn() {
                 type="button"
                 variant="outline"
                 className="w-full min-h-[44px]"
-                disabled={!!oauthLoading}
+                disabled={!!oauthLoading || googleUnavailable}
                 onClick={() => handleOAuth("google")}
               >
                 {oauthLoading === "google" ? (
@@ -106,8 +125,22 @@ export function CustomSignIn() {
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                   </svg>
                 )}
-                <span className="font-medium">{t("googleBtn")}</span>
+                <span className="flex items-center gap-2 font-medium">
+                  {t("googleBtn")}
+                </span>
               </Button>
+              {/*
+                잠긴 이유는 버튼 밖에 둔다.
+              
+                disabled 버튼은 opacity 0.5 라 안에 넣으면 안내까지 같이 흐려진다.
+                다크에서 실측 10.79 -> 3.95 로 떨어져 왜 못 누르는지 읽을 수 없었다.
+                버튼은 흐려도 되지만 이유는 읽혀야 한다.
+              */}
+              {googleUnavailable ? (
+                <p className="type-hint text-center" role="note">
+                  {t("providerUnavailable")}
+                </p>
+              ) : null}
 
               <Button
                 type="button"
@@ -124,11 +157,17 @@ export function CustomSignIn() {
                 </svg>
                 <span className="flex items-center gap-2 font-medium">
                   {t("microsoftBtn")}
-                  <Badge variant="secondary" className="text-[10px]">
-                    {t("comingSoon")}
-                  </Badge>
                 </span>
               </Button>
+              {/*
+                '준비중' 도 버튼 밖에 둔다.
+              
+                disabled 버튼은 opacity 0.5 라 안에 두면 같이 흐려진다. 왜 못 누르는지를
+                알려주는 정보가 흐려지면 사용자는 버튼이 죽은 이유를 모른다.
+              */}
+              <p className="type-hint text-center" role="note">
+                {t("comingSoon")}
+              </p>
             </div>
 
             {/* 구분선 */}
@@ -150,6 +189,7 @@ export function CustomSignIn() {
                 <Input
                   id="email"
                   type="email"
+                  autoComplete="email"
                   placeholder={t("emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -162,6 +202,7 @@ export function CustomSignIn() {
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="current-password"
                   placeholder={t("passwordPlaceholder")}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -188,7 +229,7 @@ export function CustomSignIn() {
             </form>
           </div>
 
-          <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+          <div className="text-center text-sm text-muted-foreground">
             {t("noAccount")}{" "}
             <Link
               href="/sign-up"

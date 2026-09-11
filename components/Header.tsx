@@ -55,7 +55,7 @@ export function Header() {
                 height={32}
                 className="h-8 w-8"
               />
-              <span className="text-xl font-bold text-gray-900 dark:text-white">
+              <span className="text-xl font-bold text-foreground dark:text-white">
                 {t("brand.name")}
               </span>
             </div>
@@ -63,7 +63,7 @@ export function Header() {
 
           {/* Vertical Separator */}
           {isSignedIn && hasRole && (
-            <div className="h-6 w-px bg-gray-300 dark:bg-gray-700" />
+            <div className="h-6 w-px bg-border" />
           )}
 
           {/* Navigation */}

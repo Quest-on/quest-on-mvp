@@ -292,7 +292,7 @@ export function QuestionAdjustSheet({
                     <Button
                       size="sm"
                       variant={appliedIdx === idx ? "secondary" : "outline"}
-                      className={`gap-1.5 ${appliedIdx === idx ? "bg-green-600 hover:bg-green-600 text-white" : ""}`}
+                      className={`gap-1.5 ${appliedIdx === idx ? "bg-success-solid hover:bg-success-solid text-white" : ""}`}
                       disabled={appliedIdx === idx}
                       onClick={() => {
                         onApply({

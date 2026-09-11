@@ -60,7 +60,7 @@ export function DashboardSidebar({
     if (!deadline) {
       return {
         rowClass: "text-sidebar-foreground/80",
-        badgeClass: "text-blue-600 bg-blue-500/10 border-blue-500/30",
+        badgeClass: "text-info-text bg-primary/10 border-primary/30",
         label: t("sidebar.noDueDate"),
         icon: CircleAlert,
       };
@@ -71,23 +71,23 @@ export function DashboardSidebar({
 
     if (daysLeft <= 1) {
       return {
-        rowClass: "text-red-600 dark:text-red-400",
-        badgeClass: "text-red-600 bg-red-500/10 border-red-500/30",
+        rowClass: "text-destructive",
+        badgeClass: "text-destructive bg-destructive/10/10 border-danger-border/30",
         label: daysLeft <= 0 ? "D-DAY" : `D-${daysLeft}`,
         icon: AlertTriangle,
       };
     }
     if (daysLeft <= 3) {
       return {
-        rowClass: "text-amber-600 dark:text-amber-400",
-        badgeClass: "text-amber-600 bg-amber-500/10 border-amber-500/30",
+        rowClass: "text-warning-text",
+        badgeClass: "text-warning-text bg-warning-surface/10 border-warning-border/30",
         label: `D-${daysLeft}`,
         icon: CircleAlert,
       };
     }
     return {
-      rowClass: "text-blue-600 dark:text-blue-400",
-      badgeClass: "text-blue-600 bg-blue-500/10 border-blue-500/30",
+      rowClass: "text-info-text",
+      badgeClass: "text-info-text bg-primary/10 border-primary/30",
       label: `D-${daysLeft}`,
       icon: CircleAlert,
     };
@@ -150,7 +150,7 @@ export function DashboardSidebar({
 
         {hasTodoSection && (
           <SidebarGroup>
-            <SidebarGroupLabel>TODO</SidebarGroupLabel>
+            <SidebarGroupLabel>{t("sidebar.todoTitle")}</SidebarGroupLabel>
             <SidebarGroupContent>
               {safeTodoItems.length === 0 ? (
                 <div className="px-2 py-2 text-xs text-sidebar-foreground/80 group-data-[collapsible=icon]:hidden">

@@ -3,6 +3,7 @@ import { currentUser } from "@/lib/get-current-user";
 import { successJson, errorJson } from "@/lib/api-response";
 import { logError } from "@/lib/logger";
 import { sanitizeUserInput } from "@/lib/sanitize";
+import { buildAiDraftPreservation } from "@/app/api/supa/handlers/exam-handlers";
 
 const FINAL_ANSWER_MAX_LEN = 50_000;
 const STATUS_BLOCKING_FINAL_ANSWER_EDIT = new Set([
@@ -47,6 +48,7 @@ export async function createAssignment(data: {
   rubric?: Array<{ evaluationArea: string; detailedCriteria: string }>;
   rubric_public?: boolean;
   chat_weight?: number | null;
+  course_id?: string | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -125,7 +127,7 @@ export async function createAssignment(data: {
       materials_text: data.materials_text || [],
       rubric: data.rubric || [],
       rubric_public: data.rubric_public || false,
-      chat_weight: data.chat_weight ?? 50,
+      chat_weight: data.chat_weight ?? null,
       status: data.status,
       instructor_id: user.id,
       created_at: data.created_at,
@@ -204,6 +206,9 @@ export async function createAssignment(data: {
     if (data.language === "en") {
       updatePayload.language = "en";
     }
+    if (data.course_id !== undefined) {
+      updatePayload.course_id = data.course_id;
+    }
     await getSupabase()
       .from("exams")
       .update(updatePayload)
@@ -244,6 +249,7 @@ export async function updateAssignment(data: {
     title?: string;
     questions?: unknown;
     language?: "ko" | "en";
+    course_id?: string | null;
     deadline?: string | null;
     close_at?: string | null;
     updated_at?: string;
@@ -263,7 +269,7 @@ export async function updateAssignment(data: {
     // Ownership + type check
     const { data: examRow, error: fetchError } = await getSupabase()
       .from("exams")
-      .select("id, instructor_id, type")
+      .select("id, instructor_id, type, questions, ai_draft_questions")
       .eq("id", data.id)
       .maybeSingle();
 
@@ -293,15 +299,22 @@ export async function updateAssignment(data: {
     }
 
     // Whitelist — never touch code, type, score_weights
-    const { title, questions, language, deadline, close_at, updated_at } = data.update;
+    const { title, questions, language, course_id, deadline, close_at, updated_at } = data.update;
     const updatePayload: Record<string, unknown> = {
       updated_at: updated_at ?? new Date().toISOString(),
     };
     if (title !== undefined) updatePayload.title = title;
     if (questions !== undefined) updatePayload.questions = questions;
     if (language !== undefined) updatePayload.language = language;
+    if (course_id !== undefined) updatePayload.course_id = course_id;
     if (deadline !== undefined) updatePayload.deadline = deadline;
     if (close_at !== undefined) updatePayload.close_at = close_at;
+
+    // AI 초안 보존: 문항이 처음 채워지는 순간에만 두 컬럼을 덧붙인다.
+    if (questions !== undefined) {
+      const aiDraft = buildAiDraftPreservation(examRow, questions);
+      if (aiDraft) Object.assign(updatePayload, aiDraft);
+    }
 
     const { error: updateError } = await getSupabase()
       .from("exams")

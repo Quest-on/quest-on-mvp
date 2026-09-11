@@ -17,6 +17,12 @@ const DEPLOYED_BASE: Record<string, string> = {
   ADMIN_SESSION_SECRET: "secret",
   INTERNAL_API_SECRET: "internal",
   CRON_SECRET: "cron",
+  CONSENT_SUBJECT_HMAC_KEY_V1: "consent-hmac",
+  CONSENT_GATE_MODE: "enforce",
+  CONSENT_RETENTION_PURGE_DISABLED: "1",
+  CONSENT_RETENTION_PURGE_MODE: "dry-run",
+  INCOMPLETE_ACCOUNT_PURGE_DISABLED: "1",
+  INCOMPLETE_ACCOUNT_PURGE_MODE: "dry-run",
 };
 
 describe("auditEnv", () => {
@@ -93,6 +99,42 @@ describe("committed env templates", () => {
       (spec) => !template.includes(spec.name)
     ).map((spec) => spec.name);
     expect(missing).toEqual([]);
+  });
+});
+
+describe("AI reasoning effort env keys (issue #118)", () => {
+  it("registers every task key the resolver will actually read", async () => {
+    const { AI_TASKS, GLOBAL_EFFORT_ENV_KEY, taskEffortEnvKey } = await import(
+      "../lib/ai-task-profile"
+    );
+    const registered = new Set(ENV_MANIFEST.map((spec) => spec.name));
+
+    // 해석기가 읽는 이름과 매니페스트에 적힌 이름이 어긋나면 오버라이드가 조용히 무시된다.
+    expect(registered.has(GLOBAL_EFFORT_ENV_KEY)).toBe(true);
+    for (const task of AI_TASKS) {
+      expect(registered.has(taskEffortEnvKey(task))).toBe(true);
+    }
+  });
+
+  it("keeps every effort override optional in all environments", () => {
+    const effortSpecs = ENV_MANIFEST.filter((spec) =>
+      spec.name.startsWith("AI_REASONING_EFFORT")
+    );
+    expect(effortSpecs.length).toBe(8);
+    for (const spec of effortSpecs) {
+      // 미설정이 정상이다 — 배포 환경에서 required 로 올리면 기존 배포가 깨진다.
+      expect(Object.values(spec.levels)).toEqual([]);
+    }
+  });
+
+  it("rejects an invalid effort value instead of silently ignoring it", async () => {
+    const { resolveAiTaskProfile } = await import("../lib/ai-task-profile");
+    expect(() =>
+      resolveAiTaskProfile({
+        task: "auto_grading_summary",
+        env: { AI_REASONING_EFFORT: "very-high" },
+      })
+    ).toThrow(/AI_REASONING_EFFORT/);
   });
 });
 

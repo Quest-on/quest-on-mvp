@@ -11,9 +11,9 @@ import type { QuestionSummaryData } from "@/lib/types/grading";
 import { useTranslations } from "next-intl";
 
 const SENTIMENT_CLASS: Record<"positive" | "negative" | "neutral", string> = {
-  positive: "bg-green-100 text-green-700 border-green-200",
-  negative: "bg-red-100 text-red-700 border-red-200",
-  neutral: "bg-gray-100 text-gray-700 border-gray-200",
+  positive: "bg-success-subtle text-success-text border-success-border",
+  negative: "bg-destructive/15 text-destructive border-destructive",
+  neutral: "bg-secondary text-secondary-foreground border-border",
 };
 
 interface QuestionAiSummaryCardProps {
@@ -32,7 +32,7 @@ export function QuestionAiSummaryCard({
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Sparkles className="h-4 w-4 text-indigo-600" />
+            <Sparkles className="h-4 w-4 text-info-text" />
             {t("questionAiSummary.title")}
           </CardTitle>
         </CardHeader>
@@ -54,7 +54,7 @@ export function QuestionAiSummaryCard({
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Sparkles className="h-4 w-4 text-indigo-600" />
+            <Sparkles className="h-4 w-4 text-info-text" />
             {t("questionAiSummary.title")}
           </CardTitle>
           <span
@@ -76,9 +76,9 @@ export function QuestionAiSummaryCard({
             {summary.keyQuotes.map((quote, idx) => (
               <div
                 key={idx}
-                className="flex gap-2 rounded-md bg-yellow-50 border border-yellow-200 p-2 dark:bg-yellow-950/20 dark:border-yellow-900"
+                className="flex gap-2 rounded-md bg-warning-surface border border-warning-border p-2"
               >
-                <Quote className="h-3.5 w-3.5 text-yellow-700 shrink-0 mt-0.5" />
+                <Quote className="h-3.5 w-3.5 text-warning-text shrink-0 mt-0.5" />
                 <p className="text-xs italic">{quote}</p>
               </div>
             ))}
@@ -88,8 +88,8 @@ export function QuestionAiSummaryCard({
         {summary.strengths.length > 0 && (
           <div>
             <div className="flex items-center gap-1.5 mb-1">
-              <Plus className="h-3.5 w-3.5 text-blue-600" />
-              <span className="text-xs font-semibold text-blue-700">{t("questionAiSummary.strengths")}</span>
+              <Plus className="h-3.5 w-3.5 text-info-text" />
+              <span className="text-xs font-semibold text-info-text">{t("questionAiSummary.strengths")}</span>
             </div>
             <ul className="space-y-0.5 pl-4 list-disc text-xs">
               {summary.strengths.map((s, idx) => (
@@ -102,8 +102,8 @@ export function QuestionAiSummaryCard({
         {summary.weaknesses.length > 0 && (
           <div>
             <div className="flex items-center gap-1.5 mb-1">
-              <Minus className="h-3.5 w-3.5 text-orange-600" />
-              <span className="text-xs font-semibold text-orange-700">{t("questionAiSummary.weaknesses")}</span>
+              <Minus className="h-3.5 w-3.5 text-warning-text" />
+              <span className="text-xs font-semibold text-warning-text">{t("questionAiSummary.weaknesses")}</span>
             </div>
             <ul className="space-y-0.5 pl-4 list-disc text-xs">
               {summary.weaknesses.map((w, idx) => (

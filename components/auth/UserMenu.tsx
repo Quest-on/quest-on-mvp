@@ -102,7 +102,7 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={handleSignOut}
-          className="flex items-center text-red-600 focus:text-red-600"
+          className="flex items-center text-destructive focus:text-destructive"
         >
           <LogOut className="mr-2 h-4 w-4" />
           {t("signOut")}

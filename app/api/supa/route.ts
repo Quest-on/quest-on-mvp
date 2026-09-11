@@ -5,6 +5,7 @@ import { errorJson } from "@/lib/api-response";
 import { logError } from "@/lib/logger";
 import { currentUser } from "@/lib/get-current-user";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
+import { assertConsentOrRespond } from "@/lib/consent-route-policy";
 import {
   createExamSchema,
   updateExamSchema,
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
     let body;
     try {
       body = await request.json();
-    } catch (jsonError) {
+    } catch {
       return errorJson("INVALID_JSON", "Invalid JSON in request body", 400);
     }
 
@@ -99,6 +100,13 @@ export async function POST(request: NextRequest) {
       if (!authedUser) {
         return errorJson("UNAUTHORIZED", "Unauthorized", 401);
       }
+      const consentResponse = await assertConsentOrRespond(
+        authedUser.id,
+        "/api/supa",
+        "POST",
+        { ...(rawData && typeof rawData === "object" ? rawData : {}), action }
+      );
+      if (consentResponse) return consentResponse;
     } else {
       // Public actions have no user to key on — rate limit by IP so a bare exam
       // code can't be brute-forced / scraped through these endpoints.
@@ -125,13 +133,10 @@ export async function POST(request: NextRequest) {
       session_heartbeat: RATE_LIMITS.sessionRead,
     };
 
-    if (action in rateLimitedActions) {
-      const rateLimitUser = authedUser || (await currentUser());
-      if (rateLimitUser) {
-        const rl = await checkRateLimitAsync(`supa:${action}:${rateLimitUser.id}`, rateLimitedActions[action]);
-        if (!rl.allowed) {
-          return errorJson("RATE_LIMITED", "Too many requests", 429);
-        }
+    if (action in rateLimitedActions && authedUser) {
+      const rl = await checkRateLimitAsync(`supa:${action}:${authedUser.id}`, rateLimitedActions[action]);
+      if (!rl.allowed) {
+        return errorJson("RATE_LIMITED", "Too many requests", 429);
       }
     }
 

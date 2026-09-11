@@ -152,32 +152,12 @@ export async function searchUniversities(
     }
 
     // 4. 초성만 입력한 경우 (예: 'ㅅ', 'ㅅㅇ')
+    // 완성형 한글까지 첫 초성으로 넓히면 무관한 학교가 섞이므로, 초성 질의에서만
+    // 질의 전체를 접두사로 비교한다.
     if (/^[ㄱ-ㅎ]+$/.test(trimmedQuery)) {
       if (searchableInitials.startsWith(queryInitials)) {
         initialMatches.push(uni);
         return;
-      }
-    }
-
-    // 5. 한글 한 글자 입력 시
-    if (trimmedQuery.length === 1 && /[가-힣]/.test(trimmedQuery)) {
-      const firstCharInitial = queryInitials[0];
-      if (firstCharInitial && /[ㄱ-ㅎ]/.test(firstCharInitial)) {
-        if (searchableInitials.startsWith(firstCharInitial)) {
-          initialMatches.push(uni);
-          return;
-        }
-      }
-    }
-
-    // 6. 여러 글자 입력 시 초성으로 시작하는지 확인
-    if (queryInitials && queryInitials.length > 0) {
-      const firstCharInitial = queryInitials[0];
-      if (firstCharInitial && /[ㄱ-ㅎ]/.test(firstCharInitial)) {
-        if (searchableInitials.startsWith(firstCharInitial)) {
-          initialMatches.push(uni);
-          return;
-        }
       }
     }
   });

@@ -46,6 +46,35 @@ export interface QuestionData {
   options?: string[];
 }
 
+/**
+ * AI 문항 초안 보존 (033_grade_provenance).
+ *
+ * `exams.questions` 는 단일 JSON blob 이라 저장할 때마다 통째로 덮어쓰인다. 그래서
+ * AI 가 만든 문항을 교수자가 편집하면 원본 초안이 사라지고, 무엇이 바뀌었는지 알 수 없다.
+ * 문항이 "처음" 채워지는 순간의 페이로드를 `ai_draft_questions` 로 한 번만 복사해 둔다.
+ *
+ * 초안은 시험당 정확히 하나(최초 1개)다. 이미 초안이 있으면 재생성이든 편집이든 건드리지 않는다.
+ * 반환값이 null 이면 호출부는 두 컬럼을 update 페이로드에 **아예 넣지 않아야** 한다 —
+ * null 로 보내면 이미 보존된 초안이 지워진다.
+ */
+export function buildAiDraftPreservation(
+  current: { questions?: unknown; ai_draft_questions?: unknown } | null | undefined,
+  nextQuestions: unknown,
+  now: string = new Date().toISOString()
+): { ai_draft_questions: unknown[]; ai_draft_generated_at: string } | null {
+  // 이미 보존된 초안이 있으면 절대 덮어쓰지 않는다 (재생성 포함).
+  if (current?.ai_draft_questions != null) return null;
+
+  const nextList = Array.isArray(nextQuestions) ? nextQuestions : [];
+  if (nextList.length === 0) return null;
+
+  // 최초 채움일 때만 기록한다. 기존 문항이 있으면 그건 교수자 편집이다.
+  const currentList = Array.isArray(current?.questions) ? current.questions : [];
+  if (currentList.length > 0) return null;
+
+  return { ai_draft_questions: nextList, ai_draft_generated_at: now };
+}
+
 export async function createExam(data: {
   title: string;
   code: string;
@@ -59,11 +88,24 @@ export async function createExam(data: {
   }>;
   chat_weight?: number | null;
   score_weights?: ScoreWeights | null;
+  course_id?: string | null;
   status: string;
   created_at: string;
   updated_at: string;
   parent_folder_id?: string | null;
   language?: "ko" | "en";
+  /** `exams.type`. 기본은 시험. 과제 계열은 마감 기반으로 동작한다. */
+  type?: string;
+  assignment_prompt?: string | null;
+  rubric?: string | null;
+  /**
+   * 온보딩 데모 (#82 / AC-5). 목록·통계·발행 카운트에서 제외되는 exam 이다.
+   *
+   * false 일 때 키를 아예 넣지 않는 이유: `is_demo` 는 018 마이그레이션이 추가한
+   * 컬럼이라, 아직 적용되지 않은 DB 에서 일반 시험 생성까지 같이 죽는다.
+   * 기본값은 DB 가 false 로 갖고 있다.
+   */
+  is_demo?: boolean;
 }) {
   try {
     // Get current user
@@ -151,7 +193,7 @@ export async function createExam(data: {
       });
     }
 
-    const examData = {
+    const examData: Record<string, unknown> = {
       title: data.title,
       code: examCode,
       description: null, // description 필드는 nullable이므로 null로 설정
@@ -159,12 +201,21 @@ export async function createExam(data: {
       questions: sanitizedQuestions,
       materials: data.materials || [],
       materials_text: data.materials_text || [], // 추출된 텍스트 저장
-      chat_weight: data.chat_weight ?? 50,
+      // null 은 "교수자가 안 건드림" 을 뜻한다. 여기서 50 으로 접으면 그 사실이
+      // 사라져, 편집으로 다시 들어왔을 때 손대지 않은 시험도 사용자 지정으로
+      // 보인다. 컬럼은 Int? 이고 DB 기본값이 50 이며, 채점은 lib/grading.ts:789
+      // 에서 chat_weight ?? 50 으로 이미 방어하므로 null 을 그대로 보존한다.
+      chat_weight: data.chat_weight ?? null,
       score_weights: scoreWeights,
       status: data.status,
       instructor_id: user.id, // Clerk user ID (e.g., "user_31ihNg56wMaE27ft10H4eApjc1J")
       created_at: data.created_at,
       updated_at: data.updated_at,
+      ...(data.type ? { type: data.type } : {}),
+      ...(data.assignment_prompt ? { assignment_prompt: data.assignment_prompt } : {}),
+      ...(data.rubric ? { rubric: data.rubric } : {}),
+      ...(data.course_id !== undefined ? { course_id: data.course_id } : {}),
+      ...(data.is_demo ? { is_demo: true } : {}),
     };
 
     const parentId = data.parent_folder_id || null;
@@ -302,17 +353,20 @@ export async function updateExam(data: {
     const needsCurrentExam =
       data.update.code !== undefined ||
       "score_weights" in data.update ||
+      "chat_weight" in data.update ||
       "questions" in data.update;
     let currentExam: {
       id: string;
       questions: unknown;
       score_weights: unknown;
+      ai_draft_questions: unknown;
+      chat_weight: number | null;
     } | null = null;
 
     if (needsCurrentExam) {
       const { data: foundExam, error: findError } = await getSupabase()
         .from("exams")
-        .select("id, questions, score_weights")
+        .select("id, questions, score_weights, ai_draft_questions, chat_weight")
         .eq("id", data.id)
         .eq("instructor_id", user.id)
         .maybeSingle();
@@ -325,6 +379,8 @@ export async function updateExam(data: {
         id: string;
         questions: unknown;
         score_weights: unknown;
+        ai_draft_questions: unknown;
+        chat_weight: number | null;
       };
     }
 
@@ -454,6 +510,51 @@ export async function updateExam(data: {
       if (hasScoreWeightsUpdate) {
         updateWithoutRubric.score_weights = scoreWeights;
       }
+    }
+
+    /*
+      대화/최종답안 비중도 학생이 참여한 뒤에는 잠근다. (#226)
+
+      이 값이 채점 산식의 분모를 바꾼다. 중간에 바뀌면 같은 시험 안에서
+      먼저 채점된 학생과 나중에 채점된 학생이 다른 기준으로 평가된다.
+      score_weights 와 같은 이유이므로 같은 방식으로 막는다.
+
+      null 과 50 은 저장상 다른 값이지만 채점 결과가 같다(lib/grading.ts 가
+      `chat_weight ?? 50` 으로 읽는다). 그래서 '유효 값' 으로 비교한다 —
+      null -> 50 재전송은 변경이 아니다. 저장 형식만 바뀌는 것으로 409 를
+      내면 편집 화면을 열었다 저장만 해도 막힌다.
+    */
+    const hasChatWeightUpdate = "chat_weight" in data.update;
+    if (hasChatWeightUpdate && currentExam) {
+      const effective = (v: number | null | undefined) => v ?? 50;
+      const chatWeightChanged =
+        effective(currentExam.chat_weight) !==
+        effective(data.update.chat_weight as number | null | undefined);
+
+      if (chatWeightChanged) {
+        const { data: sessions } = await getSupabase()
+          .from("sessions")
+          .select("id")
+          .eq("exam_id", data.id)
+          .limit(1);
+
+        if (sessions && sessions.length > 0) {
+          return errorJson(
+            "CHAT_WEIGHT_LOCKED",
+            "학생이 이미 참여한 시험의 채점 비중은 변경할 수 없습니다.",
+            409
+          );
+        }
+      }
+    }
+
+    // AI 초안 보존: 문항이 처음 채워지는 순간에만 두 컬럼을 덧붙인다.
+    if ("questions" in updateWithoutRubric) {
+      const aiDraft = buildAiDraftPreservation(
+        currentExam,
+        updateWithoutRubric.questions
+      );
+      if (aiDraft) Object.assign(updateWithoutRubric, aiDraft);
     }
 
     const { data: exam, error } = await getSupabase()
@@ -600,7 +701,7 @@ export async function getExamById(data: { id: string }) {
     const { data: exam, error } = await getSupabase()
       .from("exams")
       .select(
-        "id, title, code, description, duration, questions, materials, materials_text, rubric, rubric_public, chat_weight, score_weights, status, instructor_id, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, type, deadline, assignment_prompt, grades_released, language"
+        "id, title, code, description, duration, questions, materials, materials_text, rubric, rubric_public, chat_weight, score_weights, course_id, status, instructor_id, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, type, deadline, assignment_prompt, grades_released, language, is_demo, first_published_at"
       )
       .eq("id", data.id)
       .eq("instructor_id", user.id) // Only allow instructors to view their own exams
@@ -649,12 +750,16 @@ export async function getInstructorExams() {
       return errorJson("INSTRUCTOR_REQUIRED", "Instructor access required", 403);
     }
 
+    // is_demo 제외 (AC-17): 데모는 "플래그를 단 진짜 exam" 이라 필터를 빠뜨리면
+    // 교수자 목록에 그대로 튀어나온다. 목록·통계·발행 카운트가 감사 대상이고,
+    // __tests__/demo-exclusion.test.ts 가 새 목록 쿼리의 누락을 잡는다.
     const { data: exams, error } = await getSupabase()
       .from("exams")
       .select(
         "id, title, code, description, duration, questions, materials, status, instructor_id, created_at, updated_at, type, deadline"
       )
       .eq("instructor_id", user.id) // Clerk user ID
+      .eq("is_demo", false)
       .order("created_at", { ascending: false });
 
     if (error) throw error;

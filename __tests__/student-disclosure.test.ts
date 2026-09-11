@@ -1,3 +1,20 @@
+/**
+ * 학생 공지문과 AI 채팅 가용성 판정 (AC-14 / AC-16).
+ *
+ * 기대값이 한 번 뒤집혔다 (이슈 #325).
+ *
+ * 예전에는 "MCQ/OX 전용 시험은 정책 문구가 빈 배열" 을 고정했다. 그게 바로
+ * #325 가 결함으로 지목한 동작이다 — 객관식 전용 시험의 공지문은 제목과 입장
+ * 코드만 담겨 나가고, 학생은 AI 정책을 한 줄도 받지 못한 채 응시했다.
+ *
+ * 그렇다고 기존 3줄을 그대로 넣을 수도 없다. 채팅이 없는 시험에 "막히면
+ * AI에게 질문하세요" 를 보내면 문구 자체가 거짓이 된다. 그래서 고지는 항상
+ * 나가고 **내용만** 갈라진다(AI 제공 / AI 미제공 변형).
+ *
+ * 케이스를 지우지 않고 뒤집은 이유: 이 파일이 지키는 불변식은 "MCQ 면 빈
+ * 배열" 가 아니라 **판정이 컴포넌트로 새어나가지 않는다**였고, 그건 여전히
+ * 유효하다. 그래서 같은 지점을 새 기대값으로 계속 묶어 둔다.
+ */
 import { describe, expect, it } from "vitest";
 import { buildStudentNotice, studentNoticePolicyLines } from "@/lib/student-notice";
 import { hasAiChatQuestions } from "@/lib/grading-helpers";
@@ -68,16 +85,16 @@ describe("buildStudentNotice (AC-16)", () => {
     expect(out).toContain("입장 코드: MATH01");
   });
 
-  // 리뷰 P2: MCQ/OX 전용 시험은 학생 화면에 AI 채팅이 렌더되지 않는다
-  // (exam/[code]/page.tsx 가 !isCurrentObjective 일 때만 ExamChatSidebar 노출).
-  // ExamDetailsCard 는 aiChatAvailable=false 일 때 policyLines 를 [] 로 넘기며,
-  // 그 결과 공지문에 "AI에게 질문하세요" 류가 한 줄도 들어가지 않아야 한다.
-  it("AI 채팅이 없는 시험의 공지문에는 AI 안내가 한 줄도 없다", () => {
-    const out = buildStudentNotice({ ...base, policyLines: [] });
+  // #325: MCQ/OX 전용 시험에는 채팅을 권하지 않되, AI 미제공·외부 AI 금지·기록
+  // 범위를 알려야 한다. 정책 자체를 빼면 첫 시험의 확인이 빈 껍데기가 된다.
+  it("AI 채팅이 없는 시험 공지문도 정확한 정책 문구를 포함한다", () => {
+    const out = buildStudentNotice({
+      ...base,
+      policyLines: ["AI 채팅은 제공되지 않습니다.", "외부 AI 사용은 허용되지 않습니다."],
+    });
 
-    expect(out).not.toMatch(/AI/);
-    expect(out).not.toContain("질문");
-    // 그래도 공지문으로서 최소한의 쓸모(제목·입장 코드)는 유지된다.
+    expect(out).toContain("AI 채팅은 제공되지 않습니다.");
+    expect(out).toContain("외부 AI 사용은 허용되지 않습니다.");
     expect(out).toContain("경영전략 중간고사");
     expect(out).toContain("입장 코드: MATH01");
   });
@@ -143,6 +160,9 @@ describe("studentNoticePolicyLines + 최종 복사 문자열", () => {
     allowed: "막히면 AI에게 질문하세요. 질문은 부정행위가 아니라 시험의 일부입니다.",
     graded: "질문한 내용 자체도 평가 대상입니다.",
     visible: "AI와 나눈 대화는 교수자에게 그대로 공개됩니다.",
+    unavailable: "AI 채팅은 제공되지 않습니다.",
+    externalAiProhibited: "외부 AI 사용은 허용되지 않습니다.",
+    activityRecorded: "시험 활동은 기록됩니다.",
   };
 
   it("AI 채팅이 있으면 안내 3줄을 순서대로 넣는다", () => {
@@ -153,18 +173,23 @@ describe("studentNoticePolicyLines + 최종 복사 문자열", () => {
     ]);
   });
 
-  it("AI 채팅이 없으면 한 줄도 넣지 않는다", () => {
-    expect(studentNoticePolicyLines(false, t)).toEqual([]);
+  it("AI 채팅이 없으면 AI 미제공 정책 3줄을 넣는다", () => {
+    expect(studentNoticePolicyLines(false, t)).toEqual([
+      t.unavailable,
+      t.externalAiProhibited,
+      t.activityRecorded,
+    ]);
   });
 
-  it("객관식 전용 시험에서 복사되는 문자열에는 AI 문구가 없다", () => {
+  it("객관식 전용 시험에서 복사되는 문자열에는 AI 미제공 정책이 있다", () => {
     const notice = buildStudentNotice({
       ...base,
       policyLines: studentNoticePolicyLines(false, t),
     });
 
-    expect(notice).not.toMatch(/AI/);
-    expect(notice).not.toContain("질문");
+    expect(notice).toContain(`- ${t.unavailable}`);
+    expect(notice).toContain(`- ${t.externalAiProhibited}`);
+    expect(notice).toContain(`- ${t.activityRecorded}`);
     expect(notice).toContain("입장 코드: MATH01");
   });
 

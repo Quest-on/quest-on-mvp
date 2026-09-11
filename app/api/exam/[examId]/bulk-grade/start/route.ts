@@ -20,6 +20,19 @@ import {
 import type { ExtractedCriteria } from "@/lib/prompts";
 import { isUniqueViolation } from "@/lib/chat-idempotency";
 import { extractGradingCriteriaFromChat, isInterviewReady } from "@/lib/bulk-grading-criteria";
+import { loadCurrentVersion } from "@/lib/ai-config-store";
+import { buildRunProfileSnapshot } from "@/lib/ai-execution-context";
+import type { AiTask, ResolvedAiTaskProfile } from "@/lib/ai-task-profile";
+
+/**
+ * 런 시작 시 고정하는 태스크 집합 (이슈 #118).
+ * 이 런이 실행할 수 있는 모든 채점 태스크를 미리 해석해 스냅샷으로 박는다.
+ */
+const BULK_RUN_PINNED_TASKS: readonly AiTask[] = [
+  "bulk_grading_criteria_extract",
+  "bulk_grading_worker",
+  "bulk_grading_score_cluster",
+];
 
 const BULK_GRADE_START_RATE_LIMIT = { limit: 3, windowSec: 60 };
 const STALE_GRADING_MS = 10 * 60 * 1000;
@@ -201,6 +214,29 @@ export async function POST(
 
     const gradingSessionId = startSession.id as string;
 
+    // ── AI 설정 핀 (이슈 #118) ──────────────────────────────────────────
+    // production 라벨을 **criteria 추출보다 먼저, 한 번만** 읽는다.
+    // 기준 추출도 이 런의 일부이므로 같은 버전으로 돌아야 한다. 나중에 읽으면
+    // 기준은 A 로 뽑고 학생 채점은 B 로 도는 상태가 만들어진다.
+    let pinnedVersionId: string | null = null;
+    let pinnedSnapshot: Record<string, unknown> | null = null;
+    let criteriaProfile: ResolvedAiTaskProfile | undefined;
+    try {
+      const version = await loadCurrentVersion();
+      pinnedVersionId = version.versionId;
+      const snapshot = buildRunProfileSnapshot({
+        tasks: BULK_RUN_PINNED_TASKS,
+        version,
+      });
+      pinnedSnapshot = snapshot as unknown as Record<string, unknown>;
+      criteriaProfile = snapshot.bulk_grading_criteria_extract;
+    } catch (error) {
+      logError("bulk-grade start: AI config pin failed", error, {
+        path: `/api/exam/${examId}/bulk-grade/start`,
+      });
+      return errorJson("INTERNAL_ERROR", "AI 설정을 불러오지 못해 채점을 시작할 수 없습니다.", 500);
+    }
+
     const manualCriteria = parseCriteria(body);
     let criteria: ExtractedCriteria;
 
@@ -223,6 +259,9 @@ export async function POST(
         isAssignment: examMeta.isAssignment,
         userId: access.ctx.user.id,
         examId,
+        // 기준 추출도 런에 고정된 프로필로 돈다.
+        profile: criteriaProfile,
+        configVersionId: pinnedVersionId,
       });
 
       if (!extracted?.score_range) {
@@ -234,6 +273,7 @@ export async function POST(
       }
       criteria = extracted;
     }
+
 
     const attemptId = globalThis.crypto.randomUUID();
     const updatePayload: Record<string, unknown> = {
@@ -248,6 +288,9 @@ export async function POST(
       calibration_status: "approved",
       status: "grading",
       updated_at: new Date().toISOString(),
+      // 버전과 스냅샷은 항상 함께 쓴다(DB 짝 제약이 이를 강제한다).
+      ai_config_version_id: pinnedVersionId,
+      ai_profile_snapshot: pinnedSnapshot,
     };
 
     updatePayload.proposed_grades = {};
@@ -287,17 +330,29 @@ export async function POST(
     // Dev fallback: no QStash → inline sequential (non-Vercel only)
     if (!isQStashEnabled()) {
       // Dev: run inline (import lazily to avoid bundling in prod)
-      await runBulkGradeInline(gradingSessionId, targetSessionIds, examId, scope, attemptId);
+      await runBulkGradeInline(
+        gradingSessionId,
+        targetSessionIds,
+        examId,
+        scope,
+        attemptId,
+        pinnedVersionId,
+      );
       return successJson({ ok: true, total: targetSessionIds.length, mode: "inline", scope });
     }
 
     // Enqueue QStash jobs
+    // 컷오버 sentinel: 이 배포 이후 발행되는 작업은 전부 핀을 요구한다.
+    // 워커는 이 플래그로 "배포 전에 큐에 쌓인 레거시 작업" 과 "핀이 깨진 신규 작업" 을
+    // 구분한다 — 세션 행의 NULL 만 보고 폴백하면 둘을 구분할 수 없다.
     const jobs: BulkGradeJobPayload[] = targetSessionIds.map((sid) => ({
       gradingSessionId,
       studentSessionId: sid,
       examId,
       scope,
       attemptId,
+      pinRequired: true,
+      configVersionId: pinnedVersionId ?? undefined,
     }));
 
     const { published, failed: publishFailed } = await enqueueBulkGradeJobs(jobs);
@@ -340,6 +395,7 @@ async function runBulkGradeInline(
   examId: string,
   scope: BulkGradingScope,
   attemptId: string,
+  configVersionId: string,
 ): Promise<void> {
   // Dev-only: simulate worker calls sequentially
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -348,7 +404,17 @@ async function runBulkGradeInline(
       await fetch(`${baseUrl}/api/internal/bulk-grade-worker`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gradingSessionId, studentSessionId: sid, examId, scope, attemptId }),
+        // 인라인 경로도 큐 경로와 같은 sentinel 을 실어야 한다. 빠뜨리면 워커가
+        // 레거시 분기로 떨어져 핀을 무시하고, 개발 환경만 다른 코드 경로를 타게 된다.
+        body: JSON.stringify({
+          gradingSessionId,
+          studentSessionId: sid,
+          examId,
+          scope,
+          attemptId,
+          pinRequired: true,
+          configVersionId,
+        }),
       });
     } catch (err) {
       logError("bulk-grade inline: worker call failed", err, {

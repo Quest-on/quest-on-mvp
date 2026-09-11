@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/sidebar";
 import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ErrorAlert } from "@/components/ui/error-alert";
 import { qk } from "@/lib/query-keys";
 import { useInView } from "react-intersection-observer";
 import { usePathname } from "next/navigation";
@@ -168,7 +169,7 @@ export default function StudentDashboard() {
     data: profileData,
     isLoading: isProfileLoading,
   } = useQuery({
-    queryKey: ["student-profile", user?.id],
+    queryKey: qk.student.profile(user?.id),
     enabled:
       isLoaded &&
       isSignedIn &&
@@ -218,6 +219,8 @@ export default function StudentDashboard() {
     hasNextPage,
     isFetchingNextPage,
     isLoading: isSessionsLoading,
+    isError: isSessionsError,
+    refetch: refetchSessions,
   } = useInfiniteQuery({
     queryKey: qk.student.sessions(user?.id),
     queryFn: async ({ pageParam = 1, signal }) => {
@@ -407,7 +410,7 @@ export default function StudentDashboard() {
   const handleSessionHover = (session: { id: string; status: string; isGraded: boolean; gradesReleased?: boolean }) => {
     if (session.status === "completed" && (session.isGraded || session.gradesReleased === false)) {
       queryClient.prefetchQuery({
-        queryKey: ["student-report", session.id, user?.id],
+        queryKey: qk.student.report(session.id, user?.id),
         queryFn: async () => {
           const response = await fetch(`/api/student/session/${session.id}/report`);
           if (!response.ok) throw new Error("Prefetch failed");
@@ -491,7 +494,7 @@ export default function StudentDashboard() {
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">{t("profileLoading")}</p>
+        <p className="type-hint">{t("profileLoading")}</p>
       </div>
     );
   }
@@ -573,7 +576,7 @@ export default function StudentDashboard() {
       return (
         <Badge
           variant="outline"
-          className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20 px-3 py-1.5"
+          className="bg-warning-solid/10 text-warning-text border-warning-border/20 px-3 py-1.5"
           aria-label={t("session.pendingEvaluation")}
         >
           {t("session.pendingEvaluation")}
@@ -608,7 +611,7 @@ export default function StudentDashboard() {
                 <User className="w-8 h-8 text-primary-foreground" />
               </div>
               <CardTitle className="text-xl">{t("loginRequired")}</CardTitle>
-              <p className="text-sm text-muted-foreground">
+              <p className="type-hint">
                 {t("loginHint")}
               </p>
             </CardHeader>
@@ -739,7 +742,7 @@ export default function StudentDashboard() {
                               </span>
                             </div>
                             {thisMonthSessions > 0 && (
-                              <span className="text-xs text-muted-foreground">
+                              <span className="type-meta">
                                 {t("stats.thisMonth", { count: thisMonthSessions })}
                               </span>
                             )}
@@ -758,9 +761,9 @@ export default function StudentDashboard() {
                             <span className="text-sm font-medium text-muted-foreground">
                               {t("stats.todo")}
                             </span>
-                            <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                            <div className="h-8 w-8 rounded-lg bg-warning-surface/10 flex items-center justify-center">
                               <Clock
-                                className="w-4 h-4 text-amber-600"
+                                className="w-4 h-4 text-warning-text"
                                 aria-hidden="true"
                               />
                             </div>
@@ -985,6 +988,16 @@ export default function StudentDashboard() {
                           <SessionCardSkeletonList />
                         </div>
                       )
+                    ) : isSessionsError ? (
+                      /*
+                        오류를 빈 상태로 보여주면 안 된다. 예전에는 isError 를 안 봐서
+                        조회가 실패해도 "응시한 시험이 없다" 고 말했다. 학생에게 이건
+                        자기 응시 기록이 사라졌다는 뜻으로 읽힌다.
+                      */
+                      <ErrorAlert
+                        message={t("emptyState.loadError")}
+                        onRetry={() => refetchSessions()}
+                      />
                     ) : allSessions.length === 0 ? (
                       <div
                         className="text-center py-12 sm:py-16 border-2 border-dashed border-muted-foreground/20 rounded-lg bg-muted/30"
@@ -1195,7 +1208,7 @@ export default function StudentDashboard() {
                                     </div>
                                     {session.score !== null &&
                                       session.maxScore !== null && (
-                                        <div className="text-xs text-muted-foreground">
+                                        <div className="type-meta">
                                           {t("session.scorePoints", {
                                             score: session.score,
                                             maxScore: session.maxScore,
@@ -1226,12 +1239,12 @@ export default function StudentDashboard() {
                                 className="w-6 h-6 animate-spin text-primary"
                                 aria-hidden="true"
                               />
-                              <span className="text-sm text-muted-foreground">
+                              <span className="type-hint">
                                 {t("infinite.loading")}
                               </span>
                             </>
                           ) : (
-                            <span className="text-sm text-muted-foreground">
+                            <span className="type-hint">
                               {t("infinite.scrollHint")}
                             </span>
                           )}

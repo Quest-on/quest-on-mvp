@@ -1,41 +1,79 @@
-# Website analytics on the current production release
+﻿# Website and product analytics
 
-PostHog Cloud is the website and product analytics service. EspoCRM owns outreach sends, replies and sales progress; native accounts remain the authoritative registration record. Company owner: yeongjun@quest-on.org. Project 604024, US region, Asia/Seoul timezone. Dashboard: https://us.posthog.com/project/604024/dashboard/2085781.
+PostHog Cloud is the website/product analytics service selected for #357. EspoCRM owns outreach history; native product records own actual accounts and milestones. This integration does not change the active email batch.
 
 ## Configuration
 
-Set the public project token through the hosting environment, never a personal or secret API key:
+Company owner: yeongjun@quest-on.org. Project: Quest-On (US). Use the public project token from that project in the hosting environment, never a personal or secret API key.
 
 ```text
-NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=<public project token>
+NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=<project token>
 NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 NEXT_PUBLIC_POSTHOG_ENABLED=true
-NEXT_PUBLIC_APP_ENV=production
+NEXT_PUBLIC_APP_ENV=staging
 ```
 
-Rebuild after public environment changes. Use APP_ENV=staging for validation and filter every business insight to environment=production. Missing/invalid configuration, development and test disable collection. The current Vercel login cannot write production-target environment variables; reauthentication and live ingestion verification remain pending.
+Production sets NEXT_PUBLIC_APP_ENV=production. Development and test are always disabled. Public environment changes require a rebuild. One project can receive both environments, but every production dashboard must filter environment=production. Staging events are validation data, not business results.
 
-## Current production scope
+Stable official posthog-js/posthog-node versions are pinned in package.json. No custom proxy, collector, database migration or polling service is introduced. Vercel Web Analytics mounts and the unshipped GA4 code are replaced; Vercel Speed Insights remains a separate performance measurement already present in the app.
 
-- `$pageview`: supported public and normalized application routes after analytics consent. Private route identifiers, unknown query fields and fragments are omitted.
-- `signup_start`: same-origin signup link clicks, representing intent rather than a completed account.
-- `signup_completed`: authenticated instructor accounts verified within 24 hours of creation and seen within 24 hours of verification. A deterministic UUID deduplicates repeated server captures. Delayed verification, late consent/role selection, blocking and delivery failure can leave gaps.
-- Internal auth UUID links browser and server events; account changes/logout reset browser identity. Names, emails, answers and exam codes are excluded from event properties.
+## Events and interpretation
 
-UTM keys source, medium, campaign, content and id accept lowercase campaign codes only. Next approved outreach batches can use utm_source=outreach, utm_medium=email and a batch code in utm_content. Existing sent emails are not edited.
+| Event | Meaning | Source |
+|---|---|---|
+| $pageview | A supported page was viewed | Browser, manual sanitized navigation |
+| signup_start | A same-origin signup link was clicked | Browser; intent only |
+| signup_completed | A new instructor account was email-verified and authenticated | Verified Supabase timestamps, server |
+| intake_submitted | Instructor submitted onboarding intake | New native milestone row |
+| demo_created | Instructor demo created | New native milestone row |
+| demo_answered | Demo answer submitted | New native milestone row |
+| demo_graded_viewed | Demo grade viewed; demo completion | New native milestone row |
+| first_publish | Native first-publish milestone reached | New native milestone row |
+| first_student_submission | Native first-student-submission reached | New native milestone row |
 
-The shared server helper understands milestone names, but this production port does not add an onboarding_events table or demo features. Those integrations exist in staging PR #358 and must wait for the underlying product release. Missing demo analytics is not evidence of no usage.
+Signup is exported only for instructor accounts verified within 24 hours of creation and authenticated within 24 hours of verification. Delayed verification, late role selection/consent and pre-existing accounts are not counted as new signups. Native account records remain the complete registration source. Server UUIDs are deterministic per environment, user and event so repeated captures have the same deduplication key.
 
-## Collection and reliability
+Analytics are best-effort and consented, not a durable business ledger. Milestones export only on the original native insert; denied consent, background jobs without browser consent, ad blockers, network loss or failed ingestion can produce gaps. No queue/outbox or historical backfill is added. Do not infer zero signups or zero usage from an empty analytics report. Native outcomes can be compared in aggregate, but are not silently joined to anonymous visitors.
 
-The optional preference uses localStorage quest-on.analytics-choice.v2 and the same-origin quest_on_analytics cookie. The banner/settings control supports grant, deny and later withdrawal. The preference expires after one year; PostHog's selected Free plan has one-year event retention. The service uses pseudonymous account-linked analytics, not anonymous data.
+## Acquisition
 
-Use official stable posthog-js and posthog-node. Autocapture, session replay, surveys, flags requests, automatic exception capture and performance capture are off. before_send uses an explicit property vocabulary. Server delivery uses Next after() with bounded requests; failures do not fail authentication. There is no retry queue or new database write. Vercel Web Analytics mounts are replaced; Speed Insights remains.
+Use non-personal campaign tags on the next approved batch:
 
-## Validation and release
+```text
+https://quest-on.app/?utm_source=espo&utm_medium=email&utm_campaign=professor_outreach_2026_09&utm_content=batch_005
+```
 
-Staging PR #358 passed CI and deployed. This separate main-based port follows the existing #356 production-port precedent: staging has hundreds of unrelated commits and DB differences, so a full promotion is outside analytics scope. Main review/CI gates remain in force.
+Only lowercase letters, numbers, underscore and dash, up to 80 characters are accepted. UTM values must describe shared campaigns, never individuals. First public views and subsequent navigation carry the accepted campaign fields. Login identifies the existing anonymous browser with the internal auth UUID; logout/account changes reset identity. Cross-device journeys require identification on both devices.
 
-Run type checking, lint and focused website/PostHog/auth tests. After authorized hosting access is restored, verify actual ingestion, no collection before consent or after withdrawal, single pageviews per navigation, sanitized URLs, correct identity transitions, server-confirmed signup and staging exclusion from production insights. SDK unit tests or an empty dashboard do not prove live collection.
+## Collection controls
 
-Rollback by setting NEXT_PUBLIC_POSTHOG_ENABLED=false and rebuilding, or reverting the analytics PR. Preserve CRM and native account data.
+The root WebsiteAnalytics component owns the browser SDK. Explicit opt-in is stored in localStorage and a same-origin consent cookie; withdrawal stops capture and clears the prior SDK identity. The supported-page preference control remains accessible. Declining never blocks product features.
+
+Autocapture, pageleave, recordings, surveys, flags requests, automatic exceptions and performance capture are disabled initially. Browser before_send retains an explicit property vocabulary and sanitizes nested person properties. Unknown query fields, fragments, exam IDs/codes, answer text, names and email addresses are omitted. Server exports only event name, auth UUID, instructor role and environment, never arbitrary milestone metadata. The UI must describe this as pseudonymous account-linked analytics, not anonymous data.
+
+## Dashboard
+
+Create one Outreach and activation dashboard with production filters on all tiles:
+
+- Daily unique website visitors and campaign/UTM-content breakdown.
+- Unique instructors completing signup, demo creation and demo completion.
+- A sequential pageview -> signup_completed -> demo_created -> demo_graded_viewed funnel, using a seven-day conversion window.
+
+Web views do not count as CRM replies or interested conversations. CRM remains the response KPI source. A funnel with consent-dependent tracking is an observed conversion funnel, not the denominator for all emails sent.
+
+## Validation and rollback
+
+Run in the product worktree, with the same commands on PowerShell and POSIX shells:
+
+```text
+npx tsc --noEmit
+npm run lint
+npx vitest run __tests__/website-analytics.test.ts __tests__/posthog.test.ts __tests__/onboarding-events.test.ts __tests__/auth-profile-provisioning.test.ts __tests__/auth-last-seen.test.ts
+npm audit
+```
+
+Use CI for DB-backed tests. On staging verify no capture before consent or after refusal, one pageview per navigation, safe UTM payloads, identity reset, actual backend milestone ingestion, and separation from production dashboard totals. Repeat ingestion checks after the reviewed staging-to-main deployment. A configured project or successful HTTP response alone is not proof that the application is collecting live events.
+
+Rollback: set NEXT_PUBLIC_POSTHOG_ENABLED=false and rebuild through the normal deployment workflow, or revert this PR. Do not alter CRM sending or native account/milestone records. The main branch's approval gate remains in force.
+
+Official references: https://posthog.com/docs/libraries/next-js, https://posthog.com/docs/libraries/js/config, https://posthog.com/docs/libraries/node.

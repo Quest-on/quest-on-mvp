@@ -41,8 +41,8 @@ export function AgentFab() {
       <BotMessageSquare className="h-6 w-6 -scale-x-100" />
       {running && (
         <span className="absolute right-1 top-1 flex h-3 w-3">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-primary" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-solid opacity-75" />
+          <span className="relative inline-flex h-3 w-3 rounded-full bg-success-solid ring-2 ring-primary" />
         </span>
       )}
     </button>

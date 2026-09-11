@@ -135,7 +135,7 @@ export default async function CookiesPage() {
             </ul>
           </div>
 
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="bg-info-surface border border-info-border rounded-lg p-4">
             <p className="text-sm">
               <strong>{t("cookies.section5.noteLabel")}</strong> {t("cookies.section5.noteBody")}
             </p>
@@ -148,11 +148,9 @@ export default async function CookiesPage() {
           <Link href="/legal/terms" className="hover:text-foreground transition-colors">
             {t("footerLinks.terms")}
           </Link>
-          <span>·</span>
           <Link href="/legal/privacy" className="hover:text-foreground transition-colors">
             {t("footerLinks.privacy")}
           </Link>
-          <span>·</span>
           <Link href="/legal/security" className="hover:text-foreground transition-colors">
             {t("footerLinks.security")}
           </Link>

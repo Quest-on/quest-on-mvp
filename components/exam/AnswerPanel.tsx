@@ -51,7 +51,7 @@ export function AnswerPanel({
           </div>
 
           <div className="w-full space-y-4 mb-6 sm:mb-8">
-            <div className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-sm shadow-sm min-h-[60vh] sm:min-h-[70vh] lg:min-h-[1123px] w-full">
+            <div className="bg-background border border-border rounded-sm shadow-sm min-h-[60vh] sm:min-h-[70vh] lg:min-h-[1123px] w-full">
               <AnswerTextarea
                 placeholder={t("answerPanel.placeholder")}
                 value={value}
@@ -82,7 +82,7 @@ function SaveStatusIndicator({
 
   if (saveError) {
     return (
-      <div data-testid="save-status" className="flex items-center gap-2 text-xs sm:text-sm text-red-600 dark:text-red-400">
+      <div data-testid="save-status" className="flex items-center gap-2 text-xs sm:text-sm text-destructive">
         <AlertTriangle className="w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
         <span className="font-medium">{t("answerPanel.saveError")}</span>
         <span className="hidden sm:flex items-center gap-1 text-xs">
@@ -112,10 +112,10 @@ function SaveStatusIndicator({
       >
         <div className="flex items-center gap-1.5">
           <Save
-            className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 dark:text-green-400 animate-in zoom-in duration-300"
+            className="w-3 h-3 sm:w-4 sm:h-4 text-success-text animate-in zoom-in duration-300"
             aria-hidden="true"
           />
-          <span className="font-medium text-green-600 dark:text-green-400">
+          <span className="font-medium text-success-text">
             {t("answerPanel.saved")}
           </span>
         </div>

@@ -27,6 +27,15 @@ interface ExamControlButtonsProps {
   examId: string;
   examStatus: string;
   hasGateFields?: boolean; // Gate 필드(open_at, close_at)가 있는지 여부
+  /**
+   * 데모 시험인가.
+   *
+   * 데모의 주 행동은 "학생 시점으로 해보기" 하나다. 시작 버튼까지 primary 로
+   * 두면 막 온보딩을 마친 사람 눈에 파란 버튼이 둘 들어온다. 게다가 데모는
+   * 발행 대상이 아니고(is_demo 는 발행 카운트에서 제외), 채점도 시작·종료 없이
+   * 열린다(isGradingOpen 의 is_demo 예외). 시작은 할 수 있되 권하지는 않는다.
+   */
+  isDemo?: boolean;
   onStatusChange?: (newStatus: string, startedAt?: string | null) => void;
 }
 
@@ -34,6 +43,7 @@ export function ExamControlButtons({
   examId,
   examStatus,
   hasGateFields = false,
+  isDemo = false,
   onStatusChange,
 }: ExamControlButtonsProps) {
   const t = useTranslations("authoring");
@@ -158,7 +168,7 @@ export function ExamControlButtons({
           errorData.message || t("examControlButtons.toastStartFailed")
         );
       }
-    } catch (error) {
+    } catch {
       toast.error(t("examControlButtons.toastStartError"));
     } finally {
       setIsStarting(false);
@@ -182,7 +192,7 @@ export function ExamControlButtons({
           errorData.message || t("examControlButtons.toastEndFailed")
         );
       }
-    } catch (error) {
+    } catch {
       toast.error(t("examControlButtons.toastEndError"));
     } finally {
       setIsEnding(false);
@@ -195,7 +205,7 @@ export function ExamControlButtons({
       case "scheduled":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+            <Badge variant="secondary" className="bg-warning-subtle text-warning-text">
               {t("examControlButtons.statusScheduled")}
             </Badge>
           ),
@@ -203,7 +213,9 @@ export function ExamControlButtons({
             <Button
               onClick={() => setShowStartDialog(true)}
               disabled={isStarting}
-              className="bg-green-600 hover:bg-green-700"
+              variant={isDemo ? "outline" : "default"}
+              size={isDemo ? "sm" : "default"}
+              className={isDemo ? undefined : "bg-primary hover:bg-primary/90"}
             >
               <Play className="h-4 w-4 mr-2" />
               {t("examControlButtons.buttonStart")}
@@ -214,7 +226,7 @@ export function ExamControlButtons({
         // 기본적으로 항상 "시험 시작" 버튼 표시
         return {
           badge: (
-            <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+            <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
               {t("examControlButtons.statusDraft")}
             </Badge>
           ),
@@ -222,7 +234,9 @@ export function ExamControlButtons({
             <Button
               onClick={() => setShowStartDialog(true)}
               disabled={isStarting}
-              className="bg-green-600 hover:bg-green-700"
+              variant={isDemo ? "outline" : "default"}
+              size={isDemo ? "sm" : "default"}
+              className={isDemo ? undefined : "bg-primary hover:bg-primary/90"}
             >
               <Play className="h-4 w-4 mr-2" />
               {t("examControlButtons.buttonStart")}
@@ -232,7 +246,7 @@ export function ExamControlButtons({
       case "joinable":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+            <Badge variant="secondary" className="bg-info-subtle text-info-text">
               {t("examControlButtons.statusJoinable")}
             </Badge>
           ),
@@ -240,7 +254,9 @@ export function ExamControlButtons({
             <Button
               onClick={() => setShowStartDialog(true)}
               disabled={isStarting}
-              className="bg-green-600 hover:bg-green-700"
+              variant={isDemo ? "outline" : "default"}
+              size={isDemo ? "sm" : "default"}
+              className={isDemo ? undefined : "bg-primary hover:bg-primary/90"}
             >
               <Play className="h-4 w-4 mr-2" />
               {t("examControlButtons.buttonStart")}
@@ -250,7 +266,7 @@ export function ExamControlButtons({
       case "running":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-green-100 text-green-800">
+            <Badge variant="secondary" className="bg-success-subtle text-success-text">
               {t("examControlButtons.statusRunning")}
             </Badge>
           ),
@@ -277,7 +293,7 @@ export function ExamControlButtons({
       case "entry_closed":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+            <Badge variant="secondary" className="bg-warning-subtle text-warning-text">
               {t("examControlButtons.statusEntryClosed")}
             </Badge>
           ),
@@ -304,7 +320,7 @@ export function ExamControlButtons({
       case "closed":
         return {
           badge: (
-            <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+            <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
               {t("examControlButtons.statusClosed")}
             </Badge>
           ),
@@ -313,7 +329,7 @@ export function ExamControlButtons({
       default:
         return {
           badge: (
-            <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+            <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
               {examStatus || t("examControlButtons.statusUnknown")}
             </Badge>
           ),
@@ -344,7 +360,7 @@ export function ExamControlButtons({
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <Users className="h-4 w-4 text-muted-foreground" />
-                  <strong className="text-sm font-medium">
+                  <strong className="type-field-label">
                     {t("examControlButtons.waitingStudentsLabel", { count: waitingStudents?.length ?? 0 })}
                   </strong>
                 </div>
@@ -376,7 +392,7 @@ export function ExamControlButtons({
                             )}
                           </span>
                           {student.school && (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="type-meta">
                               {student.school}
                             </span>
                           )}
@@ -392,7 +408,7 @@ export function ExamControlButtons({
               </div>
 
               <div>
-                <Label htmlFor="close_at" className="text-sm font-medium">
+                <Label htmlFor="close_at" className="type-field-label">
                   {t("examControlButtons.closeAtLabel")}
                 </Label>
                 <Input
@@ -422,7 +438,7 @@ export function ExamControlButtons({
             <AlertDialogAction
               onClick={handleStartExam}
               disabled={isStarting}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {isStarting ? (
                 <>

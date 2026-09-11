@@ -44,6 +44,12 @@ describe("isQuestionContentEmpty", () => {
     expect(isQuestionContentEmpty("<p>&nbsp;&nbsp;</p>")).toBe(true);
   });
 
+  it("treats numeric nbsp entities as empty (rich editors emit &#160; too)", () => {
+    expect(isQuestionContentEmpty("<p>&#160;</p>")).toBe(true);
+    expect(isQuestionContentEmpty("<p>&#xA0;</p>")).toBe(true);
+    expect(isQuestionContentEmpty("&#160;&#160;")).toBe(true);
+  });
+
   it("treats visible text as non-empty", () => {
     expect(isQuestionContentEmpty("<p>hello</p>")).toBe(false);
     expect(isQuestionContentEmpty("plain text")).toBe(false);

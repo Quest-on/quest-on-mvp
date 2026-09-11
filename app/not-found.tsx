@@ -6,13 +6,14 @@ import { Home, ArrowLeft, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
+import { supportMailto } from "@/lib/contact";
 
 export default function NotFound() {
   const t = useTranslations("auth.notFound");
   const router = useRouter();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950/50">
+    <div className="min-h-screen flex items-center justify-center surface-page-gradient-soft">
       <div className="container mx-auto px-4 lg:px-8 max-w-4xl">
         <div className="text-center space-y-8 py-16">
           {/* Logo */}
@@ -120,7 +121,7 @@ export default function NotFound() {
                 {t("signUp")}
               </Link>
               <a
-                href={`mailto:questonkr@gmail.com?subject=${t("mailtoSubject")}`}
+                href={supportMailto(t("mailtoSubject"))}
                 className="text-sm font-medium text-primary hover:underline flex items-center gap-2"
               >
                 <Search className="w-4 h-4" />

@@ -40,7 +40,9 @@ test.describe("POST /api/instructor/profile", () => {
     expect(data.name).toBe("Prof. Kim");
     expect(data.email).toBe("prof.kim@university.kr");
     expect(data.school).toBe("Seoul National University");
-    expect(data.status).toBe("pending");
+    // 승인 대기 개념을 없앴다(에픽 #79 P0). 교수자는 가입 즉시 활동하고,
+    // 미인증 계정 제어는 status 가 아니라 plan_limits 의 무료 한도가 맡는다.
+    expect(data.status).toBe("approved");
   });
 
   test("instructor upserts existing profile → 200", async ({

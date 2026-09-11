@@ -4,7 +4,7 @@
  * profiles.last_seen_at 을 갱신하되, 이 쓰기가 실패해도 인증은 깨지 않아야 한다.
  *
  * "@/lib/supabase-auth" 는 vitest alias 로 목이 걸려 있어서 실제 구현을 검증하려면
- * 상대경로로 임포트해야 한다.
+ * 상대경로로 임포트해야 한다 (auth-profile-provisioning.test.ts 와 같은 방식).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
@@ -32,7 +32,6 @@ vi.mock("@supabase/ssr", () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          single: async () => ({ data: sessionProfile }),
           maybeSingle: async () => ({ data: sessionProfile }),
         }),
       }),

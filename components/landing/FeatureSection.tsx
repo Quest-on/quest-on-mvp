@@ -2,6 +2,7 @@
 
 import { ShieldCheck } from "lucide-react";
 import Image from "next/image";
+import { SUPPORT_EMAIL } from "@/lib/contact";
 
 interface FooterProps {
   mode?: "light" | "dark";
@@ -41,7 +42,7 @@ const FOOTER_LINKS = {
     { label: "블로그", href: "/blog" },
     { label: "채용 안내", href: "/careers" },
     { label: "파트너십", href: "/partners" },
-    { label: "문의하기", href: "mailto:questonkr@gmail.com" },
+    { label: "문의하기", href: `mailto:${SUPPORT_EMAIL}` },
   ],
   법적고지: [
     { label: "이용약관", href: "/legal/terms" },

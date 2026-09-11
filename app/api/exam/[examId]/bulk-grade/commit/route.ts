@@ -8,7 +8,10 @@ import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { bulkGradeCommitSchema, validateRequest } from "@/lib/validations";
 import { upsertGradesBySessionQuestion } from "@/lib/grades-upsert";
 import { requireBulkGradeAccess } from "@/lib/bulk-grade-access";
-import { getBulkGradableQuestions } from "@/lib/bulk-grading";
+import {
+  getBulkGradableQuestions,
+  type ProposedGradesMap,
+} from "@/lib/bulk-grading";
 
 const COMMITTING_STALE_MS = 2 * 60 * 1000;
 
@@ -80,7 +83,7 @@ export async function POST(
     // [HIGH-1] Block commit while grading is in progress
     const { data: currentSession } = await supabase
       .from("exam_grading_sessions")
-      .select("status, calibration_status, grading_scope")
+      .select("status, calibration_status, grading_scope, proposed_grades")
       .eq("exam_id", examId)
       .eq("instructor_id", access.ctx.user.id)
       .maybeSingle();
@@ -161,19 +164,29 @@ export async function POST(
     }
 
     // Upsert grades
-    const gradeRows = grades.map((g) => ({
-      session_id: g.session_id,
-      q_idx: g.q_idx,
-      score: Math.min(100, Math.max(0, g.score)),
-      comment: g.comment ?? "",
-      stage_grading: {
-        answer: {
-          score: g.score,
-          comment: g.comment ?? "",
+    const proposedGrades = (currentSession.proposed_grades ?? {}) as ProposedGradesMap;
+    const gradeRows = grades.map((g) => {
+      const proposal = proposedGrades[g.session_id]?.[g.q_idx];
+      const hasStoredProposal =
+        typeof proposal?.score === "number" && Number.isFinite(proposal.score);
+
+      return {
+        session_id: g.session_id,
+        q_idx: g.q_idx,
+        score: Math.min(100, Math.max(0, g.score)),
+        comment: g.comment ?? "",
+        stage_grading: {
+          answer: {
+            score: g.score,
+            comment: g.comment ?? "",
+          },
         },
-      },
-      grade_type: "manual",
-    }));
+        grade_type: "manual",
+        ai_proposed_score: hasStoredProposal ? proposal.score : null,
+        ai_proposed_at: hasStoredProposal ? nowIso : null,
+        ai_proposal_source: hasStoredProposal ? "bulk_grade_commit" : null,
+      };
+    });
 
     try {
       await upsertGradesBySessionQuestion(

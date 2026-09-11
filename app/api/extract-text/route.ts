@@ -142,7 +142,7 @@ async function extractTextFromWord(buffer: Buffer): Promise<string> {
   try {
     const result = await mammoth.extractRawText({ buffer });
     return result.value || "";
-  } catch (error) {
+  } catch {
     throw new Error("Word 파일에서 텍스트를 추출할 수 없습니다.");
   }
 }
@@ -205,7 +205,7 @@ async function extractTextFromPPT(buffer: Buffer): Promise<string> {
     }
 
     return textParts.join("\n\n");
-  } catch (error) {
+  } catch {
     throw new Error("PPT 파일에서 텍스트를 추출할 수 없습니다.");
   }
 }
@@ -218,7 +218,7 @@ async function extractTextFromCSV(buffer: Buffer): Promise<string> {
     // CSV는 텍스트 파일이므로 UTF-8로 디코딩
     const text = buffer.toString("utf-8");
     return text;
-  } catch (error) {
+  } catch {
     throw new Error("CSV 파일에서 텍스트를 추출할 수 없습니다.");
   }
 }
@@ -419,7 +419,7 @@ export async function POST(request: NextRequest) {
           ? { stack: errorStack, name: errorName }
           : undefined
       );
-    } catch (jsonError) {
+    } catch {
       // JSON 응답 생성 실패 시에도 에러 반환
       return new NextResponse(
         JSON.stringify({

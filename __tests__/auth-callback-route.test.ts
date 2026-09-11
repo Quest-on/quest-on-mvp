@@ -37,21 +37,28 @@ beforeEach(() => {
 });
 
 describe("GET /auth/callback", () => {
-  it("정상 내부 경로로 돌려보낸다", async () => {
+  // 콜백은 이제 항상 /onboarding 을 거친다.
+  //
+  // 예전에는 next 로 바로 보냈는데, 그러면 동의를 받지 않은 사용자가
+  // 곧장 보호 화면으로 들어간다. 원래 가려던 곳은 잃지 않고 ?redirect= 로
+  // 보존한 뒤 온보딩을 마치고 그리로 돌려보낸다.
+  it("원래 목적지를 보존한 채 온보딩으로 보낸다", async () => {
     const location = await callCallback("?code=valid&next=/exam/ABC");
-    expect(location).toBe(`${ORIGIN}/exam/ABC`);
+    expect(location).toBe(`${ORIGIN}/onboarding?redirect=%2Fexam%2FABC`);
   });
 
-  it("next 가 없으면 루트로 보낸다", async () => {
-    expect(await callCallback("?code=valid")).toBe(`${ORIGIN}/`);
+  it("next 가 없으면 온보딩으로만 보낸다", async () => {
+    expect(await callCallback("?code=valid")).toBe(`${ORIGIN}/onboarding`);
   });
 
   it("next=@evil.com 이 호스트를 바꾸지 못한다 — 이슈 #99 재현", async () => {
     // 수정 전 구현(`${origin}${next}`)이었다면 https://quest-on.app@evil.com/ 로
     // 나가서 로그인 성공 직후 외부 사이트에 떨어졌다.
+    // 온보딩 경유로 바뀐 뒤에도 이 방어는 그대로여야 한다.
     const location = await callCallback("?code=valid&next=@evil.com");
     expect(new URL(location).host).toBe("quest-on.app");
-    expect(location).toBe(`${ORIGIN}/`);
+    // 위험한 값은 redirect 로도 실려나가지 않는다.
+    expect(location).toBe(`${ORIGIN}/onboarding`);
   });
 
   it("프로토콜 상대 URL·절대 URL·위험 스킴을 모두 막는다", async () => {

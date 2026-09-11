@@ -6,18 +6,34 @@ import Link from "next/link";
 import Image from "next/image";
 import { Users, GraduationCap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { createSupabaseClient } from "@/lib/supabase-client";
+import { buildRoleCookie } from "@/lib/onboarding-role";
+import { getAuthCallbackUrl } from "@/lib/auth-redirect";
+import { authEmailErrorKey } from "@/lib/auth-email-error";
 import { useTranslations } from "next-intl";
+import { useOAuthProviders } from "@/lib/use-oauth-providers";
+import { isProviderUnavailable } from "@/lib/oauth-providers";
 
 type Step = "start" | "verify";
 
 export function CustomSignUp() {
   const t = useTranslations("auth.signUp");
   const router = useRouter();
-  const [role, setRole] = useState<"instructor" | "student">("student");
+  /**
+   * 고르기 전에는 아무것도 선택하지 않는다.
+   *
+   * 기본값을 두면 "계정 유형을 선택해주세요" 라고 적어 놓고 이미 하나를
+   * 칠해 둔 꼴이 된다. 그 값은 `options.data.role` 로 나가고
+   * `lib/supabase-auth.ts` 가 프로필 역할을 최초 1회 확정하므로,
+   * 교수자가 안 누르면 영구히 학생이 된다.
+   *
+   * `role` 은 여러 곳에서 문자열로 쓰여 nullable 로 바꾸면 파급이 크다.
+   * 온보딩(#287)과 같이 선택 여부만 따로 든다.
+   */
+  const [role, setRole] = useState<"instructor" | "student">("instructor");
+  const [roleChosen, setRoleChosen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -25,24 +41,42 @@ export function CustomSignUp() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+  const providers = useOAuthProviders();
+  const googleUnavailable = isProviderUnavailable(providers, "google");
+
+  // 역할 의도는 쿠키로 남긴다 (#87). localStorage 는 서버가 못 읽어서, OAuth
+  // 리다이렉트로 돌아온 뒤 서버가 역할을 클레임할 방법이 없었다.
+  const rememberRole = (value: "instructor" | "student") => {
+    document.cookie = buildRoleCookie(value, {
+      secure: window.location.protocol === "https:",
+    });
+  };
 
   const handleRoleChange = (value: "instructor" | "student") => {
     setRole(value);
-    localStorage.setItem("selectedRole", value);
+    setRoleChosen(true);
+    rememberRole(value);
   };
 
   const handleOAuth = async (provider: "google" | "azure") => {
     if (oauthLoading) return;
     setOauthLoading(provider);
-    localStorage.setItem("selectedRole", role);
+    rememberRole(role);
 
     const supabase = createSupabaseClient();
-    await supabase.auth.signInWithOAuth({
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: getAuthCallbackUrl(window.location.origin),
       },
     });
+
+    // 성공하면 브라우저가 이미 떠났으므로 여기 안 온다. 여기 왔다는 건
+    // 실패했다는 뜻이다. 로딩만 걸어두면 버튼이 영영 도는 채로 남는다.
+    if (oauthError) {
+      setOauthLoading(null);
+      setError(t("providerUnavailable"));
+    }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -56,12 +90,12 @@ export function CustomSignUp() {
       password,
       options: {
         data: { role },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: getAuthCallbackUrl(window.location.origin),
       },
     });
 
     if (signUpError) {
-      setError(signUpError.message);
+      setError(t(authEmailErrorKey(signUpError)));
       setLoading(false);
       return;
     }
@@ -95,7 +129,7 @@ export function CustomSignUp() {
   return (
     <div className="flex min-h-screen">
       {/* Left Section - Sign Up Form */}
-      <div className="flex-1 flex flex-col justify-center px-6 py-10 sm:p-8 bg-white dark:bg-gray-950 relative">
+      <div className="flex-1 flex flex-col justify-center px-6 py-10 sm:p-8 bg-background relative">
         {/* 로고 - 왼쪽 상단 */}
         <Link
           href="/"
@@ -109,7 +143,7 @@ export function CustomSignUp() {
             className="w-8 h-8"
             priority
           />
-          <span className="text-lg font-bold text-gray-900 dark:text-white">
+          <span className="text-lg font-bold text-foreground dark:text-white">
             Quest-On
           </span>
         </Link>
@@ -118,10 +152,10 @@ export function CustomSignUp() {
           {step === "start" ? (
             <>
               <div className="space-y-2 mb-6">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                <h1 className="text-3xl font-bold text-foreground dark:text-white">
                   {t("heading")}
                 </h1>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-muted-foreground">
                   {t("subtitle")}
                 </p>
               </div>
@@ -129,7 +163,7 @@ export function CustomSignUp() {
               {/* 역할 선택 */}
               <div className="mb-6">
                 <div className="mb-2">
-                  <Label className="text-sm font-medium">{t("roleLabel")}</Label>
+                  <Label className="type-field-label">{t("roleLabel")}</Label>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {t("roleSubtitle")}
                   </p>
@@ -139,18 +173,18 @@ export function CustomSignUp() {
                     type="button"
                     onClick={() => handleRoleChange("instructor")}
                     className={`flex-1 flex flex-col items-start p-4 border-2 rounded-lg transition-all ${
-                      role === "instructor"
+                      roleChosen && role === "instructor"
                         ? "border-primary bg-primary/5 dark:bg-primary/10"
-                        : "border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700"
+                        : "border-border hover:border-input dark:hover:border-input"
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <Users className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground dark:text-white">
                         {t("instructorRole")}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 text-left">
+                    <p className="text-xs text-muted-foreground text-left">
                       {t("instructorRoleDesc")}
                     </p>
                   </button>
@@ -158,18 +192,18 @@ export function CustomSignUp() {
                     type="button"
                     onClick={() => handleRoleChange("student")}
                     className={`flex-1 flex flex-col items-start p-4 border-2 rounded-lg transition-all ${
-                      role === "student"
+                      roleChosen && role === "student"
                         ? "border-primary bg-primary/5 dark:bg-primary/10"
-                        : "border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700"
+                        : "border-border hover:border-input dark:hover:border-input"
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <GraduationCap className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground dark:text-white">
                         {t("studentRole")}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 text-left">
+                    <p className="text-xs text-muted-foreground text-left">
                       {t("studentRoleDesc")}
                     </p>
                   </button>
@@ -183,7 +217,7 @@ export function CustomSignUp() {
                     type="button"
                     variant="outline"
                     className="w-full min-h-[44px]"
-                    disabled={!!oauthLoading}
+                    disabled={!!oauthLoading || googleUnavailable}
                     onClick={() => handleOAuth("google")}
                   >
                     {oauthLoading === "google" ? (
@@ -196,8 +230,22 @@ export function CustomSignUp() {
                         <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                       </svg>
                     )}
-                    <span className="font-medium">{t("googleBtn")}</span>
+                    <span className="flex items-center gap-2 font-medium">
+                  {t("googleBtn")}
+                </span>
                   </Button>
+                  {/*
+                    잠긴 이유는 버튼 밖에 둔다.
+                  
+                    disabled 버튼은 opacity 0.5 라 안에 넣으면 안내까지 같이 흐려진다.
+                    다크에서 실측 10.79 -> 3.95 로 떨어져 왜 못 누르는지 읽을 수 없었다.
+                    버튼은 흐려도 되지만 이유는 읽혀야 한다.
+                  */}
+                  {googleUnavailable ? (
+                    <p className="type-hint text-center" role="note">
+                      {t("providerUnavailable")}
+                    </p>
+                  ) : null}
 
                   <Button
                     type="button"
@@ -214,11 +262,17 @@ export function CustomSignUp() {
                     </svg>
                     <span className="flex items-center gap-2 font-medium">
                       {t("microsoftBtn")}
-                      <Badge variant="secondary" className="text-[10px]">
-                        {t("comingSoon")}
-                      </Badge>
                     </span>
                   </Button>
+                  {/*
+                    '준비중' 도 버튼 밖에 둔다.
+                  
+                    disabled 버튼은 opacity 0.5 라 안에 두면 같이 흐려진다. 왜 못 누르는지를
+                    알려주는 정보가 흐려지면 사용자는 버튼이 죽은 이유를 모른다.
+                  */}
+                  <p className="type-hint text-center" role="note">
+                    {t("comingSoon")}
+                  </p>
                 </div>
 
                 {/* 구분선 */}
@@ -240,6 +294,7 @@ export function CustomSignUp() {
                     <Input
                       id="email"
                       type="email"
+                      autoComplete="email"
                       placeholder={t("emailPlaceholder")}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -252,6 +307,7 @@ export function CustomSignUp() {
                     <Input
                       id="password"
                       type="password"
+                      autoComplete="new-password"
                       placeholder={t("passwordPlaceholder")}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -268,7 +324,8 @@ export function CustomSignUp() {
                     type="submit"
                     className="w-full min-h-[44px]"
                     size="lg"
-                    disabled={loading}
+                    // 역할을 고르기 전에는 가입시키지 않는다. 기본값으로 계정이 굳는다.
+                    disabled={loading || !roleChosen}
                   >
                     {loading ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -278,7 +335,7 @@ export function CustomSignUp() {
                   </Button>
                 </form>
 
-                <div className="text-center text-sm text-gray-600 dark:text-gray-400 mt-6">
+                <div className="text-center text-sm text-muted-foreground mt-6">
                   {t("hasAccount")}{" "}
                   <Link
                     href="/sign-in"
@@ -293,11 +350,11 @@ export function CustomSignUp() {
             /* 이메일 인증 Step */
             <>
               <div className="space-y-2 mb-6">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                <h1 className="text-3xl font-bold text-foreground dark:text-white">
                   {t("verifyHeading")}
                 </h1>
-                <p className="text-gray-600 dark:text-gray-400">
-                  <span className="font-medium text-gray-900 dark:text-white">
+                <p className="text-muted-foreground">
+                  <span className="font-medium text-foreground dark:text-white">
                     {email}
                   </span>
                   {t("verifyDesc")}

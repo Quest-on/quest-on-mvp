@@ -121,7 +121,7 @@ const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({
                   </div>
                 ) : (
                   <code
-                    className="bg-muted text-primary px-1 py-0 rounded-md text-xs font-mono border border-border/50"
+                    className="bg-muted text-primary dark:text-info-text px-1 py-0 rounded-md text-xs font-mono border border-border/50"
                     {...props}
                   >
                     {children}
@@ -131,7 +131,7 @@ const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({
 
               // 테이블 스타일링
               table: ({ children }: React.ComponentProps<"table">) => (
-                <div className="overflow-x-auto my-0 mt-0 mb-0 border border-border/50 rounded-lg shadow-sm bg-white dark:bg-gray-800 [&+*]:mt-0">
+                <div className="overflow-x-auto my-0 mt-0 mb-0 border border-border/50 rounded-lg shadow-sm bg-background [&+*]:mt-0">
                   <table className="min-w-full divide-y divide-border">
                     {children}
                   </table>
@@ -194,7 +194,7 @@ const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({
               a: ({ children, href }: React.ComponentProps<"a">) => (
                 <a
                   href={href}
-                  className="text-blue-500 hover:text-blue-600 hover:underline transition-colors font-medium"
+                  className="text-info-text hover:text-info-text hover:underline transition-colors font-medium"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -252,7 +252,7 @@ const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({
         <>
           <div className="mt-4 pt-3 border-t border-border/30 flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+              <div className="w-1.5 h-1.5 rounded-full bg-success-solid"></div>
               <span className="text-xs font-medium text-muted-foreground">
                 {t("chat.aiAnswer")}
               </span>

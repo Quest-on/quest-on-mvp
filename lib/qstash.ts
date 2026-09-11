@@ -95,6 +95,18 @@ export type BulkGradeJobPayload = {
   examId: string;
   scope?: "sample" | "full";
   attemptId?: string;
+  /**
+   * 배포 컷오버 sentinel (이슈 #118).
+   *
+   * 이 마이그레이션 이후 발행되는 모든 작업은 `pinRequired: true` 와 런에 고정된
+   * `configVersionId` 를 함께 싣는다. 워커는 이 플래그로 신규/레거시를 구분한다 —
+   * 세션 행의 컬럼이 NULL 인 것만 보고 폴백하면, 배포 직후 핀이 깨진 신규 런과
+   * 배포 전에 큐에 쌓인 레거시 작업을 구분할 수 없다.
+   *
+   * sentinel 이 있는데 행의 핀이 없거나 버전이 어긋나면 불변식 위반으로 거부한다.
+   */
+  pinRequired?: true;
+  configVersionId?: string;
 };
 
 export function bulkGradingDedupId(

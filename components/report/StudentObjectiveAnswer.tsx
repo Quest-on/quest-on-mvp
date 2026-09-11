@@ -60,7 +60,7 @@ export function StudentObjectiveAnswer({
           ) : !hasScore ? (
             <Badge variant="outline">{t("ungraded")}</Badge>
           ) : isCorrect ? (
-            <Badge className="gap-1 bg-emerald-600 hover:bg-emerald-600">
+            <Badge className="gap-1 bg-success-surface hover:bg-success-surface">
               <CheckCircle2 className="h-3 w-3" />
               {t("correct")}
             </Badge>
@@ -79,7 +79,7 @@ export function StudentObjectiveAnswer({
       )}
 
       {resolvedOptions.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="type-hint">
           {answered ? t("mySelectText", { answer: selectedAnswer ?? "" }) : t("noOptionInfo")}
         </p>
       ) : (
@@ -94,7 +94,7 @@ export function StudentObjectiveAnswer({
                   isPick
                     ? released && hasScore
                       ? isCorrect
-                        ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"
+                        ? "border-success-border bg-success-surface"
                         : "border-destructive/40 bg-destructive/5"
                       : "border-primary/40 bg-primary/5"
                     : "border-border",
@@ -108,7 +108,7 @@ export function StudentObjectiveAnswer({
                   <Badge variant="outline" className="shrink-0 gap-1">
                     {released && hasScore &&
                       (isCorrect ? (
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                        <CheckCircle2 className="h-3 w-3 text-success-text" />
                       ) : (
                         <XCircle className="h-3 w-3 text-destructive" />
                       ))}
@@ -122,7 +122,7 @@ export function StudentObjectiveAnswer({
       )}
 
       {!answered && resolvedOptions.length > 0 && (
-        <p className="text-sm text-muted-foreground">{t("noSelectionMade")}</p>
+        <p className="type-hint">{t("noSelectionMade")}</p>
       )}
     </div>
   );

@@ -1,4 +1,6 @@
 "use client";
+import { ExamCode, type InstructorQuotaResponse } from "@/components/instructor/ExamCode";
+import { useQuery } from "@tanstack/react-query";
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -38,6 +40,15 @@ export default function CreateAssignment() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [createdExamCode, setCreatedExamCode] = useState("");
 
+  const { data: quotaData } = useQuery<InstructorQuotaResponse>({
+    queryKey: qk.instructor.quota(),
+    queryFn: async ({ signal }) => {
+      const response = await fetch("/api/instructor/quota", { signal });
+      if (!response.ok) throw new Error("quota");
+      return response.json() as Promise<InstructorQuotaResponse>;
+    },
+  });
+
   const [examData, setExamData] = useState({
     title: "",
     duration: 0,
@@ -45,6 +56,8 @@ export default function CreateAssignment() {
     deadline: "",
     language: "ko" as "ko" | "en",
   });
+  // 과목은 선택 사항이다. null 이 기본값이며 과제 생성을 막지 않는다.
+  const [courseId, setCourseId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const questionsListRef = useRef<HTMLDivElement>(null);
   const examInfoRef = useRef<HTMLDivElement>(null);
@@ -93,7 +106,7 @@ export default function CreateAssignment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.instructor.exams() });
-      queryClient.refetchQueries({ queryKey: ["drive-folder-contents"], type: "all" });
+      queryClient.refetchQueries({ queryKey: qk.drive.folderContentsAll(), type: "all" });
     },
   });
 
@@ -144,6 +157,7 @@ export default function CreateAssignment() {
         rubric: [],
         rubric_public: false,
         chat_weight: null,
+        ...(courseId !== null ? { course_id: courseId } : {}),
         materials: [],
         materials_text: [],
         language: examData.language,
@@ -179,13 +193,12 @@ export default function CreateAssignment() {
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2 w-full justify-between">
-              <h1 className="text-3xl font-bold">{t("newAssignment.pageTitle")}</h1>
+              <h1 className="type-page-title">{t("newAssignment.pageTitle")}</h1>
               <Button type="button" variant="outline" onClick={() => router.push("/instructor")} className="min-h-[44px] gap-2 border-border hover:bg-muted hover:text-foreground">
                 <ArrowLeft className="w-4 h-4" />
                 {t("newAssignment.backToDashboard")}
               </Button>
             </div>
-            <p className="text-muted-foreground">{t("newAssignment.pageDesc")}</p>
           </div>
 
           <form onSubmit={handleSubmit} onKeyDown={(e) => { if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "TEXTAREA") e.preventDefault(); }} className="space-y-6">
@@ -205,6 +218,8 @@ export default function CreateAssignment() {
                 deadlineError={fieldErrors.deadline}
                 language={examData.language}
                 onLanguageChange={(value) => setExamData((prev) => ({ ...prev, language: value }))}
+                courseId={courseId}
+                onCourseChange={setCourseId}
               />
             </div>
 
@@ -224,9 +239,9 @@ export default function CreateAssignment() {
               }}
             />
 
-            <div ref={questionsListRef} className={fieldErrors.questions ? "rounded-lg ring-2 ring-red-500 ring-offset-2" : ""}>
+            <div ref={questionsListRef} className={fieldErrors.questions ? "rounded-lg ring-2 ring-destructive ring-offset-2" : ""}>
               {fieldErrors.questions && (
-                <p className="text-xs text-red-500 mb-2 px-1">{fieldErrors.questions}</p>
+                <p className="text-xs text-destructive mb-2 px-1">{fieldErrors.questions}</p>
               )}
               <QuestionsList
                 questions={questions}
@@ -260,12 +275,10 @@ export default function CreateAssignment() {
               <div className="py-4">
                 <div className="space-y-3">
                   <div>
-                    <Label className="text-sm font-medium">{t("newAssignment.dialogAssignmentCode")}</Label>
+                    <Label className="type-field-label">{t("newAssignment.dialogAssignmentCode")}</Label>
                     <div className="flex items-center gap-2 mt-1">
-                      <code className="px-4 py-2 bg-muted rounded-md exam-code text-lg font-semibold">{createdExamCode}</code>
-                      <Button type="button" variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(createdExamCode); toast.success(t("newAssignment.dialogCopied"), { id: "copy-code" }); }}>
-                        {t("newAssignment.dialogCopy")}
-                      </Button>
+                      {/* 코드는 ExamCode 만 내보낸다 (이슈 #84). 새로 만든 과제는 항상 미발행이다. */}
+                      <ExamCode code={createdExamCode} quota={{ alreadyPublished: false, publishesRemaining: quotaData?.publishesRemaining ?? null }} />
                     </div>
                     <p className="text-sm text-muted-foreground mt-2">{t("newAssignment.dialogShare")}</p>
                   </div>
@@ -281,7 +294,7 @@ export default function CreateAssignment() {
               </div>
               <DialogFooter>
                 <Button onClick={() => {
-                  queryClient.refetchQueries({ queryKey: ["drive-folder-contents"], type: "all" });
+                  queryClient.refetchQueries({ queryKey: qk.drive.folderContentsAll(), type: "all" });
                   setIsDialogOpen(false);
                   router.push("/instructor");
                 }}>{t("newAssignment.dialogConfirm")}</Button>

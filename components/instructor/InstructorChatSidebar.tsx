@@ -285,7 +285,7 @@ function ChatPanel({
                 <p className="text-sm font-medium text-foreground">
                   {t("chatSidebar.emptyTitle")}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="type-meta">
                   {t("chatSidebar.emptyDesc", { scope: scopeDescription })}
                 </p>
               </div>

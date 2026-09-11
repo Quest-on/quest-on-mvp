@@ -32,27 +32,27 @@ export function QuestionPromptCard({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <FileText className="w-5 h-5 text-blue-600" />
+          <FileText className="w-5 h-5 text-info-text" />
           {t("questionPromptCard.cardTitle", { number: questionNumber })}
         </CardTitle>
       </CardHeader>
       <CardContent>
         {question ? (
-          <div className="bg-gray-50 rounded-lg p-4">
+          <div className="bg-muted rounded-lg p-4">
             <RichTextViewer content={question.prompt} className="text-sm" />
             {question.ai_context && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-xs text-gray-600 mb-2">{t("questionPromptCard.labelAiContext")}</p>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-xs text-muted-foreground mb-2">{t("questionPromptCard.labelAiContext")}</p>
+                <p className="text-sm text-foreground whitespace-pre-wrap">
                   {question.ai_context}
                 </p>
               </div>
             )}
           </div>
         ) : (
-          <div className="text-center py-8 text-red-600">
+          <div className="text-center py-8 text-destructive">
             <p>{t("questionPromptCard.errorLoad")}</p>
-            <p className="text-sm mt-2 text-gray-600">
+            <p className="text-sm mt-2 text-muted-foreground">
               {t("questionPromptCard.errorIndex", { index: questionNumber - 1 })}
             </p>
           </div>

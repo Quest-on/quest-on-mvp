@@ -72,10 +72,11 @@ export class InstructorCreateExamPage {
     // 다이얼로그가 열릴 때까지 대기
     const picker = this.page.getByTestId("add-question-picker");
     await picker.waitFor({ state: "visible" });
-    // 유형 선택 — 기본 multiple-choice 외에는 명시적으로 클릭한다.
-    if (questionType !== "multiple-choice") {
-      await this.page.locator(`#question-type-${questionType}`).click();
-    }
+    // 유형은 항상 명시적으로 누른다.
+    //
+    // 기본값에 기대면 제품이 기본값을 바꾸는 순간 조용히 다른 유형이 만들어진다.
+    // 실제로 사례형으로 바뀌면서 이 헬퍼가 사지선다를 못 만들었다(#320).
+    await this.page.locator(`#question-type-${questionType}`).click();
     // 다이얼로그의 "추가" 버튼이 선택한 유형의 빈 문제를 목록에 추가한다.
     await this.page.getByTestId("manual-add-question-btn").click();
     // 다이얼로그가 닫힐 때까지 대기

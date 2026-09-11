@@ -43,13 +43,50 @@ export default function ExamCodeEntry() {
       unauthorized: t("unauthorized"),
       server_error: t("serverError"),
       network_error: t("networkError"),
+      // 한도 초과. 학생 잘못이 아니고 코드도 맞다는 걸 먼저 말한다.
+      // 사유와 해제 방법은 교수자 표면에만 있다 — 학생에게 요금제를
+      // 설명하는 건 도움이 안 된다.
+      publish_limit: t("publishLimitReached"),
+      student_limit: t("studentLimitReached"),
     };
+
+    // 코드를 복원한다. 이게 없으면 학생이 코드를 다시 받아야 재시도할 수 있다.
+    const codeParam = params.get("code");
+    if (codeParam) setExamCode(codeParam.toUpperCase());
 
     setError(
       errorMessages[errorParam] ||
         t("unknownError")
     );
-  }, []);
+  }, [t]);
+
+  /**
+   * 서버 코드로 문구를 고른다.
+   *
+   * 예전에는 errData.message 를 그대로 썼다. 서버 메시지는 영문이고
+   * 개발자용이라 학생 화면에 "Exam not found" 가 그대로 떴다.
+   * 모르는 코드는 일반 문구로 떨어뜨린다 - 원문을 흘리지 않는다.
+   */
+  const resolveJoinError = (code?: string): string => {
+    switch (code) {
+      case "EXAM_NOT_FOUND":
+        return t("examNotFound");
+      case "EXAM_NOT_AVAILABLE":
+        return t("examNotAvailable");
+      case "ENTRY_WINDOW_CLOSED":
+        return t("entryWindowClosed");
+      case "ALREADY_SUBMITTED":
+        return t("alreadySubmitted");
+      case "STUDENT_LIMIT_REACHED":
+        return t("studentLimitReached");
+      case "PUBLISH_LIMIT_REACHED":
+        return t("publishLimitReached");
+      case "UNAUTHORIZED":
+        return t("unauthorized");
+      default:
+        return t("codeCheckFailed");
+    }
+  };
 
   const navigateToCode = async (code: string) => {
     setIsLoading(true);
@@ -62,7 +99,7 @@ export default function ExamCodeEntry() {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || t("codeCheckFailed"));
+        throw new Error(resolveJoinError(errData?.error));
       }
       const data = await res.json();
       const examType = data.exam?.type;
@@ -85,7 +122,7 @@ export default function ExamCodeEntry() {
 
   return (
     <CenteredViewportShell
-      className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-950 dark:to-slate-900"
+      className="surface-page-gradient"
       contentClassName="max-w-4xl"
     >
       <div className="w-full">
@@ -106,6 +143,7 @@ export default function ExamCodeEntry() {
                 <div className="space-y-2 mb-12">
                   <div className="flex justify-center">
                     <InputOTP
+            autoFocus
                       maxLength={6}
                       pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
                       inputMode="text"

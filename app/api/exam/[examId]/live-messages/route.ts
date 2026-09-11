@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { decompressData } from "@/lib/compression";
 import { currentUser } from "@/lib/get-current-user";
@@ -129,7 +129,7 @@ export async function GET(
     // Batch fetch all student info from Clerk (single API call)
     const clerkUserMap = await batchGetUserInfo(uniqueStudentIds);
 
-    const studentInfoMap = new Map<string, { name: string; email: string; student_number?: string; school?: string }>();
+    const studentInfoMap = new Map<string, { name: string; email: string | null; student_number?: string; school?: string }>();
     for (const studentId of uniqueStudentIds) {
       const info = clerkUserMap.get(studentId);
       const profile = studentProfileMap.get(studentId);
@@ -151,7 +151,7 @@ export async function GET(
       const studentId = session?.student_id || "";
       const studentInfo = studentInfoMap.get(studentId) || {
         name: `Student ${studentId.slice(0, 8)}`,
-        email: `${studentId}@example.com`,
+        email: null,
       };
 
       // Decompress content if needed
@@ -160,7 +160,7 @@ export async function GET(
         try {
           const decompressed = decompressData(message.compressed_content);
           content = typeof decompressed === "string" ? decompressed : content;
-        } catch (error) {
+        } catch {
           // Use original content on decompression failure
         }
       }
@@ -191,7 +191,7 @@ export async function GET(
       messages: processedMessages,
       timestamp: new Date().toISOString(),
     });
-  } catch (error) {
+  } catch {
     return errorJson("INTERNAL_ERROR", "Internal server error", 500);
   }
 }

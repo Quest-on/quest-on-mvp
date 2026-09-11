@@ -1,6 +1,0 @@
-diff --git a/app/(app)/instructor/new/page.tsx b/app/(app)/instructor/new/page.tsx
---- a/app/(app)/instructor/new/page.tsx
-+++ b/app/(app)/instructor/new/page.tsx
-@@ -56,1 +56,1 @@ export default function CreateExam() {
--export default function CreateExam() {
-+export default function CreateExam() {  

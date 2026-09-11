@@ -476,6 +476,62 @@ test.describe("Supa — POST /api/supa (core actions)", () => {
     expect(body.error).toBe("SCORE_WEIGHTS_LOCKED");
   });
 
+  // ── chat_weight 잠금 (#226) ──
+  //
+  // chat_weight 는 채점 산식의 분모를 바꾼다. 중간에 바뀌면 같은 시험 안에서
+  // 먼저 채점된 학생과 나중에 채점된 학생이 다른 기준으로 평가된다.
+
+  test("cannot change chat weight when sessions exist → 409", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({ status: "draft", chat_weight: 50 });
+    await seedSession(exam.id, "test-student-id", { status: "waiting" });
+
+    const res = await instructorRequest.post("/api/supa", {
+      data: {
+        action: "update_exam",
+        data: { id: exam.id, update: { chat_weight: 70 } },
+      },
+    });
+
+    expect(res.status()).toBe(409);
+    const body = await res.json();
+    expect(body.error).toBe("CHAT_WEIGHT_LOCKED");
+  });
+
+  test("resending the same effective chat weight is not a change → 200", async ({
+    instructorRequest,
+  }) => {
+    // null 과 50 은 저장 형식만 다르고 채점 결과가 같다(grading 이 ?? 50 으로
+    // 읽는다). 편집 화면을 열었다 저장만 해도 409 가 나면 안 된다.
+    const exam = await seedExam({ status: "draft", chat_weight: null });
+    await seedSession(exam.id, "test-student-id", { status: "waiting" });
+
+    const res = await instructorRequest.post("/api/supa", {
+      data: {
+        action: "update_exam",
+        data: { id: exam.id, update: { chat_weight: 50 } },
+      },
+    });
+
+    expect(res.status()).toBe(200);
+  });
+
+  test("can change chat weight when no sessions exist → 200", async ({
+    instructorRequest,
+  }) => {
+    const exam = await seedExam({ status: "draft", chat_weight: 50 });
+
+    const res = await instructorRequest.post("/api/supa", {
+      data: {
+        action: "update_exam",
+        data: { id: exam.id, update: { chat_weight: 70 } },
+      },
+    });
+
+    expect(res.status()).toBe(200);
+  });
+
   test("validates score weights against existing questions on score-only update → 400", async ({
     instructorRequest,
   }) => {

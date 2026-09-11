@@ -3,7 +3,14 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { withQStashSignature } from "@/lib/qstash-signature";
-import { getOpenAI, AI_MODEL_BULK_GRADING_WORKER } from "@/lib/openai";
+import { getOpenAI } from "@/lib/openai";
+import {
+  createCurrentExecutionContext,
+  createPinnedExecutionContext,
+} from "@/lib/ai-execution-context";
+import { createRouteDeadline } from "@/lib/ai-deadline";
+import { applyProfileToChatBody } from "@/lib/ai-task-profile";
+
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { logError } from "@/lib/logger";
 import { bulkGradeWorkerSchema, validateRequest } from "@/lib/validations";
@@ -39,7 +46,15 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, reason: "invalid_payload" }, { status: 200 });
     }
 
-    const { gradingSessionId, studentSessionId, examId, scope, attemptId } = validation.data;
+    const {
+      gradingSessionId,
+      studentSessionId,
+      examId,
+      scope,
+      attemptId,
+      pinRequired,
+      configVersionId,
+    } = validation.data;
     const supabase = getSupabaseServer();
 
     // [CRITICAL-1] 4-way join ownership check
@@ -51,6 +66,8 @@ async function handler(request: NextRequest): Promise<NextResponse> {
         grading_criteria,
         status,
         current_attempt_id,
+        ai_config_version_id,
+        ai_profile_snapshot,
         exams!inner ( id, questions, language, type ),
         expected_session_ids
       `)
@@ -71,6 +88,45 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       (ownershipCheck.current_attempt_id as string | null) !== attemptId
     ) {
       return NextResponse.json({ ok: false, reason: "stale_attempt" }, { status: 200 });
+    }
+
+    // ── AI 설정 핀 불변식 (이슈 #118) ────────────────────────────────────
+    // sentinel 이 달린 작업은 이 배포 이후에 발행된 것이다. 그런 작업의 런 행에
+    // 핀이 없거나 버전이 어긋나면 설정이 갈라졌다는 뜻이므로 채점하지 않는다.
+    // 폴백하면 같은 시험 학생들이 서로 다른 설정으로 채점된다.
+    // sentinel 이 없는 작업은 배포 전에 큐에 쌓인 레거시라 기존 동작을 유지한다.
+    const rowConfigVersionId = (ownershipCheck.ai_config_version_id as string | null) ?? null;
+    const rowProfileSnapshot = ownershipCheck.ai_profile_snapshot ?? null;
+
+    if (pinRequired) {
+      const pinBroken =
+        !rowConfigVersionId ||
+        !rowProfileSnapshot ||
+        (configVersionId != null && rowConfigVersionId !== configVersionId);
+
+      if (pinBroken) {
+        logError("AI_PIN_INVARIANT_BREACH", null, {
+          path: "/api/internal/bulk-grade-worker",
+          additionalData: {
+            gradingSessionId,
+            studentSessionId,
+            attemptId,
+            payloadConfigVersionId: configVersionId ?? null,
+            rowConfigVersionId,
+            hasSnapshot: rowProfileSnapshot !== null,
+          },
+        });
+        // OpenAI 를 부르지 않고 실패로 확정한다.
+        await supabase.rpc("merge_bulk_grading_result", {
+          p_session_id: gradingSessionId,
+          p_student_sid: studentSessionId,
+          p_grades_json: {},
+          p_success: false,
+          p_scope: scope,
+          p_attempt_id: attemptId ?? null,
+        });
+        return NextResponse.json({ ok: false, reason: "pin_invariant_breach" }, { status: 200 });
+      }
     }
 
     if ((ownershipCheck.status as string | null) !== "grading") {
@@ -154,20 +210,41 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     let success = false;
     const gradesMap: Record<number, { score: number; comment: string }> = {};
 
+    // 런 시작 시 고정된 스냅샷으로 실행 컨텍스트를 만든다. 라벨을 다시 읽지 않으므로
+    // 런 도중 설정이 바뀌어도 이 런의 학생들은 전부 같은 설정으로 채점된다.
+    // sentinel 이 없는 레거시 작업은 핀이 없으므로 코드 기본값으로 해석한다.
+    const aiContext = pinRequired
+      ? createPinnedExecutionContext({
+          task: "bulk_grading_worker",
+          configVersionId: rowConfigVersionId,
+          profileSnapshot: rowProfileSnapshot,
+          deadlineMs: createRouteDeadline({ startedAtMs: Date.now(), maxDurationSec: 60 }),
+        })
+      : createCurrentExecutionContext({
+          task: "bulk_grading_worker",
+          version: { versionId: "", overrides: {} },
+          deadlineMs: createRouteDeadline({ startedAtMs: Date.now(), maxDurationSec: 60 }),
+        });
+
     try {
       const tracked = await callTrackedChatCompletion(
         () =>
-          getOpenAI().chat.completions.create({
-            model: AI_MODEL_BULK_GRADING_WORKER,
-            messages: [{ role: "system", content: systemPrompt }],
-            max_completion_tokens: 1500,
-            temperature: 0,
-            response_format: { type: "json_object" },
-          }),
+          getOpenAI().chat.completions.create(
+            applyProfileToChatBody(aiContext.profile, {
+              messages: [{ role: "system" as const, content: systemPrompt }],
+              response_format: { type: "json_object" as const },
+            }),
+            {
+              timeout: aiContext.budget.timeout,
+              maxRetries: aiContext.budget.maxRetries,
+              signal: aiContext.budget.signal,
+            }
+          ),
         {
-          feature: "bulk_grading_chat",
+          feature: "bulk_grading_execute",
           route: "/api/internal/bulk-grade-worker",
-          model: AI_MODEL_BULK_GRADING_WORKER,
+          model: aiContext.profile.model,
+          configVersion: aiContext.configVersionId || null,
           examId,
           sessionId: studentSessionId,
           metadata: buildAiTextMetadata({

@@ -2,7 +2,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 
 export interface UserInfo {
   name: string;
-  email: string;
+  email: string | null;
 }
 
 /**
@@ -53,14 +53,14 @@ export async function batchGetUserInfo(
 
       result.set(id, {
         name: profileName || metadataName || `User ${id.slice(0, 8)}`,
-        email: user?.email || `${id}@example.com`,
+        email: user?.email || null,
       });
     }
   } catch {
     for (const id of uniqueIds) {
       result.set(id, {
         name: `User ${id.slice(0, 8)}`,
-        email: `${id}@example.com`,
+        email: null,
       });
     }
   }

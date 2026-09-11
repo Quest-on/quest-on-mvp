@@ -130,7 +130,7 @@ export function FinalAnswerSheet({
                 <span className="text-destructive">{error}</span>
               ) : lastSavedAt ? (
                 <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-success-text" />
                   <span>{t("finalAnswerSheet.statusLastSaved", { time: formatTime(lastSavedAt) })}</span>
                 </>
               ) : dirty ? (

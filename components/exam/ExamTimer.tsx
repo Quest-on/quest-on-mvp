@@ -62,12 +62,12 @@ export function ExamTimer({
         className={cn(
           "inline-flex items-center rounded-lg font-semibold transition-all",
           hasExpired || displaySeconds <= 0
-            ? "px-3 py-1.5 text-sm bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+            ? "px-3 py-1.5 text-sm bg-destructive/10 text-destructive dark:bg-destructive/20/30 dark:text-destructive"
             : urgent
-              ? "px-4 py-2 text-base bg-red-200 text-red-900 dark:bg-red-900/50 dark:text-red-200 animate-pulse ring-2 ring-red-400"
+              ? "px-4 py-2 text-base bg-destructive/20 text-destructive dark:bg-destructive/20/50 dark:text-destructive animate-pulse ring-2 ring-destructive"
               : critical
-                ? "px-3 py-1.5 text-sm bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 ring-1 ring-red-300"
-                : "px-3 py-1.5 text-sm bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+                ? "px-3 py-1.5 text-sm bg-destructive/10 text-destructive dark:bg-destructive/20/30 dark:text-destructive ring-1 ring-destructive"
+                : "px-3 py-1.5 text-sm bg-info-subtle text-info-text",
           className,
         )}
         data-testid="exam-timer"

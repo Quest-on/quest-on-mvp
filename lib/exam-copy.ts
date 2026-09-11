@@ -58,7 +58,7 @@ export function buildCopiedExamPayload(
     materials_text: source.materials_text ?? [],
     rubric: source.rubric ?? [],
     rubric_public: source.rubric_public ?? false,
-    chat_weight: source.chat_weight ?? 50,
+    chat_weight: source.chat_weight ?? null,
     score_weights: normalizeScoreWeights(source.score_weights),
     status: "draft", // 복사본은 초안 상태로 시작
     instructor_id: options.instructorId,

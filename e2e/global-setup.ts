@@ -7,9 +7,18 @@ import {
   createTestSupabaseClient,
   waitForTestSupabaseReady,
 } from "./helpers/supabase-test-client";
+import { assertLocalTestEnv } from "./helpers/assert-local-test-env";
 
-// Load test env vars
-dotenv.config({ path: path.resolve(__dirname, "../.env.test") });
+// Load test env vars.
+// .env.local 은 절대 읽지 않는다 — 그 파일은 실서비스 자격증명을 담는다.
+// override: true — 셸에 남아 있는 값이 .env.test 를 덮어쓰면, 로컬 스택을
+// 띄워도 원격 URL 로 붙거나(preflight 가 막지만) 엉뚱한 키를 쓰게 된다.
+dotenv.config({ path: path.resolve(__dirname, "../.env.test"), override: true });
+
+// DB 안전 멈춤 규칙(AGENTS.md) 을 여기서 fail-closed 로 강제한다.
+// 이 호출이 없으면 .env.test 에 원격 URL 이 들어 있을 때 그대로 원격을 파괴한다.
+// 마이그레이션·seed·cleanup 어느 것보다 먼저 실행되어야 한다.
+assertLocalTestEnv();
 
 let mockServer: ChildProcess | null = null;
 
@@ -31,10 +40,24 @@ function isPortInUse(port: number): Promise<boolean> {
 /** Kill any process listening on the given port */
 function killProcessOnPort(port: number): void {
   try {
-    const pid = execSync(`lsof -ti :${port}`, { encoding: "utf-8" }).trim();
-    if (pid) {
-      console.log(`[global-setup] Killing existing process on port ${port} (PID: ${pid})`);
-      execSync(`kill -9 ${pid}`, { stdio: "pipe" });
+    if (process.platform === "win32") {
+      // lsof 는 Windows 에 없다. netstat + taskkill 로 대체한다.
+      const out = execSync(`netstat -ano | findstr :${port}`, {
+        encoding: "utf-8",
+      }).trim();
+      for (const line of out.split("\n")) {
+        const pid = line.trim().split(/\s+/).pop();
+        if (pid && /^\d+$/.test(pid) && pid !== "0") {
+          console.log(`[global-setup] Killing process on port ${port} (PID: ${pid})`);
+          execSync(`taskkill /F /PID ${pid}`, { stdio: "pipe" });
+        }
+      }
+    } else {
+      const pid = execSync(`lsof -ti :${port}`, { encoding: "utf-8" }).trim();
+      if (pid) {
+        console.log(`[global-setup] Killing process on port ${port} (PID: ${pid})`);
+        execSync(`kill -9 ${pid}`, { stdio: "pipe" });
+      }
     }
   } catch {
     // No process on port — that's fine
@@ -228,6 +251,35 @@ async function applyMigrations() {
     console.warn("[global-setup] create_exam_with_node migration check failed:", err);
   }
 
+  // Migration: ensure counter RPCs exist (database/032_counter_rpcs.sql).
+  // increment_used_clarifications was never captured in a migration (운영 DB 에만
+  // 수작업으로 존재) and increment_student_count lives in sql/002 which CI never
+  // applies, so /api/chat·/api/feedback fail with "function ... in the schema
+  // cache" on any DB that lacks them (#199).
+  try {
+    const { error: counterRpcErr } = await supabase.rpc("increment_used_clarifications", {
+      p_session_id: "00000000-0000-0000-0000-000000000000",
+      p_amount: 1,
+    });
+
+    // 0행 UPDATE 는 오류 없이 성공하므로, 오류가 "does not exist" 계열일 때만 적용한다
+    if (counterRpcErr && counterRpcErr.message.includes("schema cache")) {
+      console.log("[global-setup] Applying counter RPCs (database/032)...");
+      if (!process.env.CI) {
+        execSync(
+          `docker exec -i supabase_db_quest-on-mvp psql -U postgres -d postgres < ${path.resolve(__dirname, "../database/032_counter_rpcs.sql")}`,
+          { stdio: "pipe" }
+        );
+        reloadPostgrestSchema();
+        console.log("[global-setup] counter RPCs applied.");
+      } else {
+        console.log("[global-setup] CI: counter RPCs are applied by the test setup action.");
+      }
+    }
+  } catch (err) {
+    console.warn("[global-setup] counter RPC migration check failed:", err);
+  }
+
   // Ensure exam-materials storage bucket exists (for upload tests)
   try {
     const { data: buckets } = await supabase.storage.listBuckets();
@@ -267,17 +319,34 @@ async function globalSetup() {
   }
 
   // Start the OpenAI mock server
-  mockServer = spawn("npx", ["tsx", "scripts/start-mock-server.ts"], {
-    cwd: path.resolve(__dirname, ".."),
-    stdio: "pipe",
-    env: { ...process.env, NODE_ENV: "test" },
-  });
+  if (process.platform === "win32") {
+    // GoTrue는 Docker 안에서 `host.docker.internal:4010`으로 OAuth token/userinfo
+    // stub을 호출한다. Windows 프로세스로 띄우면 WSL2 Docker bridge에서 닿지
+    // 않으므로 mock server 자체를 WSL host에 띄운다.
+    const root = path.resolve(__dirname, "..");
+    const wslRoot = execSync(`wsl.exe -- wslpath -a "${root}"`, {
+      encoding: "utf8",
+    }).trim();
+    const command =
+      `cd /tmp && exec npx --yes tsx@4.20.6 ` +
+      `'${wslRoot}/scripts/start-mock-server.ts'`;
+    mockServer = spawn("wsl.exe", ["--", "bash", "-lc", command], {
+      stdio: "pipe",
+      env: { ...process.env, NODE_ENV: "test" },
+    });
+  } else {
+    mockServer = spawn("npx", ["tsx", "scripts/start-mock-server.ts"], {
+      cwd: path.resolve(__dirname, ".."),
+      stdio: "pipe",
+      env: { ...process.env, NODE_ENV: "test" },
+    });
+  }
 
   // Wait for mock server to be ready
   await new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new Error("Mock server failed to start within 10s"));
-    }, 10_000);
+      reject(new Error("Mock server failed to start within 30s"));
+    }, 30_000);
 
     mockServer!.stdout?.on("data", (data: Buffer) => {
       const msg = data.toString();

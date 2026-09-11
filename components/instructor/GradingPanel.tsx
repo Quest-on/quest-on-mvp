@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Star, Check, Sparkles, Quote, Plus, Minus, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { StageKey, QuestionSummaryData } from "@/lib/types/grading";
@@ -36,9 +35,9 @@ interface GradingPanelProps {
 }
 
 const SENTIMENT_CLASS: Record<"positive" | "negative" | "neutral", string> = {
-  positive: "bg-green-100 text-green-700 border-green-200",
-  negative: "bg-red-100 text-red-700 border-red-200",
-  neutral: "bg-gray-100 text-gray-700 border-gray-200",
+  positive: "bg-success-subtle text-success-text border-success-border",
+  negative: "bg-destructive/15 text-destructive border-destructive",
+  neutral: "bg-secondary text-secondary-foreground border-border",
 };
 
 export function GradingPanel({
@@ -75,15 +74,15 @@ export function GradingPanel({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Star className="w-5 h-5 text-yellow-600" />
+            <Star className="w-5 h-5 text-warning-text" />
             {t("gradingPanel.inProgressTitle", { number: questionNumber })}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-            <p className="text-sm font-medium">{t("gradingPanel.inProgressDesc")}</p>
-            <p className="text-xs text-muted-foreground">
+            <Loader2 className="h-8 w-8 animate-spin text-info-solid" />
+            <p className="type-field-label">{t("gradingPanel.inProgressDesc")}</p>
+            <p className="type-meta">
               {t("gradingPanel.inProgressNote")}
             </p>
           </div>
@@ -96,7 +95,7 @@ export function GradingPanel({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Star className="w-5 h-5 text-yellow-600" />
+          <Star className="w-5 h-5 text-warning-text" />
           {t("gradingPanel.title", { number: questionNumber })}
         </CardTitle>
         <CardDescription>
@@ -119,13 +118,13 @@ export function GradingPanel({
             return (
               <div
                 key={stageKey}
-                className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4"
+                className="space-y-3 rounded-lg border border-border bg-muted p-4"
               >
                 <div className="flex items-start gap-3">
                   <stage.icon className={`h-5 w-5 ${stage.accentClass}`} />
                   <div>
                     <h4 className="text-sm font-semibold">{stage.label}</h4>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="type-meta">
                       {stage.description}
                     </p>
                   </div>
@@ -153,7 +152,7 @@ export function GradingPanel({
                             : Number(e.target.value)
                         )
                       }
-                      className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="mt-1 w-full rounded-md border border-border px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
 
@@ -184,7 +183,7 @@ export function GradingPanel({
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor="score" className="text-sm font-medium">
+            <Label htmlFor="score" className="type-field-label">
               {t("gradingPanel.scoreLabel")}
             </Label>
             <div className="mt-1 flex gap-2">
@@ -253,8 +252,8 @@ export function GradingPanel({
                     setScoreInput(clampedValue.toString());
                     onOverallScoreChange(clampedValue);
                   }}
-                  className={`flex-1 rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    isAiGradedOnly ? "bg-gray-100 text-gray-500" : ""
+                  className={`flex-1 rounded-md border border-border px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring ${
+                    isAiGradedOnly ? "bg-muted text-muted-foreground" : ""
                   }`}
                 />
               {isAiGradedOnly && aiGradedScore !== undefined && onAcceptAiScore && (
@@ -271,7 +270,7 @@ export function GradingPanel({
               )}
             </div>
             {isAiGradedOnly && aiGradedScore !== undefined && (
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {t("gradingPanel.aiScoreHint", { score: aiGradedScore })}
               </p>
             )}
@@ -281,11 +280,11 @@ export function GradingPanel({
 
         {showAiSummary && aiSummary && (
           <div
-            className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3"
+            className="rounded-lg border border-border bg-muted p-4 space-y-3"
             data-testid="grade-ai-summary"
           >
             <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-indigo-600" />
+              <Sparkles className="h-4 w-4 text-info-text" />
               <h4 className="text-sm font-semibold">{t("gradingPanel.aiSummaryTitle")}</h4>
               <span
                 className={`ml-auto rounded-full border px-2 py-0.5 text-xs font-medium ${SENTIMENT_CLASS[aiSummary.sentiment]}`}
@@ -295,7 +294,7 @@ export function GradingPanel({
             </div>
 
             {aiSummary.summary && (
-              <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+              <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
                 {aiSummary.summary}
               </p>
             )}
@@ -305,10 +304,10 @@ export function GradingPanel({
                 {aiSummary.keyQuotes.map((quote, idx) => (
                   <div
                     key={idx}
-                    className="flex gap-2 rounded-md bg-yellow-50 border border-yellow-200 p-2"
+                    className="flex gap-2 rounded-md bg-warning-surface border border-warning-border p-2"
                   >
-                    <Quote className="h-3.5 w-3.5 text-yellow-700 shrink-0 mt-0.5" />
-                    <p className="text-xs text-gray-700 italic">{quote}</p>
+                    <Quote className="h-3.5 w-3.5 text-warning-text shrink-0 mt-0.5" />
+                    <p className="text-xs text-foreground italic">{quote}</p>
                   </div>
                 ))}
               </div>
@@ -317,12 +316,12 @@ export function GradingPanel({
             {aiSummary.strengths.length > 0 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <Plus className="h-3.5 w-3.5 text-blue-600" />
-                  <span className="text-xs font-semibold text-blue-700">{t("questionAiSummary.strengths")}</span>
+                  <Plus className="h-3.5 w-3.5 text-info-text" />
+                  <span className="text-xs font-semibold text-info-text">{t("questionAiSummary.strengths")}</span>
                 </div>
                 <ul className="space-y-1 pl-5 list-disc">
                   {aiSummary.strengths.map((s, idx) => (
-                    <li key={idx} className="text-xs text-gray-700">
+                    <li key={idx} className="text-xs text-foreground">
                       {s}
                     </li>
                   ))}
@@ -333,12 +332,12 @@ export function GradingPanel({
             {aiSummary.weaknesses.length > 0 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <Minus className="h-3.5 w-3.5 text-orange-600" />
-                  <span className="text-xs font-semibold text-orange-700">{t("questionAiSummary.weaknesses")}</span>
+                  <Minus className="h-3.5 w-3.5 text-warning-text" />
+                  <span className="text-xs font-semibold text-warning-text">{t("questionAiSummary.weaknesses")}</span>
                 </div>
                 <ul className="space-y-1 pl-5 list-disc">
                   {aiSummary.weaknesses.map((w, idx) => (
-                    <li key={idx} className="text-xs text-gray-700">
+                    <li key={idx} className="text-xs text-foreground">
                       {w}
                     </li>
                   ))}
@@ -365,10 +364,10 @@ export function GradingPanel({
           <div
             className={`text-sm text-center ${
               isAiGradedOnly
-                ? "text-gray-500"
+                ? "text-muted-foreground"
                 : overallScore > 0
-                ? "text-green-600"
-                : "text-green-600"
+                ? "text-success-text"
+                : "text-success-text"
             }`}
           >
             {isAssignmentMode

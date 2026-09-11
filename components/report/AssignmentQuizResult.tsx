@@ -39,13 +39,13 @@ export function AssignmentQuizResult({ quiz }: { quiz: AssignmentQuiz }) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <ShieldQuestion className="w-5 h-5 text-amber-600" />
+          <ShieldQuestion className="w-5 h-5 text-warning-text" />
           {t("title")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
-          <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400">
+          <Badge variant="outline" className="bg-warning-surface/10 text-warning-text">
             {t("score", { score: quiz.score ?? 0 })}
           </Badge>
           <Badge variant="secondary">
@@ -55,7 +55,7 @@ export function AssignmentQuizResult({ quiz }: { quiz: AssignmentQuiz }) {
             })}
           </Badge>
           {quiz.submitted_at && (
-            <span className="text-sm text-muted-foreground">
+            <span className="type-hint">
               {t("completedAt", { date: formatDateTime(quiz.submitted_at, locale) })}
             </span>
           )}
@@ -78,8 +78,8 @@ export function AssignmentQuizResult({ quiz }: { quiz: AssignmentQuiz }) {
                       variant="outline"
                       className={
                         isCorrect
-                          ? "bg-green-500/10 text-green-700 dark:text-green-400"
-                          : "bg-red-500/10 text-red-700 dark:text-red-400"
+                          ? "bg-success-solid/10 text-success-text"
+                          : "bg-destructive/10/10 text-destructive"
                       }
                     >
                       {isCorrect ? t("correct") : t("incorrect")}
@@ -93,7 +93,7 @@ export function AssignmentQuizResult({ quiz }: { quiz: AssignmentQuiz }) {
                     : t("noAnswer")}
                 </p>
                 {typeof correctIndex === "number" && (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="type-hint">
                     {t("correctAnswer")} {question.options[correctIndex]}
                   </p>
                 )}

@@ -60,7 +60,9 @@ describe("authoring-validation mirror-drift guard", () => {
 
       it("uses isQuestionContentEmpty, not an inline HTML-strip+trim emptiness check (no &nbsp; drift)", () => {
         // `q.text.replace(/<[^>]*>/g, "").trim()` 은 &nbsp; 정규화가 빠져 헬퍼와 의미가 달라진다.
-        expect(src).not.toMatch(/\.replace\(\/<\[\^>\]\*>\/g,\s*""\)\.trim\(\)/);
+        // 메서드 체인이 줄바꿈으로 끊겨도 잡히도록 호출 사이에 \s* 를 둔다
+        // (과거 new/page.tsx 의 `.replace(...)\n.trim()` drift 가 이 틈으로 지나갔다).
+        expect(src).not.toMatch(/\.replace\(\/<\[\^>\]\*>\/g,\s*""\)\s*\.trim\(\)/);
       });
     });
   }

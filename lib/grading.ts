@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { getOpenAI, AI_MODEL_HEAVY } from "@/lib/openai";
+import { getOpenAI } from "@/lib/openai";
+import { applyProfileToChatBody, resolveAiTaskProfile } from "@/lib/ai-task-profile";
+import { loadCurrentVersion } from "@/lib/ai-config-store";
+import type { AiConfigVersionSnapshot } from "@/lib/ai-execution-context";
+import { clampTimeoutToProfile } from "@/lib/ai-deadline";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import {
   buildSummaryGenerationSystemPrompt,
@@ -188,6 +192,8 @@ ${rubricItems
  * 단일 문제 채점 (기존 pLimit 내부 closure 로직 추출)
  */
 async function gradeSingleQuestion(params: {
+  /** 진입점이 한 번 읽어 내려주는 설정 버전 (이슈 #118). 문항마다 다시 읽지 않는다. */
+  aiVersion?: AiConfigVersionSnapshot;
   question: { idx: number; prompt?: string; ai_context?: string };
   submission: { answer: string; workspace_state?: unknown } | undefined;
   questionMessages: Array<{ role: string; content: string }>;
@@ -290,129 +296,108 @@ async function gradeSingleQuestion(params: {
 
   const userPrompt = `[학생의 채팅 기반 과제 수행 기록]\n${submission.answer || "(기록 없음)"}${finalAnswerSection}${aiSummaryText}`;
 
-  // Retry loop: up to 2 retries (3 total attempts) with exponential backoff (1s, 2s)
-  const MAX_GRADING_RETRIES = 2;
-  const RETRY_DELAYS_MS = [1_000, 2_000];
-  /** Minimum useful timeout per attempt — below this it's not worth trying */
+  // 관리자 설정이 이 경로에도 닿아야 한다. 라벨은 Redis 캐시(TTL 45초)를 통해 읽는다.
+  // 진입점에서 내려온 버전을 쓴다. 없으면(구 호출부) 여기서 한 번 읽는다.
+  const aiVersion = params.aiVersion ?? (await loadCurrentVersion());
+  const { profile: questionProfile } = resolveAiTaskProfile({
+    task: "auto_grading_question",
+    overrides: aiVersion.overrides,
+  });
+
+  // 이슈 #118: 수동 재시도 루프를 제거했다.
+  //
+  // 예전에는 여기서 3회 outer 루프를 돌리면서 래퍼의 내부 재시도를 끄는 식으로
+  // 균형을 잡았다. 문제는 SDK 자체가 기본 maxRetries=2 로 조용히 재시도하고 있어서
+  // 실제 전송 횟수가 곱해졌고, 관리자가 maxRetries 를 조정할 수 있게 되면 이 루프와
+  // 다시 곱해진다. 재시도 계층은 하나여야 한다.
+  //
+  // 지금은 SDK 요청 옵션 한 층이 재시도를 소유하고, 남은 deadline 예산이 실효
+  // 재시도 수와 시도별 타임아웃을 정한다. 전송 시도 상한(예산이 넉넉할 때 3회)은
+  // 이전 최악값과 같다.
   const MIN_ATTEMPT_TIMEOUT_MS = 15_000;
-  /** Hard cap per attempt */
   const MAX_ATTEMPT_TIMEOUT_MS = 75_000;
-  /** Safety buffer before deadline (for DB writes, progress updates, etc.) */
   const DEADLINE_SAFETY_BUFFER_MS = 10_000;
 
+  const remainingMs = deadline - Date.now() - DEADLINE_SAFETY_BUFFER_MS;
+  if (remainingMs < MIN_ATTEMPT_TIMEOUT_MS) {
+    logError("[AUTO_GRADE] Insufficient time remaining — skipping call", null, {
+      path: "lib/grading.ts",
+      additionalData: { sessionId, qIdx, remainingMs },
+    });
+    return { ok: false, failureReason: "Insufficient time remaining before deadline" };
+  }
+  const attemptTimeoutMs = Math.max(
+    MIN_ATTEMPT_TIMEOUT_MS,
+    Math.min(MAX_ATTEMPT_TIMEOUT_MS, remainingMs)
+  );
+
   let rawParsed: unknown = null;
-  let lastError: unknown = null;
-  for (let attempt = 0; attempt <= MAX_GRADING_RETRIES; attempt++) {
-    if (attempt > 0) {
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt - 1]));
-      logError(
-        `[AUTO_GRADE] Retrying grading API call (attempt ${attempt + 1}/${MAX_GRADING_RETRIES + 1})`,
-        null,
-        {
-          path: "lib/grading.ts",
-          additionalData: { sessionId, qIdx, attempt },
-        }
-      );
-    }
-
-    // Deadline-aware per-attempt timeout:
-    // Distribute remaining time evenly across remaining attempts so retries
-    // never push past the caller-provided grading deadline.
-    const remainingMs = deadline - Date.now() - DEADLINE_SAFETY_BUFFER_MS;
-    if (remainingMs < MIN_ATTEMPT_TIMEOUT_MS) {
-      logError("[AUTO_GRADE] Insufficient time remaining — skipping attempt", null, {
-        path: "lib/grading.ts",
-        additionalData: { sessionId, qIdx, attempt, remainingMs },
-      });
-      return { ok: false, failureReason: "Insufficient time remaining before deadline" };
-    }
-    const remainingAttempts = MAX_GRADING_RETRIES - attempt + 1;
-    const attemptTimeoutMs = Math.max(
-      MIN_ATTEMPT_TIMEOUT_MS,
-      Math.min(MAX_ATTEMPT_TIMEOUT_MS, Math.floor(remainingMs / remainingAttempts))
-    );
-
-    try {
-      const tracked = await callTrackedChatCompletion(
-        () =>
-          getOpenAI().chat.completions.create(
-            {
-              model: AI_MODEL_HEAVY,
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
-              ],
-              response_format: { type: "json_object" },
-            },
-            { signal }
-          ),
-        {
-          feature: "auto_grading_question",
-          route: "lib/grading.ts",
-          model: AI_MODEL_HEAVY,
-          userId: studentId,
-          examId: exam.id,
-          sessionId,
-          qIdx,
-          metadata: buildAiTextMetadata({
-            inputText: [systemPrompt, userPrompt],
-            extra: {
-              chat_weight: chatWeight,
-              rubric_item_count: rubricItems.length,
-              message_count: questionMessages.length,
-              attempt,
-              attemptTimeoutMs,
-            },
+  try {
+    const tracked = await callTrackedChatCompletion(
+      () =>
+        getOpenAI().chat.completions.create(
+          applyProfileToChatBody(questionProfile, {
+            messages: [
+              { role: "system" as const, content: systemPrompt },
+              { role: "user" as const, content: userPrompt },
+            ],
+            response_format: { type: "json_object" as const },
           }),
-        },
-        {
-          timeoutMs: attemptTimeoutMs,
-          // Disable internal retries — gradeSingleQuestion's own deadline-aware
-          // retry loop handles all retry logic. Without this, callOpenAIWithTelemetry
-          // retries 3× on 5xx/429, multiplying per-question time up to 3× 225s = 675s.
-          maxAttempts: 1,
-          metadataBuilder: (result) =>
-            buildAiTextMetadata({
-              outputText:
-                (result as { choices?: Array<{ message?: { content?: string | null } }> })
-                  .choices?.[0]?.message?.content ?? null,
-            }),
-        }
-      );
-      const c = tracked.data;
-      if (!c.choices?.length) {
-        throw new Error("Empty AI response (no choices)");
-      }
-      rawParsed = JSON.parse(c.choices[0]?.message?.content || "{}");
-      break; // success
-    } catch (err) {
-      lastError = err;
-      if (attempt === MAX_GRADING_RETRIES) {
-        logError(
-          `[AUTO_GRADE] All ${MAX_GRADING_RETRIES + 1} grading attempts failed`,
-          err,
+          // 재시도·타임아웃을 SDK 가 소유한다. deadline 이 남은 예산을 정한다.
+          // 프로필 타임아웃이 상한이다 — 관리자가 낮추면 실제로 낮아져야 한다.
           {
-            path: "lib/grading.ts",
-            additionalData: { sessionId, qIdx },
+            signal,
+            timeout: clampTimeoutToProfile(questionProfile, attemptTimeoutMs),
+            maxRetries: questionProfile.maxRetries,
           }
-        );
-        return {
-          ok: false,
-          failureReason: `API failed after ${MAX_GRADING_RETRIES + 1} attempts: ${err instanceof Error ? err.message : String(err)}`,
-        };
+        ),
+      {
+        feature: "auto_grading_question",
+        route: "lib/grading.ts",
+        model: questionProfile.model,
+        configVersion: aiVersion.versionId,
+        userId: studentId,
+        examId: exam.id,
+        sessionId,
+        qIdx,
+        metadata: buildAiTextMetadata({
+          inputText: [systemPrompt, userPrompt],
+          extra: {
+            chat_weight: chatWeight,
+            rubric_item_count: rubricItems.length,
+            message_count: questionMessages.length,
+            attempt_timeout_ms: attemptTimeoutMs,
+            requested_max_retries: 2,
+          },
+        }),
+      },
+      {
+        metadataBuilder: (result) =>
+          buildAiTextMetadata({
+            outputText:
+              (result as { choices?: Array<{ message?: { content?: string | null } }> })
+                .choices?.[0]?.message?.content ?? null,
+          }),
       }
-      logError(`[AUTO_GRADE] Grading attempt ${attempt + 1} failed, will retry`, err, {
-        path: "lib/grading.ts",
-        additionalData: { sessionId, qIdx, attempt },
-      });
+    );
+    const c = tracked.data;
+    if (!c.choices?.length) {
+      throw new Error("Empty AI response (no choices)");
     }
+    rawParsed = JSON.parse(c.choices[0]?.message?.content || "{}");
+  } catch (err) {
+    logError("[AUTO_GRADE] Grading call failed", err, {
+      path: "lib/grading.ts",
+      additionalData: { sessionId, qIdx },
+    });
+    return {
+      ok: false,
+      failureReason: `API failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 
   if (rawParsed === null) {
-    return {
-      ok: false,
-      failureReason: `Grading failed: ${lastError instanceof Error ? lastError.message : "unknown"}`,
-    };
+    return { ok: false, failureReason: "Grading failed: empty response" };
   }
 
   const assignmentResponseSchema = z.object({
@@ -487,6 +472,8 @@ async function gradeSingleQuestion(params: {
  * 기존 buildSummaryEvaluationSystemPrompt를 재활용하되, 단일 문제로 스코프 좁힘.
  */
 async function generateQuestionSummary(params: {
+  /** 진입점이 한 번 읽어 내려주는 설정 버전 (이슈 #118). */
+  aiVersion?: AiConfigVersionSnapshot;
   question: { idx: number; prompt?: string; ai_context?: string };
   submission: { answer: string } | undefined;
   questionMessages: Array<{ role: string; content: string }>;
@@ -611,25 +598,36 @@ JSON 형식으로 응답해주세요:
 }
 `;
 
+  const aiVersion = params.aiVersion ?? (await loadCurrentVersion());
+  const { profile: qSummaryProfile } = resolveAiTaskProfile({
+    task: "auto_grading_question_summary",
+    overrides: aiVersion.overrides,
+  });
+
     const tracked = await callTrackedChatCompletion(
       () =>
         getOpenAI().chat.completions.create(
-          {
-            model: AI_MODEL_HEAVY,
+          applyProfileToChatBody(qSummaryProfile, {
             messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
+              { role: "system" as const, content: systemPrompt },
+              { role: "user" as const, content: userPrompt },
             ],
-            response_format: { type: "json_object" },
-            temperature: 0.3,
+            response_format: { type: "json_object" as const },
+            // seed 는 호출부 소유다 — 세션 단위 결정성을 위해 프로필이 건드리지 않는다.
             seed: deriveSessionSeed(sessionId),
-          },
-          { signal }
+          }),
+          // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
+          {
+            signal,
+            timeout: clampTimeoutToProfile(qSummaryProfile, timeoutMs),
+            maxRetries: qSummaryProfile.maxRetries,
+          }
         ),
       {
         feature: "auto_grading_question_summary",
         route: "lib/grading.ts",
-        model: AI_MODEL_HEAVY,
+        model: qSummaryProfile.model,
+        configVersion: aiVersion.versionId,
         userId: studentId,
         examId,
         sessionId,
@@ -640,7 +638,6 @@ JSON 형식으로 응답해주세요:
         }),
       },
       {
-        timeoutMs,
         metadataBuilder: (result) =>
           buildAiTextMetadata({
             outputText:
@@ -901,7 +898,9 @@ export async function listGradedQuestionsForSummary(
  */
 export async function gradeOneQuestion(
   sessionId: string,
-  qIdx: number
+  qIdx: number,
+  /** 상위(autoGradeSession)가 한 번 읽어 넘긴 설정 버전. 없으면 여기서 읽는다. */
+  aiVersion?: AiConfigVersionSnapshot
 ): Promise<{ skipped: boolean; graded: boolean; failureReason?: string }> {
   const supabase = getSupabaseServer();
 
@@ -1008,6 +1007,7 @@ export async function gradeOneQuestion(
   const abortController = new AbortController();
   const deadline = Date.now() + 180_000;
   const outcome = await gradeSingleQuestion({
+    aiVersion,
     question,
     submission,
     questionMessages,
@@ -1076,7 +1076,8 @@ export async function gradeOneQuestion(
  */
 export async function generateOneQuestionSummary(
   sessionId: string,
-  qIdx: number
+  qIdx: number,
+  aiVersion?: AiConfigVersionSnapshot
 ): Promise<{ skipped: boolean; generated: boolean }> {
   const supabase = getSupabaseServer();
 
@@ -1143,6 +1144,7 @@ export async function generateOneQuestionSummary(
   };
 
   const summary = await generateQuestionSummary({
+    aiVersion,
     question,
     submission,
     questionMessages,
@@ -1318,6 +1320,7 @@ export async function generateSessionSummaryPhase(
 
   if (!summary) {
     await updateGradingProgress(supabase, sessionId, {
+      status: "failed",
       phase: "session_summary",
       last_error: "generateSummary returned null",
     });
@@ -1365,9 +1368,14 @@ export async function autoGradeSession(
   const grades: GradeResult[] = [];
   const failedQuestions: number[] = [];
 
+  // 이슈 #118: 런 전체가 같은 설정 버전으로 채점돼야 한다. 문항마다 다시 읽으면
+  // 도중에 관리자가 발행했을 때 앞뒤 문항이 다른 설정으로 채점되고, 그건 벌크 런에
+  // 핀을 박은 이유와 똑같은 공정성 문제다. 왕복도 문항 수만큼 줄어든다.
+  const runAiVersion = await loadCurrentVersion();
+
   for (const qIdx of questionIdxs) {
     try {
-      const res = await gradeOneQuestion(sessionId, qIdx);
+      const res = await gradeOneQuestion(sessionId, qIdx, runAiVersion);
       if (res.graded) {
         const { data } = await supabase
           .from("grades")
@@ -1539,7 +1547,8 @@ async function generateSummary(
   messagesByQuestion: Record<number, Array<{ role: string; content: string }>>,
   grades: GradeResult[],
   timeBudgetMs?: number,
-  isAssignment = false
+  isAssignment = false,
+  aiVersionParam?: AiConfigVersionSnapshot
 ): Promise<SummaryData | null> {
   const supabase = getSupabaseServer();
   try {
@@ -1686,20 +1695,36 @@ ${
         "keyQuotes": ["인용구1", "인용구2"]
       }`;
 
+  const aiVersion = aiVersionParam ?? (await loadCurrentVersion());
+  const { profile: summaryProfile } = resolveAiTaskProfile({
+    task: "auto_grading_summary",
+    overrides: aiVersion.overrides,
+  });
+
     const tracked = await callTrackedChatCompletion(
       () =>
-        getOpenAI().chat.completions.create({
-          model: AI_MODEL_HEAVY,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          response_format: { type: "json_object" },
-        }),
+        getOpenAI().chat.completions.create(
+          applyProfileToChatBody(summaryProfile, {
+            messages: [
+              { role: "system" as const, content: systemPrompt },
+              { role: "user" as const, content: userPrompt },
+            ],
+            response_format: { type: "json_object" as const },
+          }),
+          // 이슈 #118: 타임아웃·재시도는 SDK 요청 옵션이 소유한다.
+          {
+            timeout: clampTimeoutToProfile(
+              summaryProfile,
+              timeBudgetMs ? timeBudgetMs - 5_000 : summaryProfile.timeoutMs,
+            ),
+            maxRetries: summaryProfile.maxRetries,
+          }
+        ),
       {
         feature: "auto_grading_summary",
         route: "lib/grading.ts",
-        model: AI_MODEL_HEAVY,
+        model: summaryProfile.model,
+        configVersion: aiVersion.versionId,
         userId: studentId,
         examId: exam.id,
         sessionId,
@@ -1711,7 +1736,6 @@ ${
         }),
       },
       {
-        timeoutMs: timeBudgetMs ? Math.min(timeBudgetMs - 5_000, 120_000) : 120_000,
         metadataBuilder: (result) =>
           buildAiTextMetadata({
             outputText:

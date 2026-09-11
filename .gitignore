@@ -63,8 +63,6 @@ next-env.d.ts
 # SQL files in database directory (can be committed if needed)
 !database/*.sql
 
-# impact-review per-run agent brief artifact (best-effort cleanup; guard against commit)
-.impact-review-brief.*.json
 # 에이전트 런타임 상태 (기기별, 버전관리 대상 아님)
 .gjc/
 **/.gjc/
@@ -75,3 +73,6 @@ next-env.d.ts
 
 # Local isolated worktrees
 .worktrees/
+
+# 에이전트 툴 스크래치 — 저장소에 들어가면 안 된다
+.omo/

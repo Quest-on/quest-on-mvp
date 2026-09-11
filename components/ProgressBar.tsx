@@ -33,9 +33,9 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ currentStep }) => {
     <div className="w-full py-2 px-4 relative">
       <div className="flex items-center justify-between max-w-3xl mx-auto relative">
         {/* Progress Line Background */}
-        <div className="absolute top-4 left-6 right-6 h-0.5 bg-gray-300">
+        <div className="absolute top-4 left-6 right-6 h-0.5 bg-border">
           <div
-            className="h-full bg-green-500 transition-all duration-500 ease-out"
+            className="h-full bg-success-solid transition-all duration-500 ease-out"
             style={{
               width:
                 currentIndex === 0
@@ -59,10 +59,10 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ currentStep }) => {
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
                   isCompleted
-                    ? "bg-green-500 border-green-500 text-white"
+                    ? "bg-success-solid border-success-border text-white"
                     : isCurrent
-                    ? "bg-blue-500 border-blue-500 text-white ring-2 ring-blue-200"
-                    : "bg-gray-100 border-gray-300 text-gray-400"
+                    ? "bg-primary border-primary text-white ring-2 ring-primary/30"
+                    : "bg-muted border-border text-muted-foreground"
                 }`}
               >
                 {isCompleted ? (
@@ -77,10 +77,10 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ currentStep }) => {
                 <p
                   className={`text-xs font-medium ${
                     isCompleted
-                      ? "text-green-600"
+                      ? "text-success-text"
                       : isCurrent
-                      ? "text-blue-600"
-                      : "text-gray-400"
+                      ? "text-info-text"
+                      : "text-muted-foreground"
                   }`}
                 >
                   {step.label}

@@ -68,7 +68,7 @@ describe("buildBulkGradeStudentIdentities", () => {
           "student-gamma-3",
           {
             name: "User student-",
-            email: "student-gamma-3@example.com",
+            email: null,
           },
         ],
       ]),

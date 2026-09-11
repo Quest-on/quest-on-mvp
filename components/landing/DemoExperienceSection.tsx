@@ -239,7 +239,7 @@ const InstructorDashboardContent = ({ onExamClick }: { onExamClick: (examId: str
       {/* Action Bar */}
       <div className="bg-card/80 border border-border rounded-lg p-3 mb-3">
         <div className="flex items-center gap-2">
-          <button className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-[10px] hover:bg-primary/90 flex items-center gap-1.5">
+          <button className="px-3 py-1.5 bg-pink-700 text-white rounded-md text-[10px] hover:bg-pink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-700 focus-visible:ring-offset-2 dark:bg-pink-600 dark:hover:bg-pink-700 dark:focus-visible:ring-pink-400 flex items-center gap-1.5">
             <Plus className="w-3 h-3" />새 항목
           </button>
           <div className="flex-1 relative">
@@ -443,28 +443,28 @@ const InstructorExamInfoContent = ({ onStudentClick }: { onStudentClick?: () => 
             <TrendingUp className="w-2.5 h-2.5" />
             <span>평균 점수</span>
           </div>
-          <div className="text-base font-semibold">{averageScore}점</div>
+          <div className="type-section-title">{averageScore}점</div>
         </div>
         <div className="bg-card border border-border rounded-lg p-2 flex flex-col items-center">
           <div className="flex items-center gap-1 text-[9px] text-muted-foreground mb-0.5">
             <MessageSquare className="w-2.5 h-2.5" />
             <span>평균 질문</span>
           </div>
-          <div className="text-base font-semibold">{averageQuestions}개</div>
+          <div className="type-section-title">{averageQuestions}개</div>
         </div>
         <div className="bg-card border border-border rounded-lg p-2 flex flex-col items-center">
           <div className="flex items-center gap-1 text-[9px] text-muted-foreground mb-0.5">
             <FileText className="w-2.5 h-2.5" />
             <span>평균 길이</span>
           </div>
-          <div className="text-base font-semibold">{averageAnswerLength}자</div>
+          <div className="type-section-title">{averageAnswerLength}자</div>
         </div>
         <div className="bg-card border border-border rounded-lg p-2 flex flex-col items-center">
           <div className="flex items-center gap-1 text-[9px] text-muted-foreground mb-0.5">
             <Clock className="w-2.5 h-2.5" />
             <span>평균 시간</span>
           </div>
-          <div className="text-base font-semibold">{averageExamDuration}분</div>
+          <div className="type-section-title">{averageExamDuration}분</div>
         </div>
       </div>
 

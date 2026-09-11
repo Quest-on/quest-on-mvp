@@ -11,7 +11,14 @@
     "saveError": "Failed to save your final answer. Please try again.",
     "submitError": "Submission failed.",
     "quizRedirect": "Redirecting to the timed quiz.",
-    "submitNetworkError": "An error occurred during submission."
+    "submitNetworkError": "An error occurred during submission.",
+    "entryWindowNotOpen": "This assignment has not started yet.",
+    "examNotAvailable": "This assignment has ended or is not public.",
+    "examNotFound": "Assignment not found.",
+    "publishLimitReached": "This assignment has reached its participation limit. Please contact your instructor.",
+    "studentLimitReached": "The student capacity for this assignment is full. Please contact your instructor.",
+    "sessionInitError": "Something went wrong opening this assignment. Please try again shortly.",
+    "submitAlreadySubmitted": "This session has already been submitted."
   },
   "review": {
     "errorNotViewable": "This assignment is not available for review.",
@@ -21,7 +28,7 @@
     "backToDashboard": "Back to student dashboard",
     "breadcrumbDashboard": "Dashboard",
     "breadcrumbReview": "Review",
-    "statusBadge": "Read-only · Closed",
+    "statusBadge": "Read-only, Closed",
     "deadline": "Due: {deadline}",
     "readonlyNotice": "The deadline has passed. Your submission is shown in read-only mode and can no longer be edited.",
     "dashboardButton": "Dashboard",
@@ -72,7 +79,7 @@
     "placeholder": "Write your final answer here...",
     "ariaLabel": "Final answer",
     "charCount": "{current} / {max} chars",
-    "statusSubmitted": "Submitted — read only",
+    "statusSubmitted": "Submitted: read only",
     "statusSaving": "Saving...",
     "statusLastSaved": "Last saved: {time}",
     "statusUnsaved": "Unsaved",

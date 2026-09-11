@@ -19,6 +19,7 @@ vi.mock("@supabase/ssr", () => ({
 
 beforeEach(() => {
   vi.stubEnv("TEST_BYPASS_SECRET", "");
+  vi.stubEnv("CONSENT_GATE_MODE", "off");
   auth.user = null;
   auth.role = null;
   auth.status = "active";
@@ -43,6 +44,8 @@ describe("public policy access through the actual request proxy", () => {
 
   it.each(["/instructor", "/student", "/legal-private"])("still protects %s from anonymous access", async (pathname) => {
     const response = await proxy(new NextRequest(`https://quest-on.app${pathname}`));
-    expect(response.headers.get("location")).toBe("https://quest-on.app/sign-in");
+    const location = new URL(response.headers.get("location")!);
+    expect(location.origin + location.pathname).toBe("https://quest-on.app/sign-in");
+    expect(location.searchParams.get("redirect")).toBe(pathname);
   });
 });

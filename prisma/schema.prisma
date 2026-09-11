@@ -148,6 +148,49 @@ model grading_chats {
   @@index([session_id, q_idx, created_at], map: "idx_grading_chats_session_q_idx_created")
 }
 
+/// AI 설정 버전 — 불변. 저장할 때마다 새 행이 생기고 기존 행은 수정되지 않는다.
+/// profiles 는 sparse override 만 담는다(코드/env 기본값을 물질화하지 않는다). 이슈 #118.
+model ai_config_versions {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  profiles       Json
+  created_by     String
+  created_at     DateTime           @default(now()) @db.Timestamptz(6)
+  labels         ai_config_labels[]
+  audit_previous ai_config_audit[]  @relation("ai_config_audit_previous_version")
+  audit_new      ai_config_audit[]  @relation("ai_config_audit_new_version")
+  pinned_runs    exam_grading_sessions[]
+  stamped_events ai_events[]
+
+  @@index([created_at(sort: Desc)], map: "idx_ai_config_versions_created_at")
+}
+
+/// 이동 가능한 라벨. `production` 하나가 현재 적용 버전을 가리킨다.
+/// 롤백 = 라벨을 이전 버전으로 옮기기(버전 행은 그대로 남는다). 이슈 #118.
+model ai_config_labels {
+  label      String             @id
+  version_id String             @db.Uuid
+  updated_at DateTime           @default(now()) @db.Timestamptz(6)
+  version    ai_config_versions @relation(fields: [version_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([version_id], map: "idx_ai_config_labels_version")
+}
+
+/// 설정 변경 감사 로그 — append-only. 누가·언제·무엇을·왜 바꿨는지 남긴다. 이슈 #118.
+model ai_config_audit {
+  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actor               String
+  action              String
+  previous_version_id String?             @db.Uuid
+  new_version_id      String              @db.Uuid
+  reason              String
+  created_at          DateTime            @default(now()) @db.Timestamptz(6)
+  previous_version    ai_config_versions? @relation("ai_config_audit_previous_version", fields: [previous_version_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  new_version         ai_config_versions  @relation("ai_config_audit_new_version", fields: [new_version_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "idx_ai_config_audit_created_at")
+  @@index([new_version_id], map: "idx_ai_config_audit_new_version")
+}
+
 model ai_events {
   id                        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   provider                  String
@@ -174,6 +217,8 @@ model ai_events {
   error_code                String?
   metadata                  Json      @default("{}")
   created_at                DateTime  @default(now()) @db.Timestamptz(6)
+  config_version            String?   @db.Uuid
+  ai_config_version         ai_config_versions? @relation(fields: [config_version], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "ai_events_config_version_fkey")
   exams                     exams?    @relation(fields: [exam_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   sessions                  sessions? @relation(fields: [session_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
@@ -183,6 +228,7 @@ model ai_events {
   @@index([exam_id, created_at(sort: Desc)], map: "idx_ai_events_exam_created_at")
   @@index([session_id], map: "idx_ai_events_session_id")
   @@index([user_id, created_at(sort: Desc)], map: "idx_ai_events_user_created_at")
+  @@index([config_version, created_at(sort: Desc)], map: "idx_ai_events_config_version_created_at")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -390,11 +436,15 @@ model exam_grading_sessions {
   calibration_attempt            Int                     @default(0)
   current_attempt_id             String?
   processed_session_ids          Json                    @default("{}")
+  ai_config_version_id           String?                 @db.Uuid
+  ai_profile_snapshot            Json?
+  ai_config_version              ai_config_versions?     @relation(fields: [ai_config_version_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "exam_grading_sessions_ai_config_version_fkey")
   exams                          exams                   @relation(fields: [exam_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   bulk_grading_messages          bulk_grading_messages[]
 
   @@unique([exam_id, instructor_id], map: "exam_grading_sessions_exam_instructor_key")
   @@index([exam_id], map: "idx_exam_grading_sessions_exam_id")
+  @@index([ai_config_version_id], map: "idx_exam_grading_sessions_ai_config_version")
 }
 
 /// AI 일괄 채점 대화 메시지 (row-per-message, race condition 방지)
@@ -409,4 +459,70 @@ model bulk_grading_messages {
   exam_grading_sessions exam_grading_sessions @relation(fields: [session_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([session_id, created_at], map: "idx_bulk_grading_messages_session_created")
+}
+/// 025: 개인정보 동의 원장. append-only — UPDATE 는 DB trigger 가 거부하고
+/// DELETE 는 purge_expired_consent_records RPC 경로만 허용한다.
+/// user_id 를 저장하지 않는다. 식별은 consent_subject_map 이 담당한다.
+/// This model contains row level security and requires additional setup for migrations.
+model consent_records {
+  id                      String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subject_ref             String
+  controller_type         String                  @default("platform")
+  consent_key             String
+  granted                 Boolean
+  policy_version          String
+  recorded_at             DateTime                @default(now()) @db.Timestamptz(6)
+  consent_policy_releases consent_policy_releases @relation(fields: [policy_version], references: [release_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([subject_ref, consent_key, recorded_at(sort: Desc)], map: "idx_consent_records_subject_key_recorded")
+  @@index([subject_ref], map: "idx_consent_records_subject_ref")
+}
+
+/// 025: 식별 매핑. 탈퇴 = 이 테이블 1행 DELETE.
+/// service_role 직접 권한은 회수됐고 register_consent_subject RPC 로만 쓴다.
+/// This model contains row level security and requires additional setup for migrations.
+model consent_subject_map {
+  user_id     String   @id
+  subject_ref String   @unique
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// 025: 불변 정책 릴리스. UPDATE/DELETE 를 trigger 가 거부한다.
+/// 최초 행은 027_seed_consent_policy_release.sql 이 소유한다.
+/// This model contains row level security and requires additional setup for migrations.
+model consent_policy_releases {
+  release_id         String            @id
+  content_hash       String            @db.Char(64)
+  effective_at       DateTime          @unique @db.Timestamptz(6)
+  requires_reconsent Boolean
+  created_at         DateTime          @default(now()) @db.Timestamptz(6)
+  consent_records    consent_records[]
+
+  @@index([effective_at(sort: Desc)], map: "idx_consent_policy_releases_effective")
+}
+
+/// 025: 탈퇴 후 3년 보존 기한. destroy_after 는 CHECK 로 DB 가 강제한다.
+/// This table contains check constraints and requires additional setup for migrations.
+/// This model contains row level security and requires additional setup for migrations.
+model consent_retention_index {
+  subject_ref   String   @id
+  deleted_at    DateTime @db.Timestamptz(6)
+  destroy_after DateTime @db.Timestamptz(6)
+
+  @@index([destroy_after], map: "idx_consent_retention_index_destroy_after")
+}
+
+/// 025: 파기 배치 실행 로그. 원·가명 user_id 를 기록하지 않는다.
+/// This table contains check constraints and requires additional setup for migrations.
+/// This model contains row level security and requires additional setup for migrations.
+model consent_purge_runs {
+  run_id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  job             String
+  started_at      DateTime  @default(now()) @db.Timestamptz(6)
+  finished_at     DateTime? @db.Timestamptz(6)
+  cutoff          DateTime? @db.Timestamptz(6)
+  candidate_count Int       @default(0)
+  deleted_count   Int       @default(0)
+  status          String
+  error           String?
 }

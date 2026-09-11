@@ -108,7 +108,7 @@ export default function InstructorLayout({
             <CardTitle className="text-xl font-bold">
               {t("auth.loginRequired")}
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
+            <p className="type-hint">
               {t("auth.loginDesc")}
             </p>
           </CardHeader>

@@ -168,7 +168,7 @@ const PHASE_BADGE: Record<
   },
   done: {
     labelKey: "agent.phase.done",
-    className: "bg-emerald-500/10 text-emerald-600",
+    className: "bg-success-surface/10 text-success-text",
   },
   failed: {
     labelKey: "agent.phase.failed",
@@ -396,9 +396,9 @@ function DoneView() {
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <AgentStepTimeline steps={activeRun?.steps ?? []} />
 
-        <div className="mt-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3">
+        <div className="mt-4 rounded-xl border border-success-border/40 bg-success-surface/10 p-3">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <CheckCircle2 className="h-4 w-4 text-success-text" />
             <p className="text-sm font-medium text-foreground">
               {t("agent.done.successTitle")}
             </p>

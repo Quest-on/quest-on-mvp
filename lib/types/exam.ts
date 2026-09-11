@@ -75,6 +75,9 @@ export interface InstructorExam extends Exam {
   initial_state?: InitialState;
   canvas_config?: CanvasConfig;
   grades_released?: boolean;
+  is_demo?: boolean;
+  /** 첫 학생이 들어온 시각. 발행 한도 판정에 쓴다(이미 발행된 시험엔 재적용 안 함). */
+  first_published_at?: string | null;
 }
 
 export type GradeStatus = "ai_graded" | "manually_graded" | "pending";

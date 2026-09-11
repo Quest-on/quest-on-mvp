@@ -45,9 +45,11 @@ Steps 0 and 2 may vary for webhooks, cron, and internal routes — see `docs/SEC
 
 ## AI Integration
 
-- All OpenAI calls MUST be tracked in the `ai_events` table (tokens, latency, cost).
-- Use models defined in env vars (`AI_MODEL`, `AI_MODEL_HEAVY`) — never hardcode model names.
-- Implement retry logic for 429/5xx responses (max 3 attempts).
+- All OpenAI calls MUST be tracked in the `ai_events` table (tokens, latency, cost, `config_version`).
+- Model and request parameters come from the task profile (`resolveAiTaskProfile` in `lib/ai-task-profile.ts`) — never hardcode model names or per-call params in a route.
+- **Retry and timeout live in exactly one layer: SDK request options.** Pass them at the callsite as `create(params, { timeout, maxRetries, signal })`. The client default `maxRetries` is pinned to 0, so retries must be explicit. Do NOT add a retry loop around the call — a second layer multiplies with the SDK's own retries (that was the 27× amplification defect in issue #118).
+- Long-running routes derive an absolute deadline from `maxDuration` (`lib/ai-deadline.ts`) and let it clamp the effective retry count; if the budget cannot fund one useful attempt, fail before calling OpenAI.
+- Streaming routes cannot use the thunk wrapper: call `recordAiStreamEvent` exactly once across all four terminal paths (completed / ended-without-completion / error / client cancel) and bridge cancellation into the SDK stream.
 - Rate limit AI endpoints to prevent runaway costs.
 
 ---

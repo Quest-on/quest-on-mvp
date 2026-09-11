@@ -237,15 +237,19 @@ export function isAssignmentType(type?: string | null): boolean {
 
 /**
  * 강사 채점을 시작할 수 있는 시점인지 판정한다(시험/과제 통일 게이트).
+ * - 데모: 교수자 혼자 겪는 샘플이므로 대기실·종료 흐름 없이 채점 가능.
  * - 과제(isAssignmentType): 마감(deadline) 경과 후. deadline 미설정이면 아직 불가.
  * - 시험: status === "closed" (대기실 종료 흐름).
  * bulk-grade-access의 requireGradable 분기와 동일한 규약 — case-grade·grade 라우트가 공유한다.
  */
 export function isGradingOpen(exam: {
+  is_demo?: boolean | null;
   type?: string | null;
   status?: string | null;
   deadline?: string | null;
 }): boolean {
+  // is_demo는 목록·통계·한도에서 이미 제외하는 경계라서 별도 종료 절차를 요구하지 않는다.
+  if (exam.is_demo === true) return true;
   if (isAssignmentType(exam.type)) {
     return exam.deadline != null && new Date() > new Date(exam.deadline);
   }

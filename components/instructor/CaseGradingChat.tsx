@@ -244,7 +244,7 @@ export function CaseGradingChat({
               <p className="text-sm font-medium text-foreground">
                 {t("caseGradingChat.emptyTitle")}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-meta">
                 {t("caseGradingChat.emptyExample")}
               </p>
             </div>

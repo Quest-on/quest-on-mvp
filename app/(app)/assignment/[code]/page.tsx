@@ -140,7 +140,7 @@ export default function AssignmentPage({
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitted, isSubmitting, session?.id, exam?.id, userId, router, finalAnswer]);
+  }, [isSubmitted, isSubmitting, session?.id, exam?.id, userId, router, finalAnswer, t]);
 
   // Pre-flight: header "제출하기" 클릭 시 호출 — 미작성이면 sheet 열고 어필
   const handleHeaderSubmitClick = () => {
@@ -188,7 +188,12 @@ export default function AssignmentPage({
           setFinalAnswerAttention(true);
           throw new Error(t("page.finalAnswerRequired"));
         }
-        throw new Error(errData.message || t("page.submitError"));
+        // 서버 원문(영문)을 학생 화면에 흘리지 않는다. 코드로 판정한다.
+        throw new Error(
+          errData?.error === "ALREADY_SUBMITTED"
+            ? t("page.submitAlreadySubmitted")
+            : t("page.submitError")
+        );
       }
 
       setIsSubmitted(true);
@@ -209,7 +214,7 @@ export default function AssignmentPage({
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">{t("page.loading")}</p>
+        <p className="type-hint">{t("page.loading")}</p>
       </div>
     );
   }

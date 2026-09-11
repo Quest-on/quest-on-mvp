@@ -8,6 +8,14 @@ import { useTranslations } from "next-intl";
 const MARQUEE_FAST_MS = 36000;
 const MARQUEE_SLOW_MS = 50000;
 
+type TestimonialAsset = {
+  key: "kang" | "lee" | "kwon" | "choi" | "chang";
+  avatar: string;
+  logo: string;
+  avatarFade?: boolean;
+  avatarSize?: "small";
+};
+
 /**
  * =============================================================================
  * TESTIMONIAL CARD 디자인 스펙
@@ -19,8 +27,8 @@ const MARQUEE_SLOW_MS = 50000;
  *    - 레이아웃: flex flex-col, relative, overflow-hidden
  *    - 모서리: rounded-[2.5rem] (40px)
  *    - 패딩: p-8 md:p-10 (32px / 40px)
- *    - 테두리: border, light → border-zinc-200, dark → border-zinc-800
- *    - 배경: light → bg-white, dark → bg-zinc-900/40
+ *    - 테두리: border, light → border-border, dark → border-border
+ *    - 배경: light → bg-background, dark → bg-muted/40
  *    - 그림자: light → shadow-xl shadow-zinc-200/50
  *    - 호버: hover:shadow-2xl hover:-translate-y-2, transition-all
  *    - 애니메이션: animate-fade-in-up-sm, animationDelay = index * 0.15s
@@ -35,7 +43,7 @@ const MARQUEE_SLOW_MS = 50000;
  * 3) 그라데이션 오버레이 (z-[5])
  *    - 위치: absolute inset-0, pointer-events-none
  *    - light: from-white/95 via-white/70 to-transparent
- *    - dark:  from-zinc-900/90 via-zinc-900/50 to-transparent
+ *    - dark:  from-foreground/90 via-foreground/50 to-transparent
  *    - 역할: 아바타 위에 텍스트가 잘 읽이도록 왼쪽→오른쪽 그라데이션
  *
  * 4) 콘텐츠 영역 (z-10, relative)
@@ -53,63 +61,49 @@ const MARQUEE_SLOW_MS = 50000;
 
 const TESTIMONIALS = [
   {
-    quote:
-      "단순 암기를 넘어 문제 해결에 몰입하게 만드는 변화, AI의 실시간 피드백이 교수 설계의 새로운 영감을 줍니다.",
-    name: "강현정 교수님",
-    title: "홍익대학교",
+    key: "kang",
     avatar: "/kang_pf-removebg-preview.png",
     logo: "/hongik_emblem_blue.png",
   },
   {
-    quote:
-      "AI시대 새롭게 요구되는 인재상에 대비할 수 있는 방법입니다. 많은 교수자님께서도 관심과 응원 부탁드립니다.",
-    name: "이중학 교수님",
-    title: "동국대학교",
+    key: "lee",
     avatar: "/lee_pf-avatar.png",
     logo: "/dongguk_emblem.png",
     avatarFade: true, // 정장 하단이 딱 잘려 보여 아랫면만 흐림 처리(크기는 기본 규격)
   },
   {
-    quote:
-      "AI 시대에 꼭 필요한 '사고 과정' 평가의 해답. 공정성과 설명 가능성을 모두 갖춘 혁신적인 플랫폼입니다.",
-    name: "권효찬 교수님",
-    title: "경기과학기술대학교",
+    key: "kwon",
     avatar: "/kwan_pf-removebg-preview.png",
     logo: "/gtec_logo.svg",
   },
   {
-    quote:
-      "기존 시험으로는 불가능했던 '추론 과정의 가시화', Quest-On을 통해 진정한 의미의 평가가 시작되었습니다.",
-    name: "최인대 교수님",
-    title: "경기과학기술대학교",
+    key: "choi",
     avatar: "/choi_pf-removebg-preview.png",
     logo: "/gtec_logo.svg",
   },
   {
-    quote: "학생-교수 모두에게 의미가 있는 가치있는 시도입니다",
-    name: "장진욱 교수님",
-    title: "고려대학교",
+    key: "chang",
     avatar: "/jangjinook-removebg-preview.png",
     logo: "/korea_logo.svg",
     avatarSize: "small" as const, // 이미지 스타일 차이로 비율 맞추기
   },
-];
+] as const satisfies readonly TestimonialAsset[];
 
-type Testimonial = (typeof TESTIMONIALS)[number];
+type Testimonial = TestimonialAsset & {
+  quote: string;
+  name: string;
+  title: string;
+};
 
 function TestimonialCard({
   testimonial,
-  isDark,
 }: {
   testimonial: Testimonial;
-  isDark: boolean;
 }) {
   return (
     <div
       className={`group relative flex flex-col w-[320px] md:w-[380px] flex-shrink-0 rounded-[2.5rem] p-8 md:p-10 border transition-all hover:shadow-2xl hover:-translate-y-2 overflow-hidden ${
-        isDark
-          ? "bg-zinc-900/40 border-zinc-800"
-          : "bg-white border-zinc-200 shadow-xl shadow-zinc-200/50"
+        "bg-background border-border shadow-xl shadow-zinc-200/50"
       }`}
     >
       {/* 이미지 배경 - 오른쪽 하단. 고려대 교수님만: 4px 띄움 + 아랫면 흐림, 나머지 3명은 원래 스타일 */}
@@ -133,7 +127,7 @@ function TestimonialCard({
           {(testimonial.avatarSize === "small" || testimonial.avatarFade) && (
             <div
               className={`absolute inset-x-0 bottom-0 h-2/5 pointer-events-none bg-gradient-to-t ${
-                isDark ? "from-zinc-900" : "from-white"
+                "from-white"
               } to-transparent`}
               aria-hidden
             />
@@ -144,9 +138,7 @@ function TestimonialCard({
       {/* 그라데이션 오버레이 - 텍스트 영역 가시성 향상 */}
       <div
         className={`absolute inset-0 z-[5] pointer-events-none ${
-          isDark
-            ? "bg-gradient-to-r from-zinc-900/90 via-zinc-900/50 to-transparent"
-            : "bg-gradient-to-r from-white/95 via-white/70 to-transparent"
+          "bg-gradient-to-r from-white/95 via-white/70 to-transparent"
         }`}
       />
 
@@ -155,14 +147,10 @@ function TestimonialCard({
         <div className="mb-6">
           <Quote
             className={`w-8 h-8 md:w-10 md:h-10 transition-colors duration-300 ${
-              isDark
-                ? "text-blue-500/20 group-hover:text-blue-500"
-                : "text-blue-600/10 group-hover:text-blue-600"
+              "text-info-text/10 group-hover:text-info-text"
             }`}
             style={{
-              filter: isDark
-                ? "drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8))"
-                : "drop-shadow(0 2px 4px rgba(255, 255, 255, 1))",
+              filter: "drop-shadow(0 2px 4px rgba(255, 255, 255, 1))",
             }}
           />
         </div>
@@ -170,13 +158,11 @@ function TestimonialCard({
         <blockquote className="flex-1 mb-8 pr-4 md:pr-8">
           <p
             className={`text-base md:text-lg lg:text-xl leading-[1.6] font-bold tracking-tight ${
-              isDark ? "text-zinc-200" : "text-[#1F1F1F]"
+              "text-[#1F1F1F]"
             }`}
             style={{
               letterSpacing: "-0.3px",
-              textShadow: isDark
-                ? "0 2px 4px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.9)"
-                : "0 2px 4px rgba(255, 255, 255, 1), 0 0 12px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(255, 255, 255, 1)",
+              textShadow: "0 2px 4px rgba(255, 255, 255, 1), 0 0 12px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(255, 255, 255, 1)",
             }}
           >
             &quot;{testimonial.quote}&quot;
@@ -200,24 +186,20 @@ function TestimonialCard({
             <div className="flex-1">
               <div
                 className={`text-base md:text-lg font-bold tracking-tight mb-1 ${
-                  isDark ? "text-white" : "text-[#1F1F1F]"
+                  "text-[#1F1F1F]"
                 }`}
                 style={{
-                  textShadow: isDark
-                    ? "0 2px 4px rgba(0, 0, 0, 0.8), 0 0 10px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.9)"
-                    : "0 2px 4px rgba(255, 255, 255, 1), 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(255, 255, 255, 1)",
+                  textShadow: "0 2px 4px rgba(255, 255, 255, 1), 0 0 10px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(255, 255, 255, 1)",
                 }}
               >
                 {testimonial.name}
               </div>
               <div
                 className={`text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] ${
-                  isDark ? "text-zinc-400" : "text-zinc-600"
+                  "text-muted-foreground"
                 }`}
                 style={{
-                  textShadow: isDark
-                    ? "0 1px 2px rgba(0, 0, 0, 0.8), 0 0 6px rgba(0, 0, 0, 0.5)"
-                    : "0 1px 2px rgba(255, 255, 255, 1), 0 0 6px rgba(255, 255, 255, 0.8)",
+                  textShadow: "0 1px 2px rgba(255, 255, 255, 1), 0 0 6px rgba(255, 255, 255, 0.8)",
                 }}
               >
                 {testimonial.title}
@@ -230,12 +212,7 @@ function TestimonialCard({
   );
 }
 
-export default function TestimonialSection({
-  mode = "light",
-}: {
-  mode?: "light" | "dark";
-}) {
-  const isDark = mode === "dark";
+export default function TestimonialSection() {
   const [isHovered, setIsHovered] = useState(false);
   const t = useTranslations("landing");
   const trackRef = useRef<HTMLDivElement>(null);
@@ -268,13 +245,13 @@ export default function TestimonialSection({
 
   return (
     <section
-      className={`w-full py-20 lg:py-28 ${isDark ? "bg-black" : "bg-white"}`}
+      className={`w-full py-20 lg:py-28 ${"bg-background"}`}
     >
       <div className="container mx-auto px-4 lg:px-6">
         <div className="mx-auto mb-14 lg:mb-20 max-w-4xl text-center">
           <h2
             className={`text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl animate-fade-in-up-sm ${
-              isDark ? "text-white" : "text-[#1F1F1F]"
+              "text-[#1F1F1F]"
             }`}
             style={{ letterSpacing: "-0.01em" }}
           >
@@ -293,14 +270,14 @@ export default function TestimonialSection({
           {/* 좌측 페이드 */}
           <div
             className={`pointer-events-none absolute left-0 top-0 bottom-0 z-10 w-24 md:w-32 lg:w-40 bg-gradient-to-r ${
-              isDark ? "from-black to-transparent" : "from-white to-transparent"
+              "from-white to-transparent"
             }`}
             aria-hidden
           />
           {/* 우측 페이드 */}
           <div
             className={`pointer-events-none absolute right-0 top-0 bottom-0 z-10 w-24 md:w-32 lg:w-40 bg-gradient-to-l ${
-              isDark ? "from-black to-transparent" : "from-white to-transparent"
+              "from-white to-transparent"
             }`}
             aria-hidden
           />
@@ -311,18 +288,26 @@ export default function TestimonialSection({
             <div className="flex flex-nowrap gap-6 md:gap-8 pr-6 md:pr-8 flex-shrink-0">
               {TESTIMONIALS.map((testimonial) => (
                 <TestimonialCard
-                  key={`a-${testimonial.name}`}
-                  testimonial={testimonial}
-                  isDark={isDark}
+                  key={`a-${testimonial.key}`}
+                  testimonial={{
+                    ...testimonial,
+                    quote: t(`testimonial.items.${testimonial.key}.quote`),
+                    name: t(`testimonial.items.${testimonial.key}.name`),
+                    title: t(`testimonial.items.${testimonial.key}.university`),
+                  }}
                 />
               ))}
             </div>
             <div className="flex flex-nowrap gap-6 md:gap-8 pr-6 md:pr-8 flex-shrink-0">
               {TESTIMONIALS.map((testimonial) => (
                 <TestimonialCard
-                  key={`b-${testimonial.name}`}
-                  testimonial={testimonial}
-                  isDark={isDark}
+                  key={`b-${testimonial.key}`}
+                  testimonial={{
+                    ...testimonial,
+                    quote: t(`testimonial.items.${testimonial.key}.quote`),
+                    name: t(`testimonial.items.${testimonial.key}.name`),
+                    title: t(`testimonial.items.${testimonial.key}.university`),
+                  }}
                 />
               ))}
             </div>

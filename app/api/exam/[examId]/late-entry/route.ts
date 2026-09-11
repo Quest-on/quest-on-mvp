@@ -109,7 +109,6 @@ export async function POST(
           is_active: true,
           last_heartbeat_at: now,
           late_entry_approved_at: now,
-          preflight_accepted_at: now, // 승인 후 preflight 건너뛰기
         })
         .eq("id", sessionId)
         .eq("status", "late_pending");

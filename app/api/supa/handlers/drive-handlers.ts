@@ -84,9 +84,7 @@ export async function getFolderContents(data: {
     const examLimit = data.examLimit ?? 12;
     const examOffset = data.examOffset ?? 0;
 
-    const selectFields = `
-      *,
-      exams (
+    const examColumns = `
         id,
         title,
         code,
@@ -98,13 +96,36 @@ export async function getFolderContents(data: {
         open_at,
         created_at,
         updated_at
+    `;
+
+    // 폴더 노드는 exam_id 가 없다. 여기서 inner join 을 쓰면 폴더가 통째로 사라진다.
+    const folderSelectFields = `
+      *,
+      exams (
+        ${examColumns}
+      )
+    `;
+
+    // 시험 노드는 inner join 으로 좁힌다 (AC-17).
+    //
+    // 교수자 홈의 실제 목록은 `getInstructorExams` 가 아니라 이 쿼리다
+    // (`components/instructor/InstructorHomeClient.tsx` → get_folder_contents).
+    // 여기에 필터가 없으면 온보딩 데모가 목록·검색·`totalExamCount` 에 그대로
+    // 나온다. 그리고 필터는 반드시 count/range 이전에 걸려야 한다 — 나중에
+    // JS 로 걸러내면 페이지당 개수와 총계가 어긋난다.
+    const examSelectFields = `
+      *,
+      exams!inner (
+        ${examColumns},
+        is_demo,
+        first_published_at
       )
     `;
 
     // Always fetch all folder nodes
     let folderQuery = supabase
       .from("exam_nodes")
-      .select(selectFields)
+      .select(folderSelectFields)
       .eq("instructor_id", user.id)
       .eq("kind", "folder");
     if (parentId === null) {
@@ -114,9 +135,10 @@ export async function getFolderContents(data: {
     }
     let examQuery = supabase
       .from("exam_nodes")
-      .select(selectFields, { count: "exact" })
+      .select(examSelectFields, { count: "exact" })
       .eq("instructor_id", user.id)
-      .eq("kind", "exam");
+      .eq("kind", "exam")
+      .eq("exams.is_demo", false);
     if (parentId === null) {
       examQuery = examQuery.is("parent_id", null);
     } else {
@@ -142,7 +164,15 @@ export async function getFolderContents(data: {
     // Stage B: childCounts + sessions 병렬 (각각 Stage A 결과에 의존, 서로는 독립)
     const [childCountResult, sessionResult] = await Promise.all([
       folderIds.length > 0
-        ? supabase.from("exam_nodes").select("parent_id").in("parent_id", folderIds).eq("instructor_id", user.id)
+        ? supabase
+            .from("exam_nodes")
+            // 폴더의 자식 수에서도 데모를 뺀다 (AC-17). 목록에 없는 시험이 개수에는
+            // 잡히면 "3개"라고 적힌 폴더를 열었더니 2개인 상황이 된다. 자식에는
+            // 폴더도 섞여 있어 inner join 을 못 쓰므로(폴더는 exams 가 없다)
+            // 좌측 조인으로 받아 여기서 걸러낸다.
+            .select("parent_id, exams (is_demo)")
+            .in("parent_id", folderIds)
+            .eq("instructor_id", user.id)
         : Promise.resolve({ data: null, error: null }),
       examIds.length > 0
         ? supabase.from("sessions").select("exam_id, student_id").in("exam_id", examIds)
@@ -152,7 +182,11 @@ export async function getFolderContents(data: {
     let foldersWithCounts = folderNodes;
     if (!childCountResult.error && childCountResult.data) {
       const countMap = new Map<string, number>();
-      for (const row of childCountResult.data) {
+      for (const row of childCountResult.data as Array<{
+        parent_id: string;
+        exams?: { is_demo?: boolean } | null;
+      }>) {
+        if (row.exams?.is_demo) continue;
         countMap.set(row.parent_id, (countMap.get(row.parent_id) || 0) + 1);
       }
       foldersWithCounts = foldersWithCounts.map((f) => ({

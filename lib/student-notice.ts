@@ -37,10 +37,18 @@ export type StudentNoticeInput = {
  */
 export function studentNoticePolicyLines(
   aiChatAvailable: boolean,
-  lines: { allowed: string; graded: string; visible: string }
+  lines: {
+    allowed: string;
+    graded: string;
+    visible: string;
+    unavailable: string;
+    externalAiProhibited: string;
+    activityRecorded: string;
+  }
 ): string[] {
-  if (!aiChatAvailable) return [];
-  return [lines.allowed, lines.graded, lines.visible];
+  return aiChatAvailable
+    ? [lines.allowed, lines.graded, lines.visible]
+    : [lines.unavailable, lines.externalAiProhibited, lines.activityRecorded];
 }
 
 /**

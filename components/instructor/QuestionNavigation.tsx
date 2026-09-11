@@ -56,13 +56,22 @@ function questionFilterBucket(type: string): Exclude<FilterType, "all"> {
   return "case";
 }
 
-/** 문제 유형별 번호를 붙인 레이블 배열 반환. 예: ["사지선다 1", "사지선다 2", "OX 1", "CASE 1"] */
-function buildQuestionLabels(questions: Question[]): string[] {
+/**
+ * 문제 유형별 번호를 붙인 레이블 배열. 예: ["사지선다 1", "사지선다 2", "OX 1", "CASE 1"]
+ *
+ * `translate` 를 반드시 받는다. 예전에는 키를 그대로 이어 붙여서
+ * `questionNavigation.typePrefixCase 1` 이 화면에 나갔다 — 번역 키가
+ * 사용자에게 노출됐다.
+ */
+function buildQuestionLabels(
+  questions: Question[],
+  translate: (key: TypePrefixKey) => string
+): string[] {
   const counters: Record<string, number> = {};
   return questions.map((q) => {
-    const prefix = getTypePrefixKey(q.type);
-    counters[prefix] = (counters[prefix] ?? 0) + 1;
-    return `${prefix} ${counters[prefix]}`;
+    const key = getTypePrefixKey(q.type);
+    counters[key] = (counters[key] ?? 0) + 1;
+    return `${translate(key)} ${counters[key]}`;
   });
 }
 
@@ -89,12 +98,12 @@ export function QuestionNavigation({
   if (!questions || !Array.isArray(questions)) {
     return (
       <div className="mb-6">
-        <div className="text-red-600">{t("questionNavigation.errorLoad")}</div>
+        <div className="text-destructive">{t("questionNavigation.errorLoad")}</div>
       </div>
     );
   }
 
-  const labels = buildQuestionLabels(questions);
+  const labels = buildQuestionLabels(questions, t);
 
   // 실제 탭에 표시할 유형만 (해당 유형 문제가 1개 이상 있을 때)
   const availableTabs = FILTER_TAB_KEYS.filter((tab) => {
@@ -167,7 +176,7 @@ export function QuestionNavigation({
               {grade && !hideScores && (
                 <Badge
                   variant="secondary"
-                  className="ml-2 bg-green-100 text-green-800"
+                  className="ml-2 bg-success-subtle text-success-text"
                 >
                   {t("questionNavigation.scorePoints", { score: grade.score || 0 })}
                 </Badge>

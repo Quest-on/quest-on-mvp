@@ -11,6 +11,12 @@ import {
   promoteSessionToInProgress,
 } from "@/app/api/supa/handlers/session-handlers";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
+import {
+  ONBOARDING_EVENTS,
+  hasOnboardingEvent,
+  recordOnboardingEvent,
+} from "@/lib/onboarding-events";
+import { isDemoPreview } from "@/lib/demo-completion";
 
 /**
  * POST /api/session/[sessionId]/preflight
@@ -63,7 +69,7 @@ export async function POST(
 
     const { data: exam, error: examError } = await supabase
       .from("exams")
-      .select("id, status, started_at, duration, type")
+      .select("id, status, started_at, duration, type, questions, is_demo, instructor_id")
       .eq("id", session.exam_id)
       .single();
 
@@ -105,8 +111,24 @@ export async function POST(
         return errorJson("INTERNAL_ERROR", "Failed to accept preflight", 500);
       }
       reconciledSession = updatedSession;
-    } else if (isExamStarted(exam.status, exam.started_at, nowTime) || (exam.type && exam.type !== "exam")) {
-      // 시험이 이미 시작되었거나, 비시험 유형인 경우 바로 in_progress로 전환
+    } else if (
+      isExamStarted(exam.status, exam.started_at, nowTime) ||
+      (exam.type && exam.type !== "exam") ||
+      // 교수자가 자기 데모를 학생 시점으로 겪는 경우도 바로 시작한다.
+      //
+      // 이게 없으면 initExamSession 이 in_progress 로 만든 세션을 여기서
+      // waiting 으로 덮어써, 교수자가 자기 데모 대기실에 갇힌다. 나가려면 다른
+      // 탭에서 교수자용 "시험 시작"을 눌러야 하는데 아무도 그걸 안내하지
+      // 않는다 — 에픽의 핵심 동선이 여기서 끊긴다.
+      //
+      // 판정은 세션 생성 때와 같은 순수 함수를 쓴다. 정의가 갈라지면 한쪽만
+      // 고쳐졌을 때 이 증상이 그대로 재발한다.
+      isDemoPreview({
+        isDemo: (exam as { is_demo?: unknown }).is_demo,
+        instructorId: (exam as { instructor_id?: unknown }).instructor_id,
+        userId: user.id,
+      }) === true
+    ) {
       reconciledSession = await promoteSessionToInProgress(session, now, {
         preflightAcceptedAt: now,
       });
@@ -133,6 +155,64 @@ export async function POST(
       }
 
       reconciledSession = updatedSession;
+    }
+
+    // AI 사용 고지 확인 기록 (AC-15).
+    //
+    // `preflight_accepted_at` 은 세션 단위라 "이 응시에서 수락했다"까지만 말한다.
+    // 학생이 처음으로 고지를 확인한 시점은 세션이 아니라 사람 단위이므로
+    // 마일스톤으로 남긴다.
+    //
+    // 교수자가 자기 데모를 학생 시점으로 겪는 경우는 기록하지 않는다(#167).
+    //
+    // #166 이 그 경로를 열면서, 데모 템플릿이 전부 서술형이라 위 판정이 참이
+    // 되고 **교수자 id 가 role:"student" 로 학생 퍼널에 박혔다.** 에픽 DoD 의
+    // `COUNT(DISTINCT user_id)` 학생 지표가 온보딩을 마친 교수자 전원만큼
+    // 부풀었다. 고지 자체는 그대로 보여준다 — 안 보여주는 게 아니라 안 세는 것이다.
+    //
+    // 판정 불능(null)이면 기록하지 않는다. 018 미적용 등으로 컬럼을 못 읽었을 때
+    // "일반 학생"으로 단정하면 그 순간 오염이 다시 시작된다.
+    const preview = isDemoPreview({
+      isDemo: (exam as { is_demo?: unknown }).is_demo,
+      instructorId: (exam as { instructor_id?: unknown }).instructor_id,
+      userId: user.id,
+    });
+
+    if (preview === false) {
+      const recorded = await recordOnboardingEvent({
+        userId: user.id,
+        role: "student",
+        event: ONBOARDING_EVENTS.STUDENT_DISCLOSURE_ACK,
+        examId: session.exam_id,
+      });
+
+      // 기록이 안 됐다고 응시를 막지는 않는다.
+      //
+      // 지켜야 할 불변식은 "쓰지도 않은 기록을 근거로 고지를 숨기지 않는다" 이고,
+      // 그건 이미 읽기 쪽이 보장한다 — hasOnboardingEvent 는 조회 장애에
+      // false 를 돌려주고(lib/onboarding-events.ts), init 은 그걸 받아 preflight 를
+      // 다시 열어 고지를 한 번 더 보여준다. 기록이 실패하면 다음번에 또 묻는다.
+      //
+      // 반면 여기서 500 을 돌려주면 onboarding_events 가 잠시 흔들리는 것만으로
+      // **모든 학생이 모든 시험에 입장하지 못한다.** 계측·기록 장애를 시험
+      // 중단으로 바꾸는 거래다. 이 저장소는 또 같은 자리에서 같은 판단을 했다 —
+      // admit_exam_session 이 깨져도 학생을 들여보낸다(fail-open).
+      //
+      // 다만 조용히 사라지게 두지는 않는다. #324 가 정확히 그 무음 때문에
+      // 20일간 관측을 잃은 사고였다.
+      if (
+        !recorded &&
+        !(await hasOnboardingEvent(user.id, ONBOARDING_EVENTS.STUDENT_DISCLOSURE_ACK))
+      ) {
+        logError(
+          "[preflight] disclosure_ack_not_persisted",
+          new Error("student_disclosure_ack write and read both failed"),
+          {
+            path: `/api/session/${sessionId}/preflight`,
+            additionalData: { examId: session.exam_id },
+          }
+        );
+      }
     }
 
     const gateState = buildGateStatePayload(reconciledSession, exam, nowTime);

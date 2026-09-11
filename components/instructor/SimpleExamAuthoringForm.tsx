@@ -1,8 +1,9 @@
 "use client";
 
 import type { KeyboardEvent, ReactNode, Ref } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { CourseSelectField } from "@/components/instructor/CourseSelectField";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -24,12 +25,24 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
   CheckCircle2,
-  FileText,
   FolderOpen,
+  HelpCircle,
   Loader2,
   Plus,
   Sparkles,
@@ -38,6 +51,10 @@ import {
 } from "lucide-react";
 import type { Question } from "@/components/instructor/QuestionEditor";
 import { QuestionEditor } from "@/components/instructor/QuestionEditor";
+import {
+  perQuestionScore as computePerQuestionScore,
+  scoreShare as computeScoreShare,
+} from "@/lib/score-weight-display";
 import {
   buildDefaultScoreWeightsForQuestionTypes,
   scoreBucketForQuestionType,
@@ -65,6 +82,10 @@ interface SimpleExamAuthoringFormProps {
   onTitleChange: (value: string) => void;
   onDurationChange: (value: number) => void;
   onLanguageChange: (value: "ko" | "en") => void;
+  /** 선택된 과목 id. null 이 기본값이고 "과목 없음"을 뜻한다 — 출제를 막지 않는다. */
+  courseId?: string | null;
+  /** 넘기지 않으면 과목 선택기를 렌더링하지 않는다(기존 호출부 무영향). */
+  onCourseChange?: (courseId: string | null) => void;
   files: File[];
   disabledFiles: Set<number>;
   canAddMoreFiles: boolean;
@@ -131,55 +152,50 @@ function getStatusTextKey(status?: ExtractionStatus): StatusTextKey {
 }
 
 /**
- * "한 줄 한 박스" 필드 블록.
- * 라벨과 안내문은 입력 위에 평문으로 두고, 경계(테두리)는 실제 입력
- * 컨트롤에만 둔다 — 섹션 전체를 카드로 감싸지 않는다.
+ * Card 안에 들어가는 서브 필드 블록.
+ * 과제 출제 폼(ExamInfoForm)과 같은 톤: 라벨 행에 HelpCircle 툴팁을 두고,
+ * 상세 설명은 툴팁 안으로 옮겨 평문 helper 행을 없앤다.
  */
-function Field({
+function SubField({
   label,
   htmlFor,
   required,
-  optional,
-  optionalLabel = "선택",
-  helper,
+  tooltip,
   action,
   children,
 }: {
   label: string;
   htmlFor?: string;
   required?: boolean;
-  optional?: boolean;
-  optionalLabel?: string;
-  helper?: ReactNode;
+  tooltip?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <Label
-            htmlFor={htmlFor}
-            className="flex items-center gap-1.5 text-base font-semibold"
-          >
-            {label}
-            {required && (
-              <span className="text-destructive" aria-hidden>
-                *
-              </span>
-            )}
-            {optional && (
-              <span className="text-xs font-normal text-muted-foreground">
-                {optionalLabel}
-              </span>
-            )}
-          </Label>
-          {helper && <p className="text-sm text-muted-foreground">{helper}</p>}
-        </div>
-        {action && <div className="shrink-0">{action}</div>}
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Label htmlFor={htmlFor} className="flex items-center gap-1.5">
+          {label}
+          {required && (
+            <span className="text-destructive" aria-hidden>
+              *
+            </span>
+          )}
+        </Label>
+        {tooltip && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <HelpCircle className="h-4 w-4 cursor-help text-muted-foreground" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="max-w-xs">{tooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+        {action && <div className="ml-auto">{action}</div>}
       </div>
       {children}
-    </section>
+    </div>
   );
 }
 
@@ -292,8 +308,8 @@ function QuestionTypePicker({
                 : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
             }`}
           >
-            <span className="text-base font-semibold">{t(option.labelKey)}</span>
-            <span className="text-xs text-muted-foreground">
+            <span className="type-section-title">{t(option.labelKey)}</span>
+            <span className="type-meta">
               {t(option.descKey)}
             </span>
           </button>
@@ -311,6 +327,8 @@ export function SimpleExamAuthoringForm({
   onTitleChange,
   onDurationChange,
   onLanguageChange,
+  courseId,
+  onCourseChange,
   files,
   disabledFiles,
   canAddMoreFiles,
@@ -347,12 +365,15 @@ export function SimpleExamAuthoringForm({
   onRemoveExistingFile,
 }: SimpleExamAuthoringFormProps) {
   const t = useTranslations("authoring");
-  const [showAdvancedGrading, setShowAdvancedGrading] = useState(false);
   // "+" 문제 추가 — 문제 유형을 고르는 Dialog 의 열림 상태.
   const [isAddPickerOpen, setIsAddPickerOpen] = useState(false);
-  // 추가 다이얼로그에서 선택 중인 문제 유형.
+  // 추가 다이얼로그에서 선택 중인 문제 유형. 기본은 사례형이다.
+  //
+  // 이 제품은 AI 와의 대화로 사고 과정을 평가하는 게 핵심이다. 사지선다를
+  // 미리 골라 두면 그 차별점에서 멀어지는 쪽으로 유도한다. 객관식이
+  // 필요하면 한 번 더 누르면 된다.
   const [pickedType, setPickedType] =
-    useState<Question["type"]>("multiple-choice");
+    useState<Question["type"]>("essay");
   // 추가 다이얼로그에서 한 번에 추가할 문제 개수 (1~5).
   const [pickedCount, setPickedCount] = useState(1);
   // 추가 다이얼로그에서 입력하는 AI 생성 프롬프트.
@@ -439,11 +460,14 @@ export function SimpleExamAuthoringForm({
       language,
       materialsText: materialsText && materialsText.length > 0 ? materialsText : undefined,
     });
-  }, [pickedPrompt, pickedType, pickedCount, onQuestionAdd, generateAll, title, language, materialsText]);
+  }, [pickedPrompt, pickedType, pickedCount, onQuestionAdd, generateAll, title, language, materialsText, t]);
 
   const isUnlimited = duration === 0;
   const effectiveWeight = chatWeight ?? 50;
   const isCustomWeight = chatWeight !== null;
+  // Reset 은 클릭 즉시 자기 자신을 화면에서 지운다. 포커스를 넘기지 않으면
+  // 키보드/스크린리더 사용자가 문서 끝으로 튕긴다. 슬라이더로 돌려준다.
+  const chatWeightSliderRef = useRef<HTMLSpanElement | null>(null);
   const presentScoreBuckets = useMemo(
     () => getPresentScoreBuckets(questions),
     [questions]
@@ -486,11 +510,17 @@ export function SimpleExamAuthoringForm({
     0,
   );
 
-  const getPerQuestionScore = (bucket: ScoreWeightBucket) => {
-    const count = scoreBucketCounts[bucket];
-    if (count === 0) return null;
-    return getScoreWeightValue(bucket) / count;
-  };
+  // 산식은 lib/score-weight-display.ts 에 있다. 여기 두면 테스트가 복제하게
+  // 되고, 그러면 이 파일을 되돌려도 테스트가 통과한다.
+  const getScoreShare = (bucket: ScoreWeightBucket) =>
+    computeScoreShare(getScoreWeightValue(bucket), totalScoreWeight);
+
+  const getPerQuestionScore = (bucket: ScoreWeightBucket) =>
+    computePerQuestionScore(
+      getScoreWeightValue(bucket),
+      totalScoreWeight,
+      scoreBucketCounts[bucket]
+    );
 
   const setScoreWeight = (bucket: ScoreWeightBucket, value: number) => {
     const current = scoreWeights ?? buildDefaultScoreWeights(questions);
@@ -516,7 +546,7 @@ export function SimpleExamAuthoringForm({
     if (failed > 0) return t("simpleExamAuthoringForm.materialSummaryFailed", { total: files.length, failed });
     if (inProgress > 0) return t("simpleExamAuthoringForm.materialSummaryAnalyzing", { total: files.length });
     return t("simpleExamAuthoringForm.materialSummaryReady", { total: files.length });
-  }, [extractionStatus, files.length]);
+  }, [extractionStatus, files.length, t]);
 
   const [durationInput, setDurationInput] = useState<string>(
     duration === 0 ? "" : duration.toString(),
@@ -711,61 +741,75 @@ export function SimpleExamAuthoringForm({
   );
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-10">
-        {/* 시험 제목 */}
-        <Field
-          label={t("simpleExamAuthoringForm.fieldTitleLabel")}
-          htmlFor="simple-title"
-          required
-          helper={t("simpleExamAuthoringForm.fieldTitleHelper")}
-        >
-          <Input
-            ref={titleRef}
-            id="simple-title"
-            aria-label={t("simpleExamAuthoringForm.fieldTitleAria")}
-            value={title}
-            onChange={(e) => onTitleChange(e.target.value)}
-            placeholder={t("simpleExamAuthoringForm.fieldTitlePlaceholder")}
-            className="h-12 text-base bg-white"
+    <div className="space-y-6">
+      {/* 기본 정보 — 제목·코드·시간·언어 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("examInfoForm.cardTitleExam")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* 시험 제목 */}
+          <SubField
+            label={t("simpleExamAuthoringForm.fieldTitleLabel")}
+            htmlFor="simple-title"
             required
-          />
-        </Field>
-
-        {/* 시험 코드 — 편집 모드에서만 표시 */}
-        {examCode != null && (
-          <Field
-            label={t("simpleExamAuthoringForm.fieldCodeLabel")}
-            required
-            helper={t("simpleExamAuthoringForm.fieldCodeHelper")}
+            tooltip={t("simpleExamAuthoringForm.fieldTitleHelper")}
           >
-            <div className="flex items-center gap-2">
-              <Input
-                value={examCode}
-                readOnly
-                className="h-11 w-40 font-mono text-base tracking-widest bg-white"
-                aria-label={t("simpleExamAuthoringForm.fieldCodeAria")}
-              />
-              {onCodeRegenerate && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={onCodeRegenerate}
-                >
-                  {t("simpleExamAuthoringForm.buttonRegenerate")}
-                </Button>
-              )}
-            </div>
-          </Field>
-        )}
+            <Input
+              ref={titleRef}
+              id="simple-title"
+              aria-label={t("simpleExamAuthoringForm.fieldTitleAria")}
+              value={title}
+              onChange={(e) => onTitleChange(e.target.value)}
+              placeholder={t("simpleExamAuthoringForm.fieldTitlePlaceholder")}
+              className="h-12 text-base"
+              required
+            />
+          </SubField>
 
-        {/* 시험 시간 */}
-        <Field
-          label={t("simpleExamAuthoringForm.fieldDurationLabel")}
-          htmlFor="simple-duration"
-          helper={t("simpleExamAuthoringForm.fieldDurationHelper")}
-        >
+          {/* 과목 — 선택 사항. 제목 바로 아래에 둬야 "무엇을/어디에" 순서로 읽힌다. */}
+          {onCourseChange && (
+            <CourseSelectField
+              value={courseId ?? null}
+              onChange={onCourseChange}
+              variant="section"
+            />
+          )}
+
+          {/* 시험 코드 — 편집 모드에서만 표시 */}
+          {examCode != null && (
+            <SubField
+              label={t("simpleExamAuthoringForm.fieldCodeLabel")}
+              required
+              tooltip={t("simpleExamAuthoringForm.fieldCodeHelper")}
+            >
+              <div className="flex items-center gap-2">
+                <Input
+                  value={examCode}
+                  readOnly
+                  className="h-11 w-40 font-mono text-base tracking-widest"
+                  aria-label={t("simpleExamAuthoringForm.fieldCodeAria")}
+                />
+                {onCodeRegenerate && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onCodeRegenerate}
+                  >
+                    {t("simpleExamAuthoringForm.buttonRegenerate")}
+                  </Button>
+                )}
+              </div>
+            </SubField>
+          )}
+
+          {/* 시험 시간 */}
+          <SubField
+            label={t("simpleExamAuthoringForm.fieldDurationLabel")}
+            htmlFor="simple-duration"
+            tooltip={t("simpleExamAuthoringForm.fieldDurationHelper")}
+          >
           <div className="flex flex-wrap items-center gap-2">
             <Input
               id="simple-duration"
@@ -777,16 +821,19 @@ export function SimpleExamAuthoringForm({
               onChange={handleDurationInputChange}
               onBlur={handleDurationInputBlur}
               placeholder={isUnlimited ? t("simpleExamAuthoringForm.placeholderUnlimited") : t("simpleExamAuthoringForm.placeholderDuration")}
-              className="h-11 w-28 text-center bg-white"
+              className="h-11 w-28 text-center"
             />
-            <span className="text-sm text-muted-foreground">{t("simpleExamAuthoringForm.unitMinutes")}</span>
+            <span className="type-hint">{t("simpleExamAuthoringForm.unitMinutes")}</span>
             {[30, 60, 90, 120].map((value) => (
               <Button
                 key={value}
                 type="button"
-                variant={
-                  !isUnlimited && duration === value ? "default" : "outline"
-                }
+                // 프리셋은 선택 상태를 들지 않는다.
+                //
+                // 숫자 입력과 칩이 같은 값을 동시에 칠하면 어느 쪽이 진짜인지 알 수
+                // 없다. Canvas 도 Moodle 도 프리셋 없이 숫자 하나만 받는다. 여기서는
+                // 속도를 위해 칩을 남기되 값을 바꾸는 동작으로만 둔다.
+                variant="outline"
                 size="sm"
                 onClick={() => {
                   onDurationChange(value);
@@ -819,21 +866,46 @@ export function SimpleExamAuthoringForm({
               </Label>
             </div>
             {showDurationWarning && (
-              <p className="flex basis-full items-center gap-1.5 text-sm text-amber-600 dark:text-amber-400">
+              <p className="flex basis-full items-center gap-1.5 text-sm text-warning-text">
                 <AlertTriangle className="h-4 w-4" />
                 {t("simpleExamAuthoringForm.durationWarning")}
               </p>
             )}
           </div>
-        </Field>
+          </SubField>
 
-        {/* 수업 자료 */}
-        <Field
-          label={t("simpleExamAuthoringForm.fieldMaterialsLabel")}
-          optional
-          optionalLabel={t("simpleExamAuthoringForm.optional")}
-          helper={t("simpleExamAuthoringForm.fieldMaterialsHelper")}
-        >
+          {/* AI 응답 언어 */}
+          <SubField
+            label={t("simpleExamAuthoringForm.fieldLanguageLabel")}
+            tooltip={t("simpleExamAuthoringForm.fieldLanguageHelper")}
+          >
+            <Select
+              value={language}
+              onValueChange={(value) => onLanguageChange(value as "ko" | "en")}
+            >
+              <SelectTrigger className="h-11 w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ko">{t("simpleExamAuthoringForm.languageKo")}</SelectItem>
+                <SelectItem value="en">{t("simpleExamAuthoringForm.languageEn")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </SubField>
+        </CardContent>
+      </Card>
+
+      {/* 수업 자료 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-1.5">
+            {t("simpleExamAuthoringForm.fieldMaterialsLabel")}
+          </CardTitle>
+          <CardDescription>
+            {t("simpleExamAuthoringForm.fieldMaterialsHelper")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
           <div className="space-y-3">
             <Input
               id="materials"
@@ -864,12 +936,12 @@ export function SimpleExamAuthoringForm({
               ) : (
                 <Upload className="h-8 w-8 text-muted-foreground" />
               )}
-              <span className="text-sm font-medium">
+              <span className="type-field-label">
                 {isDragOver
                   ? t("simpleExamAuthoringForm.dropHint")
                   : t("simpleExamAuthoringForm.uploadHint")}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="type-meta">
                 {t("simpleExamAuthoringForm.uploadSupportedFormats")}
               </span>
             </button>
@@ -879,7 +951,7 @@ export function SimpleExamAuthoringForm({
                 {existingFiles.map(({ url, name, index }) => (
                   <span
                     key={url}
-                    className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-success-border bg-success-surface px-2 py-1 text-sm text-success-text"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">{name}</span>
@@ -909,9 +981,9 @@ export function SimpleExamAuthoringForm({
                       key={`${file.name}-${index}`}
                       className={`inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-sm ${
                         disabled || status === "failed"
-                          ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+                          ? "border-destructive bg-destructive/10 text-destructive"
                           : status === "done"
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
+                            ? "border-success-border bg-success-surface text-success-text"
                             : "bg-muted/40"
                       }`}
                     >
@@ -945,38 +1017,29 @@ export function SimpleExamAuthoringForm({
               </div>
             )}
           </div>
-        </Field>
+        </CardContent>
+      </Card>
 
-        {/* AI 응답 언어 */}
-        <Field
-          label={t("simpleExamAuthoringForm.fieldLanguageLabel")}
-          helper={t("simpleExamAuthoringForm.fieldLanguageHelper")}
-        >
-          <Select
-            value={language}
-            onValueChange={(value) => onLanguageChange(value as "ko" | "en")}
-          >
-            <SelectTrigger className="h-11 w-44 bg-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ko">{t("simpleExamAuthoringForm.languageKo")}</SelectItem>
-              <SelectItem value="en">{t("simpleExamAuthoringForm.languageEn")}</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-
-        {/* 문제 — "+" 버튼이 문제 추가 Dialog(유형/개수/AI 프롬프트)를 연다. */}
-        <Field
-          label={t("simpleExamAuthoringForm.fieldQuestionsLabel")}
-          required
-          helper={
-            questions.length > 0
+      {/* 문제 — "+" 버튼이 문제 추가 Dialog(유형/개수/AI 프롬프트)를 연다. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {t("simpleExamAuthoringForm.fieldQuestionsLabel")}
+            <span className="text-destructive" aria-hidden>
+              *
+            </span>
+            <Badge variant="secondary">
+              {t("questionsList.countBadge", { count: questions.length })}
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            {questions.length > 0
               ? t("simpleExamAuthoringForm.fieldQuestionsHelperHas", { count: questions.length })
-              : t("simpleExamAuthoringForm.fieldQuestionsHelperEmpty")
-          }
-        >
-          <div className="space-y-8" data-testid="manual-questions-section">
+              : t("simpleExamAuthoringForm.fieldQuestionsHelperEmpty")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6" data-testid="manual-questions-section">
             {questions.map((question, index) => (
               <div
                 key={question.id}
@@ -1038,25 +1101,34 @@ export function SimpleExamAuthoringForm({
               className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-10 text-center transition-colors hover:border-muted-foreground hover:bg-muted/50"
             >
               <Plus className="h-8 w-8 text-muted-foreground" />
-              <span className="text-sm font-medium">
+              <span className="type-field-label">
                 {questions.length === 0 ? t("simpleExamAuthoringForm.buttonAddFirstQuestion") : t("simpleExamAuthoringForm.buttonAddQuestion")}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="type-meta">
                 {t("simpleExamAuthoringForm.addQuestionHint")}
               </span>
             </button>
           </div>
-        </Field>
+        </CardContent>
+      </Card>
 
-        {/* 최종 점수 비중 */}
-        <Field
-          label={t("simpleExamAuthoringForm.fieldScoreWeightsLabel")}
-          required
-          helper={t("simpleExamAuthoringForm.fieldScoreWeightsHelper")}
-        >
+      {/* 채점 — 최종 점수 비중 + 대화/최종답안 비중 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-1.5">
+            {t("simpleExamAuthoringForm.fieldScoreWeightsLabel")}
+            <span className="text-destructive" aria-hidden>
+              *
+            </span>
+          </CardTitle>
+          <CardDescription>
+            {t("simpleExamAuthoringForm.fieldScoreWeightsHelper")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
           <div className="rounded-md border bg-muted/20 p-3">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm text-muted-foreground">
+              <span className="type-hint">
                 {scoreWeights && presentScoreBuckets.length > 0
                   ? t("simpleExamAuthoringForm.scoreWeightsHintFree")
                   : t("simpleExamAuthoringForm.scoreWeightsHintEmpty")}
@@ -1088,7 +1160,7 @@ export function SimpleExamAuthoringForm({
                           style={{
                             width: `${totalScoreWeight > 0 ? (weight / totalScoreWeight) * 100 : 0}%`,
                           }}
-                          title={`${t(SCORE_BUCKET_LABEL_KEYS[bucket])} ${weight}%`}
+                          title={`${t(SCORE_BUCKET_LABEL_KEYS[bucket])} ${formatScoreValue(getScoreShare(bucket) * 100)}%`}
                         />
                       );
                     })}
@@ -1104,7 +1176,7 @@ export function SimpleExamAuthoringForm({
                           <span
                             className={`h-2 w-2 rounded-full ${SCORE_BUCKET_COLORS[bucket]}`}
                           />
-                          {t(SCORE_BUCKET_LABEL_KEYS[bucket])} {weight}%
+                          {t(SCORE_BUCKET_LABEL_KEYS[bucket])} {weight}
                         </span>
                       );
                     })}
@@ -1133,7 +1205,7 @@ export function SimpleExamAuthoringForm({
                             <span
                               className={`h-2.5 w-2.5 rounded-full ${SCORE_BUCKET_COLORS[bucket]}`}
                             />
-                            <span className="text-sm font-medium">
+                            <span className="type-field-label">
                               {t(SCORE_BUCKET_LABEL_KEYS[bucket])}
                             </span>
                           </div>
@@ -1141,6 +1213,16 @@ export function SimpleExamAuthoringForm({
                             {perQuestionScore !== null
                               ? t("simpleExamAuthoringForm.scoreWeightsPerQuestion", { count: scoreBucketCounts[bucket], score: formatScoreValue(perQuestionScore) })
                               : t("simpleExamAuthoringForm.scoreWeightsCount", { count: scoreBucketCounts[bucket] })}
+                          </p>
+                          {/*
+                            채점이 실제로 쓰는 값은 이 비율이다. 슬라이더 눈금만
+                            보면 60/40 과 100/100 이 달라 보이지만 둘 다 60:40,
+                            50:50 이라는 사실이 여기서 드러난다.
+                          */}
+                          <p className="mt-0.5 text-xs font-medium">
+                            {t("simpleExamAuthoringForm.scoreWeightsShare", {
+                              share: formatScoreValue(getScoreShare(bucket) * 100),
+                            })}
                           </p>
                         </div>
                         <Slider
@@ -1165,10 +1247,10 @@ export function SimpleExamAuthoringForm({
                                 Number.parseInt(e.target.value, 10) || 1
                               )
                             }
-                            className="h-9 w-20 bg-white text-center"
+                            className="h-9 w-20 text-center"
                             aria-label={t("simpleExamAuthoringForm.ariaInputBucket", { bucket: t(SCORE_BUCKET_LABEL_KEYS[bucket]) })}
                           />
-                          <span className="text-sm text-muted-foreground">{t("simpleExamAuthoringForm.unitPercent")}</span>
+                          <span className="type-hint whitespace-nowrap">{t("simpleExamAuthoringForm.unitWeight")}</span>
                         </div>
                       </div>
                     );
@@ -1176,7 +1258,7 @@ export function SimpleExamAuthoringForm({
                 </div>
 
                 {scoreWeightErrors.length > 0 && (
-                  <div className="flex flex-wrap items-start justify-between gap-2 text-sm text-amber-600 dark:text-amber-400">
+                  <div className="flex flex-wrap items-start justify-between gap-2 text-sm text-warning-text">
                     <div className="space-y-1">
                       {scoreWeightErrors.map((error) => (
                         <p key={error} className="flex items-center gap-1.5">
@@ -1200,59 +1282,66 @@ export function SimpleExamAuthoringForm({
               </div>
             )}
           </div>
-        </Field>
+          {/* 대화/최종답안 비중 */}
+          <div className="border-t pt-5">
+            <SubField
+              label={t("simpleExamAuthoringForm.fieldChatWeightLabel")}
+              tooltip={t("simpleExamAuthoringForm.fieldChatWeightHelper")}
+            >
+              <div>
+                {/*
+                  슬라이더를 처음부터 펼쳐 둔다. 예전에는 "조정" 버튼으로 펼치고
+                  "직접 설정" 스위치를 켜야 슬라이더가 나타나서, 값을 바꾸려면
+                  아무것도 정하지 않는 클릭을 두 번 먼저 해야 했다. 게다가 스위치를
+                  켜면 기본값과 같은 50 이 들어가 화면상 아무 변화도 없었다.
 
-        {/* 채점 비중 */}
-        <Field
-          label={t("simpleExamAuthoringForm.fieldChatWeightLabel")}
-          optional
-          optionalLabel={t("simpleExamAuthoringForm.optional")}
-          helper={t("simpleExamAuthoringForm.fieldChatWeightHelper")}
-        >
-          <div className="rounded-md border bg-muted/20 p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">
-                {t("simpleExamAuthoringForm.chatWeightDisplay", { chat: effectiveWeight, final: 100 - effectiveWeight })}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAdvancedGrading((prev) => !prev)}
-                className="ml-auto"
-              >
-                {t("simpleExamAuthoringForm.buttonAdjust")}
-              </Button>
-            </div>
-            {showAdvancedGrading && (
-              <div className="mt-3 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="simple-custom-weight"
-                    checked={isCustomWeight}
-                    onCheckedChange={(checked) =>
-                      onChatWeightChange(checked ? 50 : null)
-                    }
-                  />
-                  <Label htmlFor="simple-custom-weight" className="text-sm">
-                    {t("simpleExamAuthoringForm.switchCustomWeight")}
-                  </Label>
+                  chatWeight 는 null 이 기본값이고 숫자가 사용자 지정이다. 그 내부
+                  상태를 스위치로 노출하는 대신, 슬라이더를 움직이는 행위 자체를
+                  사용자 지정으로 본다 — 안 건드리면 계속 null 이라 저장 계약이
+                  그대로 유지된다.
+                */}
+                {/*
+                  shadcn 슬라이더 문서의 Controlled 패턴을 그대로 쓴다 —
+                  값은 오른쪽에 muted 로, 슬라이더는 그 아래. 예전에는 회색
+                  박스에 파일 아이콘까지 얹어서 입력이 아니라 진행 바처럼
+                  보였다.
+                */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="type-hint">
+                    {t("simpleExamAuthoringForm.chatWeightDisplay", { chat: effectiveWeight, final: 100 - effectiveWeight })}
+                  </span>
+                  {isCustomWeight && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="ml-auto"
+                      onClick={() => {
+                        onChatWeightChange(null);
+                        chatWeightSliderRef.current
+                          ?.querySelector<HTMLElement>('[role="slider"]')
+                          ?.focus();
+                      }}
+                    >
+                      {t("simpleExamAuthoringForm.buttonResetWeight")}
+                    </Button>
+                  )}
                 </div>
-                {isCustomWeight && (
-                  <Slider
-                    value={[effectiveWeight]}
-                    onValueChange={([value]) => onChatWeightChange(value)}
-                    min={0}
-                    max={100}
-                    step={10}
-                  />
-                )}
+                <Slider
+                  ref={chatWeightSliderRef}
+                  className="mt-3"
+                  value={[effectiveWeight]}
+                  onValueChange={([value]) => onChatWeightChange(value)}
+                  min={0}
+                  max={100}
+                  step={10}
+                  aria-label={t("simpleExamAuthoringForm.fieldChatWeightLabel")}
+                />
               </div>
-            )}
+            </SubField>
           </div>
-        </Field>
-      </div>
+        </CardContent>
+      </Card>
 
       <div className="sticky bottom-4 z-20 rounded-lg border bg-background/95 p-3 shadow-lg backdrop-blur">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -1355,7 +1444,7 @@ export function SimpleExamAuthoringForm({
 
           {/* 프롬프트 입력란 */}
           <div className="mt-1">
-            <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
+            <label className="type-field-label text-muted-foreground mb-1.5 block">
               {t("simpleExamAuthoringForm.dialogPromptLabel")}{" "}
               <span className="text-xs">{t("simpleExamAuthoringForm.dialogPromptOptional")}</span>
             </label>

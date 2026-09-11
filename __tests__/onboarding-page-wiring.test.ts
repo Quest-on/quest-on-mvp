@@ -17,22 +17,46 @@ import { readFileSync } from "fs";
 const source = readFileSync("app/(app)/onboarding/page.tsx", "utf8");
 
 describe("온보딩 페이지 배선", () => {
-  it("역할 해석에 localStorage.selectedRole 을 넘긴다 (#87 전 OAuth 경로)", () => {
+  it("역할 해석에 metadata 와 쿠키를 넘긴다 — localStorage 는 제거됐다 (#87)", () => {
     const call = source.slice(
       source.indexOf("resolveSignupRole({"),
       source.indexOf("resolveSignupRole({") + 600
     );
 
     expect(call).toContain("metadataRole");
-    expect(call).toContain("cookieString");
-    expect(call).toContain("localStorageRole");
-    expect(call).toContain('localStorage.getItem("selectedRole")');
+    expect(call).toContain("document.cookie");
+    expect(call).not.toContain("localStorageRole");
+    expect(source).not.toContain('localStorage.getItem("selectedRole")');
   });
 
-  it("프로필 단계에서 기존 학생 프로필을 조회한다", () => {
+  it("인가 필드를 프로필 PATCH 에 싣지 않는다 (AC-20)", () => {
+    const patch = source.slice(
+      source.indexOf('fetch("/api/user/profile"'),
+      source.indexOf('fetch("/api/user/profile"') + 400
+    );
+
+    expect(patch).toContain("display_name");
+    // role·status 를 다시 실으면 서버가 400 으로 거부해 온보딩이 통째로 막힌다.
+    expect(patch).not.toMatch(/\brole,/);
+    expect(patch).not.toContain("status:");
+  });
+
+  it("역할이 없을 때만 역할 클레임 라우트를 부른다 (AC-21)", () => {
+    expect(source).toContain('fetch("/api/user/role"');
+    expect(source).toMatch(/if \(!profile\?\.role\) \{/);
+  });
+
+  it("프로필 단계에서 역할별 기존 프로필을 조회한다", () => {
     expect(source).toContain('"/api/student/profile"');
-    // 학생 프로필 단계에서만 부른다 (강사 프로필 GET 은 없다)
-    expect(source).toMatch(/step !== "profile" \|\| role !== "student"/);
+    // 이제 강사도 기존 프로필을 프리필받는다.
+    //
+    // 예전에는 학생만 조회해서, 소급 동의 게이트가 켜지면 기존 강사가
+    // 빈 이름·학교 폼을 받고 그대로 제출해 기존 데이터를 덮어썼다.
+    // 그래서 조회 자체는 두 역할 모두 하고 대상 경로만 갈라진다.
+    expect(source).toContain('"/api/instructor/profile"');
+    expect(source).toMatch(/role === "student"\s*\?\s*"\/api\/student\/profile"/);
+    // 프로필 단계가 아니면 어느 쪽도 부르지 않는다.
+    expect(source).toMatch(/step !== "profile"/);
   });
 
   it("프리필이 사용자 입력을 덮어쓰지 않는다", () => {
@@ -44,6 +68,11 @@ describe("온보딩 페이지 배선", () => {
   it("리다이렉트 목적지를 safeInternalPath 로 좁힌 뒤에만 이동한다", () => {
     expect(source).toContain("safeInternalPath(redirectUrl)");
     expect(source).not.toMatch(/redirectUrl\.startsWith\("\/"\)/);
-    expect(source).toContain("window.location.href = redirectTarget");
+    // 검증되지 않은 원본(redirectUrl)으로 직접 이동하면 안 된다.
+    // 이동 수단(router 냐 location 이냐)은 계약이 아니다 — #338 에서
+    // 프로필 갱신 후 router 이동으로 바뀌었다. 고정할 것은 "좁힌 값으로만
+    // 이동한다" 이다.
+    expect(source).toMatch(/(router\.push|window\.location\.href =)\(?redirectTarget\)?/);
+    expect(source).not.toMatch(/(router\.push|window\.location\.href =)\(?redirectUrl\)?/);
   });
 });

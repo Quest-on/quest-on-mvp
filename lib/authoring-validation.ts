@@ -19,7 +19,11 @@ export interface ObjectiveQuestionLike {
 
 /** 리치텍스트 문항 본문이 (HTML 태그·&nbsp;·공백을 제거하면) 비어있는지 검사. */
 export function isQuestionContentEmpty(text: string): boolean {
-  return text.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() === "";
+  // 에디터마다 nbsp 표기가 다르다(&nbsp;·&#160;·&#xA0;) — 전부 공백으로 정규화한다.
+  return text
+    .replace(/<[^>]*>/g, "")
+    .replace(/&(?:nbsp|#160|#xA0);/gi, " ")
+    .trim() === "";
 }
 
 /** 객관식/OX 문제의 선택지·정답이 덜 채워졌는지 검사한다. */

@@ -210,7 +210,9 @@ describe("hasGradesForEveryExpectedQuestion", () => {
 // ─── estimateTokenCount ───────────────────────────────────────────────────────
 
 describe("estimateTokenCount", () => {
-  it("estimates tokens as chars / 4", () => {
+  // 예전 단언은 chars / 4 를 고정했다. 영어에는 맞지만 한국어에서 2.4배
+  // 과소 추정하므로 계수를 갈랐다. 삭제하지 않고 새 계약으로 갱신한다.
+  it("비한글은 0.25 토큰/자로 센다", () => {
     expect(estimateTokenCount("aaaa")).toBe(1);
     expect(estimateTokenCount("a".repeat(400))).toBe(100);
   });
