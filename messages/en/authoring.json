@@ -96,16 +96,8 @@
     "buttonDashboardLong": "Back to Dashboard",
     "buttonEdit": "Edit Exam",
     "questionsCountLabel": "{count, plural, one {# question} other {# questions}}",
-    "moreAria": "More actions"
-  },
-  "examDetailsCard": {
-    "durationMin": "{duration} min",
-    "toastNoticeCopied": "Notice copied",
-    "toastNoticeCopyFailed": "Could not copy the notice",
-    "noticeHeading": "[Quest-On] Exam notice",
-    "noticeCodeLabel": "Entry code",
-    "noticeFooter": "Questions? Contact your instructor.",
-    "toastCodeBlocked": "To prevent students from misusing instructor accounts, codes cannot be copied once the publish limit is reached. Email {email} and we will lift it."
+    "moreAria": "More actions",
+    "durationMin": "{duration} min"
   },
   "examInfoForm": {
     "cardTitleAssignment": "Assignment Info",
@@ -409,6 +401,11 @@
     "title": "Share with students",
     "subtitle": "Copy the notice below and paste it into your class announcement or messenger.",
     "codeLabel": "Entry code",
-    "copyNotice": "Copy notice"
+    "copyNotice": "Copy notice",
+    "noticeHeading": "[Quest-On] Exam notice",
+    "noticeCodeLabel": "Entry code",
+    "noticeFooter": "Questions? Contact your instructor.",
+    "toastNoticeCopied": "Notice copied",
+    "toastNoticeCopyFailed": "Could not copy the notice"
   }
 }

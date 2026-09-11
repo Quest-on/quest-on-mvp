@@ -15,7 +15,6 @@ const instructor = {
   en: readJson("en", "instructor.json") as { drive: Record<string, string> },
 };
 type AuthoringMessages = {
-  examDetailsCard: Record<string, string>;
   examCode: Record<string, string>;
 };
 
@@ -81,21 +80,32 @@ describe("AI 고지 적용 범위 (#325)", () => {
 
   it("발행 한도 안내는 사유와 해제 방법을 함께 설명한다", () => {
     for (const locale of ["ko", "en"] as const) {
-      const messages = [
-        instructor[locale].drive.toastExamCodeBlocked,
-        authoring[locale].examDetailsCard.toastCodeBlocked,
-      ];
-      for (const message of messages) {
-        // 사유
-        expect(message).toMatch(locale === "ko" ? /학생.*교수자 계정.*오용/ : /students.*misusing.*instructor accounts/i);
-        // 해제 방법.
-        //
-        // 예전에는 "계정을 인증하세요" 를 요구했는데, 그건 **상태 서술이지
-        // 방법이 아니다.** 어디서 어떻게 인증하는지가 제품 어느 화면에도 없었다
-        // — 승인 게이트와 함께 /instructor-pending 이 사라졌기 때문이다.
-        // 실제 해제 경로는 메일이므로 그 주소가 문구에 들어 있어야 한다.
-        expect(message).toContain("{email}");
-      }
+      // (1) 드라이브 목록에서 코드 복사를 눌렀을 때의 토스트.
+      const toast = instructor[locale].drive.toastExamCodeBlocked;
+      // 사유
+      expect(toast).toMatch(
+        locale === "ko" ? /학생.*교수자 계정.*오용/ : /students.*misusing.*instructor accounts/i
+      );
+      // 해제 방법.
+      //
+      // 예전에는 "계정을 인증하세요" 를 요구했는데, 그건 **상태 서술이지
+      // 방법이 아니다.** 어디서 어떻게 인증하는지가 제품 어느 화면에도 없었다
+      // — 승인 게이트와 함께 /instructor-pending 이 사라졌기 때문이다.
+      // 실제 해제 경로는 메일이므로 그 주소가 문구에 들어 있어야 한다.
+      expect(toast).toContain("{email}");
+
+      // (2) 시험 상세의 차단 패널(ExamCode).
+      //
+      // 예전에는 여기에도 같은 토스트가 있었다. 지금은 차단이면 복사 버튼과
+      // 공지문 미리보기가 아예 사라지므로 누를 것이 없고, 따라서 토스트가 뜰
+      // 자리도 없다. 그 말은 **문구가 그 자리에서 사유와 해제 방법을 다 말해야
+      // 한다**는 뜻이다. 해제 방법은 {email} 토큰이 아니라 mailto CTA 가 맡는다.
+      const code = authoring[locale].examCode;
+      expect(code.blockedBody, `${locale}: 차단 사유가 없다`).toMatch(
+        locale === "ko" ? /한도에 도달/ : /reached the free plan publish limit/i
+      );
+      expect(code.blockedCta?.trim(), `${locale}: 해제 CTA 가 없다`).toBeTruthy();
+      expect(code.blockedMailSubject?.trim(), `${locale}: 해제 메일 제목이 없다`).toBeTruthy();
     }
   });
 

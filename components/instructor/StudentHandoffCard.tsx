@@ -65,9 +65,9 @@ export function StudentHandoffCard({
   const notice = useMemo(() => {
     if (blocked) return null;
     return buildStudentNotice({
-      heading: t("examDetailsCard.noticeHeading"),
+      heading: t("studentHandoff.noticeHeading"),
       examTitle,
-      codeLabel: t("examDetailsCard.noticeCodeLabel"),
+      codeLabel: t("studentHandoff.noticeCodeLabel"),
       examCode,
       // MCQ/OX 전용 시험에는 채팅을 권하지 않고, 외부 AI 금지와 기록 범위를
       // 알려야 학생이 AI 정책 없이 시험에 들어가는 일이 없다.
@@ -79,7 +79,7 @@ export function StudentHandoffCard({
         externalAiProhibited: tExam("preflight.aiDisclosureExternalAiProhibited"),
         activityRecorded: tExam("preflight.aiDisclosureActivityRecorded"),
       }),
-      footer: t("examDetailsCard.noticeFooter"),
+      footer: t("studentHandoff.noticeFooter"),
     });
   }, [blocked, examTitle, examCode, aiChatAvailable, t, tExam]);
 
@@ -87,11 +87,11 @@ export function StudentHandoffCard({
     if (!notice) return;
     try {
       await navigator.clipboard.writeText(notice);
-      toast.success(t("examDetailsCard.toastNoticeCopied"), {
+      toast.success(t("studentHandoff.toastNoticeCopied"), {
         id: "copy-exam-notice",
       });
     } catch {
-      toast.error(t("examDetailsCard.toastNoticeCopyFailed"), {
+      toast.error(t("studentHandoff.toastNoticeCopyFailed"), {
         id: "copy-exam-notice-error",
       });
     }

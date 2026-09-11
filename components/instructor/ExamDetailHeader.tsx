@@ -95,7 +95,7 @@ export function ExamDetailHeader({
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
             <ExamStatusBadge status={status} />
             <span className="type-hint">
-              {t("examDetailsCard.durationMin", { duration: durationMinutes })}
+              {t("examDetailHeader.durationMin", { duration: durationMinutes })}
             </span>
             {questionsCount !== null && (
               <span className="type-hint">
