@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { timingSafeEqual } from "crypto";
 import { isAuthBypassAllowedEnv } from "./app-env";
+import { captureVerifiedSignup } from "./posthog-server";
 import { logError } from "./logger";
 import { getSupabaseServer } from "./supabase-server";
 
@@ -115,6 +116,7 @@ export async function currentUser(): Promise<AppUser | null> {
   if (!profile) return null;
 
   await touchLastSeenAt(user.id);
+  await captureVerifiedSignup(user, profile.role ?? "");
 
   return {
     id: user.id,

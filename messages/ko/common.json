@@ -66,5 +66,13 @@
       "label": "최종답안",
       "description": "답안 작성 및 제출"
     }
+  },
+  "analytics": {
+    "title": "방문 통계 설정",
+    "description": "방문 경로와 가입을 PostHog로 분석해 서비스를 개선해도 될까요? 허용하지 않아도 모든 기능을 이용할 수 있습니다.",
+    "decline": "허용하지 않음",
+    "allow": "분석 허용",
+    "details": "자세히 보기",
+    "settings": "방문 통계 설정"
   }
 }

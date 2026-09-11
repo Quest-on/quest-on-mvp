@@ -3,6 +3,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Geist, Geist_Mono, Roboto_Mono } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "next-intl/server";
+import { WebsiteAnalytics } from "@/components/WebsiteAnalytics";
 import { EnvBadge } from "@/components/system/EnvBadge";
 import "./globals.css";
 
@@ -68,7 +69,7 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${robotoMono.variable} antialiased`}
         suppressHydrationWarning={true}
       >
-        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        <NextIntlClientProvider>{children}<WebsiteAnalytics /></NextIntlClientProvider>
         <EnvBadge />
         <SpeedInsights />
       </body>
