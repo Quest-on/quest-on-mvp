@@ -37,6 +37,17 @@ export function sanitizePostHogProperties(input: Record<string, unknown>): Recor
       output[key] = value;
     }
   }
+  // Native Web Analytics groups by these fields. Derive them only after URL
+  // cleaning so raw SDK paths cannot reintroduce record IDs or query data.
+  if (typeof output.$current_url === "string") {
+    const url = new URL(output.$current_url);
+    output.$pathname = url.pathname;
+    output.$host = url.host;
+  }
+  if (typeof output.$referrer === "string") {
+    output.$referring_domain = output.$referrer && output.$referrer !== "null"
+      ? new URL(output.$referrer).hostname : "$direct";
+  }
   return output;
 }
 
