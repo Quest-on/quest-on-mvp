@@ -69,10 +69,10 @@
   },
   "analytics": {
     "title": "Analytics preferences",
-    "heading": "Help improve Quest-On",
-    "description": "May we analyze visits and signups to make Quest-On better?",
-    "optional": "Every feature works whether you allow this or not.",
-    "decline": "Decline",
+    "heading": "Would you help improve Quest-On?",
+    "description": "We would like to analyze the pages you visit and your sign-up journey to make Quest-On easier to use.",
+    "optional": "You can use every feature without consenting.",
+    "decline": "Do not allow",
     "allow": "Allow analytics",
     "details": "Learn more",
     "settings": "Analytics preferences"
