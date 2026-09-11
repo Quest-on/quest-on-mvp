@@ -69,7 +69,9 @@
   },
   "analytics": {
     "title": "방문 통계 설정",
-    "description": "방문 경로와 가입을 PostHog로 분석해 서비스를 개선해도 될까요? 허용하지 않아도 모든 기능을 이용할 수 있습니다.",
+    "heading": "더 나은 Quest-On을 위해",
+    "description": "방문 경로와 가입 정보를 분석해 서비스를 개선해도 될까요?",
+    "optional": "허용하지 않아도 모든 기능을 쓸 수 있어요.",
     "decline": "허용하지 않음",
     "allow": "분석 허용",
     "details": "자세히 보기",

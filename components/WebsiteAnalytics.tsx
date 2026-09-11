@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import posthog from "posthog-js";
+import { ChartNoAxesColumn, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { createSupabaseClient } from "@/lib/supabase-client";
 import { postHogConfig, sanitizePostHogProperties, syncAnalyticsIdentity } from "@/lib/posthog-config";
 import {
@@ -117,12 +119,37 @@ export function WebsiteAnalytics() {
   }
 
   if (!config || !ready || !supportedPage) return null;
-  return !choice || editing ? <aside aria-label={t("title")} className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-xl rounded-xl border bg-background p-4 text-foreground shadow-lg">
-    <p className="text-sm">{t("description")}</p>
-    <div className="mt-3 flex flex-wrap items-center gap-3">
-      <button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => choose("denied")}>{t("decline")}</button>
-      <button type="button" className="rounded bg-primary px-3 py-2 text-sm text-primary-foreground" onClick={() => choose("granted")}>{t("allow")}</button>
-      <a href="/legal/cookies" className="text-sm underline">{t("details")}</a>
-    </div>
-  </aside> : <button type="button" className="fixed bottom-2 left-2 z-40 rounded border bg-background px-2 py-1 text-xs text-foreground" onClick={() => setEditing(true)}>{t("settings")}</button>;
+  return !choice || editing ? (
+    <aside
+      aria-label={t("title")}
+      aria-describedby="analytics-consent-description"
+      className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 w-96 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-3xl border border-border/60 bg-background p-5 text-foreground shadow-xl shadow-foreground/10 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-300 sm:right-6 sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))] sm:p-6"
+    >
+      <div className="mb-4 flex items-center gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary" aria-hidden="true">
+          <ChartNoAxesColumn className="size-5" strokeWidth={1.8} />
+        </span>
+        <h2 className="text-base leading-snug font-semibold tracking-tight [text-wrap:balance]">{t("heading")}</h2>
+      </div>
+      <div id="analytics-consent-description" className="space-y-2">
+        <p className="text-sm leading-relaxed text-muted-foreground [word-break:keep-all]">{t("description")}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground [word-break:keep-all]">{t("optional")}</p>
+      </div>
+      <div className="mt-5 grid grid-cols-2 gap-2">
+        <Button type="button" variant="secondary" className="h-11 rounded-xl px-3 shadow-none motion-reduce:transition-none" onClick={() => choose("denied")}>
+          {t("decline")}
+        </Button>
+        <Button type="button" className="h-11 rounded-xl px-3 shadow-none motion-reduce:transition-none" onClick={() => choose("granted")}>
+          {t("allow")}
+        </Button>
+      </div>
+      <a href="/legal/cookies" className="mx-auto mt-2 flex min-h-9 w-fit items-center gap-0.5 rounded-lg px-2 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+        {t("details")}<ChevronRight className="size-3.5" aria-hidden="true" />
+      </a>
+    </aside>
+  ) : (
+    <Button type="button" variant="outline" className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 h-10 gap-2 rounded-full border-border/60 px-3 text-xs text-muted-foreground shadow-sm motion-reduce:transition-none sm:right-6 sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))]" onClick={() => setEditing(true)}>
+      <SlidersHorizontal className="size-3.5" aria-hidden="true" />{t("settings")}
+    </Button>
+  );
 }
