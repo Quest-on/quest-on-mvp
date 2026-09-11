@@ -30,7 +30,7 @@
       },
       "analytics": {
         "heading": "Analytics cookies",
-        "body": "These cookies collect anonymized usage data to help us improve the user experience. No personally identifiable information is collected."
+        "body": "With your analytics consent, we send visit, campaign, signup events to PostHog's US data region. After login, activity is linked using an internal account identifier. Names, email addresses, exam codes and answer content are not sent as analytics properties. Session recording is disabled. The current free plan retains analytics events for one year."
       }
     },
     "section4": {
@@ -58,9 +58,9 @@
           "retention": "1 year"
         },
         "analytics": {
-          "purpose": "Usage statistics",
+          "purpose": "PostHog usage analysis and consent preference. Analytics identifiers are stored in localStorage.",
           "type": "Analytics",
-          "retention": "2 years"
+          "retention": "Consent cookie: one year. Analytics localStorage: until withdrawal or browser data deletion."
         }
       }
     },
@@ -74,9 +74,9 @@
         "safari": "Preferences → Privacy → Cookies and Website Data",
         "edge": "Settings → Cookies and site permissions → Cookies and site data"
       },
-      "note": "Note: Consent for analytics cookies can be individually withdrawn on the settings page within the service. (Coming soon)",
+      "note": "Note: Withdraw analytics consent using Analytics preferences at the bottom of the page. Service features remain available.",
       "noteLabel": "Note:",
-      "noteBody": "Consent for analytics cookies can be individually withdrawn on the settings page within the service. (Coming soon)"
+      "noteBody": "Withdraw analytics consent using Analytics preferences at the bottom of the page. This stops subsequent analytics collection without blocking the service. To request deletion of previously collected analytics data, use the contact in our privacy policy."
     }
   },
   "privacy": {

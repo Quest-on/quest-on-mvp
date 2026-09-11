@@ -86,6 +86,8 @@
     "openai": "^5.15.0",
     "p-limit": "^7.3.0",
     "pdf2json": "^4.0.0",
+    "posthog-js": "1.429.5",
+    "posthog-node": "5.52.1",
     "radix-ui": "^1.4.3",
     "react": "19.1.0",
     "react-day-picker": "^9.14.0",
