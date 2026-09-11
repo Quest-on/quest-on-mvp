@@ -1,81 +1,79 @@
-# Website acquisition measurement
+﻿# Website and product analytics
 
-This change addresses #357. Runtime code is the source of truth. The integration is not live until the stream settings, deployment, and browser collection below are verified.
+PostHog Cloud is the website/product analytics service selected for #357. EspoCRM owns outreach history; native product records own actual accounts and milestones. This integration does not change the active email batch.
 
-## Responsibilities
+## Configuration
 
-| System | What it establishes |
-|---|---|
-| GA4 Standard | Consented public-page visits and campaign acquisition; `signup_start` is intent, not completed registration |
-| Vercel Analytics | Existing anonymous page metrics, now mounted once at the root, with query strings and dynamic identifiers removed |
-| Existing product data | Actual profiles and the `onboarding_events` milestones, including demo completion and first student submission |
-| EspoCRM | Sent, bounced, clicked, actual replies, leads, and follow-up tasks |
-
-Do not count opens, clicks, pageviews, or signup clicks as professor responses. Anonymous visits do not identify a professor. Do not send email addresses, user IDs, exam codes, answers, or private page titles to GA4. Private application paths disable the GA4 tag and are excluded from its explicit events.
-
-## Account and stream setup
-
-Use a team-controlled GA4 Standard property named `Quest-On`, web stream `https://quest-on.app`, reporting timezone Asia/Seoul, currency KRW. Confirm whether an existing property exists before creating another. The proposed owner is apple021104@gmail.com; confirm actual account access and ownership. A company account can be granted access later according to the owner's instructions.
-
-Production variables, set only after stream configuration:
+Company owner: yeongjun@quest-on.org. Project: Quest-On (US). Use the public project token from that project in the hosting environment, never a personal or secret API key.
 
 ```text
-NEXT_PUBLIC_GA4_MEASUREMENT_ID=G-<actual measurement id>
-NEXT_PUBLIC_GA4_ENABLED=true
+NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=<project token>
+NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+NEXT_PUBLIC_POSTHOG_ENABLED=true
+NEXT_PUBLIC_APP_ENV=staging
 ```
 
-The measurement ID is a public identifier, not an API secret. Leave both unset on previews and developer machines. Use a separate test stream if enabling tracking on staging. This implementation adds no npm package or database migration.
+Production sets NEXT_PUBLIC_APP_ENV=production. Development and test are always disabled. Public environment changes require a rebuild. One project can receive both environments, but every production dashboard must filter environment=production. Staging events are validation data, not business results.
 
-Configure the stream **before enabling the tag**:
+Stable official posthog-js/posthog-node versions are pinned in package.json. No custom proxy, collector, database migration or polling service is introduced. Vercel Web Analytics mounts and the unshipped GA4 code are replaced; Vercel Speed Insights remains a separate performance measurement already present in the app.
 
-1. Disable Enhanced Measurement entirely for the initial rollout. It can send history pageviews independently of `send_page_view:false`, and can collect forms, search terms, outgoing URLs and downloads outside this implementation's allowlist.
-2. Keep Google Signals, advertising personalization, user-provided data collection, and advertising product links disabled. The code also disables advertising consent/signals.
-3. Add no User-ID. Avoid an IP exclusion for the whole campus, which would remove legitimate prospects. Use a separately verified internal-traffic definition only for known team traffic and first keep the filter in Testing.
-4. Do not mark `signup_start` as the completed-signup key event. Existing product milestones remain the source of truth until a separately validated registration/activation event bridge exists.
-5. Use Traffic acquisition with session source/medium and session campaign. Create a public-page exploration from home to signup page to `signup_start`; this is an intent funnel, not a completed-registration funnel.
+## Events and interpretation
 
-## Campaign links
+| Event | Meaning | Source |
+|---|---|---|
+| $pageview | A supported page was viewed | Browser, manual sanitized navigation |
+| signup_start | A same-origin signup link was clicked | Browser; intent only |
+| signup_completed | A new instructor account was email-verified and authenticated | Verified Supabase timestamps, server |
+| intake_submitted | Instructor submitted onboarding intake | New native milestone row |
+| demo_created | Instructor demo created | New native milestone row |
+| demo_answered | Demo answer submitted | New native milestone row |
+| demo_graded_viewed | Demo grade viewed; demo completion | New native milestone row |
+| first_publish | Native first-publish milestone reached | New native milestone row |
+| first_student_submission | Native first-student-submission reached | New native milestone row |
 
-For the next approved batch use a shared, non-personal convention:
+Signup is exported only for instructor accounts verified within 24 hours of creation and authenticated within 24 hours of verification. Delayed verification, late role selection/consent and pre-existing accounts are not counted as new signups. Native account records remain the complete registration source. Server UUIDs are deterministic per environment, user and event so repeated captures have the same deduplication key.
+
+Analytics are best-effort and consented, not a durable business ledger. Milestones export only on the original native insert; denied consent, background jobs without browser consent, ad blockers, network loss or failed ingestion can produce gaps. No queue/outbox or historical backfill is added. Do not infer zero signups or zero usage from an empty analytics report. Native outcomes can be compared in aggregate, but are not silently joined to anonymous visitors.
+
+## Acquisition
+
+Use non-personal campaign tags on the next approved batch:
 
 ```text
 https://quest-on.app/?utm_source=espo&utm_medium=email&utm_campaign=professor_outreach_2026_09&utm_content=batch_005
 ```
 
-Values are lowercase letters, numbers, `_` and `-`, maximum 80 characters. Never put a professor's name, email, school/person identifier, or private CRM contact ID in UTMs. The code sends allowlisted campaign fields and a clean page URL. Current active batches are not changed by this code. Untagged historical visits cannot be retrospectively attributed.
+Only lowercase letters, numbers, underscore and dash, up to 80 characters are accepted. UTM values must describe shared campaigns, never individuals. First public views and subsequent navigation carry the accepted campaign fields. Login identifies the existing anonymous browser with the internal auth UUID; logout/account changes reset identity. Cross-device journeys require identification on both devices.
 
-## Consent and coverage
+## Collection controls
 
-The existing anonymous Vercel metric remains separate from optional GA4 cookies. GA4 is loaded only for a configured stream and an explicit browser choice on public pages. Declining leaves site functionality available; the public-page preference button allows changing that choice. Storage failures must not break navigation or login. No preference UI is shown until GA4 is enabled.
+The root WebsiteAnalytics component owns the browser SDK. Explicit opt-in is stored in localStorage and a same-origin consent cookie; withdrawal stops capture and clears the prior SDK identity. The supported-page preference control remains accessible. Declining never blocks product features.
 
-Public pages are enumerated in `lib/website-analytics.ts`. New marketing routes must be added intentionally. Vercel product routes are grouped at the top-level family to avoid leaking record IDs; unknown routes and admin pages are dropped. This changes path-level reporting granularity intentionally.
+Autocapture, pageleave, recordings, surveys, flags requests, automatic exceptions and performance capture are disabled initially. Browser before_send retains an explicit property vocabulary and sanitizes nested person properties. Unknown query fields, fragments, exam IDs/codes, answer text, names and email addresses are omitted. Server exports only event name, auth UUID, instructor role and environment, never arbitrary milestone metadata. The UI must describe this as pseudonymous account-linked analytics, not anonymous data.
 
-Review the published cookie/privacy information against the chosen Google property configuration before production release. The pre-existing cookie page mentions `analytics_id` and a future settings control; that text predates this integration and must not be treated as proof of an existing GA4 deployment.
+## Dashboard
 
-## Verification and rollback
+Create one Outreach and activation dashboard with production filters on all tiles:
 
-Local checks (PowerShell or POSIX shell, product worktree):
+- Daily unique website visitors and campaign/UTM-content breakdown.
+- Unique instructors completing signup, demo creation and demo completion.
+- A sequential pageview -> signup_completed -> demo_created -> demo_graded_viewed funnel, using a seven-day conversion window.
+
+Web views do not count as CRM replies or interested conversations. CRM remains the response KPI source. A funnel with consent-dependent tracking is an observed conversion funnel, not the denominator for all emails sent.
+
+## Validation and rollback
+
+Run in the product worktree, with the same commands on PowerShell and POSIX shells:
 
 ```text
 npx tsc --noEmit
 npm run lint
-npx vitest run __tests__/website-analytics.test.ts __tests__/i18n-config.test.ts
+npx vitest run __tests__/website-analytics.test.ts __tests__/posthog.test.ts __tests__/onboarding-events.test.ts __tests__/auth-profile-provisioning.test.ts __tests__/auth-last-seen.test.ts
+npm audit
 ```
 
-Do not load production environment files or run DB-backed local browser tests. In a staging deployment connected to a test stream, verify via browser network tools and GA4 DebugView/Realtime:
+Use CI for DB-backed tests. On staging verify no capture before consent or after refusal, one pageview per navigation, safe UTM payloads, identity reset, actual backend milestone ingestion, and separation from production dashboard totals. Repeat ingestion checks after the reviewed staging-to-main deployment. A configured project or successful HTTP response alone is not proof that the application is collecting live events.
 
-- Before consent and after declining, no Google tag or GA collection request.
-- After allowing, one public `page_view`; navigating to signup adds one, not two. Reload and client navigation both work.
-- Test URL `?utm_source=espo&utm_medium=email&utm_campaign=qa&utm_content=qa&email=private@example.test#secret` produces only the clean URL and allowed campaign fields; inspect network payloads.
-- A signup link emits `signup_start`; failed auth or merely opening the signup page does not emit `sign_up`.
-- No exam/admin URLs, codes, names, answers, or form contents appear in requests. Changing to a private route disables GA events.
-- Declining after allowing stops subsequent collection. Confirm the preference survives reload and that login still works.
-- Repeat on production after the reviewed staging-to-main promotion. Realtime/DebugView proof is required before reporting setup complete; standard reports can lag.
+Rollback: set NEXT_PUBLIC_POSTHOG_ENABLED=false and rebuild through the normal deployment workflow, or revert this PR. Do not alter CRM sending or native account/milestone records. The main branch's approval gate remains in force.
 
-Rollback: set `NEXT_PUBLIC_GA4_ENABLED=false` and redeploy the previously verified release or revert the analytics PR through the usual staging/main flow. Client-public environment values require a rebuild. Do not change CRM sending or product event data as part of rollback.
-
-## Official references
-
-- [GA4 Standard](https://marketingplatform.google.com/about/analytics/)
-- [Manual pageviews and duplicate history events](https://developers.google.com/analytics/devguides/collection/ga4/views)
-- [Campaign URL parameters](https://support.google.com/analytics/answer/10917952)
+Official references: https://posthog.com/docs/libraries/next-js, https://posthog.com/docs/libraries/js/config, https://posthog.com/docs/libraries/node.

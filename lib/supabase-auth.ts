@@ -4,6 +4,7 @@ import { timingSafeEqual } from "crypto";
 import { isAuthBypassAllowedEnv } from "./app-env";
 import { logError } from "./logger";
 import { getSupabaseServer } from "./supabase-server";
+import { captureVerifiedSignup } from "./posthog-server";
 
 export type AppUser = {
   id: string; // Supabase UUID
@@ -191,6 +192,7 @@ export async function currentUser(): Promise<AppUser | null> {
   if (!profile) return null;
 
   await touchLastSeenAt(user.id);
+  await captureVerifiedSignup(user, profile.role ?? "");
 
   return {
     id: user.id,

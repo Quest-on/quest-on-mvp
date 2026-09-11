@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { marketingPage, sanitizeAnalyticsUrl, campaignParameters, readAnalyticsChoice, validMeasurementId, safeReferrer } from "@/lib/website-analytics";
+import { marketingPage, sanitizeAnalyticsUrl, campaignParameters, readAnalyticsChoice, safeReferrer } from "@/lib/website-analytics";
 
 describe("website analytics coverage and data boundaries", () => {
   it("does not treat a missing, invalid or unreadable preference as consent", () => {
@@ -9,9 +9,6 @@ describe("website analytics coverage and data boundaries", () => {
     }
     expect(readAnalyticsChoice({getItem: () => { throw new Error("Storage disabled"); }})).toBeNull();
     expect(readAnalyticsChoice({getItem: () => "granted"})).toBe("granted");
-    expect(validMeasurementId(undefined)).toBe(false);
-    expect(validMeasurementId("G-<actual measurement id>")).toBe(false);
-    expect(validMeasurementId("G-ABC1234567")).toBe(true);
   });
   it("does not forward referrer paths or query strings", () => {
     expect(safeReferrer("https://mail.example.com/inbox/private?token=secret")).toBe("https://mail.example.com");
@@ -30,7 +27,7 @@ describe("website analytics coverage and data boundaries", () => {
     expect(sanitizeAnalyticsUrl("https://quest-on.app/unknown-person@example.com")).toBeNull();
   });
   it("only accepts campaign convention values, never arbitrary query data", () => {
-    expect(campaignParameters("?utm_source=espo&utm_medium=email&utm_campaign=professor_outreach_2026_09&utm_content=batch_005&email=x@y.com")).toEqual({campaign_source:"espo",campaign_medium:"email",campaign_name:"professor_outreach_2026_09",campaign_content:"batch_005"});
+    expect(campaignParameters("?utm_source=espo&utm_medium=email&utm_campaign=professor_outreach_2026_09&utm_content=batch_005&email=x@y.com")).toEqual({utm_source:"espo",utm_medium:"email",utm_campaign:"professor_outreach_2026_09",utm_content:"batch_005"});
     expect(campaignParameters("?utm_campaign=person%40example.com&token=secret")).toEqual({});
   });
   it("mounts analytics once at the root instead of missing public pages", () => {

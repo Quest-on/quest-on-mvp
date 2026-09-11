@@ -25,7 +25,7 @@ export function sanitizeAnalyticsUrl(raw: string): string | null {
 export function campaignParameters(search: string): Record<string, string> {
   const query = new URLSearchParams(search);
   const result: Record<string, string> = {};
-  const names = {utm_source:"campaign_source",utm_medium:"campaign_medium",utm_campaign:"campaign_name",utm_content:"campaign_content",utm_id:"campaign_id"};
+  const names = {utm_source:"utm_source",utm_medium:"utm_medium",utm_campaign:"utm_campaign",utm_content:"utm_content",utm_id:"utm_id"};
   for (const [input, output] of Object.entries(names)) {
     const value = query.get(input);
     if (value && /^[a-z0-9_-]{1,80}$/.test(value)) result[output] = value;
@@ -33,12 +33,9 @@ export function campaignParameters(search: string): Record<string, string> {
   return result;
 }
 
-export function validMeasurementId(value: string | undefined): value is string {
-  return typeof value === "string" && /^G-[A-Z0-9]{6,20}$/.test(value);
-}
-
 export type AnalyticsChoice = "granted" | "denied";
-export const ANALYTICS_CHOICE_KEY = "quest-on.analytics-choice.v1";
+export const ANALYTICS_CHOICE_KEY = "quest-on.analytics-choice.v2";
+export const ANALYTICS_CHOICE_COOKIE = "quest_on_analytics";
 
 export function readAnalyticsChoice(storage: Pick<Storage, "getItem">): AnalyticsChoice | null {
   try {

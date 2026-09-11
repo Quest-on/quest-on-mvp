@@ -1,5 +1,6 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { logError } from "@/lib/logger";
+import { captureProductMilestone } from "@/lib/posthog-server";
 
 /**
  * 온보딩 액티베이션 퍼널 마일스톤 (Epic #79 / 이슈 #80 / ADR-006).
@@ -80,7 +81,9 @@ export async function recordOnboardingEvent({
     }
 
     // ignoreDuplicates 로 중복이면 빈 배열이 온다 — 오류가 아니라 "이미 도달함"이다.
-    return Array.isArray(data) && data.length > 0;
+    const recorded = Array.isArray(data) && data.length > 0;
+    if (recorded) await captureProductMilestone(userId, event, role);
+    return recorded;
   } catch (err) {
     logError("[onboarding-events] Unhandled error", err, {
       path: "lib/onboarding-events",

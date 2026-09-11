@@ -82,11 +82,11 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              `script-src 'self' 'unsafe-inline'${developmentEvalSource()} https://challenges.cloudflare.com https://va.vercel-scripts.com https://www.googletagmanager.com`,
+              `script-src 'self' 'unsafe-inline'${developmentEvalSource()} https://challenges.cloudflare.com https://va.vercel-scripts.com https://*.posthog.com`,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://*.supabase.co",
               "font-src 'self' data:",
-              `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://va.vercel-scripts.com https://www.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com${localSupabaseSources}`,
+              `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://va.vercel-scripts.com https://*.posthog.com${localSupabaseSources}`,
               "frame-src 'self' https://challenges.cloudflare.com https://www.youtube.com",
               "worker-src 'self' blob:",
             ].join("; "),

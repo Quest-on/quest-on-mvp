@@ -99,7 +99,7 @@ export default async function CookiesPage() {
                 <td className="px-4 py-2 border border-border">{t("cookies.section4.rows.theme.retention")}</td>
               </tr>
               <tr>
-                <td className="px-4 py-2 border border-border font-mono text-sm">analytics_id</td>
+                <td className="px-4 py-2 border border-border font-mono text-sm">quest_on_analytics / ph_*</td>
                 <td className="px-4 py-2 border border-border">{t("cookies.section4.rows.analytics.purpose")}</td>
                 <td className="px-4 py-2 border border-border">{t("cookies.section4.rows.analytics.type")}</td>
                 <td className="px-4 py-2 border border-border">{t("cookies.section4.rows.analytics.retention")}</td>
