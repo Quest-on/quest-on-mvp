@@ -93,22 +93,13 @@
     "buttonConfirmEnd": "시험 종료"
   },
   "examDetailHeader": {
-    "examCode": "시험 코드: {code}",
-    "buttonDashboardShort": "대시보드",
     "buttonDashboardLong": "대시보드로 돌아가기",
-    "buttonEdit": "시험 편집"
+    "buttonEdit": "시험 편집",
+    "questionsCountLabel": "문제 {count}개",
+    "moreAria": "더보기"
   },
   "examDetailsCard": {
-    "toastCodeCopied": "시험 코드가 복사되었습니다.",
-    "toastCodeCopyFailed": "시험 코드를 복사하지 못했습니다.",
-    "cardTitle": "시험 정보",
-    "labelDescription": "설명",
-    "labelTime": "시간",
     "durationMin": "{duration}분",
-    "labelCreatedAt": "생성일",
-    "labelExamCode": "시험 코드",
-    "buttonCopy": "복사",
-    "buttonCopyNotice": "학생 공지문 복사",
     "toastNoticeCopied": "공지문을 복사했습니다",
     "toastNoticeCopyFailed": "공지문 복사에 실패했습니다",
     "noticeHeading": "[퀘스트온] 시험 안내",
@@ -142,12 +133,6 @@
     "unitMinutes": "분",
     "quickSelectMin": "{time}분",
     "durationWarning": "시험 시간은 최소 15분 이상이어야 합니다."
-  },
-  "examQuickActionsCard": {
-    "toastCodeCopied": "시험 코드가 복사되었습니다.",
-    "toastCodeCopyFailed": "시험 코드를 복사하지 못했습니다.",
-    "cardTitle": "빠른 작업",
-    "buttonCopyCode": "시험 코드 복사"
   },
   "examStudentCard": {
     "labelSubmitted": "제출:",
@@ -419,5 +404,11 @@
     "restartConfirmKeeps": "시험 자체와 문항은 그대로 남습니다.",
     "restartConfirmCta": "지우고 다시 풀기",
     "restartConfirmCancel": "취소"
+  },
+  "studentHandoff": {
+    "title": "학생에게 알리기",
+    "subtitle": "아래 공지문을 그대로 복사해 수업 공지나 메신저에 붙여넣으세요.",
+    "codeLabel": "입장 코드",
+    "copyNotice": "공지문 복사"
   }
 }

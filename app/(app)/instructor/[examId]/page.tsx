@@ -7,8 +7,8 @@ import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ExamDetailHeader } from "@/components/instructor/ExamDetailHeader";
-import { resolveCodeGate, type InstructorQuotaResponse } from "@/components/instructor/ExamCode";
-import { ExamDetailsCard } from "@/components/instructor/ExamDetailsCard";
+import { type InstructorQuotaResponse } from "@/components/instructor/ExamCode";
+import { StudentHandoffCard } from "@/components/instructor/StudentHandoffCard";
 import { QuestionsListCard } from "@/components/instructor/QuestionsListCard";
 import { ExamControlButtons } from "@/components/instructor/ExamControlButtons";
 import { LateEntryPanel } from "@/components/instructor/LateEntryPanel";
@@ -19,6 +19,10 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  DropdownMenuItem,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -29,11 +33,6 @@ import {
 } from "@/components/ui/select";
 import { Search, ChevronDown, ChevronUp, RefreshCw, Loader2, Eye, EyeOff, Download, Bot } from "lucide-react";
 import toast from "react-hot-toast";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { StudentLiveMonitoring } from "@/components/instructor/StudentLiveMonitoring";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useExamDetail } from "@/hooks/useExamDetail";
@@ -43,6 +42,7 @@ import {
   type StudentFilterSortOption,
 } from "@/hooks/useStudentFiltering";
 import { qk } from "@/lib/query-keys";
+import { resolveExamDetailPhase } from "@/lib/exam-detail-phase";
 import { shouldShowStudentListSkeleton } from "@/lib/instructor-utils";
 import { cn } from "@/lib/utils";
 import type { InstructorExam } from "@/lib/types/exam";
@@ -82,8 +82,9 @@ export default function ExamDetail({
   const t = useTranslations("instructor");
 
   const [monitoringStudent, setMonitoringStudent] = useState<ExamStudentSummary | null>(null);
-  const [examInfoOpen, setExamInfoOpen] = useState(false);
-  const [questionsOpen, setQuestionsOpen] = useState(false);
+  // 문항 개폐 기본값은 단계가 정한다(아래 questionsOpen). null 이면 아직
+  // 교수자가 손대지 않았다는 뜻 — 손대면 그 선택이 단계보다 우선한다.
+  const [questionsOverride, setQuestionsOverride] = useState<boolean | null>(null);
   const [bulkGradingOpen, setBulkGradingOpen] = useState(false);
 
   const {
@@ -222,9 +223,12 @@ export default function ExamDetail({
 
   const questionsCount = examDetailData?.questionsCount ?? null;
   const questionsLoading = examDetailLoading;
+  // 개폐 상태에 걸지 않는다. 문항은 examDetailData 에 이미 들어 있는데
+  // 여는 순간에야 넘기면 펼칠 때마다 스피너부터 뜬다 — 클릭하고 기다렸다
+  // 읽는다. 스스로 만든 대기였다.
   const questions = useMemo(
-    () => (questionsOpen ? examDetailData?.questionsRaw ?? [] : []),
-    [examDetailData?.questionsRaw, questionsOpen],
+    () => examDetailData?.questionsRaw ?? [],
+    [examDetailData?.questionsRaw],
   );
 
   const handleLiveMonitoring = (student: ExamStudentSummary) => {
@@ -372,6 +376,52 @@ export default function ExamDetail({
     summariesLoading,
   });
 
+  /**
+   * 이 화면이 지금 어느 단계인가 — 배포(setup) / 감독(live) / 검수(review).
+   *
+   * 한 벌짜리 레이아웃이 세 가지 일을 다 맡고 있었다. 판정은 순수 함수에 있고
+   * (`lib/exam-detail-phase.ts`) 여기서는 결과만 쓴다. 화면 안에서 다시 계산하면
+   * "학생이 있는데 목록 도구가 사라지는" 회귀를 테스트가 못 막는다.
+   */
+  const phase = resolveExamDetailPhase({
+    status: exam?.status,
+    studentCount: students.length,
+    // 오류로 못 받은 것과 "0명"은 다르다. 모르면 숨기지 않는다.
+    studentsLoaded: !summariesLoading && !summariesError,
+  });
+
+  // 배포 단계에서는 문항 본문이 이 화면의 주인공이다. 갓 만든 시험에서 교수자가
+  // 제일 먼저 확인할 것을 접어 두고 클릭을 요구할 이유가 없다(NN/g: 대부분의
+  // 패널을 열 것 같으면 아코디언을 쓰지 않는다). 감독·검수 단계에서는 보조 정보라
+  // 접어 둔다. 교수자가 직접 연/닫은 뒤에는 그 선택이 단계보다 우선한다.
+  const questionsOpen = questionsOverride ?? phase === "setup";
+
+  // 공개할 성적이 없는 화면에 성적 공개 줄을 띄우지 않는다.
+  const showGradesReleaseRow = phase !== "setup";
+
+  /**
+   * 코드 반출 한도 상태.
+   *
+   * 표면마다 따로 조립하면 한쪽만 고쳐졌을 때 게이트가 새므로 여기 한 번만
+   * 만들어 `StudentHandoffCard` 에 넘긴다. 카드 안에서 `resolveCodeGate` 로
+   * 판정하고, 차단이면 코드도 공지문도 만들지 않는다.
+   */
+  const codeQuota = {
+    isDemo: isDemoExam,
+    alreadyPublished: !!exam?.first_published_at,
+    publishesRemaining: quotaData?.publishesRemaining ?? null,
+    // 이 시험이 실제로 몇 명을 받았는지 알고 있으므로 잔여를 계산해 넘긴다.
+    // 상한을 모르면 null 이고, 그러면 안 막는다.
+    studentsRemaining:
+      quotaData?.studentsRemaining === null ||
+      quotaData?.studentsRemaining === undefined
+        ? null
+        : Math.max(
+            0,
+            quotaData.studentsRemaining - (bulkGradeStatus?.studentCount ?? 0)
+          ),
+  };
+
   if (!isLoaded || loading) {
     return <PageSpinner />;
   }
@@ -409,22 +459,10 @@ export default function ExamDetail({
             title={exam.title}
             code={exam.code}
             examId={exam.id}
+            status={exam.status || "draft"}
+            durationMinutes={exam.duration}
+            questionsCount={questionsCount}
             isDemo={isDemoExam}
-            quota={{
-              isDemo: isDemoExam,
-              alreadyPublished: !!exam.first_published_at,
-              publishesRemaining: quotaData?.publishesRemaining ?? null,
-              // 이 시험이 실제로 몇 명을 받았는지 알고 있으므로 잔여를 계산해
-              // 넘긴다. 상한을 모르면 null 이고, 그러면 안 막는다.
-              studentsRemaining:
-                quotaData?.studentsRemaining === null ||
-                quotaData?.studentsRemaining === undefined
-                  ? null
-                  : Math.max(
-                      0,
-                      quotaData.studentsRemaining - (bulkGradeStatus?.studentCount ?? 0)
-                    ),
-            }}
             demoPreviewLabel={t("examDetail.tryAsStudent")}
             // 완주한 데모는 이미 제출본이 있어 그냥 들어가면 읽기 전용 화면만
             // 뜬다. 연습용이므로 다시 풀 수 있어야 한다 — 라벨이 있으면 CTA 가
@@ -437,223 +475,181 @@ export default function ExamDetail({
                 ? t("examDetail.retryAsStudentHint")
                 : undefined
             }
-            extraActions={
-              <>
-                {process.env.NODE_ENV === "development" && (
-                  <div className="text-xs text-muted-foreground mr-2">
-                    Status: {exam.status || "undefined"} |
-                    Gate: {!!(exam.open_at || exam.close_at) ? "true" : "false"}
-                  </div>
-                )}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className={!allStudentsManuallyGraded ? "cursor-not-allowed" : undefined}>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDownload("excel")}
-                        disabled={!allStudentsManuallyGraded || isExporting !== null}
-                      >
-                        {isExporting === "excel" ? (
-                          <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                        ) : (
-                          <Download className="h-4 w-4 mr-1.5" />
-                        )}
-                        Excel
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
+            primaryActions={
+              <ExamControlButtons
+                examId={exam.id}
+                examStatus={exam.status || "draft"}
+                hasGateFields={!!(exam.open_at || exam.close_at)}
+                isDemo={isDemoExam}
+                onStatusChange={(newStatus, startedAt) => {
+                  setExam((prev) => {
+                    if (!prev) return prev;
+                    return {
+                      ...prev,
+                      status: newStatus as InstructorExam["status"],
+                      started_at: startedAt || prev.started_at,
+                    };
+                  });
+                  queryClient.invalidateQueries({
+                    queryKey: qk.instructor.examDetail(resolvedParams.examId),
+                  });
+                  queryClient.invalidateQueries({
+                    queryKey: qk.instructor.studentSummaries(resolvedParams.examId),
+                  });
+                }}
+              />
+            }
+            menuActions={
+              // 내보내기는 채점이 끝난 시험에서만 할 일이다. 예전에는 학생이
+              // 0명인 화면에도 Excel/CSV 가 비활성 상태로 헤더에 떠 있어서,
+              // 방금 시험을 만든 사람에게 "여기서 뭔가 해야 하나"만 남겼다.
+              phase === "review" ? (
+                <>
+                  <DropdownMenuItem
+                    disabled={!allStudentsManuallyGraded || isExporting !== null}
+                    onSelect={() => void handleDownload("excel")}
+                  >
+                    {isExporting === "excel" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    {t("examDetail.exportExcel")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!allStudentsManuallyGraded || isExporting !== null}
+                    onSelect={() => void handleDownload("csv")}
+                  >
+                    {isExporting === "csv" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    {t("examDetail.exportCsv")}
+                  </DropdownMenuItem>
+                  {/* 비활성만 해 두면 왜 못 누르는지 알 수 없다. 이유를 같은
+                      자리에 적는다 — 예전에는 툴팁이라 hover 해야 보였다. */}
                   {!allStudentsManuallyGraded && (
-                    <TooltipContent side="bottom">
+                    <DropdownMenuLabel className="type-meta font-normal">
                       {t("examDetail.allGradedRequired")}
-                    </TooltipContent>
+                    </DropdownMenuLabel>
                   )}
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className={!allStudentsManuallyGraded ? "cursor-not-allowed" : undefined}>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDownload("csv")}
-                        disabled={!allStudentsManuallyGraded || isExporting !== null}
-                      >
-                        {isExporting === "csv" ? (
-                          <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                        ) : (
-                          <Download className="h-4 w-4 mr-1.5" />
-                        )}
-                        CSV
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {!allStudentsManuallyGraded && (
-                    <TooltipContent side="bottom">
-                      {t("examDetail.allGradedRequired")}
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-                <ExamControlButtons
-                  examId={exam.id}
-                  examStatus={exam.status || "draft"}
-                  hasGateFields={!!(exam.open_at || exam.close_at)}
-                  isDemo={isDemoExam}
-                  onStatusChange={(newStatus, startedAt) => {
-                    setExam((prev) => {
-                      if (!prev) return prev;
-                      return {
-                        ...prev,
-                        status: newStatus as InstructorExam["status"],
-                        started_at: startedAt || prev.started_at,
-                      };
-                    });
-                    queryClient.invalidateQueries({
-                      queryKey: qk.instructor.examDetail(resolvedParams.examId),
-                    });
-                    queryClient.invalidateQueries({
-                      queryKey: qk.instructor.studentSummaries(resolvedParams.examId),
-                    });
-                  }}
-                />
-              </>
+                </>
+              ) : null
             }
           />
 
+          {/*
+            학생에게 건네는 자리. 종료된 시험에서는 띄우지 않는다 — 그 코드로는
+            아무도 들어올 수 없으므로 "알리기"가 거짓말이 된다.
+            시험이 돌고 있으면 지각 입장자 때문에 코드는 여전히 필요하지만
+            화면의 주인공은 학생 목록이어야 하므로 한 줄로 접는다.
+          */}
+          {phase !== "review" && (
+            <StudentHandoffCard
+              examCode={exam.code}
+              examTitle={exam.title}
+              aiChatAvailable={aiChatAvailable}
+              quota={codeQuota}
+              variant={phase === "setup" ? "full" : "compact"}
+              className="mb-6"
+            />
+          )}
 
-          <div className="space-y-3 mt-6 mb-6">
-            <div id="exam-info-section">
-              <Collapsible open={examInfoOpen} onOpenChange={setExamInfoOpen}>
-                <div className="border rounded-lg">
-                  <CollapsibleTrigger className="w-full">
-                    <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <h3 className="font-semibold">{t("examDetail.examInfo")}</h3>
-                        <span className="type-hint">
-                          {/* 코드는 헤더의 ExamCode 가 이미 내보낸다. 여기서
-                              한 번 더 그리면 게이트를 우회하는 두 번째 표면이
-                              된다 — 소요 시간만 남긴다. */}
-                          {exam.duration}분
-                        </span>
+          <div id="questions-section" className="mb-6">
+            <Collapsible
+              open={questionsOpen}
+              onOpenChange={(open) => setQuestionsOverride(open)}
+            >
+              <div className="border rounded-lg">
+                <CollapsibleTrigger className="w-full">
+                  <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <h2 className="font-semibold">{t("examDetail.questionsSection")}</h2>
+                      <span className="type-hint">
+                        {questionsCount !== null
+                          ? t("examDetail.questionsCountLabel", { count: questionsCount })
+                          : t("examDetail.questionsLoading")}
+                      </span>
+                    </div>
+                    {questionsOpen ? (
+                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-4 pb-4">
+                    {questionsLoading && questions.length === 0 ? (
+                      <div className="space-y-3">
+                        <Skeleton className="h-20 w-full rounded-lg" />
+                        <Skeleton className="h-20 w-full rounded-lg" />
                       </div>
-                      {examInfoOpen ? (
-                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </div>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="px-4 pb-4">
-                      <ExamDetailsCard
-                        // 발행 한도에 걸린 미발행 시험은 이 카드에서도 코드를
-                        // 반출하면 안 된다. 헤더만 막으면 카드가 우회로가 된다.
-                        codeGateBlocked={
-                          resolveCodeGate({
-                            isDemo: isDemoExam,
-                            alreadyPublished: !!exam.first_published_at,
-                            publishesRemaining: quotaData?.publishesRemaining ?? null,
-                          }) === "blocked"
-                        }
-                        description={exam.description}
-                        duration={exam.duration}
-                        createdAt={exam.createdAt}
-                        examCode={exam.code}
-                        examTitle={exam.title}
-                        aiChatAvailable={aiChatAvailable}
-                      />
-                    </div>
-                  </CollapsibleContent>
-                </div>
-              </Collapsible>
-            </div>
-
-            <div id="questions-section">
-              <Collapsible open={questionsOpen} onOpenChange={setQuestionsOpen}>
-                <div className="border rounded-lg">
-                  <CollapsibleTrigger className="w-full">
-                    <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <h3 className="font-semibold">{t("examDetail.viewQuestions")}</h3>
-                        <span className="type-hint">
-                          {questionsCount !== null
-                            ? t("examDetail.questionsCountLabel", { count: questionsCount })
-                            : t("examDetail.questionsLoading")}
-                        </span>
-                      </div>
-                      {questionsOpen ? (
-                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </div>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="px-4 pb-4">
-                      {questionsLoading ? (
-                        <div className="flex items-center justify-center py-8">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-                        </div>
-                      ) : (
-                        <QuestionsListCard questions={questions} />
-                      )}
-                    </div>
-                  </CollapsibleContent>
-                </div>
-              </Collapsible>
-            </div>
+                    ) : (
+                      <QuestionsListCard questions={questions} />
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
           </div>
 
           <div className="space-y-4">
-            <h3 className="font-semibold">{t("examDetail.studentList")}</h3>
+            <h2 className="font-semibold">{t("examDetail.studentList")}</h2>
 
             {exam.status === "running" && (
               <LateEntryPanel examId={exam.id} examStatus={exam.status} />
             )}
 
-            <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
-              <div className="flex items-center gap-2">
-                {exam.grades_released ? (
-                  <Eye className="h-4 w-4 text-success-text" />
-                ) : (
-                  <EyeOff className="h-4 w-4 text-muted-foreground" />
-                )}
-                <span className="type-field-label">
-                  {exam.grades_released ? t("examDetail.gradesPublic") : t("examDetail.gradesHidden")}
-                </span>
-                <span className="text-xs text-muted-foreground hidden sm:inline">
-                  {exam.grades_released
-                    ? t("examDetail.gradesPublicDesc")
-                    : t("examDetail.gradesHiddenDesc")}
-                </span>
+            {/* 응시자가 0명인 화면에 성적 공개 버튼을 띄우지 않는다. 공개할
+                성적이 없으면 그건 다음 행동이 아니다. */}
+            {showGradesReleaseRow && (
+              <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                <div className="flex items-center gap-2">
+                  {exam.grades_released ? (
+                    <Eye className="h-4 w-4 text-success-text" />
+                  ) : (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className="type-field-label">
+                    {exam.grades_released ? t("examDetail.gradesPublic") : t("examDetail.gradesHidden")}
+                  </span>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">
+                    {exam.grades_released
+                      ? t("examDetail.gradesPublicDesc")
+                      : t("examDetail.gradesHiddenDesc")}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant={
+                    // 공개할 성적이 없으면 다음 행동이 아니다.
+                    //
+                    // 갓 만든 데모에는 응시자가 0명이다. 그런데도 이 버튼이 강조돼서
+                    // 착지 화면에 강조 CTA 가 셋(학생 시점 / 시험 시작 / 성적 공개)이나
+                    // 떴다. 온보딩 직후 첫 걸음은 학생 시점 하나다 - 데모를 겪어 보는
+                    // 게 목적이고 나머지 둘은 그 뒤 행동이다.
+                    exam.grades_released ||
+                    showBulkCaseGradingCta ||
+                    (bulkGradeStatus?.studentCount ?? 0) === 0
+                      ? "outline"
+                      : "default"
+                    }
+                  disabled={releaseGradesMutation.isPending}
+                  onClick={handleToggleGradesRelease}
+                >
+                  {releaseGradesMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                  ) : exam.grades_released ? (
+                    <EyeOff className="h-4 w-4 mr-1.5" />
+                  ) : (
+                    <Eye className="h-4 w-4 mr-1.5" />
+                  )}
+                  {exam.grades_released ? t("examDetail.makeHidden") : t("examDetail.makePublic")}
+                </Button>
               </div>
-              <Button
-                size="sm"
-                variant={
-                  // 공개할 성적이 없으면 다음 행동이 아니다.
-                  //
-                  // 갓 만든 데모에는 응시자가 0명이다. 그런데도 이 버튼이 강조돼서
-                  // 착지 화면에 강조 CTA 가 셋(학생 시점 / 시험 시작 / 성적 공개)이나
-                  // 떴다. 온보딩 직후 첫 걸음은 학생 시점 하나다 - 데모를 겪어 보는
-                  // 게 목적이고 나머지 둘은 그 뒤 행동이다.
-                  exam.grades_released ||
-                  showBulkCaseGradingCta ||
-                  (bulkGradeStatus?.studentCount ?? 0) === 0
-                    ? "outline"
-                    : "default"
-                  }
-                disabled={releaseGradesMutation.isPending}
-                onClick={handleToggleGradesRelease}
-              >
-                {releaseGradesMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-                ) : exam.grades_released ? (
-                  <EyeOff className="h-4 w-4 mr-1.5" />
-                ) : (
-                  <Eye className="h-4 w-4 mr-1.5" />
-                )}
-                {exam.grades_released ? t("examDetail.makeHidden") : t("examDetail.makePublic")}
-              </Button>
-            </div>
+            )}
 
             {showBulkCaseGradingCta && (
               <div className="flex items-center justify-between p-3 border border-info-border rounded-lg bg-info-surface">
@@ -682,52 +678,58 @@ export default function ExamDetail({
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder={t("examDetail.searchPlaceholder")}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
+            {/* 0행 위에 검색창·정렬·새로고침을 띄워 두지 않는다. 다룰 것이
+                없는 도구는 화면을 채우기만 하고 아무 질문에도 답하지 않는다. */}
+            {phase !== "setup" && (
+              <>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder={t("examDetail.searchPlaceholder")}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select
+                  value={sortOption}
+                  onValueChange={(v) => setSortOption(v as StudentFilterSortOption)}
+                >
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                    <SelectValue placeholder={t("examDetail.sortBy")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name">{t("examDetail.sortByName")}</SelectItem>
+                    <SelectItem value="studentNumber">{t("examDetail.sortByStudentNumber")}</SelectItem>
+                    <SelectItem value="submittedAt">{t("examDetail.sortBySubmittedAt")}</SelectItem>
+                    <SelectItem value="overallStatus">{t("examDetail.sortByStatus")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 shrink-0"
+                  onClick={() => {
+                    queryClient.invalidateQueries({
+                      queryKey: qk.instructor.lateStudents(resolvedParams.examId),
+                    });
+                    queryClient.invalidateQueries({
+                      queryKey: qk.instructor.examDetail(resolvedParams.examId),
+                    });
+                    void refetchSummaries();
+                  }}
+                  title={t("examDetail.refresh")}
+                >
+                  <RefreshCw className={cn("h-4 w-4", summariesFetching && "animate-spin")} />
+                </Button>
               </div>
-              <Select
-                value={sortOption}
-                onValueChange={(v) => setSortOption(v as StudentFilterSortOption)}
-              >
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue placeholder={t("examDetail.sortBy")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">{t("examDetail.sortByName")}</SelectItem>
-                  <SelectItem value="studentNumber">{t("examDetail.sortByStudentNumber")}</SelectItem>
-                  <SelectItem value="submittedAt">{t("examDetail.sortBySubmittedAt")}</SelectItem>
-                  <SelectItem value="overallStatus">{t("examDetail.sortByStatus")}</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 shrink-0"
-                onClick={() => {
-                  queryClient.invalidateQueries({
-                    queryKey: qk.instructor.lateStudents(resolvedParams.examId),
-                  });
-                  queryClient.invalidateQueries({
-                    queryKey: qk.instructor.examDetail(resolvedParams.examId),
-                  });
-                  void refetchSummaries();
-                }}
-                title={t("examDetail.refresh")}
-              >
-                <RefreshCw className={cn("h-4 w-4", summariesFetching && "animate-spin")} />
-              </Button>
-            </div>
 
-            <p className="type-hint">
-              {t("examDetail.totalStudents", { count: filteredAndSortedStudents.length })}
-            </p>
+              <p className="type-hint">
+                {t("examDetail.totalStudents", { count: filteredAndSortedStudents.length })}
+              </p>
+              </>
+            )}
 
             {studentsLoading ? (
               <div className="border rounded-lg overflow-hidden p-4 space-y-4">
@@ -758,8 +760,20 @@ export default function ExamDetail({
                 </Button>
               </div>
             ) : filteredAndSortedStudents.length === 0 ? (
-              <div className="border rounded-lg p-12 text-center text-muted-foreground">
-                <p>{t("examDetail.noStudents")}</p>
+              <div className="border rounded-lg p-12 text-center">
+                {/*
+                  빈 화면도 기능의 일부다. "표시할 학생이 없습니다"는 상태만
+                  말하고 다음 행동을 말하지 않는다 — 방금 시험을 만든 사람은
+                  그게 정상인지 고장인지 구분할 수 없다.
+                */}
+                <p className="font-medium">
+                  {phase === "setup"
+                    ? t("examDetail.noStudentsYetTitle")
+                    : t("examDetail.noStudents")}
+                </p>
+                {phase === "setup" && (
+                  <p className="type-hint mt-1">{t("examDetail.noStudentsYetHint")}</p>
+                )}
               </div>
             ) : (
               <div className="border rounded-lg overflow-hidden">

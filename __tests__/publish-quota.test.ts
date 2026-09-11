@@ -41,10 +41,8 @@ const CODE_RENDER_REGISTRY: Record<string, string> = {
     "채점 결과지의 시험 식별 표기다. 응시가 끝난 시험이라 발행 한도와 무관하다.",
   "components/student/StudentDashboardClient.tsx":
     "학생 본인이 응시한 시험 목록이다. 교수자 반출 표면이 아니다.",
-  "components/instructor/ExamQuickActionsCard.tsx":
-    "응시 종료 후 채점 액션 카드다. 이미 학생을 받은 시험이라 발행 한도와 무관하다.",
-  "components/instructor/ExamDetailsCard.tsx":
-    "복사 핸들러가 codeGateBlocked 를 먼저 확인하고 막는다. 코드 렌더는 헤더의 ExamCode 가 맡는다.",
+  "components/instructor/StudentHandoffCard.tsx":
+    "공지문 본문을 미리 보여주는 표면이다. 공지문 안에 코드가 들어가므로 차단이면 문자열 자체를 만들지 않는다(notice === null) — 미리보기와 복사 버튼이 함께 사라진다. 코드 렌더는 ExamCode 가 맡는다.",
   "components/instructor/InstructorHomeClient.tsx":
     "복사 핸들러가 gateBlocked 를 먼저 확인하고 막는다. 코드 렌더는 ExamCard 의 ExamCode 가 맡는다.",
   "app/(app)/instructor/assignment/[assignmentId]/page.tsx":

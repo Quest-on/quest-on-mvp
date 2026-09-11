@@ -93,22 +93,13 @@
     "buttonConfirmEnd": "End Exam"
   },
   "examDetailHeader": {
-    "examCode": "Exam Code: {code}",
-    "buttonDashboardShort": "Dashboard",
     "buttonDashboardLong": "Back to Dashboard",
-    "buttonEdit": "Edit Exam"
+    "buttonEdit": "Edit Exam",
+    "questionsCountLabel": "{count, plural, one {# question} other {# questions}}",
+    "moreAria": "More actions"
   },
   "examDetailsCard": {
-    "toastCodeCopied": "Exam code copied.",
-    "toastCodeCopyFailed": "Failed to copy exam code.",
-    "cardTitle": "Exam Info",
-    "labelDescription": "Description",
-    "labelTime": "Duration",
     "durationMin": "{duration} min",
-    "labelCreatedAt": "Created",
-    "labelExamCode": "Exam Code",
-    "buttonCopy": "Copy",
-    "buttonCopyNotice": "Copy student notice",
     "toastNoticeCopied": "Notice copied",
     "toastNoticeCopyFailed": "Could not copy the notice",
     "noticeHeading": "[Quest-On] Exam notice",
@@ -142,12 +133,6 @@
     "unitMinutes": "min",
     "quickSelectMin": "{time} min",
     "durationWarning": "Exam duration must be at least 15 minutes."
-  },
-  "examQuickActionsCard": {
-    "toastCodeCopied": "Exam code copied.",
-    "toastCodeCopyFailed": "Failed to copy exam code.",
-    "cardTitle": "Quick Actions",
-    "buttonCopyCode": "Copy Exam Code"
   },
   "examStudentCard": {
     "labelSubmitted": "Submitted:",
@@ -419,5 +404,11 @@
     "restartConfirmKeeps": "The exam itself and its questions stay as they are.",
     "restartConfirmCta": "Delete and restart",
     "restartConfirmCancel": "Cancel"
+  },
+  "studentHandoff": {
+    "title": "Share with students",
+    "subtitle": "Copy the notice below and paste it into your class announcement or messenger.",
+    "codeLabel": "Entry code",
+    "copyNotice": "Copy notice"
   }
 }
