@@ -66,5 +66,13 @@
       "label": "Final answer",
       "description": "Write and submit your answer"
     }
+  },
+  "analytics": {
+    "title": "Analytics preferences",
+    "description": "May we use PostHog to understand visits, signup and demo usage? All features work if you decline.",
+    "decline": "Decline",
+    "allow": "Allow analytics",
+    "details": "Learn more",
+    "settings": "Analytics preferences"
   }
 }
