@@ -30,7 +30,7 @@
       },
       "analytics": {
         "heading": "Analytics cookies",
-        "body": "With your analytics consent, we send page visit and duration, campaign, click, form submission, signup and key feature usage events to PostHog's US data region. After login, activity is linked using an internal account identifier. Names, email addresses, exam codes and answer content are not sent as analytics properties. Session recording is disabled. The current free plan retains analytics events for one year."
+        "body": "With your analytics consent, we send page visit and duration, campaign, click, form submission, signup and key feature usage events to PostHog's US data region. After login, activity is linked using an internal account identifier. Names, email addresses, exam codes and answer content are not sent as analytics properties. Session replay records navigation, clicks and scrolling with inputs and on-screen text masked. Answer and AI chat content, images, attached documents, audio and video are excluded. Recordings are retained for 30 days; collection can be stopped in analytics preferences at any time. The current free plan retains analytics events for one year."
       }
     },
     "section4": {

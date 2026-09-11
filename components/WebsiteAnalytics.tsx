@@ -13,6 +13,8 @@ import {
   marketingPage, readAnalyticsChoice, safeReferrer, sanitizeAnalyticsUrl,
 } from "@/lib/website-analytics";
 
+import { sessionReplayConfig, replayProperties } from "@/lib/posthog-replay";
+
 const config = postHogConfig();
 let initialized = false;
 
@@ -41,7 +43,7 @@ export function WebsiteAnalytics() {
     if (!config || !ready) return;
     document.cookie = `${ANALYTICS_CHOICE_COOKIE}=${choice ?? "denied"}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`;
     if (choice !== "granted") {
-      if (initialized) { posthog.reset(); posthog.opt_out_capturing(); }
+      if (initialized) { posthog.opt_out_capturing(); posthog.stopSessionRecording(); posthog.reset(); posthog.opt_out_capturing(); }
       lastPage.current = null;
       return;
     }
@@ -60,14 +62,22 @@ export function WebsiteAnalytics() {
         rageclick: false,
         capture_exceptions: false,
         capture_performance: false,
-        disable_session_recording: true,
+        disable_session_recording: false,
+        session_recording: sessionReplayConfig,
+        enable_recording_console_log: false,
         disable_surveys: true,
-        disable_external_dependency_loading: true,
-        advanced_disable_flags: true,
+        disable_external_dependency_loading: false,
+        advanced_disable_feature_flags: true,
+        disable_product_tours: true,
+        disable_conversations: true,
         save_campaign_params: false,
         save_referrer: false,
         person_profiles: "identified_only",
         before_send: (event) => {
+          if (event?.event === "$snapshot") {
+            event.properties = replayProperties(event.properties, config.environment);
+            return event;
+          }
           if (!event || !["$pageview", "$pageleave", "$autocapture", "$identify", "signup_start"].includes(event.event)) return null;
           event.properties = sanitizePostHogProperties({ ...event.properties, environment: config.environment });
           return event;
@@ -76,6 +86,7 @@ export function WebsiteAnalytics() {
       initialized = true;
     }
     posthog.opt_in_capturing({ captureEventName: false });
+    posthog.set_config({ disable_session_recording: false });
     posthog.register({ environment: config.environment, ...campaignParameters(window.location.search) });
 
     const supabase = createSupabaseClient();
