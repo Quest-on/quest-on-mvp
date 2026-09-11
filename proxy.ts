@@ -9,6 +9,7 @@ const isPublicRoute = (pathname: string) =>
     "/sign-in",
     "/sign-up",
     "/onboarding",
+    "/legal",
     "/instructor-pending",
     "/auth/callback",
   ].some((r) => pathname === r || pathname.startsWith(r + "/"));
@@ -89,8 +90,11 @@ function applyRouteGuards(
   isPending: boolean,
 ): NextResponse {
   // 로그인된 유저가 공개 라우트(홈, 로그인 등)에 접근 → role에 맞는 대시보드로 리다이렉트
-  // /onboarding은 제외: role이 없으면 여기서 설정해야 하므로 통과, role이 있어도 접근 허용 (페이지가 자체 처리)
-  if (isPublicRoute(pathname) && pathname !== "/auth/callback" && pathname !== "/join" && pathname !== "/onboarding") {
+  // 설정과 정책 문서는 로그인 여부나 역할에 관계없이 확인할 수 있어야 한다.
+  if (
+    isPublicRoute(pathname) && pathname !== "/auth/callback" && pathname !== "/join" && pathname !== "/onboarding" &&
+    pathname !== "/legal" && !pathname.startsWith("/legal/")
+  ) {
     if (!role) {
       return NextResponse.redirect(new URL("/onboarding", request.url));
     }
