@@ -1,4 +1,3 @@
-import { Analytics } from "@vercel/analytics/next";
 import QueryProvider from "@/components/providers/QueryProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
@@ -14,7 +13,6 @@ export default async function AdminLayout({
         <div className="min-h-screen bg-background">{children}</div>
         <Toaster />
       </QueryProvider>
-      <Analytics />
     </ThemeProvider>
   );
 }

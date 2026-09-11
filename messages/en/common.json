@@ -66,5 +66,13 @@
       "label": "Final answer",
       "description": "Write and submit your answer"
     }
+  },
+  "analytics": {
+    "title": "Analytics preferences",
+    "description": "May we use Google Analytics to understand traffic sources and visits to public pages? All features work if you decline.",
+    "decline": "Decline",
+    "allow": "Allow analytics",
+    "details": "Learn more",
+    "settings": "Analytics preferences"
   }
 }
