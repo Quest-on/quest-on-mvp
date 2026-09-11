@@ -22,6 +22,19 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 describe("PostHog data and identity boundaries", () => {
+  it("derives native page breakdowns from cleaned URLs instead of raw SDK identifiers", () => {
+    const properties = sanitizePostHogProperties({
+      $current_url: "https://quest-on.app/instructor/private-exam?email=person@example.com",
+      $pathname: "/instructor/private-exam", $host: "wrong.example",
+      $referrer: "https://search.example/results?q=private", $referring_domain: "wrong.example",
+    });
+    expect(properties.$pathname).toBe("/instructor/[id]");
+    expect(properties.$host).toBe("quest-on.app");
+    expect(properties.$referring_domain).toBe("search.example");
+    expect(sanitizePostHogProperties({ $referrer: "" }).$referring_domain).toBe("$direct");
+    expect(sanitizePostHogProperties({ $referrer: "data:text/plain,private" }).$referring_domain).toBe("$direct");
+    expect(sanitizePostHogProperties({ $pathname: "/private", $host: "wrong.example" })).toEqual({});
+  });
   it("rejects local collection, missing configuration and unapproved hosts", () => {
     expect(postHogConfig()?.environment).toBe("staging");
     vi.stubEnv("NEXT_PUBLIC_APP_ENV", "development");
@@ -41,6 +54,7 @@ describe("PostHog data and identity boundaries", () => {
       $set_once: {$initial_utm_campaign: "person@example.com"}, answer: "private answer", environment: "staging",
     })).toEqual({
       distinct_id: "user-id", $current_url: "https://quest-on.app/exam/[id]", $referrer: "https://mail.example",
+      $pathname: "/exam/[id]", $host: "quest-on.app", $referring_domain: "mail.example",
       $set: {$initial_current_url: "https://quest-on.app/", utm_campaign: "outreach_005"},
       $set_once: {}, environment: "staging",
     });
