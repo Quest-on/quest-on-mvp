@@ -69,7 +69,9 @@
   },
   "analytics": {
     "title": "Analytics preferences",
-    "description": "May we use PostHog to understand visits, signup and demo usage? All features work if you decline.",
+    "heading": "Help improve Quest-On",
+    "description": "May we analyze visits, signups and demo usage to make Quest-On better?",
+    "optional": "Every feature works whether you allow this or not.",
     "decline": "Decline",
     "allow": "Allow analytics",
     "details": "Learn more",
