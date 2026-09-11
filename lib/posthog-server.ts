@@ -18,7 +18,8 @@ export function milestoneUuid(environment: string, userId: string, event: string
 /** Best-effort analytics only; native product records remain authoritative. */
 export async function captureProductMilestone(userId: string, event: string, role: string, timestamp?: Date): Promise<void> {
   const config = postHogConfig();
-  if (!config || !PRODUCT_EVENTS.has(event) || role !== "instructor") return;
+  if (!config || !PRODUCT_EVENTS.has(event) ||
+      (role !== "instructor" && !(event === "signup_completed" && role === "student"))) return;
   try {
     if ((await cookies()).get(ANALYTICS_CHOICE_COOKIE)?.value !== "granted") return;
     after(async () => {

@@ -9,16 +9,60 @@ export function marketingPage(pathname: string): string | null {
   return PUBLIC_PAGES[pathname] ?? null;
 }
 
+// Keep page templates distinct while removing record IDs and invitation codes.
+// The route coverage test checks this list against App Router pages.
+export const ANALYTICS_ROUTES = [
+  "/instructor/assignment/new",
+  "/student/profile-setup",
+  "/admin/onboarding",
+  "/admin/ai-config",
+  "/admin/ai-usage",
+  "/legal/security",
+  "/instructor/new",
+  "/legal/cookies",
+  "/legal/privacy",
+  "/admin/login",
+  "/legal/terms",
+  "/instructor",
+  "/onboarding",
+  "/settings",
+  "/sign-in",
+  "/profile",
+  "/sign-up",
+  "/student",
+  "/admin",
+  "/join",
+  "/",
+  "/instructor/assignment/[id]/edit",
+  "/instructor/assignment/[id]",
+  "/student/session/[id]/quiz",
+  "/assignment/[id]/review",
+  "/instructor/[id]/edit",
+  "/student/report/[id]",
+  "/instructor/[id]",
+  "/assignment/[id]",
+  "/exam/[id]",
+  "/instructor/assignment/[id]/grade/[id]",
+  "/instructor/[id]/grade/[id]/re",
+  "/instructor/[id]/grade/[id]"
+] as const;
+
+export function analyticsPath(pathname: string): string | null {
+  const parts = pathname.replace(/\/$/, "").split("/");
+  for (const route of ANALYTICS_ROUTES) {
+    const template = route.replace(/\/$/, "").split("/");
+    if (template.length === parts.length && template.every((part, i) =>
+      part === "[id]" ? Boolean(parts[i]) : part === parts[i])) return route;
+  }
+  return null;
+}
+
 export function sanitizeAnalyticsUrl(raw: string): string | null {
   try {
     const url = new URL(raw);
     if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-    const path = url.pathname;
-    if (marketingPage(path)) return `${url.origin}${path}`;
-    // Existing product page metrics remain useful, without record identifiers.
-    const root = path.split("/")[1];
-    if (!["instructor", "student", "exam", "join", "onboarding"].includes(root)) return null;
-    return `${url.origin}/${root}${path.split("/").filter(Boolean).length > 1 ? "/[id]" : ""}`;
+    const path = analyticsPath(url.pathname);
+    return path === null ? null : `${url.origin}${path}`;
   } catch { return null; }
 }
 
