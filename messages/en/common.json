@@ -70,7 +70,7 @@
   "analytics": {
     "title": "Analytics preferences",
     "heading": "Would you help improve Quest-On?",
-    "description": "We would like to analyze the pages you visit and your sign-up journey to make Quest-On easier to use.",
+    "description": "We analyze the screens you visit and how you use features to make Quest-On easier to use.",
     "optional": "You can use every feature without consenting.",
     "decline": "Do not allow",
     "allow": "Allow analytics",

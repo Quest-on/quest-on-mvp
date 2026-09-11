@@ -111,3 +111,30 @@ describe("verified server milestones", () => {
     expect(mocks.capture.mock.calls[0][0]).toMatchObject({event: "signup_completed", timestamp: new Date(recent)});
   });
 });
+
+
+describe("native global interaction analytics", () => {
+  it("retains native selectors and durations without DOM text, classes or identifiers", () => {
+    const clean = sanitizePostHogProperties({
+      $event_type: "click", $current_url: "https://quest-on.app/assignment/CODE/review?token=secret",
+      $elements_chain: 'button.private-class:nth-child="2"nth-of-type="1"text="Private answer";a:href="/exam/SECRET?token=hidden"nth-child="1"nth-of-type="1"',
+      $el_text: "Private answer", $elements: [{text: "private"}],
+      $external_click_url: "mailto:private@example.com", $form_value: "secret",
+      $prev_pageview_pathname: "/instructor/SECRET/edit", $prev_pageview_duration: 12.5,
+    });
+    expect(clean).toMatchObject({
+      $event_type: "click", $pathname: "/assignment/[id]/review",
+      $elements_chain: 'button:nth-child="2"nth-of-type="1";a:href="/exam/[id]"nth-child="1"nth-of-type="1"',
+      $prev_pageview_pathname: "/instructor/[id]/edit", $prev_pageview_duration: 12.5,
+    });
+    expect(JSON.stringify(clean)).not.toMatch(/private|SECRET|hidden|token|answer/i);
+  });
+  it("counts verified student signups separately without enabling instructor milestones for them", async () => {
+    const recent = new Date(Date.now() - 60000).toISOString();
+    await captureVerifiedSignup({ id: "student", created_at: recent, email_confirmed_at: recent }, "student");
+    await captureProductMilestone("student", "first_publish", "student");
+    expect(mocks.tasks).toHaveLength(1);
+    await mocks.tasks[0]();
+    expect(mocks.capture.mock.calls[0][0]).toMatchObject({ event: "signup_completed", properties: { role: "student" } });
+  });
+});

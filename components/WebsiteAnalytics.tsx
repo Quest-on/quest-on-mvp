@@ -51,8 +51,13 @@ export function WebsiteAnalytics() {
         defaults: "2026-05-30",
         persistence: "localStorage",
         capture_pageview: false,
-        capture_pageleave: false,
-        autocapture: false,
+        capture_pageleave: true,
+        autocapture: { dom_event_allowlist: ["click", "submit"], capture_copied_text: false },
+        mask_all_text: true,
+        mask_all_element_attributes: true,
+        capture_dead_clicks: false,
+        capture_heatmaps: false,
+        rageclick: false,
         capture_exceptions: false,
         capture_performance: false,
         disable_session_recording: true,
@@ -63,7 +68,7 @@ export function WebsiteAnalytics() {
         save_referrer: false,
         person_profiles: "identified_only",
         before_send: (event) => {
-          if (!event || !["$pageview", "$identify", "signup_start"].includes(event.event)) return null;
+          if (!event || !["$pageview", "$pageleave", "$autocapture", "$identify", "signup_start"].includes(event.event)) return null;
           event.properties = sanitizePostHogProperties({ ...event.properties, environment: config.environment });
           return event;
         },

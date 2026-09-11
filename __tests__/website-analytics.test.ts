@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { marketingPage, sanitizeAnalyticsUrl, campaignParameters, readAnalyticsChoice, safeReferrer } from "@/lib/website-analytics";
+import { readFileSync, readdirSync } from "node:fs";
+import { ANALYTICS_ROUTES, marketingPage, sanitizeAnalyticsUrl, campaignParameters, readAnalyticsChoice, safeReferrer } from "@/lib/website-analytics";
 
 describe("website analytics coverage and data boundaries", () => {
   it("does not treat a missing, invalid or unreadable preference as consent", () => {
@@ -35,5 +35,36 @@ describe("website analytics coverage and data boundaries", () => {
     for (const path of ["app/(app)/layout.tsx", "app/admin/layout.tsx"]) {
       expect(readFileSync(path, "utf8")).not.toContain("<Analytics");
     }
+  });
+});
+
+
+describe("global product page coverage", () => {
+  it("keeps every App Router page analyzable as a stable template", () => {
+    const routes = readdirSync("app", { recursive: true, encoding: "utf8" })
+      .map(path => path.replaceAll("\\", "/"))
+      .filter(path => path === "page.tsx" || path.endsWith("/page.tsx"))
+      .map(path => "/" + path.split("/").slice(0, -1)
+        .filter(part => !part.startsWith("(") && !part.startsWith("[[..."))
+        .map(part => part.startsWith("[") ? "[id]" : part).join("/"))
+      .filter(path => path !== "/sign-up/sso-callback");
+    expect(new Set(ANALYTICS_ROUTES)).toEqual(new Set(routes));
+  });
+  it("distinguishes feature pages instead of collapsing all instructor paths", () => {
+    const expected: Record<string, string> = {
+      "/instructor/new": "/instructor/new",
+      "/instructor/secret/edit": "/instructor/[id]/edit",
+      "/instructor/secret/grade/person/re": "/instructor/[id]/grade/[id]/re",
+      "/instructor/assignment/secret/grade/person": "/instructor/assignment/[id]/grade/[id]",
+      "/assignment/SECRET/review": "/assignment/[id]/review",
+      "/student/session/SECRET/quiz": "/student/session/[id]/quiz",
+      "/settings": "/settings", "/profile": "/profile", "/admin/ai-usage": "/admin/ai-usage",
+    };
+    for (const [path, template] of Object.entries(expected)) {
+      expect(sanitizeAnalyticsUrl(`https://quest-on.app${path}?answer=private#token`))
+        .toBe(`https://quest-on.app${template}`);
+    }
+    expect(sanitizeAnalyticsUrl("https://quest-on.app/auth/callback?code=secret")).toBeNull();
+    expect(sanitizeAnalyticsUrl("https://quest-on.app/assignment/secret/unknown-private")).toBeNull();
   });
 });
