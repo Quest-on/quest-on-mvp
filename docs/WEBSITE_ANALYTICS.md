@@ -49,9 +49,9 @@ Only lowercase letters, numbers, underscore and dash, up to 80 characters are ac
 
 ## Collection controls
 
-The root WebsiteAnalytics component owns the browser SDK. Explicit opt-in is stored in localStorage and a same-origin consent cookie; withdrawal stops capture and clears the prior SDK identity. The supported-page preference control remains accessible. Declining never blocks product features.
+The root WebsiteAnalytics component owns the browser SDK. Explicit opt-in is stored in localStorage and a same-origin consent cookie; withdrawal stops capture and clears the prior SDK identity. The supported-page preference control remains accessible. Declining never blocks product features. The v3 preference renews earlier grants because the v2 disclosure excluded replay; previous refusals remain refused. Opt-out precedes recorder stop/reset so queued snapshots cannot flush after withdrawal.
 
-Native click/form-submit autocapture and pageleave are enabled app-wide after consent. Session recordings, copied text, surveys, flags requests, automatic exceptions, heatmaps, dead/rage clicks and performance capture remain disabled. The browser integration is global, not a signup-only funnel.
+Native click/form-submit autocapture and pageleave are enabled app-wide after consent. Native session replay is enabled with input/text masking, blocked media/editors, sanitized replay URLs and filtered DOM attributes. Classes and layout-only styles remain for playback. Copied text, surveys, feature flag evaluation, automatic exceptions, console logs, network payloads, canvas, heatmaps, dead/rage clicks and performance capture remain disabled. The SDK may fetch remote configuration and load its native recorder after consent. Replay snapshot envelopes use a separate property allowlist so the analytics scalar filter does not corrupt rrweb data. Recordings have 30-day retention in the project. The browser integration is global, not a signup-only funnel.
 
 Page templates cover all App Router application pages, including assignments, grading, settings, profile and admin. Dynamic identifiers become `[id]`; static feature segments remain distinct. Authentication callback transport pages and unknown routes are omitted. A route coverage test fails when a new application page is not represented, preventing silent coverage drift.
 
@@ -83,3 +83,5 @@ Use CI for DB-backed tests. On staging verify no capture before consent or after
 Rollback: set NEXT_PUBLIC_POSTHOG_ENABLED=false and rebuild through the normal deployment workflow, or revert this PR. Do not alter CRM sending or native account/milestone records. The main branch's approval gate remains in force.
 
 Official references: https://posthog.com/docs/libraries/next-js, https://posthog.com/docs/libraries/js/config, https://posthog.com/docs/libraries/node.
+
+Session replay reference: https://posthog.com/docs/session-replay/privacy.

@@ -78,13 +78,15 @@ export function campaignParameters(search: string): Record<string, string> {
 }
 
 export type AnalyticsChoice = "granted" | "denied";
-export const ANALYTICS_CHOICE_KEY = "quest-on.analytics-choice.v2";
+export const ANALYTICS_CHOICE_KEY = "quest-on.analytics-choice.v3";
 export const ANALYTICS_CHOICE_COOKIE = "quest_on_analytics";
 
 export function readAnalyticsChoice(storage: Pick<Storage, "getItem">): AnalyticsChoice | null {
   try {
     const value = storage.getItem(ANALYTICS_CHOICE_KEY);
-    return value === "granted" || value === "denied" ? value : null;
+    if (value === "granted" || value === "denied") return value;
+    // Preserve refusals; the earlier disclosure explicitly excluded recordings.
+    return storage.getItem("quest-on.analytics-choice.v2") === "denied" ? "denied" : null;
   } catch { return null; }
 }
 
