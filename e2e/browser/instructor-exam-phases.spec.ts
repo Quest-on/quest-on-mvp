@@ -1,9 +1,13 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { test, expect } from "../fixtures/auth-browser.fixture";
-import { cleanupTestData } from "../helpers/test-data-builder";
-import { seedExam, seedSession, seedStudentProfile } from "../../helpers/seed";
-import { TIMEOUTS } from "../../constants";
+import { test, expect } from "./fixtures/auth-browser.fixture";
+import {
+  cleanupTestData,
+  seedExam,
+  seedSession,
+  seedStudentProfile,
+} from "../helpers/seed";
+import { TIMEOUTS } from "../constants";
 
 /**
  * 시험 상세가 지금 어느 단계인지 아는가 (#385).
@@ -19,7 +23,7 @@ import { TIMEOUTS } from "../../constants";
 
 const ko = (file: string) =>
   JSON.parse(
-    readFileSync(path.resolve(__dirname, "../../../messages/ko", file), "utf8")
+    readFileSync(path.resolve(__dirname, "../../messages/ko", file), "utf8")
   ) as Record<string, Record<string, string>>;
 
 const AUTHORING = ko("authoring.json");
