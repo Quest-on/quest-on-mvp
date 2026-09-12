@@ -90,6 +90,18 @@ describe("코드 반출 표면이 하나로 수렴한다", () => {
         // 삼항으로 코드를 그리는 패턴(`copied ? "복사됨" : exam.code`)도 반출이다.
         /\?[^\n]{0,80}:\s*[\w.?]*\bexam\??\.code\b/.test(source);
       if (rendersRawCode) offenders.push(file);
+
+      // 공지문은 **코드를 품은 파생 문자열**이다. `writeText(notice)` 는 위
+      // 이름 검사(code|examCode|createdExamCode)를 그대로 통과한다 — 실제로
+      // StudentHandoffCard 가 레지스트리에 등록돼 있는데도 어느 패턴에도
+      // 걸리지 않았다. 즉 그 등록은 주석이지 게이트가 아니었다.
+      //
+      // 그래서 이름이 아니라 **조립 사실**로 잡는다: 공지문을 만드는 파일은
+      // 반드시 게이트를 판정해야 한다. 다음에 생길 표면(메일 카드, 공유
+      // 시트)이 quota 를 빠뜨리면 여기서 걸린다.
+      if (/buildStudentNotice\(/.test(source) && !/resolveCodeGate\(/.test(source)) {
+        offenders.push(file);
+      }
     }
 
     expect(offenders).toEqual([]);

@@ -123,7 +123,12 @@ export function StudentHandoffCard({
     <section className={cn("rounded-lg border p-4 space-y-4", className)}>
       <div>
         <h2 className="font-semibold">{t("studentHandoff.title")}</h2>
-        <p className="type-hint">{t("studentHandoff.subtitle")}</p>
+        {/*
+          부제는 "아래 공지문을 그대로 복사해…" 라고 말한다. 차단이면 아래에
+          공지문이 없다(`notice === null`). 없는 것을 복사하라고 적지 않는다 —
+          같은 화면의 차단 패널이 대신 사유와 해제 방법을 말한다.
+        */}
+        {notice && <p className="type-hint">{t("studentHandoff.subtitle")}</p>}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">

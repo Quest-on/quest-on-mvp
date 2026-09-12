@@ -462,6 +462,7 @@ export default function ExamDetail({
             status={exam.status || "draft"}
             durationMinutes={exam.duration}
             questionsCount={questionsCount}
+            description={exam.description}
             isDemo={isDemoExam}
             demoPreviewLabel={t("examDetail.tryAsStudent")}
             // 완주한 데모는 이미 제출본이 있어 그냥 들어가면 읽기 전용 화면만

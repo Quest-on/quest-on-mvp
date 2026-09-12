@@ -242,7 +242,7 @@ export default function ExamPage() {
   const isCurrentObjective = isObjectiveQuestion(currentQuestionType);
 
   // 시험 단위로 한 번만 계산 — sidebar-width 게이팅, Preflight 고지 프롭 전달에 사용.
-  // 판정식은 lib/grading-helpers.ts 한 곳에만 둔다: 교수자 공지문(ExamDetailsCard)이
+  // 판정식은 lib/grading-helpers.ts 한 곳에만 둔다: 교수자 공지문(StudentHandoffCard)이
   // 같은 판정을 쓰는데, 식을 화면마다 복제하면 한쪽만 고쳐졌을 때 공지가 거짓이 된다.
   const examHasEssay = useMemo(
     () => hasAiChatQuestions(exam?.questions),

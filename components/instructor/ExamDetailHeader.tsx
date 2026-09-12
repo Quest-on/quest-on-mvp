@@ -35,6 +35,15 @@ interface ExamDetailHeaderProps {
   durationMinutes: number;
   /** 문항 수. 아직 못 받았으면 `null` — 모르는 수를 0 으로 적지 않는다. */
   questionsCount: number | null;
+  /**
+   * 교수자가 직접 쓴 시험 설명.
+   *
+   * 예전에는 "설명" 라벨과 함께 카드 안에 있었는데, 데모는 값을 넣지 않아
+   * 빈 라벨만 렌더됐다. 라벨은 걷되 본문은 남긴다 — 이건 교수자가 쓴 값이고
+   * 학생 preflight 에도 나가는 값이라, 상세 화면에서만 사라지면 어디서
+   * 확인하는지 알 수 없게 된다. 비어 있으면 줄 자체를 만들지 않는다.
+   */
+  description?: string | null;
   isDemo?: boolean;
   demoPreviewLabel?: string;
   /**
@@ -70,6 +79,7 @@ export function ExamDetailHeader({
   status,
   durationMinutes,
   questionsCount,
+  description,
   isDemo,
   demoPreviewLabel,
   demoRestartLabel,
@@ -103,6 +113,9 @@ export function ExamDetailHeader({
               </span>
             )}
           </div>
+          {description?.trim() && (
+            <p className="mt-2 max-w-prose type-hint">{description.trim()}</p>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">

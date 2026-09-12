@@ -273,8 +273,6 @@
     "buttonAddFirst": "Add your first question"
   },
   "questionsListCard": {
-    "cardTitle": "Questions ({count})",
-    "cardDescription": "Review and edit exam questions",
     "emptyState": "No questions added yet.",
     "questionTitle": "Question {index}",
     "typeEssay": "Essay",
