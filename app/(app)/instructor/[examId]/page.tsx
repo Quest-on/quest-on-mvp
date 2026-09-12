@@ -564,14 +564,10 @@ export default function ExamDetail({
               <div className="border rounded-lg">
                 <CollapsibleTrigger className="w-full">
                   <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <h2 className="font-semibold">{t("examDetail.questionsSection")}</h2>
-                      <span className="type-hint">
-                        {questionsCount !== null
-                          ? t("examDetail.questionsCountLabel", { count: questionsCount })
-                          : t("examDetail.questionsLoading")}
-                      </span>
-                    </div>
+                    {/* 문항 수를 여기서 되풀이하지 않는다. 바로 위 제목 아래
+                        메타 줄이 이미 말했고, 같은 사실을 "문제 1개" 와
+                        "1개 문제" 로 다르게 두 번 적고 있었다. */}
+                    <h2 className="font-semibold">{t("examDetail.questionsSection")}</h2>
                     {questionsOpen ? (
                       <ChevronUp className="h-4 w-4 text-muted-foreground" />
                     ) : (
