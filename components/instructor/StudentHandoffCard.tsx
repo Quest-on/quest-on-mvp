@@ -138,7 +138,10 @@ export function StudentHandoffCard({
             이메일)이 전부 다른 서식을 쓰므로 공지문은 마크다운을 넣지 않는다 —
             미리보기도 같은 이유로 꾸미지 않는다. 화면에서 본 것이 붙여넣은 것이다.
           */}
-          <pre className="whitespace-pre-wrap break-words rounded-md border bg-muted/40 p-3 font-sans text-sm text-foreground">
+          <pre
+            data-testid="student-notice-preview"
+            className="whitespace-pre-wrap break-words rounded-md border bg-muted/40 p-3 font-sans text-sm text-foreground"
+          >
             {notice}
           </pre>
           <div className="flex justify-end">{copyButton}</div>
