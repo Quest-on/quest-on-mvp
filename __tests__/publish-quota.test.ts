@@ -41,10 +41,8 @@ const CODE_RENDER_REGISTRY: Record<string, string> = {
     "채점 결과지의 시험 식별 표기다. 응시가 끝난 시험이라 발행 한도와 무관하다.",
   "components/student/StudentDashboardClient.tsx":
     "학생 본인이 응시한 시험 목록이다. 교수자 반출 표면이 아니다.",
-  "components/instructor/ExamQuickActionsCard.tsx":
-    "응시 종료 후 채점 액션 카드다. 이미 학생을 받은 시험이라 발행 한도와 무관하다.",
-  "components/instructor/ExamDetailsCard.tsx":
-    "복사 핸들러가 codeGateBlocked 를 먼저 확인하고 막는다. 코드 렌더는 헤더의 ExamCode 가 맡는다.",
+  "components/instructor/StudentHandoffCard.tsx":
+    "공지문 본문을 미리 보여주는 표면이다. 공지문 안에 코드가 들어가므로 차단이면 문자열 자체를 만들지 않는다(notice === null) — 미리보기와 복사 버튼이 함께 사라진다. 코드 렌더는 ExamCode 가 맡는다.",
   "components/instructor/InstructorHomeClient.tsx":
     "복사 핸들러가 gateBlocked 를 먼저 확인하고 막는다. 코드 렌더는 ExamCard 의 ExamCode 가 맡는다.",
   "app/(app)/instructor/assignment/[assignmentId]/page.tsx":
@@ -92,6 +90,18 @@ describe("코드 반출 표면이 하나로 수렴한다", () => {
         // 삼항으로 코드를 그리는 패턴(`copied ? "복사됨" : exam.code`)도 반출이다.
         /\?[^\n]{0,80}:\s*[\w.?]*\bexam\??\.code\b/.test(source);
       if (rendersRawCode) offenders.push(file);
+
+      // 공지문은 **코드를 품은 파생 문자열**이다. `writeText(notice)` 는 위
+      // 이름 검사(code|examCode|createdExamCode)를 그대로 통과한다 — 실제로
+      // StudentHandoffCard 가 레지스트리에 등록돼 있는데도 어느 패턴에도
+      // 걸리지 않았다. 즉 그 등록은 주석이지 게이트가 아니었다.
+      //
+      // 그래서 이름이 아니라 **조립 사실**로 잡는다: 공지문을 만드는 파일은
+      // 반드시 게이트를 판정해야 한다. 다음에 생길 표면(메일 카드, 공유
+      // 시트)이 quota 를 빠뜨리면 여기서 걸린다.
+      if (/buildStudentNotice\(/.test(source) && !/resolveCodeGate\(/.test(source)) {
+        offenders.push(file);
+      }
     }
 
     expect(offenders).toEqual([]);

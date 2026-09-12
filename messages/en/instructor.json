@@ -76,9 +76,6 @@
     "error": "Error",
     "loadFail": "Unable to load exam data.",
     "backToList": "Back to exam list",
-    "examInfo": "Exam info",
-    "viewQuestions": "View questions",
-    "questionsLoading": "Loading questions...",
     "studentList": "Students",
     "gradesPublic": "Grades visible",
     "gradesHidden": "Grades hidden",
@@ -101,7 +98,6 @@
     "retry": "Try again",
     "refresh": "Refresh",
     "retryLater": "Please try again later.",
-    "questionsCountLabel": "{count, plural, one {# question} other {# questions}}",
     "tableColStudent": "Student",
     "tableColMCQ": "MCQ",
     "tableColOX": "T/F",
@@ -132,7 +128,12 @@
     "bulkGradeLoadFail": "Failed to load bulk grading status.",
     "tryAsStudent": "Try as a student",
     "retryAsStudent": "Retake the demo",
-    "retryAsStudentHint": "Retaking clears your previous answers, AI conversations, and grading results."
+    "retryAsStudentHint": "Retaking clears your previous answers, AI conversations, and grading results.",
+    "questionsSection": "Questions",
+    "exportExcel": "Export to Excel",
+    "exportCsv": "Export to CSV",
+    "noStudentsYetTitle": "No students have joined yet",
+    "noStudentsYetHint": "Share the entry code above and start the exam. Students will show up here."
   },
   "assignmentDetail": {
     "error": "Error",

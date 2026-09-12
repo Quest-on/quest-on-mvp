@@ -56,9 +56,29 @@ describe("데모 착지 화면의 주 행동이 눈에 띈다", () => {
     expect(demoBlock).not.toMatch(/<Button size="sm">\{demoRestartLabel/);
   });
 
-  it("나머지 헤더 버튼은 보조 스타일을 유지한다", () => {
-    // 주 행동 하나만 강조여야 위계가 선다.
-    const outlines = (HEADER.match(/variant="outline"/g) ?? []).length;
-    expect(outlines).toBeGreaterThanOrEqual(2);
+  it("헤더에서 강조되는 버튼은 데모 주 행동 분기뿐이다", () => {
+    // 주 행동 하나만 강조여야 위계가 선다. 예전에는 편집·대시보드·Excel·CSV 가
+    // 전부 헤더에 늘어서서, 강조가 아니어도 자리로 경쟁했다. 지금은 부차 행동이
+    // 더보기 메뉴로 내려갔으므로 헤더에 남은 강조 버튼은 데모 CTA 뿐이어야 한다.
+    const emphasized = [...HEADER.matchAll(/<Button((?:[^>"]|"[^"]*")*?)>([\s\S]{0,40})/g)]
+      .filter((m) => !/variant=/.test(m[1]))
+      .map((m) => m[2].trim().slice(0, 30));
+
+    expect(emphasized.length, "헤더에 강조 버튼이 하나도 없다").toBeGreaterThan(0);
+    // #174 로 재응시가 확인 다이얼로그를 거치면서 분기가 둘로 갈렸다. 둘은
+    // 상호배타라 화면에는 언제나 하나만 뜬다.
+    const stray = emphasized.filter(
+      (label) => !/demoRestartLabel|demoPreviewLabel/.test(label)
+    );
+    expect(stray, `데모 CTA 가 아닌 강조 버튼이 있다: ${stray.join(" | ")}`).toHaveLength(0);
+  });
+
+  it("부차 행동이 헤더에서 더보기 메뉴로 내려가 있다", () => {
+    for (const key of ["buttonEdit", "buttonDashboardLong"]) {
+      expect(
+        HEADER,
+        `${key} 가 더보기 메뉴 항목이 아니다`
+      ).toMatch(new RegExp(`<DropdownMenuItem asChild>[\\s\\S]{0,200}?${key}`));
+    }
   });
 });

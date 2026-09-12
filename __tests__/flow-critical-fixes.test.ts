@@ -67,22 +67,38 @@ describe("문구가 지킬 수 없는 약속을 하지 않는다", () => {
 });
 
 describe("코드 반출 게이트에 우회로가 없다", () => {
-  const card = read("components/instructor/ExamDetailsCard.tsx");
+  const card = read("components/instructor/StudentHandoffCard.tsx");
   const detail = read("app/(app)/instructor/[examId]/page.tsx");
 
-  it("상세 페이지가 카드에도 게이트 값을 넘긴다", () => {
-    // 헤더만 막으면 카드가 그대로 우회로가 된다.
-    expect(detail).toMatch(/codeGateBlocked=\{/);
-    expect(detail).toMatch(/resolveCodeGate\(/);
+  it("상세 페이지가 카드에도 한도 상태를 넘긴다", () => {
+    // 안 넘기면 카드가 게이트를 판정할 값을 못 받아 그대로 우회로가 된다.
+    expect(detail).toMatch(/<StudentHandoffCard[\s\S]{0,400}?quota=\{codeQuota\}/);
   });
 
-  it("차단 상태에서 코드 문자열을 렌더하지 않는다", () => {
-    expect(card).toMatch(/codeGateBlocked \? t\("examCode\.blockedTitle"\) : examCode/);
+  it("카드가 스스로 게이트를 판정한다", () => {
+    expect(card).toMatch(/resolveCodeGate\(quota\) === "blocked"/);
   });
 
-  it("공지문 복사도 같은 게이트를 탄다", () => {
-    // 공지문에 코드가 들어간다. 코드 복사만 막으면 여기가 우회로다.
-    expect(card).toMatch(/handleCopyNotice = async[\s\S]{0,300}?codeGateBlocked/);
+  it("차단이면 공지문 문자열 자체를 만들지 않는다", () => {
+    // 미리보기와 복사 버튼을 각각 막으면 다음에 표면이 늘 때 한쪽이 빠진다.
+    // `notice === null` 하나로 둘이 동시에 사라져야 한다.
+    expect(card).toMatch(/if \(blocked\) return null;/);
+    // 그 null 이 실제로 두 표면을 동시에 끈다.
+    expect(card).toMatch(/const copyButton = notice \?/);
+    expect(card).toMatch(/\{notice && \(/);
+  });
+
+  it("복사 핸들러도 문자열 없이는 아무것도 하지 않는다", () => {
+    // 미리보기가 없어도 버튼만 남아 클릭되면 코드가 클립보드로 나간다.
+    expect(card).toMatch(/handleCopyNotice = async[\s\S]{0,120}?if \(!notice\) return;/);
+  });
+
+  it("차단 상태에서 코드 문자열을 렌더하는 유일한 경로가 ExamCode 다", () => {
+    // 카드가 코드를 직접 그리면 ExamCode 의 차단 판정을 우회한다.
+    expect(card).toMatch(/<ExamCode code=\{examCode\} quota=\{quota\}/);
+    // `code={examCode}` 는 ExamCode 에 넘기는 것이므로 위반이 아니다.
+    // 그걸 걷어낸 뒤에도 남는 `{examCode}` 는 직접 렌더다.
+    expect(card.replace(/\bcode=\{[^}]*\}/g, "")).not.toMatch(/\{examCode\}/);
   });
 });
 

@@ -76,9 +76,6 @@
     "error": "오류 발생",
     "loadFail": "시험 데이터를 불러올 수 없습니다.",
     "backToList": "시험 목록으로 돌아가기",
-    "examInfo": "시험 정보",
-    "viewQuestions": "문제 보기",
-    "questionsLoading": "문제 로딩 중...",
     "studentList": "학생 목록",
     "gradesPublic": "성적 공개중",
     "gradesHidden": "성적 비공개",
@@ -101,7 +98,6 @@
     "retry": "다시 시도",
     "refresh": "새로고침",
     "retryLater": "잠시 후 다시 시도해 주세요.",
-    "questionsCountLabel": "{count}개 문제",
     "tableColStudent": "학생",
     "tableColMCQ": "객관식",
     "tableColOX": "O/X",
@@ -132,7 +128,12 @@
     "bulkGradeLoadFail": "일괄 채점 상태를 불러오지 못했습니다.",
     "tryAsStudent": "학생 시점으로 해보기",
     "retryAsStudent": "데모 다시 풀기",
-    "retryAsStudentHint": "다시 풀면 이전 답안과 AI 대화, 채점 결과가 모두 사라집니다."
+    "retryAsStudentHint": "다시 풀면 이전 답안과 AI 대화, 채점 결과가 모두 사라집니다.",
+    "questionsSection": "문제",
+    "exportExcel": "Excel 로 내보내기",
+    "exportCsv": "CSV 로 내보내기",
+    "noStudentsYetTitle": "아직 입장한 학생이 없습니다",
+    "noStudentsYetHint": "위 입장 코드를 학생에게 알리고 시험을 시작하면 여기에 나타납니다."
   },
   "assignmentDetail": {
     "error": "오류 발생",

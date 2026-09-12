@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -199,16 +198,12 @@ export function ExamControlButtons({
     }
   };
 
-  // 상태별 배너 및 버튼 표시
+  // 상태별 주 행동 버튼. 상태 배지는 ExamStatusBadge 가 제목 아래 메타 줄에서
+  // 그린다 — 버튼 옆에 두면 누를 수 있는 것처럼 보인다.
   const getStatusDisplay = () => {
     switch (examStatus) {
       case "scheduled":
         return {
-          badge: (
-            <Badge variant="secondary" className="bg-warning-subtle text-warning-text">
-              {t("examControlButtons.statusScheduled")}
-            </Badge>
-          ),
           button: (
             <Button
               onClick={() => setShowStartDialog(true)}
@@ -225,11 +220,6 @@ export function ExamControlButtons({
       case "draft":
         // 기본적으로 항상 "시험 시작" 버튼 표시
         return {
-          badge: (
-            <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
-              {t("examControlButtons.statusDraft")}
-            </Badge>
-          ),
           button: (
             <Button
               onClick={() => setShowStartDialog(true)}
@@ -245,11 +235,6 @@ export function ExamControlButtons({
         };
       case "joinable":
         return {
-          badge: (
-            <Badge variant="secondary" className="bg-info-subtle text-info-text">
-              {t("examControlButtons.statusJoinable")}
-            </Badge>
-          ),
           button: (
             <Button
               onClick={() => setShowStartDialog(true)}
@@ -265,11 +250,6 @@ export function ExamControlButtons({
         };
       case "running":
         return {
-          badge: (
-            <Badge variant="secondary" className="bg-success-subtle text-success-text">
-              {t("examControlButtons.statusRunning")}
-            </Badge>
-          ),
           button: (
             <Button
               onClick={() => setShowEndDialog(true)}
@@ -292,11 +272,6 @@ export function ExamControlButtons({
         };
       case "entry_closed":
         return {
-          badge: (
-            <Badge variant="secondary" className="bg-warning-subtle text-warning-text">
-              {t("examControlButtons.statusEntryClosed")}
-            </Badge>
-          ),
           button: (
             <Button
               onClick={() => setShowEndDialog(true)}
@@ -319,33 +294,20 @@ export function ExamControlButtons({
         };
       case "closed":
         return {
-          badge: (
-            <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
-              {t("examControlButtons.statusClosed")}
-            </Badge>
-          ),
           button: null,
         };
       default:
         return {
-          badge: (
-            <Badge variant="secondary" className="bg-secondary text-secondary-foreground">
-              {examStatus || t("examControlButtons.statusUnknown")}
-            </Badge>
-          ),
           button: null,
         };
     }
   };
 
-  const { badge, button } = getStatusDisplay();
+  const { button } = getStatusDisplay();
 
   return (
     <>
-      <div className="flex items-center gap-3">
-        {badge}
-        {button}
-      </div>
+      {button}
 
       {/* 시험 시작 확인 모달 */}
       <AlertDialog open={showStartDialog} onOpenChange={setShowStartDialog}>
