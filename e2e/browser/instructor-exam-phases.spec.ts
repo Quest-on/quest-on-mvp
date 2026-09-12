@@ -60,9 +60,11 @@ test.describe("시험 상세 단계별 화면 (#385)", () => {
     });
 
     await instructorPage.goto(`/instructor/${exam.id}`);
-    await expect(instructorPage.getByText("단계 검증 시험")).toBeVisible({
-      timeout: TIMEOUTS.PAGE_LOAD,
-    });
+    // 제목으로 잡는다. getByText 는 공지문 미리보기 안의 시험명까지 걸려서
+    // strict mode 위반이 난다 - 그 자체가 미리보기에 제목이 들어간다는 증거다.
+    await expect(
+      instructorPage.getByRole("heading", { name: "단계 검증 시험", level: 1 })
+    ).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
 
     // 1) 문항 본문. 예전에는 접혀 있었고, 펼치면 fetch 가 그때 시작돼 스피너부터 떴다.
     await expect(
