@@ -47,16 +47,25 @@ describe("시험 상세 버튼 위계 (#212)", () => {
     expect(m![0], "응시자가 0명이어도 강조된다").toMatch(/studentCount/);
   });
 
-  it("내보내기 두 개가 같은 강도다", () => {
+  it("내보내기 두 개가 같은 자리, 같은 강도다", () => {
     // 엑셀만 강조되고 CSV 는 outline 이었다. 같은 성격이면 같은 강도여야 한다.
-    const downloads = [...PAGE.matchAll(/<Button([\s\S]{0,220}?)handleDownload/g)].map(
+    // 지금은 둘 다 더보기 메뉴 항목이라 강도가 구조적으로 같다.
+    const items = [...PAGE.matchAll(/<DropdownMenuItem([\s\S]{0,300}?)handleDownload/g)].map(
       (m) => m[1]
     );
-    expect(downloads.length, "내보내기 버튼을 못 찾았다").toBeGreaterThanOrEqual(2);
-    for (const b of downloads) {
-      expect(b, ).toMatch(
-        /variant="outline"/
-      );
-    }
+    expect(items.length, "내보내기 메뉴 항목을 못 찾았다").toBeGreaterThanOrEqual(2);
+  });
+
+  it("내보내기가 헤더 버튼으로 되돌아가지 않는다", () => {
+    // 학생이 0명인 화면에도 비활성 Excel/CSV 버튼 둘이 헤더를 차지하고 있었다.
+    // 방금 시험을 만든 사람에게 그건 "여기서 뭔가 해야 하나"만 남긴다.
+    const asButtons = [...PAGE.matchAll(/<Button([\s\S]{0,220}?)handleDownload/g)];
+    expect(asButtons, "내보내기가 다시 헤더 버튼이 됐다").toHaveLength(0);
+  });
+
+  it("내보내기는 채점이 끝난 시험에서만 보인다", () => {
+    // 채점 전에는 내보낼 결과 자체가 없다. 비활성으로 띄우는 것과 아예 안
+    // 띄우는 것은 다르다 — 전자는 매번 "왜 안 눌리지"를 만든다.
+    expect(PAGE).toMatch(/phase === "review" \? \(/);
   });
 });
