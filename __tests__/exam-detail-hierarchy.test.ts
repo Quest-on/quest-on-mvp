@@ -54,6 +54,21 @@ describe("시험 상세 버튼 위계 (#212)", () => {
       (m) => m[1]
     );
     expect(items.length, "내보내기 메뉴 항목을 못 찾았다").toBeGreaterThanOrEqual(2);
+
+    // 자리가 같다고 강도가 같은 건 아니다. 한쪽만 먼저 열리면 예전처럼
+    // "엑셀은 되는데 CSV 는 왜 안 되지" 가 된다 - 활성 조건이 같아야 한다.
+    const disabled = items.map((a) => {
+      const m = /disabled=\{([^}]*)\}/.exec(a);
+      return m ? m[1].replace(/\s+/g, " ").trim() : null;
+    });
+    expect(
+      disabled.every(Boolean),
+      "내보내기 항목에 활성 조건이 없다"
+    ).toBe(true);
+    expect(
+      new Set(disabled).size,
+      `두 내보내기의 활성 조건이 다르다: ${disabled.join(" vs ")}`
+    ).toBe(1);
   });
 
   it("내보내기가 헤더 버튼으로 되돌아가지 않는다", () => {

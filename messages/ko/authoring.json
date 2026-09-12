@@ -273,8 +273,6 @@
     "buttonAddFirst": "첫 문제 추가하기"
   },
   "questionsListCard": {
-    "cardTitle": "문제 ({count})",
-    "cardDescription": "시험 문제 검토 및 편집",
     "emptyState": "등록된 문제가 없습니다.",
     "questionTitle": "문제 {index}",
     "typeEssay": "서술형",

@@ -107,6 +107,16 @@ describe("AI 고지 적용 범위 (#325)", () => {
       expect(code.blockedCta?.trim(), `${locale}: 해제 CTA 가 없다`).toBeTruthy();
       expect(code.blockedMailSubject?.trim(), `${locale}: 해제 메일 제목이 없다`).toBeTruthy();
     }
+
+    // 문구만 있고 링크가 없으면 "메일 주세요" 가 갈 곳이 없다. 토스트의
+    // `{email}` 토큰에 해당하는 것이 이 패널에서는 mailto 배선이다.
+    const examCodeSource = readFileSync(
+      path.join(root, "components", "instructor", "ExamCode.tsx"),
+      "utf8"
+    );
+    expect(examCodeSource, "차단 패널의 해제 CTA 가 mailto 로 배선되지 않았다").toMatch(
+      /href=\{supportMailto\(t\("blockedMailSubject"\)\)\}/
+    );
   });
 
   it("한도 해제 경로가 실제로 화면에 있다", () => {

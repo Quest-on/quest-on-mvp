@@ -153,7 +153,7 @@ describe("hasAiChatQuestions — AI 채팅 노출 판정 (리뷰 P2 공통 원�
  *
  * 이전 테스트는 `policyLines: []` 를 테스트가 직접 넘겨서, 카드가 다시 무조건
  * AI 문구를 넣도록 되돌아가도 통과했다. 판정을 순수 함수로 빼고 그 함수 +
- * 조립 결과를 함께 고정한다 (ExamDetailsCard 는 이 함수만 호출한다).
+ * 조립 결과를 함께 고정한다 (StudentHandoffCard 는 이 함수만 호출한다).
  */
 describe("studentNoticePolicyLines + 최종 복사 문자열", () => {
   const t = {
