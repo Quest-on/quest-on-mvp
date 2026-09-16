@@ -105,7 +105,7 @@ describe("AI 고지 적용 범위 (#325)", () => {
       // 자리가 차서 막힌 교수자에게도 "발행 한도에 도달했다"고 말했다 —
       // 발행에 여유가 있는 사람이 엉뚱한 곳을 보게 된다.
       expect(code.blockedBodyPublish, `${locale}: 발행 차단 사유가 없다`).toMatch(
-        locale === "ko" ? /한도에 도달/ : /reached the free plan publish limit/i
+        locale === "ko" ? /시험을 더 열려면/ : /open more exams/i
       );
       expect(code.blockedBodyStudent, `${locale}: 학생 자리 차단 사유가 없다`).toMatch(
         locale === "ko" ? /자리가 모두 찼/ : /no student seats left/i

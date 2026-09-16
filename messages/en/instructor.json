@@ -45,6 +45,9 @@
     "theme": "Theme",
     "signOut": "Sign out",
     "roleInstructor": "Instructor",
+    "verified": "Verified instructor",
+    "verification": "Request verification",
+    "verificationMailSubject": "[Quest-On] Instructor verification request",
     "roleStudent": "Student",
     "language": "Language"
   },
@@ -411,7 +414,7 @@
     "colorPurple": "Purple",
     "colorPink": "Pink",
     "colorGray": "Gray",
-    "toastExamCodeBlocked": "To prevent students from misusing instructor accounts, codes cannot be copied once the publish limit is reached. Email {email} and we will lift it.",
+    "toastExamCodeBlocked": "To prevent students from misusing instructor accounts, unverified accounts cannot copy codes once a limit is reached. Email {email} and we will lift it.",
     "loadError": "Could not load your exams.",
     "folderItems": "{count} items",
     "folderEmpty": "Empty"

@@ -928,6 +928,9 @@ export default function CreateExam() {
                             quota={{
                               alreadyPublished: false,
                               publishesRemaining: quotaData?.publishesRemaining ?? null,
+                              // 상한 두 축은 안내 팝오버 값이다. 판정에는 안 쓴다.
+                              maxPublishes: quotaData?.maxPublishes ?? null,
+                              maxStudents: quotaData?.maxStudents ?? null,
                             }}
                           />
                         </div>

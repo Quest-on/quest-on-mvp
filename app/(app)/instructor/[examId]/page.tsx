@@ -420,6 +420,9 @@ export default function ExamDetail({
       quotaData?.maxStudents,
       bulkGradeStatus?.studentCount
     ),
+    // 상한 두 축은 "여유 있음" 안내 팝오버의 값이다. 판정에는 안 쓴다.
+    maxPublishes: quotaData?.maxPublishes ?? null,
+    maxStudents: quotaData?.maxStudents ?? null,
   };
 
   if (!isLoaded || loading) {

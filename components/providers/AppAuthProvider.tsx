@@ -15,6 +15,15 @@ import type { User } from "@supabase/supabase-js";
 export type AppProfile = {
   role: "instructor" | "student";
   status: "pending" | "approved";
+  /**
+   * 요금 등급. `verified` 면 발행·학생 한도가 없다 (`plan_limits`).
+   *
+   * 여기서 실어 나르는 이유: 사이드바가 인증 상태를 보여주려면 이 값이
+   * 필요한데, `/api/instructor/quota` 는 instructor 전용(403)이고 사이드바는
+   * 학생 화면에서도 렌더된다(StudentDashboardClient). 프로필은 이미 한 번
+   * 읽으므로 컬럼 하나를 더 얹는 편이 요청도 역할 가드도 늘리지 않는다.
+   */
+  plan: string;
   fullName: string | null;
   avatarUrl: string | null;
   email: string;
@@ -84,6 +93,7 @@ function getTestBypassUser(): { user: User; profile: AppProfile } | null {
       profile: {
         role,
         status: "approved",
+        plan: "free",
         fullName: [parsed.firstName, parsed.lastName].filter(Boolean).join(" ") || null,
         avatarUrl: null,
         email: parsed.email ?? `${parsed.id}@test.local`,
@@ -106,7 +116,7 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = createSupabaseClient();
     const { data } = await supabase
       .from("profiles")
-      .select("role, status, display_name, avatar_url")
+      .select("role, status, plan, display_name, avatar_url")
       .eq("id", user.id)
       .single();
 
@@ -116,6 +126,7 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
         ? {
             role: data.role as AppProfile["role"],
             status: (data.status ?? "approved") as AppProfile["status"],
+            plan: (data.plan as string | null) ?? "free",
             fullName: data.display_name ?? null,
             avatarUrl: data.avatar_url ?? null,
             email: user.email ?? "",
