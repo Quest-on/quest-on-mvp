@@ -1,9 +1,14 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Copy, Check, ShieldAlert, AlertTriangle, Mail } from "lucide-react";
+import { Copy, Check, ShieldAlert, AlertTriangle, Mail, Info } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { supportMailto } from "@/lib/contact";
 
@@ -36,6 +41,15 @@ import { supportMailto } from "@/lib/contact";
 export type InstructorQuotaResponse = {
   publishesRemaining: number | null;
   /**
+   * 플랜의 발행 **상한**. `null` 이면 무제한.
+   *
+   * 잔여(publishesRemaining)와 따로 내보내는 이유: 화면이 "시험 3개까지"를
+   * 말하려면 상한이 필요한데, 그 숫자를 메시지에 박으면 `plan_limits` 와
+   * 갈라진다. 그 테이블은 사고 시 UPDATE 한 줄로 한도를 푸는 복구 수단이라,
+   * 갈라지는 순간 화면이 거짓말을 한다.
+   */
+  maxPublishes: number | null;
+  /**
    * 플랜의 시험당 학생 **상한**. `null` 이면 무제한.
    *
    * 예전 이름이 `studentsRemaining` 이었는데, 담긴 값은 잔여가 아니라 상한이다.
@@ -63,6 +77,15 @@ export type ExamCodeQuota = {
    * 새 학생은 못 들어온다(`admit_exam_session` 의 student_limit).
    */
   studentsRemaining?: number | null;
+  /**
+   * 안내용 플랜 **상한** 두 축. `null` 이면 무제한.
+   *
+   * 게이트 판정에는 쓰지 않는다 — 판정은 잔여로만 한다. 이 둘은 "여유 있음"
+   * 상태에서 뜨는 안내 팝오버의 값이다. 둘 중 하나라도 모르면 안내를 띄우지
+   * 않는다. 인증을 마친 계정은 둘 다 `null` 이므로 자연히 아무것도 안 뜬다.
+   */
+  maxPublishes?: number | null;
+  maxStudents?: number | null;
 };
 
 /** 무엇이 게이트를 닫았는가. 문구가 이 값을 따라간다. */
@@ -194,6 +217,21 @@ export function ExamCode({ code, quota, className, copyable = true }: ExamCodePr
     );
   }
 
+  // 여유 있을 때의 안내는 문장이 아니라 아이콘 뒤에 둔다 (이슈 #395).
+  //
+  // ExamCode 는 코드가 보이는 자리마다 렌더되므로, 여기에 정책 문장을 상시로
+  // 깔면 시험을 여러 개 굴리는 교수자에게는 같은 줄이 화면마다 반복된다.
+  // 아이콘 하나면 자리를 거의 안 먹고, 필요한 사람만 열어 본다.
+  //
+  // 상한을 모르면 띄우지 않는다. 인증을 마친 계정은 두 상한이 모두 null 이라
+  // 이 조건에서 자연히 빠진다 — plan 을 따로 볼 필요가 없다.
+  const showLimits =
+    !quota?.isDemo &&
+    quota?.maxPublishes !== null &&
+    quota?.maxPublishes !== undefined &&
+    quota?.maxStudents !== null &&
+    quota?.maxStudents !== undefined;
+
   return (
     <div className={cn("space-y-1", className)}>
       <div className="flex items-center gap-2">
@@ -202,6 +240,45 @@ export function ExamCode({ code, quota, className, copyable = true }: ExamCodePr
           <Button variant="ghost" size="sm" onClick={copy} aria-label={t("copyAria")}>
             {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
           </Button>
+        )}
+        {showLimits && gate.level === "open" && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                aria-label={t("limitAria")}
+              >
+                <Info className="h-3.5 w-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-auto p-3">
+              <dl className="grid grid-cols-[auto_auto] gap-x-6 gap-y-1 text-xs">
+                <dt className="text-muted-foreground">{t("limitExamsLabel")}</dt>
+                <dd className="text-right font-medium tabular-nums">
+                  {t("limitExamsValue", { count: quota?.maxPublishes ?? 0 })}
+                </dd>
+                <dt className="text-muted-foreground">{t("limitStudentsLabel")}</dt>
+                <dd className="text-right font-medium tabular-nums">
+                  {t("limitStudentsValue", { count: quota?.maxStudents ?? 0 })}
+                </dd>
+              </dl>
+              {/* 발행 카운트가 "만든 시험 수"가 아니라 "첫 학생이 들어온 시험
+                  수"라는 건 직관과 어긋난다. 반직관적 산정 규칙은 숫자 바로
+                  옆에 적는다. */}
+              <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+                {t("limitNote")}
+              </p>
+              <a
+                href={supportMailto(t("blockedMailSubject"))}
+                className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-primary underline underline-offset-2"
+              >
+                <Mail className="h-3 w-3 shrink-0" />
+                {t("blockedCta")}
+              </a>
+            </PopoverContent>
+          </Popover>
         )}
       </div>
       {gate.level === "warning" && (

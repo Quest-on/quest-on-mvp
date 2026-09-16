@@ -278,7 +278,15 @@ export default function CreateAssignment() {
                     <Label className="type-field-label">{t("newAssignment.dialogAssignmentCode")}</Label>
                     <div className="flex items-center gap-2 mt-1">
                       {/* 코드는 ExamCode 만 내보낸다 (이슈 #84). 새로 만든 과제는 항상 미발행이다. */}
-                      <ExamCode code={createdExamCode} quota={{ alreadyPublished: false, publishesRemaining: quotaData?.publishesRemaining ?? null }} />
+                      <ExamCode
+                        code={createdExamCode}
+                        quota={{
+                          alreadyPublished: false,
+                          publishesRemaining: quotaData?.publishesRemaining ?? null,
+                          maxPublishes: quotaData?.maxPublishes ?? null,
+                          maxStudents: quotaData?.maxStudents ?? null,
+                        }}
+                      />
                     </div>
                     <p className="text-sm text-muted-foreground mt-2">{t("newAssignment.dialogShare")}</p>
                   </div>
