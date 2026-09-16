@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { resolveCodeGate } from "@/components/instructor/ExamCode";
+import { resolveCodeGate as rawGate } from "@/components/instructor/ExamCode";
 
 const root = resolve(__dirname, "..");
 const read = (p: string) => readFileSync(resolve(root, p), "utf8");
+
+// 이 파일이 검증하는 건 **심각도**다. 원인별 분기는 quota-gate-cause.test.ts 가 본다.
+const gateLevel = (q?: Parameters<typeof rawGate>[0]) => rawGate(q).level;
 
 /**
  * 코드를 뿌리기 전에 학생 한도를 알려준다.
@@ -23,17 +26,17 @@ describe("코드 노출 게이트가 학생 한도를 본다", () => {
     const base = { publishesRemaining: 5 };
 
     it("학생 자리도 넉넉하면 연다", () => {
-      expect(resolveCodeGate({ ...base, studentsRemaining: 30 })).toBe("open");
+      expect(gateLevel({ ...base, studentsRemaining: 30 })).toBe("open");
     });
 
     it("학생 자리가 얼마 안 남으면 경고한다", () => {
       // 뿌린 뒤에 막히면 늦다. 뿌리기 전에 알아야 한다.
-      expect(resolveCodeGate({ ...base, studentsRemaining: 3 })).toBe("warning");
+      expect(gateLevel({ ...base, studentsRemaining: 3 })).toBe("warning");
     });
 
     it("학생 자리가 없으면 막는다", () => {
       // 뿌려도 아무도 못 들어온다. 코드를 내보내는 게 오히려 해롭다.
-      expect(resolveCodeGate({ ...base, studentsRemaining: 0 })).toBe("blocked");
+      expect(gateLevel({ ...base, studentsRemaining: 0 })).toBe("blocked");
     });
   });
 
@@ -42,7 +45,7 @@ describe("코드 노출 게이트가 학생 한도를 본다", () => {
     // 하지만 학생 한도는 계속 적용된다.
     it("학생 자리가 없으면 막는다", () => {
       expect(
-        resolveCodeGate({
+        gateLevel({
           alreadyPublished: true,
           publishesRemaining: 0,
           studentsRemaining: 0,
@@ -52,7 +55,7 @@ describe("코드 노출 게이트가 학생 한도를 본다", () => {
 
     it("학생 자리가 있으면 연다", () => {
       expect(
-        resolveCodeGate({
+        gateLevel({
           alreadyPublished: true,
           publishesRemaining: 0,
           studentsRemaining: 20,
@@ -64,28 +67,28 @@ describe("코드 노출 게이트가 학생 한도를 본다", () => {
   describe("한도를 모르는 경우", () => {
     it("무제한이면 연다", () => {
       expect(
-        resolveCodeGate({ publishesRemaining: null, studentsRemaining: null })
+        gateLevel({ publishesRemaining: null, studentsRemaining: null })
       ).toBe("open");
     });
 
     it("값이 없으면 막지 않는다", () => {
       // 조회 실패와 '자리 없음' 은 다르다. 모르면 안 막는다.
-      expect(resolveCodeGate({ publishesRemaining: 5 })).toBe("open");
-      expect(resolveCodeGate(undefined)).toBe("open");
+      expect(gateLevel({ publishesRemaining: 5 })).toBe("open");
+      expect(gateLevel(undefined)).toBe("open");
     });
   });
 
   describe("데모", () => {
     it("한도를 소모하지 않으므로 항상 연다", () => {
       expect(
-        resolveCodeGate({ isDemo: true, publishesRemaining: 0, studentsRemaining: 0 })
+        gateLevel({ isDemo: true, publishesRemaining: 0, studentsRemaining: 0 })
       ).toBe("open");
     });
   });
 
   describe("발행 한도가 먼저다", () => {
     it("발행이 막히면 학생 자리가 남아도 막는다", () => {
-      expect(resolveCodeGate({ publishesRemaining: 0, studentsRemaining: 100 })).toBe(
+      expect(gateLevel({ publishesRemaining: 0, studentsRemaining: 100 })).toBe(
         "blocked"
       );
     });
@@ -93,16 +96,16 @@ describe("코드 노출 게이트가 학생 한도를 본다", () => {
 });
 
 describe("쿼터 API 가 학생 한도를 내보낸다", () => {
-  it("응답에 studentsRemaining 이 있다", () => {
+  it("응답에 학생 상한이 있다", () => {
     // 화면이 볼 수 없으면 게이트도 판정할 수 없다.
     const src = read("app/api/instructor/quota/route.ts");
-    expect(src, "학생 잔여를 안 내보낸다").toMatch(/studentsRemaining/);
+    expect(src, "학생 상한을 안 내보낸다").toMatch(/maxStudents/);
   });
 
   it("판정 불능은 null 로 답한다", () => {
     // fail-open. 한도 계산 장애로 수업이 멈추면 안 된다.
     const src = read("app/api/instructor/quota/route.ts");
-    expect(src).toMatch(/studentsRemaining: null/);
+    expect(src).toMatch(/maxStudents: null/);
   });
 });
 

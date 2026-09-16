@@ -76,7 +76,7 @@ describe("코드 반출 게이트에 우회로가 없다", () => {
   });
 
   it("카드가 스스로 게이트를 판정한다", () => {
-    expect(card).toMatch(/resolveCodeGate\(quota\) === "blocked"/);
+    expect(card).toMatch(/resolveCodeGate\(quota\)\.level === "blocked"/);
   });
 
   it("차단이면 공지문 문자열 자체를 만들지 않는다", () => {
