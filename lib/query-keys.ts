@@ -8,7 +8,18 @@
 
 export const qk = {
   instructor: {
-    /** 발행 한도 사용량 */
+    /**
+     * 발행 한도 사용량.
+     *
+     * **인자 없는 형태는 무효화용 프리픽스다. 조회 키로 쓰지 않는다.**
+     * 네 화면 중 셋이 `quota()` 를, 하나가 `quota(user.id)` 를 쓰고 있었다.
+     * 같은 엔드포인트가 캐시 두 칸(`["instructor-quota"]` 와
+     * `["instructor-quota", id]`)을 차지해서, 목록과 상세가 동시에 서로
+     * 다른 잔여량을 보여줄 수 있었다 (#394).
+     *
+     *   조회   useQuery({ queryKey: qk.instructor.quota(user.id), ... })
+     *   무효화 invalidateQueries({ queryKey: qk.instructor.quota() })
+     */
     quota: (userId?: string) =>
       userId ? (["instructor-quota", userId] as const) : (["instructor-quota"] as const),
     /**
