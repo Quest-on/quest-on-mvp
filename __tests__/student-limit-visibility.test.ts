@@ -125,10 +125,50 @@ describe("화면이 그 값을 실제로 받는다", () => {
     expect(inline, ).toHaveLength(0);
   });
 
+  const detail = () => read("app/(app)/instructor/[examId]/page.tsx");
+
+  /**
+   * `codeQuota` 조립부의 **코드만** 본다.
+   *
+   * 주석을 걷어내는 이유: 이 아래 금지 단언이 설명 주석에 걸리면, 왜 그
+   * 소스를 쓰면 안 되는지 적을수록 테스트가 깨진다.
+   */
+  const quotaBlock = () => {
+    const src = detail();
+    const start = src.indexOf("const codeQuota =");
+    const NL = String.fromCharCode(10);
+    return src
+      .slice(start, src.indexOf("};", start))
+      .split(NL)
+      .filter((l) => !l.trim().startsWith("//"))
+      .join(NL);
+  };
+
   it("시험 상세가 실제 학생 수로 잔여를 계산한다", () => {
     // 플랜 상한만 넘기면 이미 30명 받은 시험도 "30자리 남음" 이 된다.
-    const src = read("app/(app)/instructor/[examId]/page.tsx");
-    expect(src).toMatch(/studentsRemaining:/);
-    expect(src, "실제 학생 수를 빼지 않는다").toMatch(/bulkGradeStatus\?\.studentCount/);
+    expect(quotaBlock()).toMatch(/studentsRemaining:/);
+    expect(quotaBlock(), "실제 학생 수를 빼지 않는다").toMatch(/students\.length/);
+  });
+
+  it("학생 수를 시험 상태로 게이팅된 쿼리에서 가져오지 않는다", () => {
+    // 이슈 #400. 예전에는 bulkGradeStatus?.studentCount 를 썼는데 그 쿼리는
+    // exam.status === "closed" 일 때만 돈다. 진행 중인 시험에서는 늘 undefined
+    // 라 잔여가 상한 그대로가 됐고, 학생 자리 게이트가 한 번도 닫히지 않았다.
+    // staging 에서 학생 3명이 들어온 시험이 "여유 있음"으로 떴다.
+    expect(
+      quotaBlock(),
+      "closed 일 때만 로드되는 값을 다시 잔여 계산에 쓰고 있다"
+    ).not.toMatch(/bulkGradeStatus/);
+  });
+
+  it("그 쿼리가 실제로 closed 전용이다 — 위 금지의 근거", () => {
+    // 이 단언이 깨지면 위 금지의 전제가 바뀐 것이다. 그때 다시 판단한다.
+    expect(detail()).toMatch(/enabled: !!exam && exam\.status === "closed"/);
+  });
+
+  it("목록을 못 받았으면 잔여를 모른다고 답한다", () => {
+    // 조회 중인 것과 '자리 없음' 은 다르다. 모르는 값은 막지 않는다.
+    expect(quotaBlock()).toMatch(/studentsLoaded/);
+    expect(quotaBlock()).toMatch(/: null/);
   });
 });
