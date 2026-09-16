@@ -1,5 +1,9 @@
 "use client";
-import { resolveCodeGate, type InstructorQuotaResponse } from "@/components/instructor/ExamCode";
+import {
+  resolveCodeGate,
+  resolveStudentsRemaining,
+  type InstructorQuotaResponse,
+} from "@/components/instructor/ExamCode";
 
 import { Button } from "@/components/ui/button";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
@@ -807,7 +811,14 @@ export default function InstructorHome() {
                     isDemo: node.exams?.is_demo,
                     alreadyPublished: !!node.exams?.first_published_at,
                     publishesRemaining: quotaData?.publishesRemaining ?? null,
-                  }) === "blocked"
+                    // 목록도 학생 자리를 본다. 예전에는 발행 한도만 넘겨서,
+                    // 5자리가 꽉 찬 시험 코드가 목록에서 그대로 복사돼 나갔다
+                    // — 상세 화면에 들어가지 않은 교수자는 끝까지 몰랐다.
+                    studentsRemaining: resolveStudentsRemaining(
+                      quotaData?.maxStudents,
+                      node.student_count
+                    ),
+                  }).level === "blocked"
                 );
               }}
             >

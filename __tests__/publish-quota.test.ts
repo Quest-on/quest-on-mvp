@@ -117,41 +117,41 @@ describe("코드 반출 표면이 하나로 수렴한다", () => {
 describe("한도 게이트 판정", () => {
   it("데모는 어떤 안내도 띄우지 않는다", async () => {
     const { resolveCodeGate } = await import("../components/instructor/ExamCode");
-    expect(resolveCodeGate({ isDemo: true, publishesRemaining: 0 })).toBe("open");
+    expect(resolveCodeGate({ isDemo: true, publishesRemaining: 0 }).level).toBe("open");
   });
 
   it("이미 발행된 시험에는 발행 한도를 다시 적용하지 않는다", async () => {
     // 재적용하면 한도를 넘긴 교수자의 진행 중인 시험이 수업 도중에 멈춘다.
     const { resolveCodeGate } = await import("../components/instructor/ExamCode");
-    expect(resolveCodeGate({ alreadyPublished: true, publishesRemaining: 0 })).toBe("open");
+    expect(resolveCodeGate({ alreadyPublished: true, publishesRemaining: 0 }).level).toBe("open");
   });
 
   it("무제한이면 열려 있다", async () => {
     const { resolveCodeGate } = await import("../components/instructor/ExamCode");
-    expect(resolveCodeGate({ publishesRemaining: null })).toBe("open");
+    expect(resolveCodeGate({ publishesRemaining: null }).level).toBe("open");
   });
 
   it("한도에 도달하면 차단한다", async () => {
     const { resolveCodeGate } = await import("../components/instructor/ExamCode");
-    expect(resolveCodeGate({ publishesRemaining: 0 })).toBe("blocked");
+    expect(resolveCodeGate({ publishesRemaining: 0 }).level).toBe("blocked");
   });
 
   it("임박하면 경고한다", async () => {
     const { resolveCodeGate } = await import("../components/instructor/ExamCode");
-    expect(resolveCodeGate({ publishesRemaining: 1 })).toBe("warning");
+    expect(resolveCodeGate({ publishesRemaining: 1 }).level).toBe("warning");
   });
 
   it("여유가 있으면 조용하다 — 상시 카운터는 두지 않는다", async () => {
     // 발행 카운트는 "만든 시험 수"가 아니라 "첫 학생이 들어온 시험 수"라
     // `1/3 사용` 같은 표시는 의미부터 틀리고 첫 경험을 제약 중심으로 만든다.
     const { resolveCodeGate } = await import("../components/instructor/ExamCode");
-    expect(resolveCodeGate({ publishesRemaining: 3 })).toBe("open");
+    expect(resolveCodeGate({ publishesRemaining: 3 }).level).toBe("open");
   });
 
   it("quota 를 모르면 막지 않는다 — fail-open", async () => {
     const { resolveCodeGate } = await import("../components/instructor/ExamCode");
-    expect(resolveCodeGate(undefined)).toBe("open");
-    expect(resolveCodeGate({})).toBe("open");
+    expect(resolveCodeGate(undefined).level).toBe("open");
+    expect(resolveCodeGate({}).level).toBe("open");
   });
 });
 
@@ -161,7 +161,7 @@ describe("차단 상태에서는 코드를 아예 내보내지 않는다", () =>
   it("차단이면 코드 문자열과 복사 버튼이 렌더되지 않는다", () => {
     // 보여주고 "쓰지 마세요"라고 적는 건 소용없다 — 이미 복사해 배포한 뒤다.
     const blocked = source.slice(
-      source.indexOf('if (gate === "blocked")'),
+      source.indexOf('if (gate.level === "blocked")'),
       source.indexOf("return (\n    <div className={cn(\"space-y-1\"")
     );
     expect(blocked).not.toMatch(/\{code\}/);
@@ -179,7 +179,7 @@ describe("게이트가 실제로 배선돼 있다", () => {
     // 인자를 안 넘기면 게이트가 있어도 없는 것과 같다. 실제로 그 상태였다.
     expect(drive).toMatch(/handleCopyExamCode\(/);
     expect(drive).toMatch(/resolveCodeGate\(/);
-    expect(drive).toMatch(/\}\) === "blocked"/);
+    expect(drive).toMatch(/\}\)\.level === "blocked"/);
   });
 
   it("드라이브 조회가 판정에 필요한 컬럼을 함께 읽는다", () => {

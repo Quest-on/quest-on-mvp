@@ -60,7 +60,7 @@ export function StudentHandoffCard({
   const t = useTranslations("authoring");
   const tExam = useTranslations("exam");
 
-  const blocked = resolveCodeGate(quota) === "blocked";
+  const blocked = resolveCodeGate(quota).level === "blocked";
 
   const notice = useMemo(() => {
     if (blocked) return null;

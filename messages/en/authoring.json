@@ -382,11 +382,13 @@
   },
   "examCode": {
     "copyAria": "Copy exam code",
-    "warning": "Your free plan can admit students to {remaining} more exam(s).",
+    "warningPublish": "Your free plan can admit students to {remaining} more exam(s).",
+    "warningStudent": "{remaining} student seat(s) left on this exam.",
     "blockedTitle": "Lift the limit before sharing this code",
-    "blockedBody": "You have reached the free plan publish limit. Students cannot enter even if you share this code. Email us below and we will lift it.",
+    "blockedBodyPublish": "You have reached the free plan publish limit. Students cannot enter even if you share this code. Email us below and we will lift it.",
+    "blockedBodyStudent": "This exam has no student seats left. New students cannot enter even if you share this code. Email us below and we will lift it.",
     "blockedCta": "Request a higher limit",
-    "blockedMailSubject": "[Quest-On] Request to lift the publish limit"
+    "blockedMailSubject": "[Quest-On] Request to lift a plan limit"
   },
   "examDetail": {
     "restartConfirmTitle": "Restart this demo?",

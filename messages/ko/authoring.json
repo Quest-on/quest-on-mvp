@@ -382,11 +382,13 @@
   },
   "examCode": {
     "copyAria": "시험 코드 복사",
-    "warning": "무료 등급에서 앞으로 {remaining}개 시험까지 학생을 받을 수 있습니다.",
+    "warningPublish": "무료 등급에서 앞으로 {remaining}개 시험까지 학생을 받을 수 있습니다.",
+    "warningStudent": "이 시험에 학생 {remaining}자리가 남았습니다.",
     "blockedTitle": "코드를 배포하기 전에 한도를 풀어야 합니다",
-    "blockedBody": "무료 플랜의 발행 한도에 도달했습니다. 지금 코드를 공유해도 학생이 입장하지 못합니다. 아래로 메일 주시면 한도를 풀어 드립니다.",
+    "blockedBodyPublish": "무료 플랜의 발행 한도에 도달했습니다. 지금 코드를 공유해도 학생이 입장하지 못합니다. 아래로 메일 주시면 한도를 풀어 드립니다.",
+    "blockedBodyStudent": "이 시험은 학생 자리가 모두 찼습니다. 지금 코드를 공유해도 새 학생은 들어오지 못합니다. 아래로 메일 주시면 한도를 풀어 드립니다.",
     "blockedCta": "한도 해제 요청",
-    "blockedMailSubject": "[퀘스트온] 발행 한도 해제 요청"
+    "blockedMailSubject": "[퀘스트온] 한도 해제 요청"
   },
   "examDetail": {
     "restartConfirmTitle": "이 데모를 다시 풀까요?",

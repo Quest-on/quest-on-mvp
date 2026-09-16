@@ -7,7 +7,10 @@ import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ExamDetailHeader } from "@/components/instructor/ExamDetailHeader";
-import { type InstructorQuotaResponse } from "@/components/instructor/ExamCode";
+import {
+  resolveStudentsRemaining,
+  type InstructorQuotaResponse,
+} from "@/components/instructor/ExamCode";
 import { StudentHandoffCard } from "@/components/instructor/StudentHandoffCard";
 import { QuestionsListCard } from "@/components/instructor/QuestionsListCard";
 import { ExamControlButtons } from "@/components/instructor/ExamControlButtons";
@@ -411,15 +414,12 @@ export default function ExamDetail({
     alreadyPublished: !!exam?.first_published_at,
     publishesRemaining: quotaData?.publishesRemaining ?? null,
     // 이 시험이 실제로 몇 명을 받았는지 알고 있으므로 잔여를 계산해 넘긴다.
-    // 상한을 모르면 null 이고, 그러면 안 막는다.
-    studentsRemaining:
-      quotaData?.studentsRemaining === null ||
-      quotaData?.studentsRemaining === undefined
-        ? null
-        : Math.max(
-            0,
-            quotaData.studentsRemaining - (bulkGradeStatus?.studentCount ?? 0)
-          ),
+    // 뺄셈은 resolveStudentsRemaining 한 곳에서만 한다 — 호출부마다 다시
+    // 쓰면 언젠가 한 곳이 상한을 잔여로 착각한다(실제로 ExamCard 가 그랬다).
+    studentsRemaining: resolveStudentsRemaining(
+      quotaData?.maxStudents,
+      bulkGradeStatus?.studentCount
+    ),
   };
 
   if (!isLoaded || loading) {
