@@ -52,6 +52,43 @@ describe("OAuth provider 가용성", () => {
     expect(isProviderUnavailable(a, "azure")).toBe(true);
   });
 
+  describe("kakao", () => {
+    // 카카오는 비즈앱 심사 뒤에야 켜진다. 그 사이 버튼이 막다른 길로
+    // 보내면 안 되므로 프로브가 kakao 를 읽어야 한다.
+    it("꺼진 kakao 를 꺼졌다고 읽는다", async () => {
+      stubFetch(() => ok({ google: true, azure: false, kakao: false }));
+
+      const a = await fetchEnabledProviders("https://x.supabase.co", "anon");
+      expect(a.enabled?.kakao).toBe(false);
+      expect(isProviderUnavailable(a, "kakao")).toBe(true);
+    });
+
+    it("켜진 kakao 는 막지 않는다", async () => {
+      stubFetch(() => ok({ google: true, azure: false, kakao: true }));
+
+      const a = await fetchEnabledProviders("https://x.supabase.co", "anon");
+      expect(a.enabled?.kakao).toBe(true);
+      expect(isProviderUnavailable(a, "kakao")).toBe(false);
+    });
+
+    it("응답에 kakao 키가 없으면 꺼졌다고 읽는다", async () => {
+      // 배포 중 구형 settings 응답. google/azure 와 같은 규칙 —
+      // external 은 있는데 키가 없으면 false.
+      stubFetch(() => ok({ google: true, azure: false }));
+
+      const a = await fetchEnabledProviders("https://x.supabase.co", "anon");
+      expect(isProviderUnavailable(a, "kakao")).toBe(true);
+    });
+
+    it("조회 실패 시 kakao 도 막지 않는다", async () => {
+      stubFetch(() => {
+        throw new Error("network down");
+      });
+      const a = await fetchEnabledProviders("https://x.supabase.co", "anon");
+      expect(isProviderUnavailable(a, "kakao")).toBe(false);
+    });
+  });
+
   it("anon 키를 apikey 헤더로 보낸다", async () => {
     const spy = vi.fn(() => ok({ google: true }));
     vi.stubGlobal("fetch", spy);
