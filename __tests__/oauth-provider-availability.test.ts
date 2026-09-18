@@ -39,7 +39,7 @@ describe("OAuth provider 가용성", () => {
     stubFetch(() => ok({ google: false, azure: false, email: true }));
 
     const a = await fetchEnabledProviders("https://x.supabase.co", "anon");
-    expect(a.enabled).toEqual({ google: false, azure: false });
+    expect(a.enabled).toEqual({ google: false, azure: false, kakao: false });
     expect(isProviderUnavailable(a, "google")).toBe(true);
   });
 
