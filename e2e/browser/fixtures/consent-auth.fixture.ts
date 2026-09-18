@@ -233,6 +233,10 @@ export const test = base.extend<ConsentAuthFixtures>({
       });
 
       await page.goto("/sign-up", { waitUntil: "networkidle" });
+      // 가입 화면은 역할을 고르기 전에는 소셜 버튼을 잠그고 있다 — 안 잠그면
+      // role 초기값 instructor 가 쿠키로 나가 학생이 교수자로 굳는다.
+      // 이 스텁은 학생 가입을 흔내 내므로 학생 카드를 먼저 누른다.
+      await page.getByRole("button", { name: /^(학생|Student)\b/ }).click();
       await page.getByRole("button", { name: /Google/i }).click();
       try {
         await page.waitForURL(/\/onboarding(?:\?|$)/, { timeout: 20_000 });
