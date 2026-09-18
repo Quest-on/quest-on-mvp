@@ -217,7 +217,10 @@ export function CustomSignUp() {
                     type="button"
                     variant="outline"
                     className="w-full min-h-[44px]"
-                    disabled={!!oauthLoading || googleUnavailable}
+                    // 역할을 고르기 전에는 소셜 로그인도 막는다. handleOAuth 가
+                    // rememberRole(role) 을 부르고 role 초기값이 instructor 라,
+                    // 안 막으면 학생이 교수자로 굳는다. 이메일 제출과 같은 이유다.
+                    disabled={!!oauthLoading || googleUnavailable || !roleChosen}
                     onClick={() => handleOAuth("google")}
                   >
                     {oauthLoading === "google" ? (

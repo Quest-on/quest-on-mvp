@@ -148,8 +148,10 @@ describe("로그인·가입 화면 배선", () => {
   it.each(FILES)("%s 가 가용성을 보고 구글 버튼을 잠근다", (path) => {
     const src = read(path);
     expect(src, "가용성 훅을 안 쓴다").toMatch(/useOAuthProviders\(\)/);
+    // 가입 화면은 역할 게이트(!roleChosen)가 뒤에 더 붙는다. 가용성
+    // 조건이 들어 있는지만 본다.
     expect(src, "구글 버튼이 가용성과 무관하게 열려 있다").toMatch(
-      /disabled=\{!!oauthLoading \|\| googleUnavailable\}/
+      /disabled=\{!!oauthLoading \|\| googleUnavailable[^}]*\}/
     );
   });
 
