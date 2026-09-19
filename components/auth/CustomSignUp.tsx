@@ -43,6 +43,7 @@ export function CustomSignUp() {
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const providers = useOAuthProviders();
   const googleUnavailable = isProviderUnavailable(providers, "google");
+  const kakaoUnavailable = isProviderUnavailable(providers, "kakao");
 
   // 역할 의도는 쿠키로 남긴다 (#87). localStorage 는 서버가 못 읽어서, OAuth
   // 리다이렉트로 돌아온 뒤 서버가 역할을 클레임할 방법이 없었다.
@@ -58,7 +59,7 @@ export function CustomSignUp() {
     rememberRole(value);
   };
 
-  const handleOAuth = async (provider: "google" | "azure") => {
+  const handleOAuth = async (provider: "google" | "azure" | "kakao") => {
     if (oauthLoading) return;
     setOauthLoading(provider);
     rememberRole(role);
@@ -217,7 +218,10 @@ export function CustomSignUp() {
                     type="button"
                     variant="outline"
                     className="w-full min-h-[44px]"
-                    disabled={!!oauthLoading || googleUnavailable}
+                    // 역할을 고르기 전에는 소셜 로그인도 막는다. handleOAuth 가
+                    // rememberRole(role) 을 부르고 role 초기값이 instructor 라,
+                    // 안 막으면 학생이 교수자로 굳는다. 이메일 제출과 같은 이유다.
+                    disabled={!!oauthLoading || googleUnavailable || !roleChosen}
                     onClick={() => handleOAuth("google")}
                   >
                     {oauthLoading === "google" ? (
@@ -242,6 +246,31 @@ export function CustomSignUp() {
                     버튼은 흐려도 되지만 이유는 읽혀야 한다.
                   */}
                   {googleUnavailable ? (
+                    <p className="type-hint text-center" role="note">
+                      {t("providerUnavailable")}
+                    </p>
+                  ) : null}
+
+                  {/* 브랜드 규정은 CustomSignIn.tsx 의 같은 버튼 주석 참조. */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full min-h-[44px] rounded-xl border-[#FEE500] bg-[#FEE500] text-black hover:bg-[#FEE500]/90 hover:text-black dark:border-[#FEE500] dark:bg-[#FEE500] dark:text-black dark:hover:bg-[#FEE500]/90"
+                    disabled={!!oauthLoading || kakaoUnavailable || !roleChosen}
+                    onClick={() => handleOAuth("kakao")}
+                  >
+                    {oauthLoading === "kakao" ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#000000" aria-hidden="true">
+                        <path d="M12 3C6.48 3 2 6.58 2 11c0 2.83 1.86 5.32 4.66 6.74-.15.53-.96 3.43-.99 3.66 0 0-.02.17.09.23.11.06.24.01.24.01.32-.04 3.7-2.42 4.28-2.83.56.08 1.13.12 1.72.12 5.52 0 10-3.58 10-8s-4.48-8-10-8z" />
+                      </svg>
+                    )}
+                    <span className="flex items-center gap-2 font-medium text-black/85">
+                      {t("kakaoBtn")}
+                    </span>
+                  </Button>
+                  {kakaoUnavailable ? (
                     <p className="type-hint text-center" role="note">
                       {t("providerUnavailable")}
                     </p>
