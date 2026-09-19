@@ -18,6 +18,8 @@ import { qk } from "@/lib/query-keys";
 import { useOAuthProviders } from "@/lib/use-oauth-providers";
 import { isProviderUnavailable } from "@/lib/oauth-providers";
 import type { LinkableProvider } from "@/lib/account-link-intent";
+import { createSupabaseClient } from "@/lib/supabase-client";
+import { getAccountLinkCallbackUrl } from "@/lib/auth-redirect";
 
 type Identity = {
   id: string;
@@ -40,9 +42,11 @@ const PROVIDER_LABEL: Record<string, string> = {
  * 계정이 되게 한다. 인터뷰 결론(스펙 AC-15c): 이미 갈라진 계정은 합치지 않고,
  * 앞으로 갈라지는 것만 여기서 막는다.
  *
- * 연결은 서버가 의도 쿠키를 발급한 뒤 provider 로 리다이렉트한다
- * (`lib/account-link-intent.ts`). 언링크는 수단이 2개 이상일 때만 — 마지막
- * 하나를 떼면 다시 못 들어온다.
+ * 연결 순서: (1) 서버에 의도 쿠키를 발급받는다 (2) **브라우저 SDK** 가
+ * `linkIdentity()` 로 provider 로 나간다. SDK 를 브라우저에서 부르는 이유는
+ * PKCE verifier — SDK 가 자기 쿠키에 쓰는데 서버에서 부르면 그 쿠키가 응답에
+ * 안 실려 콜백 교환이 실패한다. 로그인 버튼과 같은 패턴이다.
+ * 언링크는 수단이 2개 이상일 때만 — 마지막 하나를 떼면 다시 못 들어온다.
  */
 export function LinkedAccountsCard({ userId }: { userId: string }) {
   const t = useTranslations("auth.settings.linkedAccounts");
@@ -66,14 +70,17 @@ export function LinkedAccountsCard({ userId }: { userId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider }),
       });
-      if (!res.ok) throw new Error("link failed");
-      return (await res.json()) as { url: string };
+      if (!res.ok) throw new Error("intent failed");
+
+      const supabase = createSupabaseClient();
+      const { error } = await supabase.auth.linkIdentity({
+        provider,
+        options: { redirectTo: getAccountLinkCallbackUrl(window.location.origin) },
+      });
+      if (error) throw error;
+      // 여기서 브라우저가 떠난다. 돌아오면 /auth/link-callback → /settings?linked=…
     },
     onMutate: (provider) => setPending(provider),
-    onSuccess: ({ url }) => {
-      // 여기서 브라우저가 떠난다. 돌아오면 /auth/link-callback → /settings?linked=…
-      window.location.assign(url);
-    },
     onError: () => {
       setPending(null);
       toast.error(t("linkFailed"));

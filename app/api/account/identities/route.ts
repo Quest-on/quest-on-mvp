@@ -6,7 +6,6 @@ import { getSupabaseAuthClient } from "@/lib/supabase-auth";
 import { successJson, errorJson } from "@/lib/api-response";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
-import { getAccountLinkCallbackUrl } from "@/lib/auth-redirect";
 import {
   ACCOUNT_LINK_COOKIE,
   ACCOUNT_LINK_CALLBACK_PATH,
@@ -18,7 +17,11 @@ import {
  * 계정에 붙은 로그인 수단 (PR-2).
  *
  * GET    — 연결된 identity 목록
- * POST   — 연결 시작: 의도 쿠키를 발급하고 provider authorize URL 을 돌려준다
+ * POST   — 연결 시작: 의도 쿠키만 발급한다. `linkIdentity()` 자체는 브라우저가
+ *          부른다 — PKCE code verifier 를 SDK 가 자기 저장소(쿠키)에 쓰는데,
+ *          서버에서 부르면 그 쿠키가 응답에 실리지 않아 콜백의 교환이 실패한다
+ *          (staging 실측). 기존 로그인 버튼이 브라우저에서 signInWithOAuth 를
+ *          부르는 것과 같은 이유다.
  * DELETE — 언링크 (identity 가 2개 이상일 때만)
  *
  * 인가는 Supabase 세션이 한다. 여기서 다루는 identity 는 전부 **현재 세션
@@ -66,23 +69,8 @@ export async function POST(request: NextRequest) {
   }
   const provider = parsed.data.provider;
 
-  const callbackUrl = getAccountLinkCallbackUrl(request.nextUrl.origin);
-
-  const supabase = await getSupabaseAuthClient();
-  const { data, error } = await supabase.auth.linkIdentity({
-    provider,
-    options: { redirectTo: callbackUrl, skipBrowserRedirect: true },
-  });
-  if (error || !data?.url) {
-    logError("[account-identities] linkIdentity failed", error, {
-      path: "/api/account/identities",
-      additionalData: { provider },
-    });
-    return errorJson("LINK_FAILED", "Failed to start linking", 500);
-  }
-
   const nonce = randomBytes(24).toString("base64url");
-  const response = successJson({ url: data.url });
+  const response = successJson({ provider });
   response.cookies.set(ACCOUNT_LINK_COOKIE, encodeURIComponent(JSON.stringify({ nonce, userId: user.id, provider })), {
     httpOnly: true,
     secure: request.nextUrl.protocol === "https:",
