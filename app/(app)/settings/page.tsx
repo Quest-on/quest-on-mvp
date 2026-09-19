@@ -4,7 +4,8 @@ import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import toast from "react-hot-toast";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import {
   Card,
@@ -14,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ChangePasswordForm } from "@/components/settings/ChangePasswordForm";
+import { LinkedAccountsCard } from "@/components/settings/LinkedAccountsCard";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +26,15 @@ export default function SettingsPage() {
   const t = useTranslations("auth.settings");
   const { user, isLoaded } = useAppUser();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // /auth/link-callback 이 ?linked=<provider> 로 돌려보낸다. 한 번 알리고 지운다.
+  useEffect(() => {
+    const linked = searchParams.get("linked");
+    if (!linked) return;
+    toast.success(t("linkedAccounts.linked", { provider: linked }));
+    router.replace("/settings", { scroll: false });
+  }, [searchParams, router, t]);
 
   const consentQuery = useQuery({
     queryKey: qk.consent.status(user?.id ?? "anonymous"),
@@ -83,6 +94,8 @@ export default function SettingsPage() {
               <ChangePasswordForm />
             </CardContent>
           </Card>
+
+          <LinkedAccountsCard userId={user.id} />
 
           <Card id="privacy">
             <CardHeader>
