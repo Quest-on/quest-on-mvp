@@ -85,7 +85,7 @@
       "heading": "1. Data we collect",
       "required": {
         "heading": "Required",
-        "item1": "Name, email, institution, role (educator/examinee), login identifier",
+        "item1": "Name, email, institution, role (educator/examinee), login identifier, nickname provided by social login",
         "item1Label": "Account information:",
         "item2": "Exam code, session time, submitted answers, rubric scores, feedback logs",
         "item2Label": "Exam data:",

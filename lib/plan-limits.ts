@@ -18,7 +18,6 @@ export type PlanLimits = {
   maxPublishes: number | null;
   /** null = 무제한 */
   maxStudents: number | null;
-  aiDemoGeneration: boolean;
 };
 
 /** DB 조회 실패 시 사용하는 최소 제약 폴백. 막는 쪽이 아니라 여는 쪽으로 실패한다. */
@@ -26,7 +25,6 @@ export const FALLBACK_LIMITS: PlanLimits = {
   plan: "free",
   maxPublishes: null,
   maxStudents: null,
-  aiDemoGeneration: false,
 };
 
 type CacheEntry = { value: PlanLimits; expiresAt: number };
@@ -42,7 +40,6 @@ type PlanLimitsRow = {
   plan: string;
   max_publishes: number | null;
   max_students: number | null;
-  ai_demo_generation: boolean | null;
 };
 
 export function rowToPlanLimits(row: PlanLimitsRow): PlanLimits {
@@ -50,7 +47,6 @@ export function rowToPlanLimits(row: PlanLimitsRow): PlanLimits {
     plan: row.plan,
     maxPublishes: row.max_publishes,
     maxStudents: row.max_students,
-    aiDemoGeneration: row.ai_demo_generation ?? false,
   };
 }
 
@@ -69,7 +65,7 @@ export async function getPlanLimits(plan: string): Promise<PlanLimits> {
     const supabase = getSupabaseServer();
     const { data, error } = await supabase
       .from("plan_limits")
-      .select("plan, max_publishes, max_students, ai_demo_generation")
+      .select("plan, max_publishes, max_students")
       .eq("plan", plan)
       .maybeSingle();
 

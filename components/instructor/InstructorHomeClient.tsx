@@ -1,5 +1,9 @@
 "use client";
-import { resolveCodeGate, type InstructorQuotaResponse } from "@/components/instructor/ExamCode";
+import {
+  resolveCodeGate,
+  resolveStudentsRemaining,
+  type InstructorQuotaResponse,
+} from "@/components/instructor/ExamCode";
 
 import { Button } from "@/components/ui/button";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
@@ -414,12 +418,15 @@ export default function InstructorHome() {
 
   // 발행 한도. 교수자가 코드를 건네기 전에 알아야 한다(이슈 #84).
   const { data: quotaData } = useQuery<InstructorQuotaResponse>({
-    queryKey: qk.instructor.quota(),
+    queryKey: qk.instructor.quota(user?.id),
     queryFn: async ({ signal }) => {
       const response = await fetch("/api/instructor/quota", { signal });
       if (!response.ok) throw new Error("quota");
       return response.json() as Promise<InstructorQuotaResponse>;
     },
+    // 인자 없는 키는 무효화용 프리픽스다. 조회 키로 쓰면 같은 엔드포인트가
+    // 캐시 두 칸을 쓰고, 두 화면이 서로 다른 잔여량을 보여줄 수 있다 (#394).
+    enabled: !!user?.id,
   });
 
   const handleCopyExamCode = async (code?: string, gateBlocked?: boolean) => {
@@ -807,7 +814,14 @@ export default function InstructorHome() {
                     isDemo: node.exams?.is_demo,
                     alreadyPublished: !!node.exams?.first_published_at,
                     publishesRemaining: quotaData?.publishesRemaining ?? null,
-                  }) === "blocked"
+                    // 목록도 학생 자리를 본다. 예전에는 발행 한도만 넘겨서,
+                    // 5자리가 꽉 찬 시험 코드가 목록에서 그대로 복사돼 나갔다
+                    // — 상세 화면에 들어가지 않은 교수자는 끝까지 몰랐다.
+                    studentsRemaining: resolveStudentsRemaining(
+                      quotaData?.maxStudents,
+                      node.student_count
+                    ),
+                  }).level === "blocked"
                 );
               }}
             >

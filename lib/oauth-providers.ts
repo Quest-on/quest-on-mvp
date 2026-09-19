@@ -17,7 +17,7 @@
  * 알려준다. 환경마다 다른 설정을 코드에 박지 않고 실제 값을 묻는다.
  */
 
-export type OAuthProvider = "google" | "azure";
+export type OAuthProvider = "google" | "azure" | "kakao";
 
 const SETTINGS_PATH = "/auth/v1/settings";
 
@@ -62,6 +62,7 @@ export async function fetchEnabledProviders(
       enabled: {
         google: external.google === true,
         azure: external.azure === true,
+        kakao: external.kakao === true,
       },
     };
   } catch {

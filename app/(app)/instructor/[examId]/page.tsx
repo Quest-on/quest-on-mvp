@@ -7,7 +7,10 @@ import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ExamDetailHeader } from "@/components/instructor/ExamDetailHeader";
-import { type InstructorQuotaResponse } from "@/components/instructor/ExamCode";
+import {
+  resolveStudentsRemaining,
+  type InstructorQuotaResponse,
+} from "@/components/instructor/ExamCode";
 import { StudentHandoffCard } from "@/components/instructor/StudentHandoffCard";
 import { QuestionsListCard } from "@/components/instructor/QuestionsListCard";
 import { ExamControlButtons } from "@/components/instructor/ExamControlButtons";
@@ -383,11 +386,15 @@ export default function ExamDetail({
    * (`lib/exam-detail-phase.ts`) 여기서는 결과만 쓴다. 화면 안에서 다시 계산하면
    * "학생이 있는데 목록 도구가 사라지는" 회귀를 테스트가 못 막는다.
    */
+  // 목록을 실제로 받았는가. 단계 판정과 한도 잔여가 같은 답을 써야 한다 —
+  // 각자 판단하면 한쪽만 고쳐졌을 때 갈라진다.
+  const studentsLoaded = !summariesLoading && !summariesError;
+
   const phase = resolveExamDetailPhase({
     status: exam?.status,
     studentCount: students.length,
     // 오류로 못 받은 것과 "0명"은 다르다. 모르면 숨기지 않는다.
-    studentsLoaded: !summariesLoading && !summariesError,
+    studentsLoaded,
   });
 
   // 배포 단계에서는 문항 본문이 이 화면의 주인공이다. 갓 만든 시험에서 교수자가
@@ -411,15 +418,23 @@ export default function ExamDetail({
     alreadyPublished: !!exam?.first_published_at,
     publishesRemaining: quotaData?.publishesRemaining ?? null,
     // 이 시험이 실제로 몇 명을 받았는지 알고 있으므로 잔여를 계산해 넘긴다.
-    // 상한을 모르면 null 이고, 그러면 안 막는다.
-    studentsRemaining:
-      quotaData?.studentsRemaining === null ||
-      quotaData?.studentsRemaining === undefined
-        ? null
-        : Math.max(
-            0,
-            quotaData.studentsRemaining - (bulkGradeStatus?.studentCount ?? 0)
-          ),
+    // 뺄셈은 resolveStudentsRemaining 한 곳에서만 한다 — 호출부마다 다시
+    // 쓰면 언젠가 한 곳이 상한을 잔여로 착각한다(실제로 ExamCard 가 그랬다).
+    //
+    // 학생 수는 **학생 목록**에서 온다. 예전에는 bulkGradeStatus?.studentCount
+    // 를 썼는데, 그 쿼리는 `exam.status === "closed"` 일 때만 돈다. 그래서
+    // 진행 중인 시험에서는 늘 undefined 였고, 잔여가 상한 그대로(5)가 되어
+    // 학생 자리 게이트가 한 번도 닫히지 않았다 — 코드를 나눠 주는 바로 그
+    // 시점에 꺼져 있었던 셈이다 (이슈 #400).
+    //
+    // 목록을 아직 못 받았으면 null 이다. 조회 중인 것과 "자리 없음" 은 다르고,
+    // 모르는 값은 막지 않는다.
+    studentsRemaining: studentsLoaded
+      ? resolveStudentsRemaining(quotaData?.maxStudents, students.length)
+      : null,
+    // 상한 두 축은 "여유 있음" 안내 팝오버의 값이다. 판정에는 안 쓴다.
+    maxPublishes: quotaData?.maxPublishes ?? null,
+    maxStudents: quotaData?.maxStudents ?? null,
   };
 
   if (!isLoaded || loading) {

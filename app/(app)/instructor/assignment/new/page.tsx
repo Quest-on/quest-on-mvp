@@ -41,12 +41,15 @@ export default function CreateAssignment() {
   const [createdExamCode, setCreatedExamCode] = useState("");
 
   const { data: quotaData } = useQuery<InstructorQuotaResponse>({
-    queryKey: qk.instructor.quota(),
+    queryKey: qk.instructor.quota(user?.id),
     queryFn: async ({ signal }) => {
       const response = await fetch("/api/instructor/quota", { signal });
       if (!response.ok) throw new Error("quota");
       return response.json() as Promise<InstructorQuotaResponse>;
     },
+    // 인자 없는 키는 무효화용 프리픽스다. 조회 키로 쓰면 같은 엔드포인트가
+    // 캐시 두 칸을 쓰고, 두 화면이 서로 다른 잔여량을 보여줄 수 있다 (#394).
+    enabled: !!user?.id,
   });
 
   const [examData, setExamData] = useState({
@@ -278,7 +281,15 @@ export default function CreateAssignment() {
                     <Label className="type-field-label">{t("newAssignment.dialogAssignmentCode")}</Label>
                     <div className="flex items-center gap-2 mt-1">
                       {/* 코드는 ExamCode 만 내보낸다 (이슈 #84). 새로 만든 과제는 항상 미발행이다. */}
-                      <ExamCode code={createdExamCode} quota={{ alreadyPublished: false, publishesRemaining: quotaData?.publishesRemaining ?? null }} />
+                      <ExamCode
+                        code={createdExamCode}
+                        quota={{
+                          alreadyPublished: false,
+                          publishesRemaining: quotaData?.publishesRemaining ?? null,
+                          maxPublishes: quotaData?.maxPublishes ?? null,
+                          maxStudents: quotaData?.maxStudents ?? null,
+                        }}
+                      />
                     </div>
                     <p className="text-sm text-muted-foreground mt-2">{t("newAssignment.dialogShare")}</p>
                   </div>

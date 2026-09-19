@@ -25,6 +25,7 @@ export function CustomSignIn() {
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const providers = useOAuthProviders();
   const googleUnavailable = isProviderUnavailable(providers, "google");
+  const kakaoUnavailable = isProviderUnavailable(providers, "kakao");
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +55,7 @@ export function CustomSignIn() {
     router.refresh();
   };
 
-  const handleOAuth = async (provider: "google" | "azure") => {
+  const handleOAuth = async (provider: "google" | "azure" | "kakao") => {
     if (oauthLoading) return;
     setOauthLoading(provider);
     const supabase = createSupabaseClient();
@@ -137,6 +138,37 @@ export function CustomSignIn() {
                 버튼은 흐려도 되지만 이유는 읽혀야 한다.
               */}
               {googleUnavailable ? (
+                <p className="type-hint text-center" role="note">
+                  {t("providerUnavailable")}
+                </p>
+              ) : null}
+
+              {/*
+                카카오 버튼은 브랜드 규정이 고정이다 — 컨테이너 #FEE500, 심볼·레이블
+                #000000(레이블은 85%), radius 12px, 문구는 "카카오 로그인" 만.
+                outline variant 는 bg-background + rounded-md 라 정면 충돌하므로
+                className 으로 덮는다. 다크모드에서도 색을 바꾸지 않는다 —
+                공식 가이드에 다크 변형이 없다.
+              */}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full min-h-[44px] rounded-xl border-[#FEE500] bg-[#FEE500] text-black hover:bg-[#FEE500]/90 hover:text-black dark:border-[#FEE500] dark:bg-[#FEE500] dark:text-black dark:hover:bg-[#FEE500]/90"
+                disabled={!!oauthLoading || kakaoUnavailable}
+                onClick={() => handleOAuth("kakao")}
+              >
+                {oauthLoading === "kakao" ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#000000" aria-hidden="true">
+                    <path d="M12 3C6.48 3 2 6.58 2 11c0 2.83 1.86 5.32 4.66 6.74-.15.53-.96 3.43-.99 3.66 0 0-.02.17.09.23.11.06.24.01.24.01.32-.04 3.7-2.42 4.28-2.83.56.08 1.13.12 1.72.12 5.52 0 10-3.58 10-8s-4.48-8-10-8z" />
+                  </svg>
+                )}
+                <span className="flex items-center gap-2 font-medium text-black/85">
+                  {t("kakaoBtn")}
+                </span>
+              </Button>
+              {kakaoUnavailable ? (
                 <p className="type-hint text-center" role="note">
                   {t("providerUnavailable")}
                 </p>

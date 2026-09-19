@@ -101,8 +101,14 @@ describe("AI 고지 적용 범위 (#325)", () => {
       // 자리도 없다. 그 말은 **문구가 그 자리에서 사유와 해제 방법을 다 말해야
       // 한다**는 뜻이다. 해제 방법은 {email} 토큰이 아니라 mailto CTA 가 맡는다.
       const code = authoring[locale].examCode;
-      expect(code.blockedBody, `${locale}: 차단 사유가 없다`).toMatch(
-        locale === "ko" ? /한도에 도달/ : /reached the free plan publish limit/i
+      // 사유는 원인별로 갈린다 (#393). 예전에는 본문이 하나뿐이라, 학생
+      // 자리가 차서 막힌 교수자에게도 "발행 한도에 도달했다"고 말했다 —
+      // 발행에 여유가 있는 사람이 엉뚱한 곳을 보게 된다.
+      expect(code.blockedBodyPublish, `${locale}: 발행 차단 사유가 없다`).toMatch(
+        locale === "ko" ? /시험을 더 열려면/ : /open more exams/i
+      );
+      expect(code.blockedBodyStudent, `${locale}: 학생 자리 차단 사유가 없다`).toMatch(
+        locale === "ko" ? /자리가 모두 찼/ : /no student seats left/i
       );
       expect(code.blockedCta?.trim(), `${locale}: 해제 CTA 가 없다`).toBeTruthy();
       expect(code.blockedMailSubject?.trim(), `${locale}: 해제 메일 제목이 없다`).toBeTruthy();

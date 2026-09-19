@@ -27,13 +27,11 @@ const free: PlanLimits = {
   plan: "free",
   maxPublishes: 3,
   maxStudents: 5,
-  aiDemoGeneration: false,
 };
 const verified: PlanLimits = {
   plan: "verified",
   maxPublishes: null,
   maxStudents: null,
-  aiDemoGeneration: true,
 };
 
 beforeEach(() => {
@@ -49,20 +47,8 @@ describe("rowToPlanLimits", () => {
         plan: "verified",
         max_publishes: null,
         max_students: null,
-        ai_demo_generation: true,
       })
     ).toEqual(verified);
-  });
-
-  it("ai_demo_generation 이 null 이면 false 로 좁힌다", () => {
-    expect(
-      rowToPlanLimits({
-        plan: "free",
-        max_publishes: 3,
-        max_students: 5,
-        ai_demo_generation: null,
-      }).aiDemoGeneration
-    ).toBe(false);
   });
 });
 
@@ -73,7 +59,6 @@ describe("getPlanLimits", () => {
         plan: "free",
         max_publishes: 3,
         max_students: 5,
-        ai_demo_generation: false,
       },
       error: null,
     });
@@ -88,7 +73,6 @@ describe("getPlanLimits", () => {
         plan: "free",
         max_publishes: 3,
         max_students: 5,
-        ai_demo_generation: false,
       },
       error: null,
     });

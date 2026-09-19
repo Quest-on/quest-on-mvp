@@ -48,6 +48,33 @@ describe("회원가입 역할 선택", () => {
       /disabled=\{[^}]*!roleChosen/
     );
   });
+
+  it("고르기 전에는 소셜 로그인도 막는다", () => {
+    // 위 테스트는 이메일 제출 버튼 하나만 잡는다. OAuth 버튼은 빠져 있었다.
+    //
+    // handleOAuth 는 rememberRole(role) 을 부르고 role 초기값은 "instructor" 다.
+    // 역할을 안 고르고 Google 을 누르면 instructor 쿠키가 나가고,
+    // POST /api/user/role 이 그걸 최초 1회 확정한다. 학생이 교수자로
+    // 굳는다 — 이메일 경로에서 막은 바로 그 사고다.
+    //
+    // handleOAuth("...") 를 부르는 모든 버튼의 disabled 에 !roleChosen 이
+    // 있어야 한다. Azure 는 상시 disabled 라 제외한다.
+    const buttons = [...src.matchAll(/<Button[\s\S]*?<\/Button>/g)].map(
+      (m) => m[0]
+    );
+    // Azure 는 `disabled` 단독(상시 잠금)이라 `disabled={` 가 없다.
+    const oauth = buttons.filter(
+      (b) => /handleOAuth\(/.test(b) && /disabled=\{/.test(b)
+    );
+    expect(oauth.length, "OAuth 버튼을 못 찾았다").toBeGreaterThan(0);
+    for (const b of oauth) {
+      const provider = b.match(/handleOAuth\("(\w+)"\)/)?.[1];
+      expect(
+        b,
+        `${provider} 버튼이 역할 선택 전에 열려 있다`
+      ).toMatch(/disabled=\{[^}]*!roleChosen/);
+    }
+  });
 });
 
 describe("코드 입력 화면", () => {

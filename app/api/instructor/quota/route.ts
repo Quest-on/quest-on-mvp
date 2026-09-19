@@ -39,7 +39,8 @@ export async function GET(_request: NextRequest) {
     if (limits.maxPublishes === null) {
       return successJson({
         publishesRemaining: null,
-        studentsRemaining: limits.maxStudents,
+        maxPublishes: limits.maxPublishes,
+        maxStudents: limits.maxStudents,
         plan: limits.plan,
       });
     }
@@ -48,9 +49,18 @@ export async function GET(_request: NextRequest) {
 
     return successJson({
       publishesRemaining: Math.max(0, limits.maxPublishes - used),
-      // 시험별 잔여는 상세 화면이 계산한다. 여기서는 플랜 상한만 알린다 -
-      // 목록에서 시험마다 학생 수를 세면 조회가 N 배로 늘어난다.
-      studentsRemaining: limits.maxStudents,
+      // 상한도 함께 내보낸다. 화면이 "시험 3개까지"를 말하려면 잔여가 아니라
+      // 상한이 필요한데, 그 숫자를 메시지에 박으면 plan_limits 와 갈라진다.
+      // 그 테이블은 사고 시 UPDATE 한 줄로 한도를 푸는 복구 수단이라,
+      // 갈라지는 순간 화면이 거짓말을 한다.
+      maxPublishes: limits.maxPublishes,
+      // 잔여가 아니라 플랜 **상한**이다. 시험별 잔여는 화면이 그 시험의 실제
+      // 학생 수를 빼서 낸다(resolveStudentsRemaining) - 여기서 시험마다 세면
+      // 조회가 N 배로 늘어난다.
+      //
+      // 이름이 studentsRemaining 이었을 때 ExamCard 가 이 값을 잔여로 믿고
+      // 5명을 받은 시험을 "5자리 남음"으로 판정했다. 상한은 상한이라고 부른다.
+      maxStudents: limits.maxStudents,
       plan: limits.plan,
     });
   } catch (error) {
@@ -60,7 +70,8 @@ export async function GET(_request: NextRequest) {
     // 판정 불능은 무제한으로 답한다. 최종 강제는 DB 함수가 한다.
     return successJson({
       publishesRemaining: null,
-      studentsRemaining: null,
+      maxPublishes: null,
+      maxStudents: null,
       plan: null,
     });
   }
