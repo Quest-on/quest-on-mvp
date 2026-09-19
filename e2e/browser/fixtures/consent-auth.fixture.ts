@@ -236,7 +236,9 @@ export const test = base.extend<ConsentAuthFixtures>({
       // 가입 화면은 역할을 고르기 전에는 소셜 버튼을 잠그고 있다 — 안 잠그면
       // role 초기값 instructor 가 쿠키로 나가 학생이 교수자로 굳는다.
       // 이 스텁은 학생 가입을 흔내 내므로 학생 카드를 먼저 누른다.
-      await page.getByRole("button", { name: /^(학생|Student)\b/ }).click();
+      // \b 는 쓰지 않는다 — JS 정규식의 \w 는 ASCII 뿐이라 한글 뒤에서는 어느 경계도
+      // 잡지 못한다. CI 에서 30초 타임아웃으로 확인했다.
+      await page.getByRole("button", { name: /^(학생|Student)(\s|$)/ }).click();
       await page.getByRole("button", { name: /Google/i }).click();
       try {
         await page.waitForURL(/\/onboarding(?:\?|$)/, { timeout: 20_000 });
