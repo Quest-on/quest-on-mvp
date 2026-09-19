@@ -305,4 +305,8 @@ export const qk = {
   consent: {
     status: (userId: string) => ["consent-status", userId] as const,
   },
+  /** 계정에 붙은 로그인 수단. 사용자별로 갈른다. */
+  account: {
+    identities: (userId: string) => ["account-identities", userId] as const,
+  },
 } as const;
