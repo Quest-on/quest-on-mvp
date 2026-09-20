@@ -68,16 +68,32 @@ describe("resolveAiTaskProfile — precedence", () => {
       overrides: { bulk_grading_worker: {} },
       env: CLEAN_ENV,
     }).profile;
-    expect(inherited.temperature).toBe(0);
     expect(inherited.maxTokens).toBe(1500);
 
     const removed = resolveAiTaskProfile({
       task: "bulk_grading_worker",
-      overrides: { bulk_grading_worker: { temperature: null, maxTokens: null } },
+      overrides: { bulk_grading_worker: { maxTokens: null } },
+      env: CLEAN_ENV,
+    }).profile;
+    expect(removed).not.toHaveProperty("maxTokens");
+  });
+
+  it("keeps the same inherit/remove split for temperature where the task still takes it", () => {
+    // 채점 태스크는 #421 로 temperature 를 못 싣는다. 상속/제거 구분 자체는
+    // temperature 를 여전히 받는 태스크에서 확인한다.
+    const set = resolveAiTaskProfile({
+      task: "bulk_grading_criteria_extract",
+      overrides: { bulk_grading_criteria_extract: { temperature: 0.2 } },
+      env: CLEAN_ENV,
+    }).profile;
+    expect(set.temperature).toBe(0.2);
+
+    const removed = resolveAiTaskProfile({
+      task: "bulk_grading_criteria_extract",
+      overrides: { bulk_grading_criteria_extract: { temperature: null } },
       env: CLEAN_ENV,
     }).profile;
     expect(removed).not.toHaveProperty("temperature");
-    expect(removed).not.toHaveProperty("maxTokens");
   });
 
   it("keeps the requested maxRetries independent of any deadline clamping", () => {
