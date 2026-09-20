@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { qk } from "@/lib/query-keys";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -68,6 +70,7 @@ function PasswordField({
 export function ChangePasswordForm() {
   const t = useTranslations("auth.changePassword");
   const { user } = useAppUser();
+  const qc = useQueryClient();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -77,13 +80,22 @@ export function ChangePasswordForm() {
   const [showNew, setShowNew] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 이메일/비밀번호 로그인 수단 보유 여부 — 없으면 소셜 전용 계정이므로 "설정" 모드(재인증 생략)
-  const hasPassword = (() => {
-    const identities = user?.identities ?? [];
-    if (identities.some((i) => i.provider === "email")) return true;
-    const providers = (user?.app_metadata?.providers as string[] | undefined) ?? [];
-    return providers.includes("email");
-  })();
+  // 이메일/비밀번호 로그인 수단 보유 여부 — 없으면 소셜 전용 계정이므로 "설정" 모드(재인증 생략).
+  //
+  // 예전에는 `user.identities` / `app_metadata.providers` 로 판정했는데 틀렸다 —
+  // 소셜 계정에 비밀번호를 설정해도 둘 다 그대로다(#408, staging 실측). 진실은
+  // 서버만 안다. 로그인 수단 목록이 비밀번호를 `provider: "email"` 행으로 준다.
+  const identitiesQuery = useQuery({
+    queryKey: qk.account.identities(user?.id ?? ""),
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const res = await fetch("/api/account/identities");
+      if (!res.ok) throw new Error("identities unavailable");
+      return (await res.json()) as { identities: { provider: string }[] };
+    },
+  });
+  const hasPassword =
+    identitiesQuery.data?.identities.some((i) => i.provider === "email") ?? false;
 
   const email = user?.email ?? "";
   const confirmMismatch =
@@ -164,6 +176,11 @@ export function ChangePasswordForm() {
         hasPassword ? t("changed") : t("set"),
       );
       resetForm();
+      // 비밀번호가 생기면 로그인 수단이 하나 늘어난다 — 이 폼의 모드와 아래 카드가
+      // 같은 쿼리를 보므로 한 번 무효화하면 둘 다 갱신된다 (#408).
+      if (!hasPassword && user) {
+        void qc.invalidateQueries({ queryKey: qk.account.identities(user.id) });
+      }
     } catch {
       toast.error(t("genericError"));
     } finally {

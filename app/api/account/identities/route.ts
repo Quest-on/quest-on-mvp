@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { z } from "zod";
 import { currentUser } from "@/lib/get-current-user";
 import { getSupabaseAuthClient } from "@/lib/supabase-auth";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { successJson, errorJson } from "@/lib/api-response";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
@@ -32,6 +33,60 @@ import {
 const LinkSchema = z.object({ provider: z.string() });
 const UnlinkSchema = z.object({ identityId: z.string().uuid() });
 
+type SignInMethod = {
+  id: string | null;
+  provider: string;
+  email: string | null;
+  createdAt: string | null;
+};
+
+/**
+ * 로그인 수단 목록. `auth.identities` 행 + **비밀번호**.
+ *
+ * 소셜로 가입한 뒤 `updateUser({ password })` 로 비밀번호를 설정하면 Supabase 는
+ * `encrypted_password` **만** 채운다. `email` identity 행도, `app_metadata.providers` 도
+ * 그대로다(staging 실측). 그런데 이메일 로그인은 된다. 클라이언트 SDK 가 주는
+ * 어떤 필드로도 알 수 없어 서비스 롤 RPC `user_has_password` 로 묻는다
+ * (`database/038`). identity 만 세면 "수단 하나" 로 잡혀 소셜을 못 떼고 이메일이
+ * 목록에 없다(#408).
+ *
+ * 비밀번호 수단은 identity 행이 없으므로 `id: null` — `unlinkIdentity` 로 못 떼고
+ * 비밀번호 변경 카드에서 다룬다. 하지만 **개수에는 센다** — 그래야 소셜 하나를
+ * 떼도 들어올 길이 남는다는 판단이 맞는다.
+ */
+async function listSignInMethods(
+  supabase: Awaited<ReturnType<typeof getSupabaseAuthClient>>,
+  user: { id: string; email: string }
+): Promise<{ methods: SignInMethod[]; raw: Awaited<ReturnType<typeof supabase.auth.getUserIdentities>>["data"] } | { error: unknown }> {
+  const [{ data, error }, { data: hasPassword, error: pwError }] = await Promise.all([
+    supabase.auth.getUserIdentities(),
+    getSupabaseServer().rpc("user_has_password", { p_user_id: user.id }),
+  ]);
+  if (error) return { error };
+  // 모를 때 '없음'으로 두면 마지막 수단 판정이 틀려 소셜을 떼게 할 수 있다. 실패한다.
+  if (pwError) return { error: pwError };
+
+  const identities = data?.identities ?? [];
+  const methods: SignInMethod[] = identities.map((i) => ({
+    id: i.identity_id,
+    provider: i.provider,
+    email: typeof i.identity_data?.email === "string" ? i.identity_data.email : null,
+    createdAt: i.created_at ?? null,
+  }));
+
+  const hasEmailIdentity = identities.some((i) => i.provider === "email");
+  if (hasPassword === true && !hasEmailIdentity) {
+    methods.unshift({
+      id: null,
+      provider: "email",
+      email: user.email || null,
+      createdAt: null,
+    });
+  }
+
+  return { methods, raw: data };
+}
+
 export async function GET() {
   const user = await currentUser();
   if (!user) return errorJson("UNAUTHORIZED", "Unauthorized", 401);
@@ -40,20 +95,13 @@ export async function GET() {
   if (!rl.allowed) return errorJson("RATE_LIMITED", "Too many requests", 429);
 
   const supabase = await getSupabaseAuthClient();
-  const { data, error } = await supabase.auth.getUserIdentities();
-  if (error) {
-    logError("[account-identities] list failed", error, { path: "/api/account/identities" });
+  const listed = await listSignInMethods(supabase, user);
+  if ("error" in listed) {
+    logError("[account-identities] list failed", listed.error, { path: "/api/account/identities" });
     return errorJson("FETCH_FAILED", "Failed to load identities", 500);
   }
 
-  return successJson({
-    identities: (data?.identities ?? []).map((i) => ({
-      id: i.identity_id,
-      provider: i.provider,
-      email: typeof i.identity_data?.email === "string" ? i.identity_data.email : null,
-      createdAt: i.created_at ?? null,
-    })),
-  });
+  return successJson({ identities: listed.methods });
 }
 
 export async function POST(request: NextRequest) {
@@ -92,17 +140,18 @@ export async function DELETE(request: NextRequest) {
   if (!parsed.success) return errorJson("INVALID_INPUT", "Invalid input", 400);
 
   const supabase = await getSupabaseAuthClient();
-  const { data, error: listError } = await supabase.auth.getUserIdentities();
-  if (listError) {
-    logError("[account-identities] list before unlink failed", listError, { path: "/api/account/identities" });
+  const listed = await listSignInMethods(supabase, user);
+  if ("error" in listed) {
+    logError("[account-identities] list before unlink failed", listed.error, { path: "/api/account/identities" });
     return errorJson("FETCH_FAILED", "Failed to load identities", 500);
   }
 
-  const identities = data?.identities ?? [];
-  // AC-17: 마지막 로그인 수단은 못 뗀다. 떼면 다시 못 들어온다.
-  if (identities.length < 2) {
+  // AC-17: 마지막 로그인 수단은 못 뗼다. 떼면 다시 못 들어온다.
+  // 비밀번호도 수단이다 — 소셜 하나 + 비밀번호면 소셜을 떼도 된다.
+  if (listed.methods.length < 2) {
     return errorJson("LAST_IDENTITY", "Cannot unlink the only sign-in method", 409);
   }
+  const identities = listed.raw?.identities ?? [];
   const target = identities.find((i) => i.identity_id === parsed.data.identityId);
   if (!target) return errorJson("NOT_FOUND", "Identity not found", 404);
 
