@@ -29,12 +29,21 @@ type Identity = {
   createdAt: string | null;
 };
 
-const PROVIDER_LABEL: Record<string, string> = {
+/**
+ * provider 표시명. 고유명사라 번역하지 않는다 — "Google" 은 어느 언어에서도 Google.
+ * `settings/page.tsx` 의 연결 완료 토스트도 이걸 쓴다 — 쿼리스트링 raw 값이 그대로
+ * 사용자 문구에 나가면 안 된다(red-team WATCH).
+ */
+export const PROVIDER_LABEL: Record<string, string> = {
   google: "Google",
   kakao: "Kakao",
   email: "Email",
   azure: "Microsoft",
 };
+
+export function providerLabel(provider: string): string {
+  return PROVIDER_LABEL[provider] ?? provider;
+}
 
 /**
  * 계정에 붙은 로그인 수단 (PR-2 / AC-23).
