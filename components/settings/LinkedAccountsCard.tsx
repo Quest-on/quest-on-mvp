@@ -22,7 +22,8 @@ import { createSupabaseClient } from "@/lib/supabase-client";
 import { getAccountLinkCallbackUrl } from "@/lib/auth-redirect";
 
 type Identity = {
-  id: string;
+  /** 비밀번호 수단은 identity 행이 없어 null — 언링크 대신 비밀번호 카드로 (#408) */
+  id: string | null;
   provider: string;
   email: string | null;
   createdAt: string | null;
@@ -133,7 +134,10 @@ export function LinkedAccountsCard({ userId }: { userId: string }) {
         ) : (
           <ul className="divide-y divide-border rounded-md border" aria-label={t("listLabel")}>
             {identities.map((identity) => (
-              <li key={identity.id} className="flex items-center justify-between gap-3 px-4 py-3">
+              <li
+                key={identity.id ?? `password:${identity.provider}`}
+                className="flex items-center justify-between gap-3 px-4 py-3"
+              >
                 <div className="min-w-0">
                   <p className="font-medium">
                     {PROVIDER_LABEL[identity.provider] ?? identity.provider}
@@ -142,23 +146,28 @@ export function LinkedAccountsCard({ userId }: { userId: string }) {
                     <p className="type-hint truncate">{identity.email}</p>
                   ) : null}
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={!canUnlink || unlink.isPending}
-                  onClick={() => unlink.mutate(identity.id)}
-                  aria-label={t("unlinkAria", {
-                    provider: PROVIDER_LABEL[identity.provider] ?? identity.provider,
-                  })}
-                >
-                  {unlink.isPending && unlink.variables === identity.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Unlink className="w-4 h-4" />
-                  )}
-                  {t("unlink")}
-                </Button>
+                {identity.id === null ? (
+                  // 비밀번호는 identity 가 아니라 여기서 못 떼다. 변경은 위 카드에서.
+                  <p className="type-hint">{t("passwordManagedAbove")}</p>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={!canUnlink || unlink.isPending}
+                    onClick={() => unlink.mutate(identity.id as string)}
+                    aria-label={t("unlinkAria", {
+                      provider: PROVIDER_LABEL[identity.provider] ?? identity.provider,
+                    })}
+                  >
+                    {unlink.isPending && unlink.variables === identity.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Unlink className="w-4 h-4" />
+                    )}
+                    {t("unlink")}
+                  </Button>
+                )}
               </li>
             ))}
           </ul>

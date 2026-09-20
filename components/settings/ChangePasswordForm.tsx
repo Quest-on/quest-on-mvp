@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { qk } from "@/lib/query-keys";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -68,6 +70,7 @@ function PasswordField({
 export function ChangePasswordForm() {
   const t = useTranslations("auth.changePassword");
   const { user } = useAppUser();
+  const qc = useQueryClient();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -164,6 +167,10 @@ export function ChangePasswordForm() {
         hasPassword ? t("changed") : t("set"),
       );
       resetForm();
+      // 비밀번호가 생기면 로그인 수단이 하나 늘어난다 — 아래 카드가 다시 읽게 한다 (#408).
+      if (!hasPassword && user) {
+        void qc.invalidateQueries({ queryKey: qk.account.identities(user.id) });
+      }
     } catch {
       toast.error(t("genericError"));
     } finally {
