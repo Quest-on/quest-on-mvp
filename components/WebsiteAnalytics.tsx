@@ -164,7 +164,9 @@ export function WebsiteAnalytics() {
       </a>
     </aside>
   ) : (
-    <Button type="button" variant="outline" className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 h-10 gap-2 rounded-full border-border/60 px-3 text-xs text-muted-foreground shadow-sm motion-reduce:transition-none sm:right-6 sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))]" onClick={() => setEditing(true)}>
+    // z-30: 우측 드로어(CASE AI 가채점 패널 등)가 z-40 으로 같은 모서리를 잡는다.
+    // 같은 값이면 나중에 그려지는 이 pill 이 이겨서 드로어의 전송 버튼을 덮는다 (이슈 #422).
+    <Button type="button" variant="outline" className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 h-10 gap-2 rounded-full border-border/60 px-3 text-xs text-muted-foreground shadow-sm motion-reduce:transition-none sm:right-6 sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))]" onClick={() => setEditing(true)}>
       <SlidersHorizontal className="size-3.5" aria-hidden="true" />{t("settings")}
     </Button>
   );
