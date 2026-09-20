@@ -115,7 +115,8 @@ describe("a real SDK call receives the profile-derived options", () => {
 
     expect(body.model).toBe("gpt-5.6-luna");
     expect(body.max_completion_tokens).toBe(1500);
-    expect(body.temperature).toBe(0);
+    // #421: 채점 경로는 temperature 를 싣지 않는다.
+    expect(body).not.toHaveProperty("temperature");
     expect(body).not.toHaveProperty("reasoning_effort");
     expect(options.maxRetries).toBe(2);
     expect(options.timeout).toBe(60_000);
@@ -123,13 +124,13 @@ describe("a real SDK call receives the profile-derived options", () => {
 
   it("propagates an admin override all the way into the request", async () => {
     const [body, options] = await callLikeProduction({
-      bulk_grading_worker: { timeoutMs: 8_000, maxRetries: 1, temperature: null },
+      bulk_grading_worker: { timeoutMs: 8_000, maxRetries: 1, maxTokens: null },
     });
 
     expect(options.timeout).toBe(8_000);
     expect(options.maxRetries).toBe(1);
     // 명시적 null 은 wire 에서 키가 사라지는 것으로 나타나야 한다.
-    expect(body).not.toHaveProperty("temperature");
+    expect(body).not.toHaveProperty("max_completion_tokens");
   });
 
   it("carries a reasoning effort onto the wire when configured", async () => {

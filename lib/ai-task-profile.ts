@@ -96,7 +96,7 @@ export const TASK_REGISTRY: Readonly<Record<AiTask, TaskCapability>> = {
   },
   auto_grading_question_summary: {
     endpoint: "chat.completions",
-    supports: { maxTokens: true, temperature: true, reasoningEffort: true },
+    supports: { maxTokens: true, temperature: false, reasoningEffort: true },
     callsiteOwnedFields: ["messages", "response_format", "seed"],
   },
   auto_grading_summary: {
@@ -106,7 +106,7 @@ export const TASK_REGISTRY: Readonly<Record<AiTask, TaskCapability>> = {
   },
   bulk_grading_score_cluster: {
     endpoint: "chat.completions",
-    supports: { maxTokens: true, temperature: true, reasoningEffort: true },
+    supports: { maxTokens: true, temperature: false, reasoningEffort: true },
     callsiteOwnedFields: ["messages", "response_format"],
   },
   bulk_grading_criteria_extract: {
@@ -116,7 +116,7 @@ export const TASK_REGISTRY: Readonly<Record<AiTask, TaskCapability>> = {
   },
   bulk_grading_worker: {
     endpoint: "chat.completions",
-    supports: { maxTokens: true, temperature: true, reasoningEffort: true },
+    supports: { maxTokens: true, temperature: false, reasoningEffort: true },
     callsiteOwnedFields: ["messages", "response_format"],
   },
   assignment_chat_stream: {
@@ -143,6 +143,13 @@ export const TASK_REGISTRY: Readonly<Record<AiTask, TaskCapability>> = {
  *     기존 수동 루프(MAX_GRADING_RETRIES)와 래퍼 루프의 최악값을 그대로 보존한다.
  *   - assignment_chat_stream = 0 → 유일한 의도적 예외. 현행 SSE 경로는 재시도가 없고,
  *     첫 토큰이 나간 뒤의 replay 는 안전하지 않다.
+ *
+ * `temperature` 는 어떤 태스크도 싣지 않는다 (이슈 #421). gpt-5.6 계열은 chat.completions 에서
+ * 이 파라미터를 거부하고 `unsupported_value` 로 떨어진다 — staging 에서 CASE 일괄 가채점이
+ * 이것 때문에 전부 실패했다. 같은 모델·같은 엔드포인트인데 temperature 만 없는
+ * bulk_grading_chat_options 는 정상 동작해서, 변수가 temperature 하나로 좁혀졌다.
+ * 기본값에서 빼는 것으로 끝내지 않고 TASK_REGISTRY 의 supports.temperature 도 false 로 둔다.
+ * 그래야 관리자 오버라이드로 다시 들어오는 경로까지 resolve 단계에서 걷힌다.
  */
 export const CODE_DEFAULTS: Readonly<Record<AiTask, ResolvedAiTaskProfile>> = {
   auto_grading_question: { model: AI_MODEL_HEAVY, timeoutMs: 120_000, maxRetries: 2 },
@@ -150,7 +157,6 @@ export const CODE_DEFAULTS: Readonly<Record<AiTask, ResolvedAiTaskProfile>> = {
     model: AI_MODEL_HEAVY,
     timeoutMs: 120_000,
     maxRetries: 2,
-    temperature: 0.3,
   },
   auto_grading_summary: { model: AI_MODEL_HEAVY, timeoutMs: 120_000, maxRetries: 2 },
   bulk_grading_score_cluster: {
@@ -158,7 +164,6 @@ export const CODE_DEFAULTS: Readonly<Record<AiTask, ResolvedAiTaskProfile>> = {
     timeoutMs: 120_000,
     maxRetries: 2,
     maxTokens: 3000,
-    temperature: 0,
   },
   bulk_grading_criteria_extract: {
     model: AI_MODEL_BULK_GRADING_WORKER,
@@ -171,7 +176,6 @@ export const CODE_DEFAULTS: Readonly<Record<AiTask, ResolvedAiTaskProfile>> = {
     timeoutMs: 120_000,
     maxRetries: 2,
     maxTokens: 1500,
-    temperature: 0,
   },
   assignment_chat_stream: { model: AI_MODEL, timeoutMs: 120_000, maxRetries: 0 },
 };
