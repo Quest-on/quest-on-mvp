@@ -96,6 +96,9 @@ export function ChangePasswordForm() {
   });
   const hasPassword =
     identitiesQuery.data?.identities.some((i) => i.provider === "email") ?? false;
+  // 수단 목록을 모르면 모드를 모른다. 모를 때 "설정 모드"로 두면 로딩 찰나에 재인증 없이
+  // updateUser 로 간다(red-team WATCH). 알 때까지 제출을 잠그고, 못 알면 안내한다.
+  const modeKnown = identitiesQuery.isSuccess;
 
   const email = user?.email ?? "";
   const confirmMismatch =
@@ -121,6 +124,7 @@ export function ChangePasswordForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!modeKnown) return;
 
     const validationError = validate();
     if (validationError) {
@@ -190,7 +194,12 @@ export function ChangePasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
-      {!hasPassword && (
+      {identitiesQuery.isError && (
+        <p className="text-sm text-destructive rounded-md bg-muted p-3" role="alert">
+          {t("modeUnavailable")}
+        </p>
+      )}
+      {modeKnown && !hasPassword && (
         <p className="text-sm text-muted-foreground rounded-md bg-muted p-3">
           {t("socialAccountInfo")}
         </p>
@@ -247,7 +256,7 @@ export function ChangePasswordForm() {
         </Label>
       </div>
 
-      <Button type="submit" disabled={isSubmitting} className="min-h-[40px]">
+      <Button type="submit" disabled={isSubmitting || !modeKnown} className="min-h-[40px]">
         {isSubmitting ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
