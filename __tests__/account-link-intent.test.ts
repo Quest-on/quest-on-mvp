@@ -53,11 +53,12 @@ describe("링크 의도 쿠키", () => {
 
 const exchangeCodeForSession = vi.fn(async () => ({ error: null }));
 const getUser = vi.fn(async () => ({ data: { user: { id: "user-9" } }, error: null }));
+const signOut = vi.fn(async () => ({ error: null }));
 let cookieJar: Record<string, string> = {};
 const setCookie = vi.fn();
 
 vi.mock("@supabase/ssr", () => ({
-  createServerClient: () => ({ auth: { exchangeCodeForSession, getUser } }),
+  createServerClient: () => ({ auth: { exchangeCodeForSession, getUser, signOut } }),
 }));
 
 vi.mock("next/headers", () => ({
@@ -106,6 +107,28 @@ describe("GET /auth/link-callback", () => {
     // 다른 사람의 브라우저에서 훔친 code 를 내 의도 쿠키에 붙이는 시나리오.
     armIntent("n-1", "someone-else");
     const res = await callLinkCallback("?code=valid");
+    expect(res.headers.get("location")).toBe(`${ORIGIN}/sign-in?error=auth_callback_failed`);
+  });
+
+  it("교환이 세션을 다른 사용자로 바꿨으면 그 세션을 남기지 않는다 — red-team BLOCK", async () => {
+    // exchangeCodeForSession 은 성공하면 쿠키를 code 소유자의 세션으로 덮어쓴다.
+    // 대조가 실패해 302 를 돌려도 그 쿠키가 응답에 실려 나가면 피해자 브라우저가
+    // 공격자 계정으로 로그인된다(세션 고정 공격의 역방향). 실패 경로에서는 바뀜 세션을
+    // 반드시 끊어야 한다.
+    armIntent("n-1", "victim");
+    getUser.mockResolvedValue({ data: { user: { id: "attacker" } }, error: null });
+    const res = await callLinkCallback("?code=attackers-code");
+    expect(res.headers.get("location")).toBe(`${ORIGIN}/sign-in?error=auth_callback_failed`);
+    expect(signOut, "바뀜 세션을 끊지 않았다 — 피해자가 공격자 계정으로 로그인된다").toHaveBeenCalled();
+  });
+
+  it("교환 전에 현재 세션이 의도의 userId 가 아니면 교환하지 않는다", async () => {
+    // 링크는 로그인된 사용자만 시작할 수 있다. 콜백 시점에 그 사용자가 아니면
+    // (로그아웃됐거나 다른 계정) 교환을 시도할 이유가 없다. 교환하면 세션이 바뀜다.
+    armIntent("n-1", "victim");
+    getUser.mockResolvedValue({ data: { user: null }, error: null });
+    const res = await callLinkCallback("?code=valid");
+    expect(exchangeCodeForSession).not.toHaveBeenCalled();
     expect(res.headers.get("location")).toBe(`${ORIGIN}/sign-in?error=auth_callback_failed`);
   });
 
