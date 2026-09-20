@@ -15,7 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ChangePasswordForm } from "@/components/settings/ChangePasswordForm";
-import { LinkedAccountsCard } from "@/components/settings/LinkedAccountsCard";
+import { LinkedAccountsCard, providerLabel } from "@/components/settings/LinkedAccountsCard";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +32,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const linked = searchParams.get("linked");
     if (!linked) return;
-    toast.success(t("linkedAccounts.linked", { provider: linked }));
+    toast.success(t("linkedAccounts.linked", { provider: providerLabel(linked) }));
     router.replace("/settings", { scroll: false });
   }, [searchParams, router, t]);
 
