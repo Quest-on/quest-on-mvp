@@ -52,7 +52,7 @@ describe("링크 의도 쿠키", () => {
 // ── 링크 전용 콜백 ──────────────────────────────────────────────
 
 const exchangeCodeForSession = vi.fn(async () => ({ error: null }));
-const getUser = vi.fn(async () => ({ data: { user: { id: "user-9" } }, error: null }));
+const getUser = vi.fn(async (): Promise<{ data: { user: { id: string } | null }; error: null }> => ({ data: { user: { id: "user-9" } }, error: null }));
 const signOut = vi.fn(async () => ({ error: null }));
 let cookieJar: Record<string, string> = {};
 const setCookie = vi.fn();
@@ -116,7 +116,10 @@ describe("GET /auth/link-callback", () => {
     // 공격자 계정으로 로그인된다(세션 고정 공격의 역방향). 실패 경로에서는 바뀜 세션을
     // 반드시 끊어야 한다.
     armIntent("n-1", "victim");
-    getUser.mockResolvedValue({ data: { user: { id: "attacker" } }, error: null });
+    // 교환 전에는 피해자 세션(정상 시작), 교환이 공격자 code 를 소비한 뒤에는 공격자 세션.
+    getUser
+      .mockResolvedValueOnce({ data: { user: { id: "victim" } }, error: null })
+      .mockResolvedValueOnce({ data: { user: { id: "attacker" } }, error: null });
     const res = await callLinkCallback("?code=attackers-code");
     expect(res.headers.get("location")).toBe(`${ORIGIN}/sign-in?error=auth_callback_failed`);
     expect(signOut, "바뀜 세션을 끊지 않았다 — 피해자가 공격자 계정으로 로그인된다").toHaveBeenCalled();

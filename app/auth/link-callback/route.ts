@@ -15,8 +15,16 @@ import {
  * `/auth/callback` 은 성공한 code 를 무조건 `/onboarding` 으로 보내므로 연결에
  * 쓸 수 없다 — 연결 끝내고 신규 가입 온보딩으로 튕긴다.
  *
- * 순서가 중요하다: **의도 쿠키를 먼저 본다.** 쿠키가 없으면 code 교환도 하지
- * 않는다. 교환부터 하면 이 URL 을 그냥 로그인 우회로로 쓸 수 있다.
+ * 순서가 중요하다:
+ * 1. **의도 쿠키를 먼저 본다.** 없으면 code 교환도 하지 않는다 — 교환부터 하면
+ *    이 URL 을 로그인 우회로로 쓸 수 있다.
+ * 2. **교환 전에 현재 세션이 의도를 만든 사용자인지 대조한다.** 링크는 로그인된
+ *    사용자만 시작하므로 콜백 시점에 그 사용자가 아니면 교환할 이유가 없다.
+ * 3. 교환 뒤 세션 사용자를 다시 대조한다. `exchangeCodeForSession` 은 성공하면
+ *    쿠키를 **code 소유자의 세션으로 덮어쓴다.** 다른 사람의 code 였다면 여기서
+ *    잡히는데, 그냥 302 만 주면 덮어쓴 쿠키가 응답에 실려 나가 피해자 브라우저가
+ *    공격자 계정으로 로그인된다(세션 고정의 역방향). 그래서 실패 경로는 **반드시
+ *    signOut 해서 바뀜 세션을 끊는다.** 독립 red-team 이 잡은 구멍.
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -45,14 +53,23 @@ export async function GET(request: Request) {
     }
   );
 
+  // (2) 교환 전: 지금 로그인된 사람이 의도를 만든 사람인가.
+  const before = await supabase.auth.getUser();
+  const beforeId = before.data?.user?.id;
+  if (before.error || !beforeId || !safeEqual(beforeId, intent.userId)) {
+    clearIntent(cookieStore);
+    return fail();
+  }
+
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) return fail();
 
-  // 교환 뒤 세션 사용자가 의도를 만든 사용자여야 한다. 다르면 남의 code 를
-  // 내 의도 쿠키에 붙인 것이다.
-  const { data, error: userError } = await supabase.auth.getUser();
-  const sessionUserId = data?.user?.id;
-  if (userError || !sessionUserId || !safeEqual(sessionUserId, intent.userId)) {
+  // (3) 교환 후: 세션이 여전히 같은 사람인가. 다르면 남의 code 였다 — 바뀜 세션을
+  // 끊지 않으면 피해자가 공격자 계정으로 로그인된 채 돌아간다.
+  const after = await supabase.auth.getUser();
+  const afterId = after.data?.user?.id;
+  if (after.error || !afterId || !safeEqual(afterId, intent.userId)) {
+    await supabase.auth.signOut();
     clearIntent(cookieStore);
     return fail();
   }
