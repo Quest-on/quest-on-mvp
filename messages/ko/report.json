@@ -6,7 +6,7 @@
     "backToDashboard": "학생 대시보드로 돌아가기",
     "backToDashboardShort": "대시보드로 돌아가기",
     "grading": {
-      "failedTitle": "AI 채점 중 일부 문제가 실패했어요",
+      "failedTitle": "AI 채점 중 일부 문제가 실패했습니다",
       "inProgressTitle": "AI 채점이 진행 중입니다",
       "failedDesc": "강사가 확인하고 재채점을 진행할 예정입니다.",
       "inProgressDesc": "채점이 완료되면 자동으로 리포트가 표시됩니다.",
