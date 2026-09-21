@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { randomBytes } from "crypto";
 import { z } from "zod";
 import { currentUser } from "@/lib/get-current-user";
 import { getSupabaseAuthClient } from "@/lib/supabase-auth";
@@ -7,12 +6,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { successJson, errorJson } from "@/lib/api-response";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { logError } from "@/lib/logger";
-import {
-  ACCOUNT_LINK_COOKIE,
-  ACCOUNT_LINK_CALLBACK_PATH,
-  ACCOUNT_LINK_COOKIE_MAX_AGE,
-  isLinkableProvider,
-} from "@/lib/account-link-intent";
+import { isLinkableProvider, linkIntentCookie } from "@/lib/account-link-intent";
 
 /**
  * 계정에 붙은 로그인 수단 (PR-2).
@@ -117,15 +111,14 @@ export async function POST(request: NextRequest) {
   }
   const provider = parsed.data.provider;
 
-  const nonce = randomBytes(24).toString("base64url");
+  // 쿠키 형식은 lib/account-link-intent 가 유일하게 정의한다. 여기서 다시
+  // 쓰면 테스트가 검증하는 것과 배포되는 것이 갈라진다(이슈 #414).
+  const cookie = linkIntentCookie(
+    { userId: user.id, provider },
+    request.nextUrl.protocol === "https:"
+  );
   const response = successJson({ provider });
-  response.cookies.set(ACCOUNT_LINK_COOKIE, encodeURIComponent(JSON.stringify({ nonce, userId: user.id, provider })), {
-    httpOnly: true,
-    secure: request.nextUrl.protocol === "https:",
-    sameSite: "lax",
-    path: ACCOUNT_LINK_CALLBACK_PATH,
-    maxAge: ACCOUNT_LINK_COOKIE_MAX_AGE,
-  });
+  response.cookies.set(cookie.name, cookie.value, cookie.options);
   return response;
 }
 

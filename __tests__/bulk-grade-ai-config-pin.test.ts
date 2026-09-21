@@ -27,10 +27,12 @@ const PINNED_TASKS: readonly AiTask[] = [
 
 const CLEAN_ENV: Record<string, string | undefined> = {};
 
-function versionSnapshot(versionId: string, temperature: number): AiConfigVersionSnapshot {
+// 버전 A/B 를 가르는 값으로 maxTokens 를 쓴다. temperature 는 #421 로 채점 태스크에서
+// 걷히므로 스냅샷 고정 여부를 관찰할 수 있는 필드가 아니다.
+function versionSnapshot(versionId: string, maxTokens: number): AiConfigVersionSnapshot {
   return {
     versionId,
-    overrides: { bulk_grading_worker: { temperature } },
+    overrides: { bulk_grading_worker: { maxTokens } },
   };
 }
 
@@ -39,7 +41,7 @@ const FAR_DEADLINE = 10_000_000;
 describe("run pin — deterministic A-read / B-publish barrier (AC-21)", () => {
   it("keeps the whole run on version A even after B is published mid-run", () => {
     // 1) 런 시작: 버전 A 를 한 번 읽고 스냅샷을 고정한다.
-    const versionA = versionSnapshot(VERSION_A, 0);
+    const versionA = versionSnapshot(VERSION_A, 1500);
     const pinnedSnapshot = buildRunProfileSnapshot({
       tasks: PINNED_TASKS,
       version: versionA,
@@ -47,8 +49,8 @@ describe("run pin — deterministic A-read / B-publish barrier (AC-21)", () => {
     });
 
     // 2) 런 도중 관리자가 B 를 발행한다(= 라벨이 옮겨진다).
-    const versionB = versionSnapshot(VERSION_B, 1.5);
-    expect(versionB.overrides.bulk_grading_worker?.temperature).toBe(1.5);
+    const versionB = versionSnapshot(VERSION_B, 800);
+    expect(versionB.overrides.bulk_grading_worker?.maxTokens).toBe(800);
 
     // 3) 워커는 라벨을 다시 읽지 않고 고정된 스냅샷만 본다.
     const context = createPinnedExecutionContext({
@@ -60,14 +62,14 @@ describe("run pin — deterministic A-read / B-publish barrier (AC-21)", () => {
     });
 
     expect(context.configVersionId).toBe(VERSION_A);
-    expect(context.profile.temperature).toBe(0);
+    expect(context.profile.maxTokens).toBe(1500);
     expect(context.pinned).toBe(true);
   });
 
   it("pins every task the run can execute, not just the worker", () => {
     const snapshot = buildRunProfileSnapshot({
       tasks: PINNED_TASKS,
-      version: versionSnapshot(VERSION_A, 0),
+      version: versionSnapshot(VERSION_A, 1500),
       env: CLEAN_ENV,
     });
 
@@ -80,7 +82,7 @@ describe("run pin — deterministic A-read / B-publish barrier (AC-21)", () => {
   it("binds the request profile and the event version to one context", () => {
     const snapshot = buildRunProfileSnapshot({
       tasks: PINNED_TASKS,
-      version: versionSnapshot(VERSION_A, 0),
+      version: versionSnapshot(VERSION_A, 1500),
       env: CLEAN_ENV,
     });
     const context = createPinnedExecutionContext({

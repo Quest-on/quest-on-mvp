@@ -91,33 +91,33 @@ type TaskCapability = {
 export const TASK_REGISTRY: Readonly<Record<AiTask, TaskCapability>> = {
   auto_grading_question: {
     endpoint: "chat.completions",
-    supports: { maxTokens: true, temperature: true, reasoningEffort: true },
+    supports: { maxTokens: true, temperature: false, reasoningEffort: true },
     callsiteOwnedFields: ["messages", "response_format"],
   },
   auto_grading_question_summary: {
     endpoint: "chat.completions",
-    supports: { maxTokens: true, temperature: true, reasoningEffort: true },
+    supports: { maxTokens: true, temperature: false, reasoningEffort: true },
     callsiteOwnedFields: ["messages", "response_format", "seed"],
   },
   auto_grading_summary: {
     endpoint: "chat.completions",
-    supports: { maxTokens: true, temperature: true, reasoningEffort: true },
+    supports: { maxTokens: true, temperature: false, reasoningEffort: true },
     callsiteOwnedFields: ["messages", "response_format"],
   },
   bulk_grading_score_cluster: {
     endpoint: "chat.completions",
-    supports: { maxTokens: true, temperature: true, reasoningEffort: true },
+    supports: { maxTokens: true, temperature: false, reasoningEffort: true },
     callsiteOwnedFields: ["messages", "response_format"],
   },
   bulk_grading_criteria_extract: {
     endpoint: "chat.completions",
-    supports: { maxTokens: true, temperature: true, reasoningEffort: true },
+    supports: { maxTokens: true, temperature: false, reasoningEffort: true },
     callsiteOwnedFields: ["messages", "response_format"],
   },
   bulk_grading_worker: {
     endpoint: "chat.completions",
-    supports: { maxTokens: true, temperature: true, reasoningEffort: true },
-    callsiteOwnedFields: ["messages", "response_format"],
+    supports: { maxTokens: true, temperature: false, reasoningEffort: true },
+    callsiteOwnedFields: ["messages", "response_format", "seed"],
   },
   assignment_chat_stream: {
     endpoint: "responses.stream",
@@ -143,6 +143,25 @@ export const TASK_REGISTRY: Readonly<Record<AiTask, TaskCapability>> = {
  *     기존 수동 루프(MAX_GRADING_RETRIES)와 래퍼 루프의 최악값을 그대로 보존한다.
  *   - assignment_chat_stream = 0 → 유일한 의도적 예외. 현행 SSE 경로는 재시도가 없고,
  *     첫 토큰이 나간 뒤의 replay 는 안전하지 않다.
+ *
+ * `temperature` 는 어느 태스크도 싣지 않는다 (이슈 #421). gpt-5.6 계열은 chat.completions 에서
+ * 이 파라미터를 거부하고 `unsupported_value` 로 떨어진다 — staging 에서 CASE 일괄 가채점이
+ * 이것 때문에 전부 실패했다. 같은 모델·같은 엔드포인트인데 temperature 만 없는
+ * bulk_grading_chat_options 는 정상 동작해서, 변수가 temperature 하나로 좁혀졌다.
+ *
+ * 기본값에서 빼는 것으로 끝내지 않는다. 막아야 할 입구가 셋이다:
+ *   1. CODE_DEFAULTS       — 여기서 뺐다.
+ *   2. 관리자 오버라이드    — TASK_REGISTRY 의 supports.temperature 를 false 로 둬서
+ *                            resolve 단계가 걷어낸다.
+ *   3. 핀된 스냅샷          — 예전 배포가 쓴 스냅샷에 값이 남아 있을 수 있어
+ *                            validatePinnedProfile 도 같은 표를 본다.
+ *
+ * 전체 태스크를 false 로 둔 이유: 지금 이 파일의 모든 chat.completions 태스크가
+ * gpt-5.6 계열(AI_MODEL / AI_MODEL_HEAVY / AI_MODEL_BULK_GRADING_WORKER)에서 돌고,
+ * 그중 어느 것도 temperature 를 쓰지 않는다. 받는 모델로 바꾸는 날 이 표를 같이 고친다.
+ *
+ * 결정성은 temperature 대신 호출부의 `seed` 로 지킨다 — lib/grading.ts 의
+ * deriveSessionSeed 와 같은 방식이다.
  */
 export const CODE_DEFAULTS: Readonly<Record<AiTask, ResolvedAiTaskProfile>> = {
   auto_grading_question: { model: AI_MODEL_HEAVY, timeoutMs: 120_000, maxRetries: 2 },
@@ -150,7 +169,6 @@ export const CODE_DEFAULTS: Readonly<Record<AiTask, ResolvedAiTaskProfile>> = {
     model: AI_MODEL_HEAVY,
     timeoutMs: 120_000,
     maxRetries: 2,
-    temperature: 0.3,
   },
   auto_grading_summary: { model: AI_MODEL_HEAVY, timeoutMs: 120_000, maxRetries: 2 },
   bulk_grading_score_cluster: {
@@ -158,7 +176,6 @@ export const CODE_DEFAULTS: Readonly<Record<AiTask, ResolvedAiTaskProfile>> = {
     timeoutMs: 120_000,
     maxRetries: 2,
     maxTokens: 3000,
-    temperature: 0,
   },
   bulk_grading_criteria_extract: {
     model: AI_MODEL_BULK_GRADING_WORKER,
@@ -171,7 +188,6 @@ export const CODE_DEFAULTS: Readonly<Record<AiTask, ResolvedAiTaskProfile>> = {
     timeoutMs: 120_000,
     maxRetries: 2,
     maxTokens: 1500,
-    temperature: 0,
   },
   assignment_chat_stream: { model: AI_MODEL, timeoutMs: 120_000, maxRetries: 0 },
 };
@@ -529,16 +545,40 @@ export function validatePinnedProfile(task: AiTask, raw: unknown): ResolvedAiTas
     });
   }
 
+  // 핀은 "그 런의 설정을 얼려 둔다" 는 뜻이지 "모델이 거부하는 값도 그대로 보낸다" 는
+  // 뜻이 아니다. 스냅샷은 예전 배포가 쓴 것일 수 있으므로, resolve 와 똑같이
+  // 태스크가 지원하지 않는 필드는 여기서도 걷어낸다 (이슈 #421 의 재발 경로).
+  const capability = TASK_REGISTRY[task];
+
   return Object.freeze({
     model: src.model,
     timeoutMs: src.timeoutMs as number,
     maxRetries: src.maxRetries as number,
-    ...(typeof src.maxTokens === "number" ? { maxTokens: src.maxTokens } : {}),
-    ...(typeof src.temperature === "number" ? { temperature: src.temperature } : {}),
-    ...(src.reasoningEffort !== undefined
+    ...(capability.supports.maxTokens && typeof src.maxTokens === "number"
+      ? { maxTokens: src.maxTokens }
+      : {}),
+    ...(capability.supports.temperature && typeof src.temperature === "number"
+      ? { temperature: src.temperature }
+      : {}),
+    ...(capability.supports.reasoningEffort && src.reasoningEffort !== undefined
       ? { reasoningEffort: src.reasoningEffort as ReasoningEffort }
       : {}),
   });
+}
+
+// ── 결정성 ────────────────────────────────────────────────────────────
+
+/**
+ * 세션 id 에서 뽑는 결정적 seed. 같은 입력이면 같은 draw 를 받는다.
+ *
+ * temperature 를 못 싣는 모델(이슈 #421)에서 결정성을 지키는 유일한 수단이다.
+ * lib/grading.ts 가 요약 경로에서 먼저 쓰던 함수를 여기로 올렸다 — 정의는 하나여야 한다.
+ */
+export function deriveSessionSeed(sessionId: string): number {
+  return Array.from(sessionId).reduce(
+    (h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0,
+    0
+  );
 }
 
 // ── wire 변환 ──────────────────────────────────────────────────────────

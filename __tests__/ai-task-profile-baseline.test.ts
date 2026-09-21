@@ -57,7 +57,7 @@ describe("ai task profile — production baseline freeze", () => {
     expect(body.response_format).toEqual({ type: "json_object" });
   });
 
-  it("auto_grading_question_summary keeps temperature 0.3 and leaves seed to the callsite", () => {
+  it("auto_grading_question_summary sends no temperature and leaves seed to the callsite", () => {
     const body = applyProfileToBody(
       "auto_grading_question_summary",
       profileFor("auto_grading_question_summary"),
@@ -65,7 +65,8 @@ describe("ai task profile — production baseline freeze", () => {
     );
 
     expect(body.model).toBe(AI_MODEL_HEAVY);
-    expect(body.temperature).toBe(0.3);
+    // #421: gpt-5.6 계열이 temperature 를 거부한다. 예전 기본값 0.3 은 걷어냈다.
+    expect(body).not.toHaveProperty("temperature");
     expect(body).not.toHaveProperty("max_completion_tokens");
     expect(body.seed).toBe(12345);
   });
@@ -81,7 +82,7 @@ describe("ai task profile — production baseline freeze", () => {
     expect(body).not.toHaveProperty("temperature");
   });
 
-  it("bulk_grading_score_cluster keeps max 3000 and temperature 0", () => {
+  it("bulk_grading_score_cluster keeps max 3000 and sends no temperature", () => {
     const body = applyProfileToBody(
       "bulk_grading_score_cluster",
       profileFor("bulk_grading_score_cluster"),
@@ -90,7 +91,7 @@ describe("ai task profile — production baseline freeze", () => {
 
     expect(body.model).toBe(AI_MODEL_BULK_GRADING_WORKER);
     expect(body.max_completion_tokens).toBe(3000);
-    expect(body.temperature).toBe(0);
+    expect(body).not.toHaveProperty("temperature"); // #421
   });
 
   it("bulk_grading_criteria_extract keeps max 800 with no temperature", () => {
@@ -105,7 +106,7 @@ describe("ai task profile — production baseline freeze", () => {
     expect(body).not.toHaveProperty("temperature");
   });
 
-  it("bulk_grading_worker keeps max 1500 and temperature 0", () => {
+  it("bulk_grading_worker keeps max 1500 and sends no temperature", () => {
     const body = applyProfileToBody("bulk_grading_worker", profileFor("bulk_grading_worker"), {
       messages: [],
       response_format: { type: "json_object" },
@@ -113,7 +114,7 @@ describe("ai task profile — production baseline freeze", () => {
 
     expect(body.model).toBe(AI_MODEL_BULK_GRADING_WORKER);
     expect(body.max_completion_tokens).toBe(1500);
-    expect(body.temperature).toBe(0);
+    expect(body).not.toHaveProperty("temperature"); // #421
   });
 
   it("assignment_chat_stream preserves the Responses static body and adds no token cap", () => {

@@ -1,5 +1,5 @@
 /**
- * 계정 연결 의도 — nonce 쿠키와 링크 전용 콜백 (PR-2, AC-16).
+ * 계정 연결 의도 쿠키와 링크 전용 콜백 (PR-2, AC-16).
  *
  * 왜 이 형태인가 (스펙 f46):
  * - OAuth `state` 는 SDK/GoTrue 가 PKCE-CSRF 용으로 소유한다. 앱이 덮어쓰면 안 된다.
@@ -7,44 +7,70 @@
  *   단독으로 못 믿는다.
  * - `onboarding_role` 쿠키는 비-HttpOnly 라 인가 판단에 못 쓴다(파일 주석 명시).
  *
- * 그래서: 인증된 시작점에서 서버가 opaque nonce 를 만들어 HttpOnly 쿠키에 넣고,
- * 링크 전용 pathname 콜백이 그 nonce 를 1회 소비한다. nonce 자체가 비밀이라
- * 서명이 필요 없다 — HttpOnly 쿠키는 스크립트가 못 읽는다.
+ * 그래서 인증된 시작점이 의도를 HttpOnly·Path 한정 쿠키에 넣고, 링크 전용
+ * 콜백이 1회 소비한다. **핵심 통제는 `userId` 결합**이다 — 콜백이 쿠키의
+ * userId 와 실제 세션 사용자를 대조한다.
+ *
+ * 예전에는 opaque `nonce` 도 있었지만 대조하는 곳이 없어 아무 일도 하지 않았고,
+ * 이 파일의 테스트 이름이 "nonce 가 맞고" 라고 적어 없는 통제를 있다고 말했다
+ * (이슈 #414). 지웠다.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   ACCOUNT_LINK_COOKIE,
-  buildLinkIntentCookie,
+  ACCOUNT_LINK_CALLBACK_PATH,
+  ACCOUNT_LINK_COOKIE_MAX_AGE,
+  linkIntentCookie,
   readLinkIntentCookie,
 } from "@/lib/account-link-intent";
 
 describe("링크 의도 쿠키", () => {
-  it("HttpOnly·Secure·SameSite=Lax·짧은 수명을 전부 단다", () => {
-    const c = buildLinkIntentCookie({ nonce: "abc", userId: "u1", provider: "kakao", secure: true });
-    expect(c).toMatch(new RegExp(`^${ACCOUNT_LINK_COOKIE}=`));
-    expect(c).toMatch(/HttpOnly/);
-    expect(c).toMatch(/Secure/);
-    expect(c).toMatch(/SameSite=Lax/);
-    expect(c).toMatch(/Max-Age=\d+/);
-    expect(c).toMatch(/Path=\/auth\/link-callback/);
+  // 라우트가 이 함수의 결과를 그대로 response.cookies.set 에 넘긴다.
+  // 예전 테스트는 프로덕션이 안 쓰는 헤더 빌더를 검증해서, 실제 쿠키 속성을
+  // 깨뜨려도 초록이었다(#414).
+  it("HttpOnly·Secure·SameSite=Lax·Path 한정·짧은 수명을 전부 단다", () => {
+    const c = linkIntentCookie({ userId: "u1", provider: "kakao" }, true);
+    expect(c.name).toBe(ACCOUNT_LINK_COOKIE);
+    expect(c.options.httpOnly).toBe(true);
+    expect(c.options.secure).toBe(true);
+    expect(c.options.sameSite).toBe("lax");
+    expect(c.options.path).toBe(ACCOUNT_LINK_CALLBACK_PATH);
+    expect(c.options.maxAge).toBe(ACCOUNT_LINK_COOKIE_MAX_AGE);
   });
 
-  it("값에 nonce·userId·provider 가 실려 있고 되읽힌다", () => {
-    const c = buildLinkIntentCookie({ nonce: "n-1", userId: "user-9", provider: "google", secure: false });
-    const value = c.split(";")[0].split("=").slice(1).join("=");
-    const parsed = readLinkIntentCookie(`${ACCOUNT_LINK_COOKIE}=${value}`);
-    expect(parsed).toEqual({ nonce: "n-1", userId: "user-9", provider: "google" });
+  it("평문 http 에서는 Secure 를 달지 않는다", () => {
+    expect(linkIntentCookie({ userId: "u1", provider: "kakao" }, false).options.secure).toBe(false);
+  });
+
+  it("값에 userId·provider 가 실려 있고 되읽힌다", () => {
+    const c = linkIntentCookie({ userId: "user-9", provider: "google" }, false);
+    const parsed = readLinkIntentCookie(`${ACCOUNT_LINK_COOKIE}=${c.value}`);
+    expect(parsed).toEqual({ userId: "user-9", provider: "google" });
+  });
+
+  it("라우트가 이 정의를 쓴다 — 형식이 두 벌이 되지 않게", () => {
+    const src = readFileSync(
+      resolve(__dirname, "..", "app/api/account/identities/route.ts"),
+      "utf8"
+    );
+    expect(src, "쿠키 형식을 라우트가 다시 쓰고 있다").toMatch(/linkIntentCookie\(/);
+    expect(src, "속성을 인라인으로 다시 적었다").not.toMatch(/httpOnly:\s*true/);
   });
 
   it("쿠키가 없거나 깨졌으면 null", () => {
     expect(readLinkIntentCookie(undefined)).toBeNull();
     expect(readLinkIntentCookie("other=1")).toBeNull();
     expect(readLinkIntentCookie(`${ACCOUNT_LINK_COOKIE}=not-json`)).toBeNull();
-    expect(readLinkIntentCookie(`${ACCOUNT_LINK_COOKIE}=${encodeURIComponent(JSON.stringify({ nonce: "x" }))}`)).toBeNull();
+    // userId 가 없으면 결합할 대상이 없다 — 통째로 버린다.
+    expect(
+      readLinkIntentCookie(`${ACCOUNT_LINK_COOKIE}=${encodeURIComponent(JSON.stringify({ provider: "kakao" }))}`)
+    ).toBeNull();
   });
 
   it("provider 는 허용 목록만 받는다", () => {
-    const bad = encodeURIComponent(JSON.stringify({ nonce: "n", userId: "u", provider: "evil" }));
+    const bad = encodeURIComponent(JSON.stringify({ userId: "u", provider: "evil" }));
     expect(readLinkIntentCookie(`${ACCOUNT_LINK_COOKIE}=${bad}`)).toBeNull();
   });
 });
@@ -76,8 +102,8 @@ async function callLinkCallback(query: string): Promise<Response> {
   return GET(new Request(`${ORIGIN}/auth/link-callback${query}`));
 }
 
-function armIntent(nonce = "n-1", userId = "user-9") {
-  cookieJar[ACCOUNT_LINK_COOKIE] = encodeURIComponent(JSON.stringify({ nonce, userId, provider: "kakao" }));
+function armIntent(userId = "user-9") {
+  cookieJar[ACCOUNT_LINK_COOKIE] = encodeURIComponent(JSON.stringify({ userId, provider: "kakao" }));
 }
 
 beforeEach(() => {
@@ -88,7 +114,7 @@ beforeEach(() => {
 });
 
 describe("GET /auth/link-callback", () => {
-  it("nonce 가 맞고 세션 사용자가 일치하면 설정 화면으로 보내고 쿠키를 지운다", async () => {
+  it("세션 사용자가 의도와 일치하면 설정 화면으로 보내고 쿠키를 지운다", async () => {
     armIntent();
     const res = await callLinkCallback("?code=valid");
     expect(res.headers.get("location")).toBe(`${ORIGIN}/settings?linked=kakao`);
@@ -105,7 +131,7 @@ describe("GET /auth/link-callback", () => {
 
   it("세션 사용자가 의도의 userId 와 다르면 실패 경로", async () => {
     // 다른 사람의 브라우저에서 훔친 code 를 내 의도 쿠키에 붙이는 시나리오.
-    armIntent("n-1", "someone-else");
+    armIntent("someone-else");
     const res = await callLinkCallback("?code=valid");
     expect(res.headers.get("location")).toBe(`${ORIGIN}/sign-in?error=auth_callback_failed`);
   });
@@ -115,7 +141,7 @@ describe("GET /auth/link-callback", () => {
     // 대조가 실패해 302 를 돌려도 그 쿠키가 응답에 실려 나가면 피해자 브라우저가
     // 공격자 계정으로 로그인된다(세션 고정 공격의 역방향). 실패 경로에서는 바뀜 세션을
     // 반드시 끊어야 한다.
-    armIntent("n-1", "victim");
+    armIntent("victim");
     // 교환 전에는 피해자 세션(정상 시작), 교환이 공격자 code 를 소비한 뒤에는 공격자 세션.
     getUser
       .mockResolvedValueOnce({ data: { user: { id: "victim" } }, error: null })
@@ -128,7 +154,7 @@ describe("GET /auth/link-callback", () => {
   it("교환 전에 현재 세션이 의도의 userId 가 아니면 교환하지 않는다", async () => {
     // 링크는 로그인된 사용자만 시작할 수 있다. 콜백 시점에 그 사용자가 아니면
     // (로그아웃됐거나 다른 계정) 교환을 시도할 이유가 없다. 교환하면 세션이 바뀜다.
-    armIntent("n-1", "victim");
+    armIntent("victim");
     getUser.mockResolvedValue({ data: { user: null }, error: null });
     const res = await callLinkCallback("?code=valid");
     expect(exchangeCodeForSession).not.toHaveBeenCalled();
