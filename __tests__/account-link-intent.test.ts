@@ -22,8 +22,9 @@ import {
   ACCOUNT_LINK_COOKIE,
   ACCOUNT_LINK_CALLBACK_PATH,
   ACCOUNT_LINK_COOKIE_MAX_AGE,
+  clearLinkIntentCookie,
   linkIntentCookie,
-  readLinkIntentCookie,
+  parseIntent,
 } from "@/lib/account-link-intent";
 
 describe("링크 의도 쿠키", () => {
@@ -45,9 +46,32 @@ describe("링크 의도 쿠키", () => {
   });
 
   it("값에 userId·provider 가 실려 있고 되읽힌다", () => {
+    // 콜백은 cookieStore.get(...).value 를 parseIntent 에 넘긴다. 예전 테스트는
+    // Cookie 헤더 문자열을 파싱하는 readLinkIntentCookie 를 검증했는데 그 함수는
+    // 프로덕션 호출부가 없었다 — 안 쓰는 쪽을 검증하던 #414 와 같은 모양이라 지웠다.
     const c = linkIntentCookie({ userId: "user-9", provider: "google" }, false);
-    const parsed = readLinkIntentCookie(`${ACCOUNT_LINK_COOKIE}=${c.value}`);
-    expect(parsed).toEqual({ userId: "user-9", provider: "google" });
+    expect(parseIntent(c.value)).toEqual({ userId: "user-9", provider: "google" });
+  });
+
+  it("지우는 쿠키가 발급분과 이름·Path·속성이 같고 maxAge 만 0 이다", () => {
+    // 브라우저는 이름·Path 가 일치해야 덮어쓴다. 어긋나면 삭제가 조용히 실패하고
+    // 1회 소비여야 할 의도가 TTL 끝까지 남는다.
+    const issued = linkIntentCookie({ userId: "u1", provider: "kakao" }, true);
+    const cleared = clearLinkIntentCookie(true);
+    expect(cleared.name).toBe(issued.name);
+    expect(cleared.value).toBe("");
+    expect(cleared.options.path).toBe(issued.options.path);
+    expect(cleared.options.httpOnly).toBe(issued.options.httpOnly);
+    expect(cleared.options.secure).toBe(issued.options.secure);
+    expect(cleared.options.sameSite).toBe(issued.options.sameSite);
+    expect(cleared.options.maxAge).toBe(0);
+  });
+
+  it("콜백이 쿠키 속성을 다시 적지 않는다", () => {
+    const src = readFileSync(resolve(__dirname, "..", "app/auth/link-callback/route.ts"), "utf8");
+    expect(src, "지우는 쿠키를 공용 정의에서 가져오지 않는다").toMatch(/clearLinkIntentCookie\(/);
+    expect(src, "Path 를 인라인으로 다시 적었다").not.toMatch(/path:\s*ACCOUNT_LINK_CALLBACK_PATH/);
+    expect(src, "maxAge 를 인라인으로 다시 적었다").not.toMatch(/maxAge:\s*0/);
   });
 
   it("라우트가 이 정의를 쓴다 — 형식이 두 벌이 되지 않게", () => {
@@ -59,19 +83,15 @@ describe("링크 의도 쿠키", () => {
     expect(src, "속성을 인라인으로 다시 적었다").not.toMatch(/httpOnly:\s*true/);
   });
 
-  it("쿠키가 없거나 깨졌으면 null", () => {
-    expect(readLinkIntentCookie(undefined)).toBeNull();
-    expect(readLinkIntentCookie("other=1")).toBeNull();
-    expect(readLinkIntentCookie(`${ACCOUNT_LINK_COOKIE}=not-json`)).toBeNull();
+  it("값이 깨졌으면 null", () => {
+    expect(parseIntent("not-json")).toBeNull();
+    expect(parseIntent("%E0%A4%A")).toBeNull(); // decodeURIComponent 가 던지는 입력
     // userId 가 없으면 결합할 대상이 없다 — 통째로 버린다.
-    expect(
-      readLinkIntentCookie(`${ACCOUNT_LINK_COOKIE}=${encodeURIComponent(JSON.stringify({ provider: "kakao" }))}`)
-    ).toBeNull();
+    expect(parseIntent(encodeURIComponent(JSON.stringify({ provider: "kakao" })))).toBeNull();
   });
 
   it("provider 는 허용 목록만 받는다", () => {
-    const bad = encodeURIComponent(JSON.stringify({ userId: "u", provider: "evil" }));
-    expect(readLinkIntentCookie(`${ACCOUNT_LINK_COOKIE}=${bad}`)).toBeNull();
+    expect(parseIntent(encodeURIComponent(JSON.stringify({ userId: "u", provider: "evil" })))).toBeNull();
   });
 });
 

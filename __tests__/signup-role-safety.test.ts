@@ -57,24 +57,27 @@ describe("회원가입 역할 선택", () => {
     // POST /api/user/role 이 그걸 최초 1회 확정한다. 학생이 교수자로
     // 굳는다 — 이메일 경로에서 막은 바로 그 사고다.
     //
-    // handleOAuth("...") 를 부르는 모든 버튼의 disabled 에 !roleChosen 이
-    // 있어야 한다. Azure 는 상시 disabled 라 제외한다.
-    const buttons = [...src.matchAll(/<Button[\s\S]*?<\/Button>/g)].map(
-      (m) => m[0]
+    // 버튼 마크업은 로그인 화면과 공유한다. 그래서 두 쪽을 본다:
+    // 가입 화면이 역할 게이트를 넘기는지, 공용 버튼이 그걸로 잠그는지.
+    expect(src, "가입 화면이 역할 게이트를 안 넘긴다").toMatch(
+      /blocked=\{!roleChosen\}/
     );
+
+    const shared = read("components/auth/OAuthProviderButtons.tsx");
+    const buttons = [...shared.matchAll(/<Button[\s\S]*?<\/Button>/g)].map((m) => m[0]);
     // Azure 는 `disabled` 단독(상시 잠금)이라 `disabled={` 가 없다.
     const oauth = buttons.filter(
-      (b) => /handleOAuth\(/.test(b) && /disabled=\{/.test(b)
+      (b) => /onSelect\(/.test(b) && /disabled=\{/.test(b)
     );
     expect(oauth.length, "OAuth 버튼을 못 찾았다").toBeGreaterThan(0);
     for (const b of oauth) {
-      const provider = b.match(/handleOAuth\("(\w+)"\)/)?.[1];
-      expect(
-        b,
-        `${provider} 버튼이 역할 선택 전에 열려 있다`
-      ).toMatch(/disabled=\{[^}]*!roleChosen/);
+      const provider = b.match(/onSelect\("(\w+)"\)/)?.[1];
+      expect(b, `${provider} 버튼이 추가 게이트를 안 본다`).toMatch(
+        /disabled=\{[^}]*blocked/
+      );
     }
   });
+
 });
 
 describe("코드 입력 화면", () => {
