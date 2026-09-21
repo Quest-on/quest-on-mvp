@@ -164,9 +164,15 @@ export function WebsiteAnalytics() {
       </a>
     </aside>
   ) : (
-    // z-30: 우측 드로어(CASE AI 가채점 패널 등)가 z-40 으로 같은 모서리를 잡는다.
-    // 같은 값이면 나중에 그려지는 이 pill 이 이겨서 드로어의 전송 버튼을 덮는다 (이슈 #422).
-    <Button type="button" variant="outline" className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 h-10 gap-2 rounded-full border-border/60 px-3 text-xs text-muted-foreground shadow-sm motion-reduce:transition-none sm:right-6 sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))]" onClick={() => setEditing(true)}>
+    // 우하단 모서리는 페이지가 소유한다. 이 pill 은 전역 상시 노출이라 우선순위가 가장 낮다.
+    //
+    // z-30 — 우측 드로어(CASE AI 가채점 패널)가 z-40 으로 화면 오른쪽을 통째로 덮을 때
+    //        pill 이 그 위로 올라오지 않게 한다 (이슈 #422).
+    // 세로 오프셋 — z 만 낮추면 같은 자리를 쓰는 코너 CTA 밑에 깔려서 이번엔 pill 을
+    //        누를 수 없다. FloatingChatButton·FinalAnswerButton·AgentFab 가 전부
+    //        bottom-6 에 높이 ~56px 이고, 모바일 하단 내비는 bottom-0 에 ~64px 다.
+    //        4.5rem 을 띄워 그 띠를 아예 벗어난다 — 겹침을 z 로 겨루지 않고 없앤다.
+    <Button type="button" variant="outline" className="fixed right-4 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+4.5rem)] z-30 h-10 gap-2 rounded-full border-border/60 px-3 text-xs text-muted-foreground shadow-sm motion-reduce:transition-none sm:right-6 sm:bottom-[calc(max(1.5rem,env(safe-area-inset-bottom))+4.5rem)]" onClick={() => setEditing(true)}>
       <SlidersHorizontal className="size-3.5" aria-hidden="true" />{t("settings")}
     </Button>
   );

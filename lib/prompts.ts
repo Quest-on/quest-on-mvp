@@ -3205,7 +3205,8 @@ export type ExtractedCriteria = {
 
 /**
  * System prompt for grading a single student's case answers.
- * ~2-4k tokens. temperature=0 for consistency.
+ * ~2-4k tokens. 결정성은 호출부의 seed 로 지킨다 — gpt-5.6 계열이 temperature 를
+ * 거부해서 이 경로는 더 이상 temperature 를 싣지 않는다 (이슈 #421).
  */
 export function buildPerStudentGradingSystemPrompt(params: {
   criteria: ExtractedCriteria;

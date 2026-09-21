@@ -9,7 +9,7 @@ import {
   createPinnedExecutionContext,
 } from "@/lib/ai-execution-context";
 import { createRouteDeadline } from "@/lib/ai-deadline";
-import { applyProfileToChatBody } from "@/lib/ai-task-profile";
+import { applyProfileToChatBody, deriveSessionSeed } from "@/lib/ai-task-profile";
 
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { logError } from "@/lib/logger";
@@ -233,6 +233,9 @@ async function handler(request: NextRequest): Promise<NextResponse> {
             applyProfileToChatBody(aiContext.profile, {
               messages: [{ role: "system" as const, content: systemPrompt }],
               response_format: { type: "json_object" as const },
+              // seed 는 호출부 소유다. 이 태스크는 모델이 temperature 를 거부해서(#421)
+              // 결정성을 여기서만 지킬 수 있다 — 같은 답안은 재시도해도 같은 점수를 받는다.
+              seed: deriveSessionSeed(studentSessionId),
             }),
             {
               timeout: aiContext.budget.timeout,
