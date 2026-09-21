@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import {
   ACCOUNT_LINK_COOKIE,
-  ACCOUNT_LINK_CALLBACK_PATH,
+  clearLinkIntentCookie,
   parseIntent,
 } from "@/lib/account-link-intent";
 
@@ -27,7 +27,8 @@ import {
  *    signOut 해서 바뀜 세션을 끊는다.** 독립 red-team 이 잡은 구멍.
  */
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams, origin, protocol } = new URL(request.url);
+  const secure = protocol === "https:";
   const fail = () =>
     NextResponse.redirect(new URL("/sign-in?error=auth_callback_failed", origin));
 
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
   const before = await supabase.auth.getUser();
   const beforeId = before.data?.user?.id;
   if (before.error || !beforeId || !safeEqual(beforeId, intent.userId)) {
-    clearIntent(cookieStore);
+    clearIntent(cookieStore, secure);
     return fail();
   }
 
@@ -70,20 +71,25 @@ export async function GET(request: Request) {
   const afterId = after.data?.user?.id;
   if (after.error || !afterId || !safeEqual(afterId, intent.userId)) {
     await supabase.auth.signOut();
-    clearIntent(cookieStore);
+    clearIntent(cookieStore, secure);
     return fail();
   }
 
   // 1회 소비.
-  clearIntent(cookieStore);
+  clearIntent(cookieStore, secure);
 
   const done = new URL("/settings", origin);
   done.searchParams.set("linked", intent.provider);
   return NextResponse.redirect(done);
 }
 
-function clearIntent(store: Awaited<ReturnType<typeof cookies>>) {
-  store.set(ACCOUNT_LINK_COOKIE, "", { path: ACCOUNT_LINK_CALLBACK_PATH, maxAge: 0 });
+/**
+ * 의도를 1회 소비하고 지운다. 속성은 발급과 같은 정의에서 나온다 — 여기서 다시
+ * 적으면 발급 쪽이 바뀔 때 조용히 어긋나고, 지워졌어야 할 의도가 TTL 끝까지 남는다.
+ */
+function clearIntent(store: Awaited<ReturnType<typeof cookies>>, secure: boolean) {
+  const c = clearLinkIntentCookie(secure);
+  store.set(c.name, c.value, c.options);
 }
 
 function safeEqual(a: string, b: string): boolean {
