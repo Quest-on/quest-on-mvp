@@ -12,8 +12,8 @@
  *  - countInterviewQuestions: counts AI questions posed AFTER the first user
  *    turn (excludes the welcome/init assistant message).
  *  - MIN_BULK_GRADE_INTERVIEW_QUESTIONS: minimum Q&A rounds before "proceed to grade".
- *  - formatPickedQACriteria: formats Q&A pairs collected via quick-reply chips
- *    into an appendable criteria block.
+ *  - buildCriteriaText: 서버로 보낼 criteriaText — 강사가 타이핑한 재채점 지시만
+ *    담는다. 인터뷰 답변은 채팅에 있고 서버가 거기서 읽는다 (이슈 #426).
  */
 
 /** Minimum AI↔instructor Q&A rounds before the instructor may skip to grading. */
@@ -108,20 +108,22 @@ export function countInterviewQuestions(
 }
 
 /**
- * Formats Q&A pairs collected via quick-reply chips into an appendable
- * criteria block.
+ * 서버로 보낼 `criteriaText` 를 만든다.
  *
- * NOTE: This is the SINGLE place where pickedQA is appended to criteria.
- * The re-grade arm path keeps `draft = base only` so that startGradingMutation
- * can call this function exactly once at send time — no double-appending.
+ * **강사가 직접 타이핑한 재채점 지시만 담는다.** 인터뷰 답변은 — 선택지 칩으로
+ * 고른 것이든 직접 쓴 것이든 — 이미 `bulk_grading_messages` 에 남아 있고,
+ * 서버가 `extractGradingCriteriaFromChat` 으로 거기서 읽는다.
  *
- * Returns "" when picks is empty so callers can do `base + formatPickedQACriteria(picks)`
- * without conditionals.
+ * 예전에는 칩으로 고른 Q&A 를 여기에 덧붙였다. 그런데 서버는 `criteriaText` 가
+ * 비어 있지 않으면 대화 추출을 건너뛰고 조기 반환하므로, 칩을 한 번이라도 누르면
+ * **나머지 인터뷰와 강사가 확정한 score_range 가 통째로 버려졌다** (이슈 #426).
+ * 같은 인터뷰인데 입력 방식에 따라 결과가 갈렸고, 강사는 그 구분을 알 수 없었다.
  */
-export function formatPickedQACriteria(
-  picks: { q: string; a: string }[],
-): string {
-  if (picks.length === 0) return "";
-  const body = picks.map((p) => `Q: ${p.q}\nA: ${p.a}`).join("\n\n");
-  return `\n\n---\n추가 기준 (채팅 Q&A에서 도출):\n${body}`;
+export function buildCriteriaText(input: {
+  regradeArmed: boolean;
+  criteriaMode: string;
+  draft: string;
+}): string {
+  if (!input.regradeArmed || input.criteriaMode === "ai_default") return "";
+  return input.draft.trim().slice(0, 8000);
 }

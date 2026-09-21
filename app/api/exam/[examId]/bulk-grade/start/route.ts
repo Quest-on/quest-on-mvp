@@ -19,7 +19,11 @@ import {
 } from "@/lib/bulk-grading";
 import type { ExtractedCriteria } from "@/lib/prompts";
 import { isUniqueViolation } from "@/lib/chat-idempotency";
-import { extractGradingCriteriaFromChat, isInterviewReady } from "@/lib/bulk-grading-criteria";
+import {
+  extractGradingCriteriaFromChat,
+  hasCompletedInterview,
+  readStoredScoreRange,
+} from "@/lib/bulk-grading-criteria";
 import { loadCurrentVersion } from "@/lib/ai-config-store";
 import { buildRunProfileSnapshot } from "@/lib/ai-execution-context";
 import type { AiTask, ResolvedAiTaskProfile } from "@/lib/ai-task-profile";
@@ -37,7 +41,7 @@ const BULK_RUN_PINNED_TASKS: readonly AiTask[] = [
 const BULK_GRADE_START_RATE_LIMIT = { limit: 3, windowSec: 60 };
 const STALE_GRADING_MS = 10 * 60 * 1000;
 const GRADING_SESSION_SELECT =
-  "id, status, updated_at, calibration_status, calibration_sample_session_ids, calibration_sample_grades, calibration_attempt";
+  "id, status, updated_at, calibration_status, calibration_sample_session_ids, calibration_sample_grades, calibration_attempt, grading_criteria";
 
 function parseScope(body: unknown): BulkGradingScope {
   void body;
@@ -240,11 +244,24 @@ export async function POST(
     const manualCriteria = parseCriteria(body);
     let criteria: ExtractedCriteria;
 
-    if (manualCriteria?.criteria_summary && manualCriteria.criteria_summary.length > 0) {
+    // 재채점은 강사가 이미 확정한 점수 범위를 이어받아야 한다. 안 그러면
+    // clampScore 가 조용히 0~100 으로 되돌아가서 강사가 정한 범위가 사라진다 (#426).
+    const carriedRange = readStoredScoreRange(
+      (startSession as { grading_criteria?: unknown }).grading_criteria,
+    );
+    const manualUsable =
+      !!manualCriteria?.criteria_summary &&
+      manualCriteria.criteria_summary.length > 0 &&
+      (!!manualCriteria.score_range || !!carriedRange);
+
+    if (manualUsable && manualCriteria) {
       // Re-grade path: instructor edited criteria text directly.
-      criteria = manualCriteria;
+      // 범위가 없으면 이 경로로 오지 않는다 — 위 manualUsable 이 막고 대화 추출로 넘긴다.
+      criteria = manualCriteria.score_range
+        ? manualCriteria
+        : { ...manualCriteria, score_range: carriedRange ?? undefined };
     } else {
-      if (!isInterviewReady(startSession.calibration_status as string)) {
+      if (!hasCompletedInterview(startSession.calibration_status as string)) {
         return errorJson(
           "VALIDATION_ERROR",
           "채점 기준 인터뷰를 완료하고 점수 범위(Range)를 확정해주세요.",
