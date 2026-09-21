@@ -14,7 +14,7 @@ import {
   isNearBottom,
   orderThreadItems,
   resolveSendMode,
-  formatPickedQACriteria,
+  buildCriteriaText,
 } from "@/lib/bulk-grade-thread";
 import toast from "react-hot-toast";
 import {
@@ -193,7 +193,6 @@ export function BulkGradingPanel({
   /** Quick-reply chips offered by the AI during the interviewing phase. */
   const [chatOptions, setChatOptions] = useState<string[]>([]);
   /** Q&A pairs accumulated via quick-reply chip selection. */
-  const [pickedQA, setPickedQA] = useState<{ q: string; a: string }[]>([]);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -455,8 +454,9 @@ export function BulkGradingPanel({
 
   const startGradingMutation = useMutation({
     mutationFn: async () => {
-      const base = regradeArmed && criteriaMode !== "ai_default" ? draft.trim() : "";
-      const enriched = (base + formatPickedQACriteria(pickedQA)).slice(0, 8000);
+      // 인터뷰 답변(칩·타이핑 모두)은 이미 채팅에 있다. 서버가 거기서 읽으므로
+      // 여기서는 강사가 직접 타이핑한 재채점 지시만 보낸다 (이슈 #426).
+      const enriched = buildCriteriaText({ regradeArmed, criteriaMode, draft });
       const res = await fetch(`/api/exam/${examId}/bulk-grade/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -478,7 +478,6 @@ export function BulkGradingPanel({
       setEditedGrades(null);
       setRegradeArmed(false);
       setDraft("");
-      setPickedQA([]);
       setChatOptions([]);
       queryClient.invalidateQueries({ queryKey: qk.instructor.bulkGradeSession(examId) });
       queryClient.invalidateQueries({ queryKey: qk.instructor.bulkGradeChat(examId) });
@@ -642,13 +641,9 @@ export function BulkGradingPanel({
   const displayedOptions: string[] = canShowChips ? chatOptions : [];
 
   const handleOptionPick = (label: string) => {
-    // 답을 선택: Q&A 쌍을 기록하고 채팅 메시지로 전송한다. 이 누적(pickedQA)은
-    // 다음 재가채점 시 criteria에 반영된다(대화로 조정 → 재가채점 흐름).
-    // startGradingMutation.onSuccess가 매 재가채점마다 setPickedQA([])로 비운다.
-    const msgs = chatData?.messages ?? [];
-    const latestQ =
-      [...msgs].reverse().find((m) => m.role === "assistant")?.content ?? "";
-    setPickedQA((prev) => [...prev, { q: latestQ, a: label }]);
+    // 답을 채팅 메시지로 보낸다. 별도 누적은 두지 않는다 — 서버가 채팅 전문에서
+    // 기준을 읽으므로, 칩 답변만 따로 모아 criteriaText 로 또 보내면 그 경로가
+    // 대화 추출을 건너뛰게 만든다 (이슈 #426).
     setChatOptions([]);
     chatMutation.mutate({ message: label, clientMessageId: createClientMessageId() });
   };

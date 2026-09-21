@@ -63,6 +63,58 @@ export function isInterviewReady(calibrationStatus: string | null | undefined): 
   return calibrationStatus === "sample_review";
 }
 
+/**
+ * 인터뷰가 점수 범위를 확정한 적이 있는가.
+ *
+ * `sample_review` 는 첫 가채점 직전, `approved` 는 한 번 채점한 뒤의 상태다.
+ * 재채점 게이트를 `sample_review` 로만 걸면 대화로 기준을 조정한 뒤 다시 돌릴 수
+ * 없다 — 그래서 둘 다 인정한다 (이슈 #426).
+ */
+export function hasCompletedInterview(
+  calibrationStatus: string | null | undefined,
+): boolean {
+  return calibrationStatus === "sample_review" || calibrationStatus === "approved";
+}
+
+/**
+ * 저장된 `grading_criteria` 에서 확정된 점수 범위를 읽는다.
+ *
+ * 재채점이 이 범위를 이어받지 않으면 `clampScore` 가 조용히 0~100 으로 되돌아가서,
+ * 강사가 정한 범위가 경고 없이 사라진다 (이슈 #426).
+ *
+ * `grading_criteria` 는 JSON.stringify 로 저장되므로 문자열도 받는다.
+ */
+export function readStoredScoreRange(stored: unknown): GradingScoreRange | null {
+  let record: unknown = stored;
+  if (typeof record === "string") {
+    try {
+      record = JSON.parse(record);
+    } catch {
+      return null;
+    }
+  }
+  if (!record || typeof record !== "object") return null;
+  const sr = (record as { score_range?: unknown }).score_range;
+  if (!sr || typeof sr !== "object") return null;
+  const r = sr as GradingScoreRange;
+  if (
+    typeof r.min !== "number" ||
+    typeof r.max !== "number" ||
+    !Number.isFinite(r.min) ||
+    !Number.isFinite(r.max) ||
+    r.min < 0 ||
+    r.max > 100 ||
+    r.min > r.max
+  ) {
+    return null;
+  }
+  return {
+    min: Math.round(r.min),
+    max: Math.round(r.max),
+    notes: typeof r.notes === "string" ? r.notes : undefined,
+  };
+}
+
 export function buildInterviewChatMeta(
   messages: Array<{ role: "user" | "assistant"; content: string }>,
   calibrationStatus: string | null | undefined,
