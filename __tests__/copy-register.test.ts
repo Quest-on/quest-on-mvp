@@ -4,8 +4,17 @@ import { resolve } from "node:path";
 
 const KO_DIR = resolve(__dirname, "..", "messages", "ko");
 
-/** 해요체 종결. 문장 끝에서만 본다 — 단어 중간의 '어요' 는 잡지 않는다. */
-const POLITE_CASUAL = /(어요|아요|해요|예요|에요)[.!?]?$/;
+/**
+ * 해요체 종결.
+ *
+ * 절 경계까지 본다. 예전에는 `$` 로 문자열 끝만 물어서, 해요체 뒤에 쉼표·이름·
+ * 이모지가 붙으면 그냥 통과했다 — 실제로 학생 대시보드 인사말 두 건이 가드를
+ * 빠져나가고 있었다. UI 문구는 마침표 없이 끝나는 경우가 많아서 문장 분할에만
+ * 기대면 못 본다.
+ *
+ * 단어 중간의 '어요' 는 여전히 잡지 않는다 — 뒤에 경계 문자가 와야 한다.
+ */
+const POLITE_CASUAL = /(어요|아요|해요|예요|에요)[.!?]?(?=[\s,)\]"'…]|$)/;
 
 /**
  * 의도적으로 해요체로 둔 것. **사유를 적어야 들어올 수 있다.**
@@ -19,6 +28,10 @@ const DELIBERATE: Record<string, string> = {
     "동의를 청하는 질문이다. '주시겠습니까?' 는 같은 뜻이지만 부탁을 딱딱하게 만든다.",
   "exam.json::chat.promptsTitle":
     "학생에게 AI 한테 물어보라고 권하는 힌트다. 질문을 망설이지 않게 하는 게 목적이라 친근한 톤이 맞다.",
+  "student.json::dashboard.greeting.morning":
+    "시간대별 인사말 세 개(아침·오후·저녁)가 모두 이모지와 함께 따뜻한 톤으로 묶여 있다. 사람을 맞이하는 자리라 격식체로 밀면 오히려 튄다.",
+  "student.json::dashboard.greeting.evening":
+    "같은 인사말 묶음이다. 하루를 마친 학생에게 건네는 말이라 '수고하셨습니다' 보다 이쪽이 맞다.",
 };
 
 /** 중첩된 메시지 객체를 `a.b.c` → 문자열 목록으로 편다. */
@@ -38,11 +51,7 @@ function politeCasualEntries(file: string): Array<[string, string]> {
   const entries: Array<[string, string]> = [];
   flatten(json, "", entries);
   return entries
-    .filter(([, value]) =>
-      value
-        .split(/(?<=[.!?])\s+/)
-        .some((sentence) => POLITE_CASUAL.test(sentence.trim()))
-    )
+    .filter(([, value]) => POLITE_CASUAL.test(value))
     .filter(([key]) => !(`${file}::${key}` in DELIBERATE));
 }
 
