@@ -78,22 +78,17 @@ describe("resolveAiTaskProfile — precedence", () => {
     expect(removed).not.toHaveProperty("maxTokens");
   });
 
-  it("keeps the same inherit/remove split for temperature where the task still takes it", () => {
-    // 채점 태스크는 #421 로 temperature 를 못 싣는다. 상속/제거 구분 자체는
-    // temperature 를 여전히 받는 태스크에서 확인한다.
-    const set = resolveAiTaskProfile({
-      task: "bulk_grading_criteria_extract",
-      overrides: { bulk_grading_criteria_extract: { temperature: 0.2 } },
-      env: CLEAN_ENV,
-    }).profile;
-    expect(set.temperature).toBe(0.2);
-
-    const removed = resolveAiTaskProfile({
-      task: "bulk_grading_criteria_extract",
-      overrides: { bulk_grading_criteria_extract: { temperature: null } },
-      env: CLEAN_ENV,
-    }).profile;
-    expect(removed).not.toHaveProperty("temperature");
+  it("어떤 태스크도 관리자 오버라이드로 temperature 를 되살릴 수 없다", () => {
+    // #421 의 재발 입구 중 하나. 기본값에서 빼는 것만으로는 DB 설정이 다시 넣을 수 있다.
+    // 이 저장소의 모든 태스크가 gpt-5.6 계열이라 전부 false 로 둔다.
+    for (const task of AI_TASKS) {
+      const { profile } = resolveAiTaskProfile({
+        task,
+        overrides: { [task]: { temperature: 0.2 } },
+        env: CLEAN_ENV,
+      });
+      expect(profile, task).not.toHaveProperty("temperature");
+    }
   });
 
   it("keeps the requested maxRetries independent of any deadline clamping", () => {

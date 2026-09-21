@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getOpenAI } from "@/lib/openai";
-import { applyProfileToChatBody, resolveAiTaskProfile } from "@/lib/ai-task-profile";
+import { applyProfileToChatBody, deriveSessionSeed, resolveAiTaskProfile } from "@/lib/ai-task-profile";
 import { loadCurrentVersion } from "@/lib/ai-config-store";
 import type { AiConfigVersionSnapshot } from "@/lib/ai-execution-context";
 import { clampTimeoutToProfile } from "@/lib/ai-deadline";
@@ -1531,12 +1531,7 @@ export async function autoGradeSession(
 // Deterministic seed from sessionId — stabilizes summary draws across calls.
 // Without seed, temperature 1.0 default caused re-grade to produce noticeably
 // better/worse summaries from identical inputs (stochastic variance).
-function deriveSessionSeed(sessionId: string): number {
-  return Array.from(sessionId).reduce(
-    (h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0,
-    0
-  );
-}
+// 정의는 lib/ai-task-profile.ts 에 있다 — 채점 워커도 같은 함수를 쓴다.
 
 async function generateSummary(
   sessionId: string,
