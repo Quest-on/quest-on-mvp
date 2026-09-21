@@ -97,21 +97,23 @@ export function linkIntentCookie(
 }
 
 /**
- * Cookie 헤더 문자열에서 의도를 읽는다. 형식이 어긋나면 null.
+ * 소비 후 지우는 쿠키. **발급과 같은 정의에서 나온다.**
+ *
+ * 예전에는 콜백이 `{ path: ACCOUNT_LINK_CALLBACK_PATH, maxAge: 0 }` 을 손으로
+ * 적었다. 발급 쪽에 속성이 하나 추가되거나 `Path` 가 바뀌면 지우는 쿠키가 발급된
+ * 쿠키와 안 맞아 **삭제가 조용히 실패하고, 1회 소비여야 할 의도가 TTL 이 끝날
+ * 때까지 남는다.** `#414` 가 막으려던 것과 같은 종류의 어긋남이라 여기로 모았다.
+ *
+ * 브라우저는 이름·Path(·Domain)가 일치해야 덮어쓴다. 그래서 `maxAge` 만 0 으로
+ * 바꾸고 나머지는 발급분을 그대로 쓴다.
  */
-export function readLinkIntentCookie(
-  cookieString: string | undefined | null
-): LinkIntent | null {
-  if (!cookieString) return null;
-
-  for (const part of cookieString.split(";")) {
-    const eq = part.indexOf("=");
-    if (eq === -1) continue;
-    if (part.slice(0, eq).trim() !== ACCOUNT_LINK_COOKIE) continue;
-
-    return parseIntent(part.slice(eq + 1).trim());
-  }
-  return null;
+export function clearLinkIntentCookie(secure: boolean): ReturnType<typeof linkIntentCookie> {
+  const issued = linkIntentCookie({ userId: "", provider: "google" }, secure);
+  return {
+    name: issued.name,
+    value: "",
+    options: { ...issued.options, maxAge: 0 },
+  };
 }
 
 /** 쿠키 값 하나(이미 잘라낸 것)를 해석한다. */
