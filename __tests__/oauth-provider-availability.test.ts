@@ -145,13 +145,26 @@ describe("로그인·가입 화면 배선", () => {
     ["components/auth/CustomSignUp.tsx", "signUp"],
   ] as const;
 
-  it.each(FILES)("%s 가 가용성을 보고 구글 버튼을 잠근다", (path) => {
+  // 버튼 마크업은 두 화면이 공유한다(components/auth/OAuthProviderButtons.tsx).
+  // 예전에는 같은 SVG·같은 브랜드 클래스가 두 파일에 복제돼 있었고, 이 가드도
+  // 두 벌로 돌았다. 화면은 "가용성을 읽어 넘기는지", 공용 컴포넌트는 "그걸로
+  // 잠그는지" 로 나눠 본다.
+  const PROVIDER_BUTTONS = "components/auth/OAuthProviderButtons.tsx";
+
+  it.each(FILES)("%s 가 가용성을 읽어 버튼에 넘긴다", (path) => {
     const src = read(path);
     expect(src, "가용성 훅을 안 쓴다").toMatch(/useOAuthProviders\(\)/);
-    // 가입 화면은 역할 게이트(!roleChosen)가 뒤에 더 붙는다. 가용성
-    // 조건이 들어 있는지만 본다.
+    expect(src, "가용성을 버튼에 안 넘긴다").toMatch(/googleUnavailable=\{googleUnavailable\}/);
+    expect(src, "카카오 가용성을 안 넘긴다").toMatch(/kakaoUnavailable=\{kakaoUnavailable\}/);
+  });
+
+  it("공용 버튼이 가용성으로 구글·카카오를 잠근다", () => {
+    const src = read(PROVIDER_BUTTONS);
     expect(src, "구글 버튼이 가용성과 무관하게 열려 있다").toMatch(
-      /disabled=\{!!oauthLoading \|\| googleUnavailable[^}]*\}/
+      /disabled=\{busy \|\| googleUnavailable[^}]*\}/
+    );
+    expect(src, "카카오 버튼이 가용성과 무관하게 열려 있다").toMatch(
+      /disabled=\{busy \|\| kakaoUnavailable[^}]*\}/
     );
   });
 
@@ -171,6 +184,31 @@ describe("로그인·가입 화면 배선", () => {
     );
   });
 
+  it("두 화면이 버튼 마크업을 복제하지 않는다", () => {
+    // 같은 SVG path 네 벌, 같은 카카오 브랜드 클래스, 같은 안내 문구 두 줄이
+    // 두 파일에 그대로 있었다. 가입 화면 주석이 "브랜드 규정은 CustomSignIn.tsx
+    // 의 같은 버튼 주석 참조" 라고 적을 만큼 알려진 중복이었고, 이미 갈라지고
+    // 있었다 — 가입 화면만 역할 선택 전에 잠갔다.
+    const marks = [
+      "#FEE500", // 카카오 브랜드 컨테이너 색
+      "#4285F4", // 구글 로고 path
+      "#F25022", // Microsoft 타일
+      'viewBox="0 0 23 23"',
+    ];
+    for (const [path] of FILES) {
+      const src = read(path);
+      for (const m of marks) {
+        expect(src, `${path} 에 ${m} 가 아직 있다 — 공용 버튼으로 옮겨야 한다`).not.toContain(m);
+      }
+      expect(src, `${path} 가 공용 버튼을 안 쓴다`).toMatch(/<OAuthProviderButtons/);
+    }
+    // 그리고 공용 쪽에는 전부 있어야 한다 — 위 단정이 "그냥 지웠다" 로 통과하면 안 된다.
+    const shared = read("components/auth/OAuthProviderButtons.tsx");
+    for (const m of marks) {
+      expect(shared, `공용 버튼에 ${m} 가 없다`).toContain(m);
+    }
+  });
+
   it.each(["ko", "en"])("%s 메시지가 있다", (locale) => {
     const msg = JSON.parse(read(`messages/${locale}/auth.json`));
     for (const scope of ["signIn", "signUp"]) {
@@ -186,10 +224,8 @@ describe("잠긴 이유가 읽혀야 한다", () => {
   // disabled 버튼은 opacity 0.5 다. 안내를 버튼 안에 넣으면 같이 흐려져서
   // 다크에서 대비가 10.79 -> 3.95 로 떨어졌다. 왜 못 누르는지 못 읽는다.
   // 버튼은 흐려도 되지만 이유는 읽혀야 한다.
-  const FILES = [
-    "components/auth/CustomSignIn.tsx",
-    "components/auth/CustomSignUp.tsx",
-  ] as const;
+  // 버튼과 안내는 이제 두 화면이 공유한다 — 한 곳만 보면 된다.
+  const FILES = ["components/auth/OAuthProviderButtons.tsx"] as const;
 
   it.each(FILES)("%s 의 안내가 버튼 밖에 있다", (path) => {
     const src = read(path);
