@@ -237,10 +237,8 @@ export async function POST(request: NextRequest) {
               .eq("student_id", verifiedStudentId)
               .maybeSingle();
 
-            // 데모 예외(#451)는 여기 넘기지 않는다 — 진행 중 동작이라
-            // 세션이 없으면 이어 갈 대상이 없다. chat 라우트와 같은 이유다.
             const fallback = resolveAdmissionFallback(existingSession?.id);
-            if (fallback.kind !== "continue") {
+            if (fallback.kind === "deny") {
               return errorJson(
                 QUOTA_UNAVAILABLE_CODE,
                 "Submission is temporarily unavailable. Please try again in a moment.",

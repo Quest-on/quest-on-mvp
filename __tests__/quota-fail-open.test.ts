@@ -167,15 +167,12 @@ describe("admit_exam_session 실패 시 처리", () => {
     // 새 입장이다. 한도를 모르는 채로 들이면 되돌릴 수 없다.
     // 403(한도 초과)이 아니라 503 인 이유: 정원이 찬 게 아니라 판정이 불가능한
     // 상태이고, 학생은 잠시 뒤 다시 시도하면 된다.
-    //
-    // 데모가 아닌 시험이다 — 한도를 실제로 소비하는 입장이므로 막아야 한다.
-    // (비소유자가 데모에 들어오는 경우는 별도 가드가 먼저 403 을 낸다.)
     const rpcError = { code: "ETIMEDOUT", message: "timeout" };
     supabaseMock.rpc.mockResolvedValue({ data: null, error: rpcError });
     queue({
       exams: [
-        { data: { ...exam, is_demo: false }, error: null },
-        { data: { is_demo: false }, error: null },
+        { data: exam, error: null },
+        { data: { is_demo: true }, error: null },
       ],
       sessions: [
         { data: [], error: null },
@@ -183,10 +180,7 @@ describe("admit_exam_session 실패 시 처리", () => {
       ],
     });
 
-    const res = await initExamSession({
-      examCode: "DEMO",
-      studentId: "owner-1",
-    });
+    const res = await initExamSession({ examCode: "DEMO", studentId: "owner-1" });
     expect(res.status).toBe(503);
     expect(logErrorMock).toHaveBeenCalledWith(
       "[quota] quota_check_unavailable",
@@ -195,90 +189,5 @@ describe("admit_exam_session 실패 시 처리", () => {
         additionalData: expect.objectContaining({ reason: "admit_rpc_failed" }),
       })
     );
-  });
-
-  // ── 데모 소유자 미리보기는 막지 않는다 (#451) ────────────────────
-  //
-  // `database/026_close_quota_gaps.sql` 의 `v_owner_preview` 가
-  // `is_demo AND instructor_id = p_student_id` 일 때 학생 수·발행 한도를
-  // 통째로 건너뛴다. **소비하는 한도가 없는 입장**이라, 판정 불가를 이유로
-  // 막으면 안전은 하나도 못 얻고 가입 직후 데모(에픽 #79)만 끊긴다.
-  it("RPC 오류 + 데모 소유자 미리보기 → 막지 않는다", async () => {
-    supabaseMock.rpc.mockResolvedValue({
-      data: null,
-      error: { code: "ETIMEDOUT", message: "timeout" },
-    });
-    queue({
-      exams: [
-        { data: exam, error: null },
-        { data: { is_demo: true }, error: null },
-      ],
-      sessions: [
-        { data: [], error: null },
-        { data: null, error: null }, // 기존 세션 없음 — 새 입장이다
-        { data: session, error: null },
-      ],
-      submissions: [{ data: [], error: null }],
-    });
-
-    // exam.instructor_id === studentId === "owner-1"
-    const res = await initExamSession({
-      examCode: "DEMO",
-      studentId: "owner-1",
-    });
-    expect(res.status).not.toBe(503);
-  });
-
-  it("데모 여부를 판정할 수 없으면 통과시키지 않는다", async () => {
-    // `isDemoPreview` 는 판정 불능일 때 null 을 준다(컬럼 미적용 등).
-    // 그때 "데모가 아니다" 로 단정하는 건 안전하지만, **"데모다" 로 단정하면
-    // 그 순간 한도가 샌다.** null 은 통과가 아니다.
-    //
-    // 같은 경고가 `app/api/session/[sessionId]/preflight/route.ts` 에 있다 —
-    // "판정 불능(null)이면 기록하지 않는다. 모를 때 단정하면 오염이 시작된다."
-    supabaseMock.rpc.mockResolvedValue({
-      data: null,
-      error: { code: "ETIMEDOUT", message: "timeout" },
-    });
-    queue({
-      exams: [
-        { data: { ...exam, is_demo: null }, error: null },
-        { data: { is_demo: null }, error: null },
-      ],
-      sessions: [
-        { data: [], error: null },
-        { data: null, error: null },
-      ],
-    });
-
-    const res = await initExamSession({
-      examCode: "DEMO",
-      studentId: "owner-1",
-    });
-    expect(res.status).toBe(503);
-  });
-
-  it("데모라도 소유자가 아니면 통과시키지 않는다", async () => {
-    // `is_demo` 만 보고 열어 주면, 남의 데모에 들어온 학생이 한도를 우회한다.
-    supabaseMock.rpc.mockResolvedValue({
-      data: null,
-      error: { code: "ETIMEDOUT", message: "timeout" },
-    });
-    queue({
-      exams: [
-        { data: { ...exam, instructor_id: "someone-else" }, error: null },
-        { data: { is_demo: true }, error: null },
-      ],
-      sessions: [
-        { data: [], error: null },
-        { data: null, error: null },
-      ],
-    });
-
-    const res = await initExamSession({
-      examCode: "DEMO",
-      studentId: "owner-1",
-    });
-    expect(res.status).toBe(503);
   });
 });

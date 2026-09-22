@@ -43,6 +43,31 @@ describe("#318 — 재설정 화면에 도달할 수 있다", () => {
       // 없으면 로그인 페이지로 튕긴다 — 로그인을 못 하는 사람이 쓰는 화면인데.
       expect(publicList).toContain(path);
     });
+
+    // 공개 목록은 **로그인된 사용자에게는 반대로** 작동한다 (이슈 #456).
+    //
+    //   if (isPublicRoute(pathname) && !예외목록.some(...)) → 대시보드로 리다이렉트
+    //
+    // 복구 링크는 세션을 만든다. 그러니 `/reset-password` 에 도달하는 사람은
+    // 항상 로그인 상태이고, 예외목록에 없으면 폼을 못 본다. 처음 고칠 때
+    // 공개 목록만 보고 "열었다" 고 했는데, 이 동선에서 **유일하게 의미 있는
+    // 경우를 안 본 것**이었다.
+    const guardExceptions = (() => {
+      const src = read("proxy.ts");
+      const at = src.indexOf("if (isPublicRoute(pathname) &&");
+      const line = src.slice(at, src.indexOf("\n", at));
+      return line.match(/"[^"]*"/g)?.map((x) => x.slice(1, -1)) ?? [];
+    })();
+
+    it("/reset-password 는 로그인돼 있어도 대시보드로 튕기지 않는다", () => {
+      expect(guardExceptions).toContain("/reset-password");
+    });
+
+    it("/forgot-password 는 로그인했으면 대시보드로 보낸다", () => {
+      // 이미 로그인한 사람이 비밀번호 찾기 화면에 있을 이유가 없다.
+      // 게이트를 여는 예외는 넓히지 않는다.
+      expect(guardExceptions).not.toContain("/forgot-password");
+    });
   });
 
   describe("동의 게이트 (consent-route-policy)", () => {
