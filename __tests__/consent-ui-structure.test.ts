@@ -24,7 +24,19 @@ describe("consent onboarding UI structure", () => {
         /fetch\("\/api\/consents\/onboarding",\s*\{[\s\S]*?\}\);/,
       )?.[0] ?? "";
     expect(consentPost).toContain('method: "POST"');
-    expect(consentPost).toContain("JSON.stringify({ ageOver14: true, terms: true })");
+    // 보내는 키는 정확히 둘이다. 서버가 소유한 값(user_id·policy_version 등)을
+    // 클라이언트가 끼워 넣지 못하게 하는 것이 이 테스트의 요지다.
+    //
+    // 예전에는 `JSON.stringify({ ageOver14: true, terms: true })` 를 통째로
+    // 고정했는데, 그러면 **리터럴로 보내는 것까지 함께 고정**된다. 동의 기록이
+    // 사용자 입력과 분리되는 것을 테스트가 지켜주던 셈이었다(이슈 #445).
+    // 값이 아니라 키 집합을 본다.
+    const payload = consentPost.match(/JSON\.stringify\(\{([^}]*)\}\)/)?.[1] ?? "";
+    const keys = payload
+      .split(",")
+      .map((p) => p.split(":")[0].trim())
+      .filter(Boolean);
+    expect(keys.sort()).toEqual(["ageOver14", "terms"]);
     expect(consentPost).not.toMatch(/user_id|controller_type|policy_version/);
   });
 
