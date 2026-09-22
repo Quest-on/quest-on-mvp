@@ -6,6 +6,7 @@ import { auditLog } from "@/lib/audit";
 import { logError } from "@/lib/logger";
 import { triggerGradingIfNeeded } from "@/lib/grading-trigger";
 import { sanitizeUserInput } from "@/lib/sanitize";
+import { resolveAdmissionFallback, QUOTA_UNAVAILABLE_CODE } from "@/lib/quota-admission";
 import { stripSensitiveQuestionFields } from "@/lib/sanitize-exam-questions";
 import {
   ONBOARDING_EVENTS,
@@ -249,11 +250,28 @@ export async function createOrGetSession(data: { examId: string; studentId: stri
     );
 
     if (admitError) {
-      // fail-open. 한도 계산 장애로 수업이 멈추는 것보다 낫다.
-      logError("[createOrGetSession] quota_fail_open", admitError, {
+      // 한도 판정 불가 (이슈 #326). 기존 세션이면 잇고, 없으면 막는다 —
+      // 여기서 만들어 주면 이 액션이 한도 우회로가 된다.
+      logError("[createOrGetSession] quota_check_unavailable", admitError, {
         path: "/api/supa/session-handlers",
         additionalData: { examId: data.examId, reason: "admit_rpc_failed" },
       });
+
+      const { data: existingSession } = await getSupabase()
+        .from("sessions")
+        .select("id")
+        .eq("exam_id", data.examId)
+        .eq("student_id", data.studentId)
+        .maybeSingle();
+
+      const fallback = resolveAdmissionFallback(existingSession?.id);
+      if (fallback.kind === "deny") {
+        return errorJson(
+          QUOTA_UNAVAILABLE_CODE,
+          "Entry is temporarily unavailable. Please try again in a moment.",
+          503
+        );
+      }
     }
 
     const verdict = Array.isArray(admission) ? admission[0] : admission;
@@ -756,17 +774,21 @@ export async function initExamSession(data: {
         }
       );
 
-      // 한도 판정이 깨지면 학생을 들여보낸다(fail-open). 한도 계산 장애로
-      // 수업이 멈추는 것보다 잠시 한도가 풀리는 쪽이 낫다.
+      // 한도 판정이 깨졌을 때 (이슈 #326).
       //
-      // 로그만 남기고 넘어가면 fail-open 이 아니다 — RPC 가 세션을 못 만들었으니
-      // 아래 조회가 비어 500 이 된다. 그래서 여기서 직접 만들어 준다.
+      // 예전에는 여기서 세션을 직접 만들었다("수업이 멈추는 것보다 낫다").
+      // 그건 RPC 장애 = 모든 free 계정 무제한을 뜻했고, 그렇게 들어온 학생은
+      // 이후 "기존 학생 통과" 분기에 걸려 영구히 grandfather 됐다.
+      //
+      // 멈추면 안 되는 건 **이미 응시 중인 학생**이지 새 입장이 아니다.
+      // RPC 는 원래 그 둘을 가르는데(기존 세션이면 한도를 안 본다) 에러가 나면
+      // 그 구분을 잃는다. 그래서 여기서 직접 가른다 — 있으면 잇고, 없으면 막는다.
       if (admitError) {
         const gateMissing = isQuotaGateMissing(admitError);
         logError(
           gateMissing
             ? "[quota] quota_gate_missing"
-            : "[quota] quota_fail_open",
+            : "[quota] quota_check_unavailable",
           admitError,
           {
             path: "/api/supa/session-handlers",
@@ -779,41 +801,24 @@ export async function initExamSession(data: {
           }
         );
 
-        const { error: fallbackError } = await getSupabase()
+        const { data: existingSession } = await getSupabase()
           .from("sessions")
-          .upsert(
-            {
-              exam_id: exam.id,
-              student_id: data.studentId,
-              used_clarifications: 0,
-              is_active: true,
-              last_heartbeat_at: now,
-              device_fingerprint: incomingFingerprint,
-              created_at: now,
-              status: initialStatus,
-              started_at: initialStatus === "in_progress" ? now : null,
-              attempt_timer_started_at: initialStatus === "in_progress" ? now : null,
-            },
-            { onConflict: "exam_id,student_id", ignoreDuplicates: true }
-          );
-        if (fallbackError) throw fallbackError;
+          .select("id")
+          .eq("exam_id", exam.id)
+          .eq("student_id", data.studentId)
+          .maybeSingle();
 
-        // 발행 시각도 함께 기록한다. 이걸 빼면 fail-open 으로 들어온 시험이
-        // 영영 "미발행"으로 남아 발행 한도가 조용히 새어 나간다 — 장애가
-        // 끝난 뒤에도 그 시험은 카운트되지 않는다.
-        if (exam.is_demo !== true) {
-          const { error: publicationError } = await getSupabase()
-            .from("exams")
-            .update({ first_published_at: now })
-            .eq("id", exam.id)
-            .is("first_published_at", null);
-          if (publicationError) {
-            logError("[initExamSession] quota_fail_open publication", publicationError, {
-              path: "/api/supa/session-handlers",
-              additionalData: { examId: exam.id },
-            });
-          }
+        const fallback = resolveAdmissionFallback(existingSession?.id);
+        if (fallback.kind === "deny") {
+          // 새 입장이다. 한도를 모르는 채로 들여보내면 되돌릴 수 없다.
+          // 막힌 학생은 RPC 가 돌아오면 정상 입장한다 — 영구 차단이 아니다.
+          return errorJson(
+            QUOTA_UNAVAILABLE_CODE,
+            "Entry is temporarily unavailable. Please try again in a moment.",
+            503
+          );
         }
+
       }
 
       const verdict = Array.isArray(admission) ? admission[0] : admission;

@@ -7,6 +7,7 @@ import { compressData } from "@/lib/compression";
 import { successJson, errorJson } from "@/lib/api-response";
 import { auditLog } from "@/lib/audit";
 import { logError } from "@/lib/logger";
+import { resolveAdmissionFallback, QUOTA_UNAVAILABLE_CODE } from "@/lib/quota-admission";
 import { triggerGradingIfNeeded } from "@/lib/grading-trigger";
 import { isDemoPreview } from "@/lib/demo-completion";
 import { ONBOARDING_EVENTS, recordOnboardingEvent } from "@/lib/onboarding-events";
@@ -207,12 +208,16 @@ export async function POST(request: NextRequest) {
           );
 
           if (admitError) {
-            // fail-open. 한도 계산 장애로 제출이 막히면 그게 더 큰 사고다.
+            // 한도 판정 불가 (이슈 #326).
+            //
+            // 예전에는 로그만 남기고 아래 upsert 로 넘어갔다 — RPC 장애가
+            // 곧 모든 free 계정 무제한이었다. 멈추면 안 되는 건 이미 응시
+            // 중인 학생이지 새 입장이 아니므로, 기존 세션이면 잇고 없으면 막는다.
             const gateMissing = isQuotaGateMissing(admitError);
             logError(
               gateMissing
                 ? "[quota] quota_gate_missing"
-                : "[quota] quota_fail_open",
+                : "[quota] quota_check_unavailable",
               admitError,
               {
                 path: "/api/feedback",
@@ -224,7 +229,24 @@ export async function POST(request: NextRequest) {
                 },
               }
             );
-          }
+
+            const { data: existingSession } = await getSupabase()
+              .from("sessions")
+              .select("id")
+              .eq("exam_id", exam.id)
+              .eq("student_id", verifiedStudentId)
+              .maybeSingle();
+
+            const fallback = resolveAdmissionFallback(existingSession?.id);
+            if (fallback.kind === "deny") {
+              return errorJson(
+                QUOTA_UNAVAILABLE_CODE,
+                "Submission is temporarily unavailable. Please try again in a moment.",
+                503
+              );
+            }
+            actualSessionId = fallback.sessionId;
+          } else {
 
           const verdict = Array.isArray(admission) ? admission[0] : admission;
           if (verdict && verdict.admitted === false) {
@@ -249,23 +271,6 @@ export async function POST(request: NextRequest) {
               event: ONBOARDING_EVENTS.FIRST_PUBLISH,
               examId: exam.id,
             });
-          }
-
-          // RPC 가 세션을 만들었으면 그걸 읽고, 장애로 못 만들었으면(fail-open)
-          // 여기서 만든다. 그때 발행 시각도 함께 남긴다 — 안 남기면 그 시험은
-          // 장애가 끝난 뒤에도 영영 "미발행"이라 발행 한도가 조용히 샌다.
-          if (admitError && (exam as { is_demo?: unknown }).is_demo !== true) {
-            const { error: publicationError } = await getSupabase()
-              .from("exams")
-              .update({ first_published_at: new Date().toISOString() })
-              .eq("id", exam.id)
-              .is("first_published_at", null);
-            if (publicationError) {
-              logError("[feedback] quota_fail_open publication", publicationError, {
-                path: "/api/feedback",
-                additionalData: { examId: exam.id },
-              });
-            }
           }
 
           const { data: newSession, error: createError } = await getSupabase()
@@ -296,6 +301,7 @@ export async function POST(request: NextRequest) {
               .single();
             if (fetchError) throw fetchError;
             actualSessionId = existing.id;
+          }
           }
         }
       }

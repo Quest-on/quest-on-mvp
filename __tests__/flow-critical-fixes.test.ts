@@ -105,14 +105,19 @@ describe("코드 반출 게이트에 우회로가 없다", () => {
 describe("fail-open 이 발행 카운트를 새게 하지 않는다", () => {
   const handlers = read("app/api/supa/handlers/session-handlers.ts");
 
-  it("폴백 경로도 first_published_at 을 기록한다", () => {
-    // 안 하면 fail-open 으로 들어온 시험이 영영 "미발행"으로 남아 발행
-    // 한도가 조용히 샌다 — 장애가 끝난 뒤에도 카운트되지 않는다.
-    expect(handlers).toMatch(/quota_fail_open[\s\S]{0,1600}?first_published_at: now/);
+  it("한도 판정이 불가능하면 새 입장을 만들지 않는다", () => {
+    // 예전에는 RPC 가 실패해도 세션을 직접 만들었다 — RPC 장애가 곧 모든 free
+    // 계정 무제한이었고, 그렇게 들어온 학생은 이후 "기존 학생 통과" 분기에
+    // 걸려 영구히 grandfather 됐다 (이슈 #326).
+    expect(handlers, "실패 경로가 되살아났다").not.toMatch(/quota_fail_open/);
+    expect(handlers).toMatch(/resolveAdmissionFallback\(/);
+    expect(handlers).toMatch(/QUOTA_UNAVAILABLE_CODE/);
   });
 
-  it("데모는 폴백에서도 발행으로 세지 않는다", () => {
-    expect(handlers).toMatch(/quota_fail_open[\s\S]{0,1600}?is_demo !== true/);
+  it("이미 응시 중인 학생은 계속 진행한다", () => {
+    // 막아야 하는 건 새 입장이지 진행 중인 시험이 아니다. 기존 세션을 찾아
+    // 이어 가는 조회가 실패 경로에 있어야 한다.
+    expect(handlers).toMatch(/existingSession/);
   });
 });
 
@@ -123,7 +128,10 @@ describe("지각 입장 대기가 영구히 갇히지 않는다", () => {
     // 구독 전에 승인되거나 연결이 끊기면 서버 타이머는 줄어드는데 화면은
     // "강사 승인 대기 중"에 남는다. 나가는 버튼도 없어 학생이 갇힌다.
     expect(waiting).toMatch(/setInterval\(poll/);
-    expect(waiting).toMatch(/check_gate_status/);
+    // 예전에는 `check_gate_status` 액션을 불렀는데 그 액션은 어디에도 없었다
+    // (이슈 #344). 지금은 실제 라우트를 부른다 — 주석에 남은 옛 이름이 아니라
+    // 호출 자체를 본다.
+    expect(waiting).toMatch(/\/api\/session\/\$\{sessionId\}\/gate/);
   });
 
   it("폴링이 승인과 거부를 모두 처리한다", () => {
