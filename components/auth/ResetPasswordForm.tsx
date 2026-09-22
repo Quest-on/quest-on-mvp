@@ -94,11 +94,23 @@ export function ResetPasswordForm() {
       //
       // 실패해도 재설정 자체는 성공했으므로 막지 않는다. 다만 사용자가 "다
       // 끊겼겠거니" 하고 넘어가지 않도록 문구를 달리한다.
-      const { error: signOutError } = await supabase.auth.signOut({
-        scope: "others",
-      });
+      //
+      // **던지는 경우도 같이 잡는다.** 이 호출을 바깥 try 에 맡기면 네트워크가
+      // 끊겼을 때 catch 가 돌아 "처리 중 오류" 가 뜬다 — 비밀번호는 이미
+      // 바뀌었는데 사용자는 실패로 읽고 같은 값으로 다시 시도하다가 "기존과
+      // 다른 비밀번호를 입력하세요" 를 본다. 되돌릴 수 없는 작업 뒤의 부수
+      // 작업이므로 실패를 여기서 삼킨다.
+      let signedOutOthers = true;
+      try {
+        const { error: signOutError } = await supabase.auth.signOut({
+          scope: "others",
+        });
+        signedOutOthers = !signOutError;
+      } catch {
+        signedOutOthers = false;
+      }
 
-      setOthersRevoked(!signOutError);
+      setOthersRevoked(signedOutOthers);
       setDone(true);
       // 새 비밀번호로 바뀐 세션을 서버 컴포넌트에도 반영한다.
       router.refresh();

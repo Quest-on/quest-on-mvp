@@ -11,6 +11,11 @@ import {
 import { classifyRoute, ownsInProgressSession } from "@/lib/consent-route-policy";
 import { logInfo } from "@/lib/logger";
 import { safeInternalPath } from "@/lib/safe-redirect";
+import {
+  PASSWORD_RESET_COOKIE,
+  PASSWORD_RESET_PATH,
+  hasPasswordResetIntent,
+} from "@/lib/password-reset-intent";
 
 const isPublicRoute = (pathname: string) =>
   [
@@ -187,17 +192,30 @@ async function applyRouteGuards(
 ): Promise<NextResponse> {
   // 로그인된 유저가 공개 라우트(홈, 로그인 등)에 접근 → role에 맞는 대시보드로 리다이렉트
   // /onboarding과 legal 문서는 설정/정책 확인에 필요하므로 통과한다.
-  // `/reset-password` 는 **로그인돼 있어도** 통과시켜야 한다 (이슈 #456).
+  // `/reset-password` 는 **복구로 온 사람에게만** 통과시킨다 (이슈 #456).
   //
-  // 복구 링크는 세션을 만든다 — `/auth/callback` 이 exchangeCodeForSession 을
-  // 끝내고 여기로 보내는 시점에 사용자는 이미 로그인 상태다. 그래서 공개
-  // 라우트 목록에 넣는 것만으로는 부족했다. 이 블록이 대시보드로 되돌려
-  // 보내서, 재설정 폼은 렌더되지 않고 **로그인만 된 채 잊어버린 비밀번호는
-  // 그대로** 남았다.
+  // 복구 링크는 세션을 만든다. 그래서 이 화면에 도달하는 사람은 항상 로그인
+  // 상태이고, 공개 라우트 목록에만 넣으면 이 블록이 대시보드로 되돌려 보낸다.
+  // 그렇다고 로그인 전체에 열면 **아무 로그인 사용자나 옛 비밀번호 없이
+  // 비밀번호를 바꾸는 화면**이 열린다(#447 — Supabase 가 재인증을 강제하지
+  // 않는다).
   //
-  // `/forgot-password` 는 넣지 않는다. 이미 로그인한 사람이 거기 갈 이유가
+  // 그래서 콜백이 복구 세션에만 심는 HttpOnly 의도 쿠키를 본다. 쿠키는
+  // `/reset-password` 경로로 한정돼 있어 다른 요청에는 실리지도 않는다.
+  //
+  // `/forgot-password` 는 예외가 아니다 — 이미 로그인한 사람이 거기 갈 이유가
   // 없으므로 대시보드로 보내는 게 맞다.
-  if (isPublicRoute(pathname) && !["/auth/callback", "/join", "/onboarding", "/legal", "/reset-password"].some((route) => pathname === route || pathname.startsWith(route + "/"))) {
+  const resetIntent =
+    pathname === PASSWORD_RESET_PATH &&
+    hasPasswordResetIntent(request.cookies.get(PASSWORD_RESET_COOKIE)?.value);
+
+  if (
+    isPublicRoute(pathname) &&
+    !resetIntent &&
+    !["/auth/callback", "/join", "/onboarding", "/legal"].some(
+      (route) => pathname === route || pathname.startsWith(route + "/")
+    )
+  ) {
     if (!role) return NextResponse.redirect(new URL("/onboarding", request.url));
     if (role === "instructor") {
 

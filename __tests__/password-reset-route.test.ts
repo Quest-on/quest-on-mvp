@@ -22,7 +22,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const checkRateLimitAsync = vi.hoisted(() =>
-  vi.fn(async () => ({ allowed: true }))
+  vi.fn(async (_key: string, _config: { limit: number; windowSec: number }) => ({
+    allowed: true,
+  }))
 );
 const logError = vi.hoisted(() => vi.fn());
 type ResetOptions = { redirectTo?: string };
@@ -139,22 +141,66 @@ describe("POST /api/auth/password-reset", () => {
     expect(resetPasswordForEmail).not.toHaveBeenCalled();
   });
 
-  it("IP 로 제한한다 — 비로그인 요청이라 user.id 가 없다", async () => {
+  it("IP 와 주소 둘 다로 제한한다", async () => {
+    // IP 단독이면 대학 NAT 환경에서 4번째 사람이 잠긴다 — 이 제품 사용자가
+    // 정확히 그 환경이다. 반대로 IP 만 보면 IP 를 돌려 한 주소에 무제한
+    // 발송이 가능하다. 둘 다 걸어야 양쪽이 막힌다.
     await post({ email: "a@b.ac.kr" }, { "x-forwarded-for": "198.51.100.42" });
+
+    const keys = checkRateLimitAsync.mock.calls.map((c) => c[0]);
+    expect(keys).toContain("password-reset:ip:198.51.100.42");
+    expect(keys.some((k) => k.startsWith("password-reset:addr:"))).toBe(true);
     expect(checkRateLimitAsync).toHaveBeenCalledWith(
-      "password-reset:198.51.100.42",
+      expect.any(String),
       expect.objectContaining({ limit: 3 })
     );
+  });
+
+  it("주소 키에 평문 이메일을 남기지 않는다", async () => {
+    await post({ email: "someone@university.ac.kr" }, IP);
+    const keys = checkRateLimitAsync.mock.calls.map((c) => c[0]);
+    for (const k of keys) {
+      expect(k).not.toContain("someone@university.ac.kr");
+    }
+  });
+
+  it("대소문자가 달라도 같은 주소로 본다", async () => {
+    await post({ email: "Same@University.AC.KR" }, IP);
+    const first = checkRateLimitAsync.mock.calls
+      .map((c) => c[0])
+      .find((k) => k.startsWith("password-reset:addr:"));
+
+    vi.clearAllMocks();
+    checkRateLimitAsync.mockResolvedValue({ allowed: true });
+    await post({ email: "same@university.ac.kr" }, IP);
+    const second = checkRateLimitAsync.mock.calls
+      .map((c) => c[0])
+      .find((k) => k.startsWith("password-reset:addr:"));
+
+    expect(first).toBe(second);
   });
 
   it("x-forwarded-for 가 없으면 다른 헤더를 본다", async () => {
     // 전부 비면 `unknown` 한 키로 모이는데, 이 버킷은 5분 3회라 그 상태에서는
     // 한 사람의 재시도가 전체를 잠근다.
     await post({ email: "a@b.ac.kr" }, { "x-real-ip": "198.51.100.9" });
-    expect(checkRateLimitAsync).toHaveBeenCalledWith(
-      "password-reset:198.51.100.9",
-      expect.anything()
-    );
+    const keys = checkRateLimitAsync.mock.calls.map((c) => c[0]);
+    expect(keys).toContain("password-reset:ip:198.51.100.9");
+  });
+
+  it("JSON 이 아닌 본문은 400 이다 — 보냈다고 말하지 않는다", async () => {
+    // 계정 열거를 막는 이유는 "유효한 요청인데 주소가 없을 때" 에만 적용된다.
+    // 파싱도 안 된 요청에 200 을 주면 화면이 "메일을 보냈습니다" 라고 말한다.
+    const { POST } = await import("../app/api/auth/password-reset/route");
+    const req = new Request(`${ORIGIN}/api/auth/password-reset`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...IP },
+      body: "not-json",
+    }) as unknown as import("next/server").NextRequest;
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(resetPasswordForEmail).not.toHaveBeenCalled();
   });
 
   it("이메일 형식이 아니면 400 이고 보내지 않는다", async () => {

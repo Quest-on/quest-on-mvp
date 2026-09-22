@@ -8,7 +8,32 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const exchangeCodeForSession = vi.fn(async () => ({ error: null }));
+/** amr 클레임만 담은 가짜 access token — 서명은 보지 않는다. */
+function tokenWithAmr(method: string): string {
+  const payload = Buffer.from(JSON.stringify({ amr: [{ method }] }))
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  return `header.${payload}.sig`;
+}
+
+type ExchangeResult = {
+  data: { session: { access_token: string } | null };
+  error: Error | null;
+};
+
+const PASSWORD_SESSION: ExchangeResult = {
+  data: { session: { access_token: tokenWithAmr("password") } },
+  error: null,
+};
+const RECOVERY_SESSION: ExchangeResult = {
+  data: { session: { access_token: tokenWithAmr("otp") } },
+  error: null,
+};
+
+const exchangeCodeForSession = vi.fn(async (): Promise<ExchangeResult> => PASSWORD_SESSION);
+const cookieSet = vi.fn();
 
 vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({
@@ -19,7 +44,7 @@ vi.mock("@supabase/ssr", () => ({
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     getAll: () => [],
-    set: () => {},
+    set: cookieSet,
   }),
 }));
 
@@ -33,7 +58,7 @@ async function callCallback(query: string): Promise<string> {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  exchangeCodeForSession.mockResolvedValue({ error: null });
+  exchangeCodeForSession.mockResolvedValue(PASSWORD_SESSION);
 });
 
 describe("GET /auth/callback", () => {
@@ -77,8 +102,9 @@ describe("GET /auth/callback", () => {
 
   it("세션 교환이 실패하면 로그인 페이지로 보낸다", async () => {
     exchangeCodeForSession.mockResolvedValue({
+      data: { session: null },
       error: new Error("bad code"),
-    } as never);
+    });
 
     const location = await callCallback("?code=bad&next=/exam/ABC");
     expect(location).toBe(`${ORIGIN}/sign-in?error=auth_callback_failed`);
@@ -96,13 +122,60 @@ describe("GET /auth/callback", () => {
   // 게이트)에 먼저 세우면, 동의를 미루고 탭을 닫는 순간 **로그인은 된 채
   // 잊어버린 비밀번호는 그대로** 남는다. 다음에 또 못 들어온다.
   describe("비밀번호 재설정 경로", () => {
-    it("next=/reset-password 는 온보딩을 거치지 않고 곧장 간다", async () => {
+    it("복구 세션이면 온보딩을 거치지 않고 곧장 간다", async () => {
+      exchangeCodeForSession.mockResolvedValue(RECOVERY_SESSION);
       const location = await callCallback("?code=valid&next=/reset-password");
       expect(location).toBe(`${ORIGIN}/reset-password`);
     });
 
+    it("복구 세션일 때만 의도 쿠키를 심는다", async () => {
+      exchangeCodeForSession.mockResolvedValue(RECOVERY_SESSION);
+      await callCallback("?code=valid&next=/reset-password");
+      expect(cookieSet).toHaveBeenCalledWith(
+        "password_reset_intent",
+        "1",
+        expect.objectContaining({ httpOnly: true, path: "/reset-password" })
+      );
+    });
+
+    // ── 여기가 #456 의 핵심이다 ────────────────────────────────────
+    //
+    // 예전엔 `next` 값만 보고 온보딩을 건너뛰었다. `next` 는 사용자가 붙일 수
+    // 있는 값이라, 평범한 OAuth 로그인에 붙이면 **필수 동의 게이트가 그대로
+    // 열렸다.** anon 키는 공개이므로 누구나 만들 수 있는 링크였다.
+    it("복구가 아닌 세션은 next 를 붙여도 온보딩을 거친다", async () => {
+      for (const method of ["password", "oauth"]) {
+        vi.clearAllMocks();
+        exchangeCodeForSession.mockResolvedValue({
+          data: { session: { access_token: tokenWithAmr(method) } },
+          error: null,
+        });
+        const location = await callCallback("?code=valid&next=/reset-password");
+        expect(new URL(location).pathname).toBe("/onboarding");
+        expect(cookieSet).not.toHaveBeenCalledWith(
+          "password_reset_intent",
+          expect.anything(),
+          expect.anything()
+        );
+      }
+    });
+
+    it("amr 을 읽을 수 없으면 복구로 보지 않는다", async () => {
+      // 모를 때 열어주면 그게 구멍이다.
+      for (const token of ["not-a-jwt", "a.b", ""]) {
+        vi.clearAllMocks();
+        exchangeCodeForSession.mockResolvedValue({
+          data: { session: { access_token: token } },
+          error: null,
+        });
+        const location = await callCallback("?code=valid&next=/reset-password");
+        expect(new URL(location).pathname).toBe("/onboarding");
+      }
+    });
+
     it("게이트를 여는 건 그 경로 하나뿐이다", async () => {
       // 비슷하게 생긴 경로가 묻어 들어오면 온보딩이 통째로 무력해진다.
+      exchangeCodeForSession.mockResolvedValue(RECOVERY_SESSION);
       for (const next of [
         "/reset-password-extra",
         "/reset-password/",
@@ -118,8 +191,9 @@ describe("GET /auth/callback", () => {
 
     it("세션 교환이 실패하면 재설정 화면으로도 보내지 않는다", async () => {
       exchangeCodeForSession.mockResolvedValue({
+        data: { session: null },
         error: new Error("expired"),
-      } as never);
+      });
 
       const location = await callCallback("?code=expired&next=/reset-password");
       expect(location).toBe(`${ORIGIN}/sign-in?error=auth_callback_failed`);

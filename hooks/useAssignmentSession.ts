@@ -47,6 +47,11 @@ export function useAssignmentSession(code: string) {
         EXAM_NOT_FOUND: t("examNotFound"),
         PUBLISH_LIMIT_REACHED: t("publishLimitReached"),
         STUDENT_LIMIT_REACHED: t("studentLimitReached"),
+        // 한도 판정이 잠시 불가능한 상태다 (#326). 정원이 찬 것도, 세션
+        // 생성이 실패한 것도 아니다 — 잠시 뒤 다시 시도하면 들어간다.
+        // 일반 "세션 초기화 실패" 로 뭉개면 학생이 다시 시도하지 않는다.
+        // 같은 매핑이 hooks/useExamSession.ts 에 있는데 이 형제만 빠져 있었다.
+        QUOTA_CHECK_UNAVAILABLE: t("quotaUnavailable"),
       };
       return (typeof code === "string" && known[code]) || t("sessionInitError");
     },

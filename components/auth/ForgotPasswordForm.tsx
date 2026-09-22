@@ -81,6 +81,13 @@ export function ForgotPasswordForm() {
                 {t("sentBody", { email })}
               </p>
               <p className="type-hint">{t("sentHint")}</p>
+              {/*
+                * PKCE verifier 가 **요청한 브라우저의 쿠키**에 있다. 노트북에서
+                * 요청하고 휴대폰에서 링크를 열면 교환이 실패하는데, 화면은
+                * 만료된 링크와 구분되지 않는다 — 가장 흔한 복구 동선이 그것이라
+                * 미리 알린다.
+                */}
+              <p className="type-hint">{t("sameDeviceHint")}</p>
               <Button asChild variant="outline" className="w-full min-h-[44px]">
                 <Link href="/sign-in">{t("backToSignIn")}</Link>
               </Button>
