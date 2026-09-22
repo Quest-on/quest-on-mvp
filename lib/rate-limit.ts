@@ -235,4 +235,15 @@ export const RATE_LIMITS = {
   finalAnswerSave: { limit: 60, windowSec: 60 } satisfies RateLimitConfig,
   /** AI 일괄 문제 생성용 (유형별 병렬 3콜 × 최대 제한): 5 requests per minute per user */
   bulkGenerate: { limit: 5, windowSec: 60 } satisfies RateLimitConfig,
+  /**
+   * 비밀번호 재설정 메일 발송 (IP 기준): 5분에 3회.
+   *
+   * 다른 버킷보다 창이 훨씬 길다. 이건 사용자가 연타할 동작이 아니라 **남의
+   * 주소로 메일을 보내게 만드는** 동작이기 때문이다. 60초 창이면 한 IP 가
+   * 시간당 180통을 남의 받은편지함에 넣을 수 있다.
+   *
+   * 3회로 둔 건 오타를 한 번 고칠 여지는 남기기 위해서다. 메일이 늦게 오는
+   * 것처럼 느껴져 한 번 더 누르는 것도 흔하다.
+   */
+  passwordReset: { limit: 3, windowSec: 300 } satisfies RateLimitConfig,
 } as const;

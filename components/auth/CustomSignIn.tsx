@@ -146,7 +146,20 @@ export function CustomSignIn() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password">{t("passwordLabel")}</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">{t("passwordLabel")}</Label>
+                    {/*
+                     * 비밀번호 찾기 (#318). 이메일로 가입한 사용자는 이 링크가
+                     * 없으면 복구 수단이 전혀 없다 — staging 은 Google 이 꺼져
+                     * 있어 이메일 가입만 가능하다.
+                     */}
+                    <Link
+                      href="/forgot-password"
+                      className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+                    >
+                      {t("forgotPasswordLink")}
+                    </Link>
+                  </div>
                   <Input
                     id="password"
                     type="password"
