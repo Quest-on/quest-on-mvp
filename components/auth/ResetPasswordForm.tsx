@@ -73,7 +73,17 @@ export function ResetPasswordForm() {
         password,
       });
       if (updateError) {
-        setError(updateError.message || tField("updateFailed"));
+        // 서버 원문을 그대로 띄우지 않는다.
+        //
+        // GoTrue 메시지는 영문이고 개발자용이다. 한국어 화면 한가운데
+        // "New password should be different from the old password." 가 뜬다.
+        // `updateError.message` 는 비는 법이 없어서 `||` 폴백은 영영 안 쓰인다.
+        // 같은 교훈이 `app/(app)/join/page.tsx` 에도 적혀 있다.
+        setError(
+          updateError.code === "same_password"
+            ? t("samePassword")
+            : tField("updateFailed")
+        );
         setSubmitting(false);
         return;
       }
