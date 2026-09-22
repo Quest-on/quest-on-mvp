@@ -18,6 +18,14 @@ const isPublicRoute = (pathname: string) =>
     "/join",
     "/sign-in",
     "/sign-up",
+    // 비밀번호 복구 (#318). 로그인할 수 없는 사람이 쓰는 화면이므로 반드시
+    // 공개여야 한다. 빠뜨렸을 때 /sign-in 의 "비밀번호를 잊으셨나요?" 링크가
+    // /sign-in?redirect=/forgot-password 로 되돌아오는 닫힌 루프가 됐다.
+    "/forgot-password",
+    // /reset-password 도 공개다. 복구 링크가 세션을 만들어 주긴 하지만,
+    // 만료된 링크나 주소 직접 입력으로 세션 없이 오는 경우가 있다. 여기서
+    // 막으면 "링크가 만료되었습니다" 안내를 보여줄 기회 자체가 없어진다.
+    "/reset-password",
     "/onboarding",
     "/legal",
     "/student/profile-setup",
