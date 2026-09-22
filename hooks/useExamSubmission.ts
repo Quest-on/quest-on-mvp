@@ -87,6 +87,24 @@ export function useExamSubmission({
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const data = await response.json();
+
+        // 아는 코드는 우리 문구로 바꾼다.
+        //
+        // `data.message` 는 서버 원문이고 영문·개발자용이다. 한국어 화면
+        // 한가운데 "Submission is temporarily unavailable…" 이 그대로 뜬다.
+        // 같은 교훈이 `app/(app)/join/page.tsx` 에 적혀 있다 — 거기서는
+        // "Exam not found" 가 학생 화면에 떴다.
+        //
+        // QUOTA_CHECK_UNAVAILABLE 은 특히 뭉개면 안 된다 (#326). 정원이 찬
+        // 것도 제출이 실패한 것도 아니고, 잠시 뒤 다시 누르면 된다.
+        const known: Record<string, string> = {
+          QUOTA_CHECK_UNAVAILABLE:
+            "지금은 제출 확인이 일시적으로 어렵습니다. 잠시 뒤 다시 시도해주세요.",
+        };
+        if (typeof data.error === "string" && known[data.error]) {
+          return known[data.error];
+        }
+
         return data.message || data.error || "답안 제출에 실패했습니다.";
       }
       const text = await response.text();
