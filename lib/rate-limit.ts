@@ -96,47 +96,79 @@ function checkRateLimitInMemory(
 // Upstash Redis rate limiter (serverless-safe)
 // ============================================================
 
-let upstashRatelimit: import("@upstash/ratelimit").Ratelimit | null = null;
-let upstashInitialized = false;
+/**
+ * **버킷(config)별로** limiter 를 캐시한다 (이슈 #457).
+ *
+ * 예전에는 모듈 전역 플래그 하나로 limiter 를 **한 번만** 만들었다. 주석은
+ * "once per config change" 라고 말했지만 코드는 config 를 키로 쓰지 않아서,
+ * 한 인스턴스에서 **먼저 초기화한 버킷의 한도가 나머지 전부에 적용**됐다.
+ *
+ * 프로덕션에서 `/api/chat`(30/60s)이 먼저 뜨면 `passwordReset`(3/300s)이
+ * 30/60s 가 된다 — 시간당 36통으로 막으려던 것이 1800통이 된다. 반대로
+ * `adminLogin`(5/60s)이 먼저면 응시 중 채팅이 5/60s 로 조여진다.
+ *
+ * in-memory 폴백은 매번 config 를 읽으므로 영향이 없었다. 즉 **Upstash 가
+ * 켜진 환경에서만** 어긋나고 로컬·CI 에서는 재현되지 않는다.
+ */
+const upstashLimiters = new Map<
+  string,
+  import("@upstash/ratelimit").Ratelimit
+>();
+let upstashRedis: unknown = null;
+/** 패키지 import 실패는 한 번만 시도한다 — 원래 의도를 유지한다. */
+let upstashUnavailable = false;
 
-function getUpstashRatelimit(
+/**
+ * `export` 인 이유는 테스트 때문이다.
+ *
+ * 이 함수는 `require()` 로 선택적 의존성을 늦게 불러오는데, 그래서
+ * `vi.mock` 이 걸리지 않는다. `checkRateLimitAsync` 를 통해 간접적으로
+ * 검증하려 하면 실제 Redis 로 네트워크를 시도하게 된다. 생성자만 부르는
+ * 이 함수를 직접 부르면 네트워크 없이 캐시 동작을 볼 수 있다.
+ */
+export function getUpstashRatelimit(
   config: RateLimitConfig
 ): import("@upstash/ratelimit").Ratelimit | null {
-  // Only try to initialize once per config change — avoid repeated import failures
   if (
     !process.env.UPSTASH_REDIS_REST_URL ||
     !process.env.UPSTASH_REDIS_REST_TOKEN
   ) {
     return null;
   }
+  if (upstashUnavailable) return null;
+
+  const key = `${config.limit}:${config.windowSec}`;
+  const cached = upstashLimiters.get(key);
+  if (cached) return cached;
 
   // Lazy init: we can't top-level import optional dependencies
-  if (!upstashInitialized) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { Ratelimit } = require("@upstash/ratelimit");
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { Redis } = require("@upstash/redis");
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Ratelimit } = require("@upstash/ratelimit");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Redis } = require("@upstash/redis");
 
-      const redis = new Redis({
+    // Redis 클라이언트는 하나만 만들어 버킷들이 공유한다.
+    if (!upstashRedis) {
+      upstashRedis = new Redis({
         url: process.env.UPSTASH_REDIS_REST_URL,
         token: process.env.UPSTASH_REDIS_REST_TOKEN,
       });
-
-      upstashRatelimit = new Ratelimit({
-        redis,
-        limiter: Ratelimit.fixedWindow(config.limit, `${config.windowSec} s`),
-        analytics: false,
-        prefix: "rl",
-      });
-    } catch {
-      // @upstash packages not installed — stay with in-memory
-      upstashRatelimit = null;
     }
-    upstashInitialized = true;
-  }
 
-  return upstashRatelimit;
+    const limiter = new Ratelimit({
+      redis: upstashRedis,
+      limiter: Ratelimit.fixedWindow(config.limit, `${config.windowSec} s`),
+      analytics: false,
+      prefix: "rl",
+    });
+    upstashLimiters.set(key, limiter);
+    return limiter;
+  } catch {
+    // @upstash packages not installed — stay with in-memory
+    upstashUnavailable = true;
+    return null;
+  }
 }
 
 async function checkRateLimitUpstash(
