@@ -257,12 +257,28 @@ export async function createOrGetSession(data: { examId: string; studentId: stri
         additionalData: { examId: data.examId, reason: "admit_rpc_failed" },
       });
 
-      const { data: existingSession } = await getSupabase()
+      const { data: existingSession, error: lookupError } = await getSupabase()
         .from("sessions")
         .select("id")
         .eq("exam_id", data.examId)
         .eq("student_id", data.studentId)
         .maybeSingle();
+
+      // 조회가 실패하면 "세션 없음" 과 **같은 판정**을 하되 같은 취급은 하지
+      // 않는다 (이슈 #462).
+      //
+      // 모르는 채로 세션을 만들면 #326 이 재발하므로 deny 가 맞다. 다만
+      // 조용히 지나가면 응시 중인 학생이 쫓겨나도 아무도 모른다 — #324 가
+      // 그 무음으로 20일을 잃은 사고였다.
+      if (lookupError) {
+        logError("[createOrGetSession] fallback_lookup_failed", lookupError, {
+          path: "/api/supa/session-handlers",
+          additionalData: {
+            examId: data.examId,
+            reason: "existing_session_lookup_failed",
+          },
+        });
+      }
 
       const fallback = resolveAdmissionFallback(existingSession?.id);
       if (fallback.kind === "deny") {
@@ -801,14 +817,17 @@ export async function initExamSession(data: {
           }
         );
 
-        const { data: existingSession } = await getSupabase()
-          .from("sessions")
-          .select("id")
-          .eq("exam_id", exam.id)
-          .eq("student_id", data.studentId)
-          .maybeSingle();
-
-        const fallback = resolveAdmissionFallback(existingSession?.id);
+        // 여기서 다시 조회하지 않는다 (이슈 #462).
+        //
+        // 이 블록이 도는 유일한 조건이 "admit RPC 가 실패했다" 인데, 그 원인이
+        // DB 장애면 바로 다음 조회도 실패한다. 예전 코드는 `error` 를 버려서
+        // 그 실패를 **"세션이 없다" 와 구분하지 못했다** — 응시 중인 학생이
+        // 503 으로 쫓겨났다. #438 이 지키겠다고 한 것의 정반대다.
+        //
+        // 필요한 정보는 이미 있다. 위(2단계)에서 `existingSessions` 를
+        // `checkError` 까지 처리해 읽어 뒀고, `unsubmittedSessions` 가 그
+        // 결과다. 왕복도 하나 준다.
+        const fallback = resolveAdmissionFallback(unsubmittedSessions[0]?.id);
         if (fallback.kind === "deny") {
           // 새 입장이다. 한도를 모르는 채로 들여보내면 되돌릴 수 없다.
           // 막힌 학생은 RPC 가 돌아오면 정상 입장한다 — 영구 차단이 아니다.

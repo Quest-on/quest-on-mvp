@@ -135,14 +135,16 @@ describe("admit_exam_session 실패 시 처리", () => {
     // 응시 중인 학생이다. 한도는 입장 때 이미 봤으므로 여기서 다시 물을 게 없다.
     const rpcError = { code: "PGRST202", message: "function not found" };
     supabaseMock.rpc.mockResolvedValue({ data: null, error: rpcError });
+    // 세션은 **위쪽 existingSessions 조회**에서 온다. 예전엔 폴백 전용
+    // 재조회에만 먹였는데, 실제 경로에서는 그 행이 위 조회에도 반드시
+    // 잡힌다 — 재조회를 지우면서(#462) 픽스처를 실제와 맞췄다.
     queue({
       exams: [
         { data: exam, error: null },
         { data: { is_demo: true }, error: null },
       ],
       sessions: [
-        { data: [], error: null },
-        { data: { id: "session-1" }, error: null }, // 실패 경로의 기존 세션 조회
+        { data: [session], error: null }, // existingSessions — 미제출 세션 하나
         { data: session, error: null },
       ],
       submissions: [{ data: [], error: null }],
@@ -188,6 +190,61 @@ describe("admit_exam_session 실패 시 처리", () => {
       expect.objectContaining({
         additionalData: expect.objectContaining({ reason: "admit_rpc_failed" }),
       })
+    );
+  });
+
+  // ── 조회 실패를 "세션 없음" 으로 읽지 않는다 (이슈 #462) ──────────
+  //
+  // 이 블록이 도는 유일한 조건이 admit RPC 실패다. 원인이 DB 장애면 세션
+  // 조회도 같이 실패한다. 예전 코드는 `error` 를 버려서 그 실패를 "세션이
+  // 없다" 와 구분하지 못했고, **응시 중인 학생이 503 으로 쫓겨났다.**
+  it("세션 목록을 이미 읽어 뒀으면 실패 경로에서 다시 조회하지 않는다", async () => {
+    const rpcError = { code: "ETIMEDOUT", message: "timeout" };
+    supabaseMock.rpc.mockResolvedValue({ data: null, error: rpcError });
+    queue({
+      exams: [
+        { data: exam, error: null },
+        { data: { is_demo: true }, error: null },
+      ],
+      sessions: [
+        { data: [session], error: null }, // existingSessions
+        { data: session, error: null }, // 최종 세션 읽기
+      ],
+      submissions: [{ data: [], error: null }],
+    });
+
+    const res = await initExamSession({ examCode: "DEMO", studentId: "owner-1" });
+    expect(res.status).toBe(200);
+
+    // sessions mock 을 정확히 둘만 큐에 넣었다. 폴백 전용 재조회가
+    // 되살아나면 큐가 모자라 `No mock configured for sessions` 로 던지고
+    // 이 테스트가 깨진다 — 200 이 나왔다는 것 자체가 재조회가 없다는 증거다.
+  });
+
+  it("createOrGetSession 은 조회 실패를 따로 기록한다", async () => {
+    const { createOrGetSession } = await import(
+      "@/app/api/supa/handlers/session-handlers"
+    );
+    supabaseMock.rpc.mockResolvedValue({
+      data: null,
+      error: { code: "ETIMEDOUT", message: "timeout" },
+    });
+    queue({
+      sessions: [{ data: null, error: { message: "connection reset" } }],
+    });
+
+    const res = await createOrGetSession({
+      examId: "exam-1",
+      studentId: "owner-1",
+    });
+
+    // 판정은 deny 를 유지한다 — 모르는 채로 만들면 #326 이 재발한다.
+    expect(res.status).toBe(503);
+    // 다만 조용히 지나가지 않는다. 무음이면 false deny 를 아무도 못 본다(#324).
+    expect(logErrorMock).toHaveBeenCalledWith(
+      "[createOrGetSession] fallback_lookup_failed",
+      expect.objectContaining({ message: "connection reset" }),
+      expect.anything()
     );
   });
 });
