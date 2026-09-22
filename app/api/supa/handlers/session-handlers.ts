@@ -264,7 +264,25 @@ export async function createOrGetSession(data: { examId: string; studentId: stri
         .eq("student_id", data.studentId)
         .maybeSingle();
 
-      const fallback = resolveAdmissionFallback(existingSession?.id);
+      // 데모 소유자 미리보기인지 확인한다 (#451).
+      //
+      // 이 함수는 평소에 exam 을 읽지 않는다. 장애 경로에서만 두 컬럼을
+      // 가져온다 — 드물게 도는 경로이고, 판정을 initExamSession 과 같게
+      // 두는 값이 한 번의 쿼리보다 크다. 갈라지면 한쪽만 고쳐진다.
+      const { data: examRow } = await getSupabase()
+        .from("exams")
+        .select("is_demo, instructor_id")
+        .eq("id", data.examId)
+        .maybeSingle();
+
+      const fallback = resolveAdmissionFallback(
+        existingSession?.id,
+        isDemoPreview({
+          isDemo: examRow?.is_demo,
+          instructorId: examRow?.instructor_id,
+          userId: data.studentId,
+        })
+      );
       if (fallback.kind === "deny") {
         return errorJson(
           QUOTA_UNAVAILABLE_CODE,
@@ -808,7 +826,16 @@ export async function initExamSession(data: {
           .eq("student_id", data.studentId)
           .maybeSingle();
 
-        const fallback = resolveAdmissionFallback(existingSession?.id);
+        const fallback = resolveAdmissionFallback(
+          existingSession?.id,
+          // 데모 소유자 미리보기는 RPC 도 한도를 안 본다 (#451). 여기선
+          // exam 을 이미 읽어 뒀으므로 추가 쿼리가 필요 없다.
+          isDemoPreview({
+            isDemo: exam.is_demo,
+            instructorId: exam.instructor_id,
+            userId: data.studentId,
+          })
+        );
         if (fallback.kind === "deny") {
           // 새 입장이다. 한도를 모르는 채로 들여보내면 되돌릴 수 없다.
           // 막힌 학생은 RPC 가 돌아오면 정상 입장한다 — 영구 차단이 아니다.

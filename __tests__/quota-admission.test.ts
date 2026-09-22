@@ -89,3 +89,34 @@ describe("호출부가 실패 경로에서 세션을 만들지 않는다 (#326)"
     );
   });
 });
+
+describe("데모 소유자 미리보기 예외 (#451)", () => {
+  it("기존 세션이 없어도 데모 소유자 미리보기는 통과한다", () => {
+    expect(resolveAdmissionFallback(null, true)).toEqual({
+      kind: "proceed",
+      reason: "demo_owner_preview",
+    });
+  });
+
+  it("기존 세션이 있으면 예외보다 지속이 먼저다", () => {
+    // 둘 다 통과지만 의미가 다르다. 이어 가는 쪽은 세션 id 를 돌려줘야 한다.
+    expect(resolveAdmissionFallback("s-1", true)).toEqual({
+      kind: "continue",
+      sessionId: "s-1",
+    });
+  });
+
+  it("데모가 아니면 막는다", () => {
+    expect(resolveAdmissionFallback(null, false)).toEqual({ kind: "deny" });
+  });
+
+  it("판정 불능(null)은 통과가 아니다", () => {
+    // 모를 때 "데모다" 로 단정하면 그 순간 한도가 샌다.
+    expect(resolveAdmissionFallback(null, null)).toEqual({ kind: "deny" });
+  });
+
+  it("인자를 안 주면 기존 동작 그대로 막는다", () => {
+    expect(resolveAdmissionFallback(null)).toEqual({ kind: "deny" });
+    expect(resolveAdmissionFallback(undefined)).toEqual({ kind: "deny" });
+  });
+});
