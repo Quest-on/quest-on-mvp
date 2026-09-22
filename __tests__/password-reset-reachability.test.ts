@@ -52,21 +52,27 @@ describe("#318 — 재설정 화면에 도달할 수 있다", () => {
     // 항상 로그인 상태이고, 예외목록에 없으면 폼을 못 본다. 처음 고칠 때
     // 공개 목록만 보고 "열었다" 고 했는데, 이 동선에서 **유일하게 의미 있는
     // 경우를 안 본 것**이었다.
-    const guardExceptions = (() => {
-      const src = read("proxy.ts");
-      const at = src.indexOf("if (isPublicRoute(pathname) &&");
-      const line = src.slice(at, src.indexOf("\n", at));
-      return line.match(/"[^"]*"/g)?.map((x) => x.slice(1, -1)) ?? [];
-    })();
+    const proxySrc = read("proxy.ts");
 
-    it("/reset-password 는 로그인돼 있어도 대시보드로 튕기지 않는다", () => {
-      expect(guardExceptions).toContain("/reset-password");
+    it("/reset-password 예외는 **의도 쿠키**로만 열린다", () => {
+      // 정적 목록에 넣으면 아무 로그인 사용자나 그 화면을 연다 — 그 화면은
+      // 현재 비밀번호를 묻지 않는다(#447). 콜백이 복구 세션에만 심는 쿠키를
+      // 봐야 한다.
+      expect(proxySrc).toContain("hasPasswordResetIntent");
+      expect(proxySrc).toMatch(/resetIntent[\s\S]{0,200}PASSWORD_RESET_COOKIE/);
+      // 대시보드 리다이렉트 조건에서 실제로 쓰인다.
+      expect(proxySrc).toMatch(/!resetIntent/);
     });
 
-    it("/forgot-password 는 로그인했으면 대시보드로 보낸다", () => {
+    it("정적 예외 목록에는 /reset-password 도 /forgot-password 도 없다", () => {
+      const at = proxySrc.indexOf('!["/auth/callback"');
+      expect(at).toBeGreaterThan(-1);
+      const list = proxySrc.slice(at, proxySrc.indexOf("]", at));
+      const paths = list.match(/"[^"]*"/g)?.map((x) => x.slice(1, -1)) ?? [];
+      // 무조건 여는 예외는 넓히지 않는다.
+      expect(paths).not.toContain("/reset-password");
       // 이미 로그인한 사람이 비밀번호 찾기 화면에 있을 이유가 없다.
-      // 게이트를 여는 예외는 넓히지 않는다.
-      expect(guardExceptions).not.toContain("/forgot-password");
+      expect(paths).not.toContain("/forgot-password");
     });
   });
 
@@ -113,13 +119,20 @@ describe("#318 — 재설정 화면에 도달할 수 있다", () => {
   describe("콜백이 복구만 온보딩을 건너뛴다", () => {
     const src = read("app/auth/callback/route.ts");
 
-    it("건너뛰는 경로는 /reset-password 하나뿐이다", () => {
-      const list = src.slice(
-        src.indexOf("NEXT_PATHS_SKIPPING_ONBOARDING"),
-        src.indexOf("export async function GET")
-      );
-      const paths = list.match(/"\/[^"]*"/g)?.map((s) => s.slice(1, -1)) ?? [];
-      expect(paths).toEqual(["/reset-password"]);
+    it("건너뛰는 근거가 next 값이 아니라 복구 세션이다", () => {
+      // 예전엔 `next` 만 봤다. 그건 사용자가 붙일 수 있는 값이라, 평범한
+      // OAuth 로그인에 붙이면 필수 동의 게이트가 그대로 열렸다 (#456).
+      expect(src).toContain("isRecoverySession");
+      expect(src).toMatch(/isRecoverySession\(\s*data\.session\?\.access_token/);
+      // 경로는 여전히 정확히 하나만 연다.
+      expect(src).toMatch(/next === PASSWORD_RESET_PATH/);
+    });
+
+    it("복구 세션에만 의도 쿠키를 심는다", () => {
+      const at = src.indexOf("isRecoverySession");
+      const block = src.slice(at, src.indexOf("const onboardingUrl", at));
+      expect(block).toContain("passwordResetIntentCookie");
+      expect(block).toContain("cookieStore.set");
     });
   });
 });

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { createHash } from "crypto";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { z } from "zod";
@@ -77,17 +78,41 @@ function clientIp(request: NextRequest): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const rl = await checkRateLimitAsync(
-      `password-reset:${clientIp(request)}`,
-      RATE_LIMITS.passwordReset
-    );
-    if (!rl.allowed) {
-      return errorJson("RATE_LIMITED", "Too many requests", 429);
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      // 본문이 JSON 이 아니면 파싱도 안 된 요청이다. 계정 열거를 막는 이유는
+      // "유효한 요청인데 주소가 없을 때" 에만 적용된다 — 여기서 200 을 주면
+      // 화면이 "메일을 보냈습니다" 라고 말한다.
+      return errorJson("INVALID_INPUT", "Invalid input", 400);
     }
 
-    const parsed = PasswordResetSchema.safeParse(await request.json());
+    const parsed = PasswordResetSchema.safeParse(body);
     if (!parsed.success) {
       return errorJson("INVALID_INPUT", "Invalid input", 400);
+    }
+
+    // 키를 IP + 주소로 나눈다 (리뷰 지적).
+    //
+    // IP 단독이면 **대학 NAT 환경에서 4번째 사람이 잠긴다.** 이 제품 사용자가
+    // 정확히 그 환경이다 — 한 기관이 하나의 출구 IP 를 쓴다. 반대로 IP 만 보면
+    // 공격자가 IP 를 돌려 한 주소에 무제한으로 메일을 넣을 수 있다.
+    //
+    // 그래서 둘 다 건다. 주소 쪽이 "남의 받은편지함" 을 지키고, IP 쪽이
+    // 무작위 주소 대량 시도를 지킨다. 주소는 해시해서 키에만 쓴다 — 레이트리밋
+    // 저장소에 평문 이메일을 남기지 않는다.
+    const email = parsed.data.email.toLowerCase();
+    const emailKey = createHash("sha256").update(email).digest("hex").slice(0, 32);
+
+    for (const key of [
+      `password-reset:ip:${clientIp(request)}`,
+      `password-reset:addr:${emailKey}`,
+    ]) {
+      const rl = await checkRateLimitAsync(key, RATE_LIMITS.passwordReset);
+      if (!rl.allowed) {
+        return errorJson("RATE_LIMITED", "Too many requests", 429);
+      }
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -124,7 +149,7 @@ export async function POST(request: NextRequest) {
     redirectTo.searchParams.set("next", "/reset-password");
 
     const { error } = await supabase.auth.resetPasswordForEmail(
-      parsed.data.email,
+      email,
       { redirectTo: redirectTo.toString() }
     );
 
