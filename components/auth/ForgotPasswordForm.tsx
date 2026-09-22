@@ -80,7 +80,7 @@ export function ForgotPasswordForm() {
               <p className="text-muted-foreground">
                 {t("sentBody", { email })}
               </p>
-              <p className="text-sm text-muted-foreground">{t("sentHint")}</p>
+              <p className="type-hint">{t("sentHint")}</p>
               <Button asChild variant="outline" className="w-full min-h-[44px]">
                 <Link href="/sign-in">{t("backToSignIn")}</Link>
               </Button>

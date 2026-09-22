@@ -10,7 +10,7 @@
  * 하나 넣는 순간 조용히 깨진다. 그래서 바이트 단위로 비교한다.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const checkRateLimitAsync = vi.hoisted(() =>
   vi.fn(async () => ({ allowed: true }))
@@ -44,14 +44,39 @@ async function post(body: unknown, ip?: string) {
 
 let fetchMock: ReturnType<typeof vi.fn>;
 
+/**
+ * 이 파일은 `process.env` 와 전역 `fetch` 를 건드린다. vitest 는 모듈을 파일별로
+ * 격리하지만 **둘은 워커 프로세스 공유**라, 복구하지 않으면 같은 워커에 배정된
+ * 다른 테스트 파일이 오염된다. 특히 `NEXT_PUBLIC_APP_URL` 은
+ * `lib/auth-redirect.ts` 가 읽는 값이라 리다이렉트 관련 테스트를 통째로 흔든다.
+ *
+ * 워커 배정은 실행마다 달라서, 이런 누수는 로컬에서 통과하고 CI 에서만 깨진다.
+ */
+const ENV_KEYS = [
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "NEXT_PUBLIC_APP_URL",
+] as const;
+let envBackup: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
+
 beforeEach(() => {
   vi.clearAllMocks();
   checkRateLimitAsync.mockResolvedValue({ allowed: true });
+  envBackup = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://ref.supabase.co";
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-key";
   process.env.NEXT_PUBLIC_APP_URL = ORIGIN;
   fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
   vi.stubGlobal("fetch", fetchMock);
+});
+
+afterEach(() => {
+  for (const k of ENV_KEYS) {
+    const original = envBackup[k];
+    if (original === undefined) delete process.env[k];
+    else process.env[k] = original;
+  }
+  vi.unstubAllGlobals();
 });
 
 describe("POST /api/auth/password-reset", () => {
