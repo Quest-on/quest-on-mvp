@@ -14,6 +14,7 @@ import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { validateRequest, chatRequestSchema } from "@/lib/validations";
 import { successJson, errorJson } from "@/lib/api-response";
 import { logError } from "@/lib/logger";
+import { resolveAdmissionFallback, QUOTA_UNAVAILABLE_CODE } from "@/lib/quota-admission";
 import { currentUser } from "@/lib/get-current-user";
 import { resolveChatQIdx, extractQuestionAiContext } from "@/lib/chat-qidx";
 import { classifyMessageType, type MessageType } from "@/lib/message-classification";
@@ -346,10 +347,34 @@ async function resolveTempSession(params: {
   );
 
   if (admitError) {
-    logError("[chat] quota_fail_open", admitError, {
+    // 한도 판정 불가 (이슈 #326). 기존 세션이면 잇고, 없으면 막는다 —
+    // 한도를 모르는 채로 새 학생을 들이면 되돌릴 수 없다.
+    logError("[chat] quota_check_unavailable", admitError, {
       path: "/api/chat",
       additionalData: { examId, reason: "admit_rpc_failed" },
     });
+
+    const { data: existingSession } = await getSupabase()
+      .from("sessions")
+      .select("id, used_clarifications")
+      .eq("exam_id", examId)
+      .eq("student_id", studentId)
+      .maybeSingle();
+
+    const fallback = resolveAdmissionFallback(existingSession?.id);
+    if (fallback.kind === "deny") {
+      return {
+        actualSessionId: null,
+        usedClarifications,
+        skipIncrementUsedClarifications,
+        denied: QUOTA_UNAVAILABLE_CODE,
+      };
+    }
+    return {
+      actualSessionId: fallback.sessionId,
+      usedClarifications: existingSession?.used_clarifications ?? 0,
+      skipIncrementUsedClarifications,
+    };
   }
 
   const verdict = Array.isArray(admission) ? admission[0] : admission;
@@ -647,6 +672,16 @@ export async function POST(request: NextRequest) {
 
       // 한도 초과로 입장이 거부되면 채팅도 열지 않는다. 여기서 계속 진행하면
       // sessionId 가 null 인 채로 흘러가 엉뚱한 곳에서 터진다.
+      if (denied === QUOTA_UNAVAILABLE_CODE) {
+        // 한도 초과가 아니라 판정 자체가 불가능한 상태다. 같은 403 으로 뭉뚱그리면
+        // 학생은 "정원이 찼다"고 읽고 다시 시도하지 않는다.
+        return errorJson(
+          QUOTA_UNAVAILABLE_CODE,
+          "Chat is temporarily unavailable. Please try again in a moment.",
+          503
+        );
+      }
+
       if (denied || !actualSessionId) {
         return errorJson(
           denied === "publish_limit"

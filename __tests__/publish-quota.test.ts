@@ -189,11 +189,10 @@ describe("게이트가 실제로 배선돼 있다", () => {
 
   it("세션 생성이 RPC 를 거친다 — 우회 삽입이 없다", () => {
     expect(handlers).toMatch(/"admit_exam_session"/);
-    // 정상 경로에 upsert 가 남아 있으면 한도를 통과하지 않고 세션이 생긴다.
-    // fail-open 폴백 하나만 허용하고, 그건 quota_fail_open 로그 직후여야 한다.
-    const upserts = handlers.match(/\.upsert\(/g) ?? [];
-    expect(upserts).toHaveLength(1);
-    expect(handlers).toMatch(/quota_fail_open[\s\S]{0,600}?\.upsert\(/);
+    // 세션을 만드는 건 RPC 뿐이다. 예전에는 fail-open 폴백 upsert 를 하나
+    // 허용했는데, 그게 곧 RPC 장애 = 한도 무제한이었다 (이슈 #326).
+    expect(handlers.match(/\.upsert\(/g) ?? []).toHaveLength(0);
+    expect(handlers.match(/\.insert\(/g) ?? []).toHaveLength(0);
   });
 
   it("한도 초과가 학생에게 전용 코드로 전달된다", () => {

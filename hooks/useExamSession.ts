@@ -206,6 +206,10 @@ export function useExamSession({
           // 전달되지 않는다.
           PUBLISH_LIMIT_REACHED: "publish_limit",
           STUDENT_LIMIT_REACHED: "student_limit",
+          // 한도 초과가 아니라 한도 판정 자체가 불가능한 상태다 (이슈 #326).
+          // network_error 로 떨어뜨리면 "인터넷을 확인하라"고 말하게 되는데,
+          // 학생 쪽 네트워크는 멀쩡하다. 잠시 뒤 다시 시도하면 되는 상황이다.
+          QUOTA_CHECK_UNAVAILABLE: "quota_unavailable",
         };
         const errorParam = errorCodeMap[errorData.error] || "network_error";
         // 시험 코드를 함께 넘긴다. 지금은 리다이렉트 후 코드가 빈 값이라

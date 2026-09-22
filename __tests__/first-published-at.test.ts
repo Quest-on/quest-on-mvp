@@ -112,13 +112,15 @@ describe("최초 발행 시점 기록 (이슈 #151 · #84)", () => {
     expect(rpc).toMatch(/IF NOT COALESCE\(v_exam\.is_demo, false\) THEN\n\s*UPDATE public\.exams/);
   });
 
-  it("앱단 기록은 fail-open 폴백 하나뿐이다", () => {
-    // 정상 경로는 RPC 안에서만 기록한다. 두 곳에서 쓰면 발행 카운트가 갈라진다.
-    // 다만 RPC 가 실패했을 때의 폴백은 기록해야 한다 — 안 하면 그 시험이
-    // 영영 미발행으로 남아 발행 한도가 조용히 샌다.
-    const writes = handlers.match(/first_published_at: now/g) ?? [];
-    expect(writes).toHaveLength(1);
-    expect(handlers).toMatch(/quota_fail_open[\s\S]{0,1600}?first_published_at: now/);
+  it("앱단에는 기록 경로가 없다 — RPC 가 유일한 주체다", () => {
+    // 예전에는 fail-open 폴백이 세션을 직접 만들었고, 그 시험이 영영 미발행으로
+    // 남지 않도록 여기서도 first_published_at 을 썼다. 그 폴백이 #326 으로
+    // 사라졌으므로(한도 판정 불가 시 새 입장을 만들지 않는다) 앱단 기록도 같이
+    // 없앴다. 두 곳에서 쓰면 발행 카운트가 갈라진다.
+    expect(handlers.match(/first_published_at: now/g) ?? []).toHaveLength(0);
+    expect(handlers, "폴백이 되살아났다면 발행 카운트가 다시 샌다").not.toMatch(
+      /quota_fail_open/
+    );
   });
 });
 
