@@ -230,14 +230,15 @@ export async function POST(request: NextRequest) {
               }
             );
 
-            const { data: existingSession } = await getSupabase()
-              .from("sessions")
-              .select("id")
-              .eq("exam_id", exam.id)
-              .eq("student_id", verifiedStudentId)
-              .maybeSingle();
-
-            const fallback = resolveAdmissionFallback(existingSession?.id);
+            // 여기서 다시 조회하지 않는다 (이슈 #462 · #455).
+            //
+            // 이 지점에 오는 조건이 activeSession(미제출)도 submittedSession
+            // (제출)도 없었다는 것이다. `sessions` 는 UNIQUE(exam_id,
+            // student_id) 라 그 둘이 모든 행을 덮는다 — 재조회는 같은 답을
+            // 주고, `error` 를 버려서 **DB 장애 때 "세션 없음" 과 구분되지
+            // 않는** 위험만 더했다. 이 블록이 도는 조건이 admit RPC 실패라
+            // 그 상황이 정확히 겹친다.
+            const fallback = resolveAdmissionFallback(undefined);
             if (fallback.kind === "deny") {
               return errorJson(
                 QUOTA_UNAVAILABLE_CODE,

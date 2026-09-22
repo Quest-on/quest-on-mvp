@@ -354,14 +354,17 @@ async function resolveTempSession(params: {
       additionalData: { examId, reason: "admit_rpc_failed" },
     });
 
-    const { data: existingSession } = await getSupabase()
-      .from("sessions")
-      .select("id, used_clarifications")
-      .eq("exam_id", examId)
-      .eq("student_id", studentId)
-      .maybeSingle();
-
-    const fallback = resolveAdmissionFallback(existingSession?.id);
+    // 여기서 다시 조회하지 않는다 (이슈 #462 · #455).
+    //
+    // 이 지점에 오는 조건이 "위에서 세션을 못 찾았다" 이다 — 찾았으면 이미
+    // early return 했다. 그러니 재조회는 같은 답을 주고, 게다가 `error` 를
+    // 버려서 **DB 장애 때 "세션 없음" 과 구분되지 않는** 위험만 더했다.
+    // 이 블록이 도는 유일한 조건이 admit RPC 실패이므로 그 상황이 정확히
+    // 겹친다.
+    //
+    // "응시 중인 학생은 이어 간다" 는 불변식은 위쪽 early return 이 보장한다.
+    // 여기는 새 입장 경로이고, 한도를 모르므로 막는다.
+    const fallback = resolveAdmissionFallback(undefined);
     if (fallback.kind === "deny") {
       return {
         actualSessionId: null,
@@ -372,7 +375,7 @@ async function resolveTempSession(params: {
     }
     return {
       actualSessionId: fallback.sessionId,
-      usedClarifications: existingSession?.used_clarifications ?? 0,
+      usedClarifications,
       skipIncrementUsedClarifications,
     };
   }
