@@ -89,4 +89,40 @@ describe("GET /auth/callback", () => {
     expect(exchangeCodeForSession).not.toHaveBeenCalled();
     expect(location).toBe(`${ORIGIN}/sign-in?error=auth_callback_failed`);
   });
+
+  // ── 비밀번호 재설정만 온보딩을 건너뛴다 (#318) ────────────────────
+  //
+  // 복구 링크를 누른 사람은 비밀번호를 바꾸러 온 것이다. 온보딩(필수 동의
+  // 게이트)에 먼저 세우면, 동의를 미루고 탭을 닫는 순간 **로그인은 된 채
+  // 잊어버린 비밀번호는 그대로** 남는다. 다음에 또 못 들어온다.
+  describe("비밀번호 재설정 경로", () => {
+    it("next=/reset-password 는 온보딩을 거치지 않고 곧장 간다", async () => {
+      const location = await callCallback("?code=valid&next=/reset-password");
+      expect(location).toBe(`${ORIGIN}/reset-password`);
+    });
+
+    it("게이트를 여는 건 그 경로 하나뿐이다", async () => {
+      // 비슷하게 생긴 경로가 묻어 들어오면 온보딩이 통째로 무력해진다.
+      for (const next of [
+        "/reset-password-extra",
+        "/reset-password/",
+        "/reset-password?x=1",
+        "/instructor",
+      ]) {
+        const location = await callCallback(
+          `?code=valid&next=${encodeURIComponent(next)}`
+        );
+        expect(new URL(location).pathname).toBe("/onboarding");
+      }
+    });
+
+    it("세션 교환이 실패하면 재설정 화면으로도 보내지 않는다", async () => {
+      exchangeCodeForSession.mockResolvedValue({
+        error: new Error("expired"),
+      } as never);
+
+      const location = await callCallback("?code=expired&next=/reset-password");
+      expect(location).toBe(`${ORIGIN}/sign-in?error=auth_callback_failed`);
+    });
+  });
 });
