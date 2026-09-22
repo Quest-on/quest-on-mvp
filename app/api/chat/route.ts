@@ -361,8 +361,11 @@ async function resolveTempSession(params: {
       .eq("student_id", studentId)
       .maybeSingle();
 
+    // 데모 예외(#451)는 여기 넘기지 않는다. 이 라우트는 입장이 아니라 진행
+    // 중 동작이라 세션이 없으면 이어 갈 대상 자체가 없다. 예외는 실제로
+    // 세션을 만드는 입장 지점(session-handlers)에만 둔다.
     const fallback = resolveAdmissionFallback(existingSession?.id);
-    if (fallback.kind === "deny") {
+    if (fallback.kind !== "continue") {
       return {
         actualSessionId: null,
         usedClarifications,
