@@ -272,12 +272,24 @@ async function fetchPreviousResponseId(params: {
   return data?.response_id || null;
 }
 
+/**
+ * 대화 획수는 **여기 한 곳이** 올린다.
+ *
+ * ff277e8d 는 새 temp 세션을 앱에서 직접 INSERT 하면서
+ * `used_clarifications: 1` 로 선반영했고, 그래서 이 증가를 건너뇰는
+ * `skip` 플래그가 필요했다. #438 이 그 INSERT 를 `admit_exam_session`
+ * RPC 로 엮기면서 선반영도 사라졌다 — RPC 는 0 으로 넣고
+ * (database/026_close_quota_gaps.sql), 첫 턴에 이 증가가 1 로 만들어
+ * 주므로 최종 상황는 이전과 같다.
+ *
+ * 그래서 `skip` 은 #438 이후 모든 호출부에서 false 였다. 항상 거짃인
+ * 플래그는 "건너뛰는 경우가 있다" 고 읽힌다. 선반영을 되새리려면
+ * RPC 와 이 함수를 **같이** 보고 고쳐야 한다.
+ */
 async function incrementUsedClarifications(params: {
   sessionId: string;
-  skip?: boolean;
 }): Promise<void> {
-  const { sessionId, skip } = params;
-  if (skip) return;
+  const { sessionId } = params;
 
   // Atomic increment via RPC (prevents race conditions with concurrent requests)
   const { error } = await getSupabase().rpc("increment_used_clarifications", {
@@ -298,20 +310,12 @@ async function resolveTempSession(params: {
   actualSessionId: string | null;
   /** 거부 사유. 없으면 정상. */
   denied?: string;
-  usedClarifications?: number;
-  skipIncrementUsedClarifications: boolean;
 }> {
   const { sessionId, examId, studentId } = params;
   let actualSessionId = sessionId;
-  let usedClarifications: number | undefined;
-  let skipIncrementUsedClarifications = false;
 
   if (!examId || !studentId) {
-    return {
-      actualSessionId,
-      usedClarifications,
-      skipIncrementUsedClarifications,
-    };
+    return { actualSessionId };
   }
 
   const { data: existingSession } = await getSupabase()
@@ -321,14 +325,17 @@ async function resolveTempSession(params: {
     .eq("student_id", studentId)
     .single();
 
+  // ⚠ 이 early return 이 아래 폴백 deny 의 **유일한 근거**다 (이슈 #455).
+  //
+  // admitError 분기는 `resolveAdmissionFallback(undefined)` — 항상 deny — 를
+  // 쓴다. 그게 안전한 이유는 여기서 빠지므로 "그 분기에 도달했다 =
+  // 새 입장이다" 가 성립하기 때문이다. 이걸 RPC 뒤로 엮기면 DB 가
+  // 흔들릴 때마다 웑시 중인 학생이 503 으로 줽개난다(#326).
+  //
+  // __tests__/quota-fallback-early-return.test.ts 가 이 순서를 고정한다.
   if (existingSession) {
     actualSessionId = existingSession.id;
-    usedClarifications = existingSession.used_clarifications ?? 0;
-    return {
-      actualSessionId,
-      usedClarifications,
-      skipIncrementUsedClarifications,
-    };
+    return { actualSessionId };
   }
 
   // 이 경로도 같은 원자 연산을 거친다 (이슈 #84).
@@ -366,47 +373,28 @@ async function resolveTempSession(params: {
     // 여기는 새 입장 경로이고, 한도를 모르므로 막는다.
     const fallback = resolveAdmissionFallback(undefined);
     if (fallback.kind === "deny") {
-      return {
-        actualSessionId: null,
-        usedClarifications,
-        skipIncrementUsedClarifications,
-        denied: QUOTA_UNAVAILABLE_CODE,
-      };
+      return { actualSessionId: null, denied: QUOTA_UNAVAILABLE_CODE };
     }
-    return {
-      actualSessionId: fallback.sessionId,
-      usedClarifications,
-      skipIncrementUsedClarifications,
-    };
+    return { actualSessionId: fallback.sessionId };
   }
 
   const verdict = Array.isArray(admission) ? admission[0] : admission;
   if (verdict && verdict.admitted === false) {
-    return {
-      actualSessionId: null,
-      usedClarifications,
-      skipIncrementUsedClarifications,
-      denied: verdict.denial_reason as string,
-    };
+    return { actualSessionId: null, denied: verdict.denial_reason as string };
   }
 
   const { data: newSession } = await getSupabase()
     .from("sessions")
-    .select("id, used_clarifications")
+    .select("id")
     .eq("exam_id", examId)
     .eq("student_id", studentId)
     .maybeSingle();
 
   if (newSession) {
     actualSessionId = newSession.id;
-    usedClarifications = newSession.used_clarifications ?? 0;
   }
 
-  return {
-    actualSessionId,
-    usedClarifications,
-    skipIncrementUsedClarifications,
-  };
+  return { actualSessionId };
 }
 
 async function handleChatLogic(params: {
@@ -420,7 +408,6 @@ async function handleChatLogic(params: {
   examMaterialsText?: Array<{ url: string; text: string; fileName: string }>;
   currentQuestionText?: string;
   currentQuestionAiContext?: string;
-  skipIncrementUsedClarifications?: boolean;
   userId?: string;
   language?: PromptLanguage;
 }): Promise<{
@@ -440,7 +427,6 @@ async function handleChatLogic(params: {
     examMaterialsText,
     currentQuestionText,
     currentQuestionAiContext,
-    skipIncrementUsedClarifications,
     userId,
     language,
   } = params;
@@ -555,10 +541,7 @@ async function handleChatLogic(params: {
     },
   ]);
 
-  const incrementPromise = incrementUsedClarifications({
-    sessionId,
-    skip: !!skipIncrementUsedClarifications,
-  });
+  const incrementPromise = incrementUsedClarifications({ sessionId });
 
   const [aiInsertSettled, incrementSettled] = await Promise.allSettled([
     insertAiPromise,
@@ -666,12 +649,11 @@ export async function POST(request: NextRequest) {
 
     // ✅ 임시/정규 공통 처리: 세션/시험 컨텍스트만 준비하고 나머지는 handleChatLogic로 통합
     if (isTemp) {
-      const {
-        actualSessionId,
-        usedClarifications,
-        skipIncrementUsedClarifications,
-        denied,
-      } = await resolveTempSession({ sessionId, examId, studentId });
+      const { actualSessionId, denied } = await resolveTempSession({
+        sessionId,
+        examId,
+        studentId,
+      });
 
       // 한도 초과로 입장이 거부되면 채팅도 열지 않는다. 여기서 계속 진행하면
       // sessionId 가 null 인 채로 흘러가 엉뚱한 곳에서 터진다.
@@ -773,7 +755,6 @@ export async function POST(request: NextRequest) {
         examId,
         currentQuestionText,
         currentQuestionAiContext,
-        skipIncrementUsedClarifications,
         userId: user?.id ?? studentId,
         language: tempExamLanguage,
       });
