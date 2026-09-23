@@ -935,11 +935,12 @@ export default function CreateExam() {
                               maxPublishes: quotaData?.maxPublishes ?? null,
                               maxStudents: quotaData?.maxStudents ?? null,
                             }}
+                            // 형제 <p> 로 두지 않는다 (이슈 #470). 차단이면
+                            // 코드가 안 나오는데 안내만 남아 "없는 코드를
+                            // 공유하세요" 가 된다.
+                            shareHint={t("newExam.dialogShare")}
                           />
                         </div>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          {t("newExam.dialogShare")}
-                        </p>
                       </div>
                       {/* P2-5: Summary */}
                       <div className="text-sm text-muted-foreground space-y-1 border-t pt-3">

@@ -174,9 +174,29 @@ type ExamCodeProps = {
   className?: string;
   /** 코드 옆 복사 버튼을 띄울지. 목록처럼 좁은 자리에서는 끈다. */
   copyable?: boolean;
+  /**
+   * 코드 아래에 붙는 "이 코드를 학생들에게 공유하세요" 류의 안내.
+   *
+   * **차단 상태에서는 렌더하지 않는다** (이슈 #470). 이걸 호출부의 형제
+   * `<p>` 로 두면, 코드가 사라진 자리에 "이 코드를 공유하세요" 가 그대로
+   * 남아 바로 위 차단 패널과 정면으로 모순된다. 실제로 출제·과제 두
+   * 대화상자가 그 상태였다.
+   *
+   * 호출부에서 `resolveCodeGate` 를 다시 부르게 하지 않는 이유는 이 파일
+   * 맨 위 docstring 그대로다 — 표면마다 한도 UI 를 따로 붙이면 다음에
+   * 생기는 표면이 반드시 잊는다. 안내를 코드와 같은 곳에 두면 새 표면은
+   * 그냥 넘기기만 해도 올바르게 동작한다.
+   */
+  shareHint?: React.ReactNode;
 };
 
-export function ExamCode({ code, quota, className, copyable = true }: ExamCodeProps) {
+export function ExamCode({
+  code,
+  quota,
+  className,
+  copyable = true,
+  shareHint,
+}: ExamCodeProps) {
   const t = useTranslations("authoring.examCode");
   const [copied, setCopied] = useState(false);
   const gate = resolveCodeGate(quota);
@@ -291,6 +311,9 @@ export function ExamCode({ code, quota, className, copyable = true }: ExamCodePr
             : t("warningPublish", { remaining: quota?.publishesRemaining ?? 0 })}
         </p>
       )}
+      {/* 여기 도달했다는 건 차단이 아니라는 뜻이다 — 차단은 위에서 early
+          return 했다. 즉 코드가 실제로 보이는 경우에만 안내가 붙는다. */}
+      {shareHint && <p className="type-hint mt-2">{shareHint}</p>}
     </div>
   );
 }
