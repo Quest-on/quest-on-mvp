@@ -289,9 +289,10 @@ export default function CreateAssignment() {
                           maxPublishes: quotaData?.maxPublishes ?? null,
                           maxStudents: quotaData?.maxStudents ?? null,
                         }}
+                        // 형제 <p> 로 두지 않는다 (이슈 #470).
+                        shareHint={t("newAssignment.dialogShare")}
                       />
                     </div>
-                    <p className="text-sm text-muted-foreground mt-2">{t("newAssignment.dialogShare")}</p>
                   </div>
                   <div className="text-sm text-muted-foreground space-y-1 border-t pt-3">
                     <p>{t("newAssignment.dialogSummaryQuestions", { count: questions.length })}</p>
