@@ -57,6 +57,48 @@ describe("교수 에이전트에 진입점이 있다 (#436)", () => {
     expect(between, "FAB 이 authoring route 가드 안에 들어갔다").toContain("MobileBottomNav");
   });
 
+  /**
+   * 반응형 노출까지 본다 (이슈 #460).
+   *
+   * 위 두 검사는 소스의 **줄 순서**만 본다. 그래서 #439 가 FAB 에
+   * `hidden md:flex` 를 달아 데스크톱 전용으로 만든 것을 통과시켰다 —
+   * 768px 미만에서는 진입점이 하나도 없는데도.
+   *
+   * 여기서 고정하는 것은 "지금 이게 맞다" 가 아니라 **두 사실이 짝으로
+   * 움직인다**는 것이다. 한쪽만 고치고 끝났다고 생각하는 걸 막는다.
+   */
+  it("진입점의 반응형 노출과 내비 가드를 짝으로 고정한다", () => {
+    const fab = read("components/agent/AgentFab.tsx");
+
+    // 사실 1: FAB 은 md 이상에서만 보인다.
+    expect(fab, "FAB 의 반응형 클래스가 바뀌었다 — #460 을 다시 읽고 아래 it.fails 도 함께 고친다").toMatch(
+      /hidden\s+md:flex/
+    );
+
+    // 사실 2: 모바일 내비는 출제 화면에서 렌더되지 않는다. 그런데 실행기가
+    // 붙어 있는 곳이 바로 그 화면이다.
+    expect(layout).toMatch(/!isAuthoringRoute[\s\S]{0,200}MobileBottomNav/);
+  });
+
+  /**
+   * 위 두 사실이 겹치면 모바일에는 진입점이 없다. 그게 #460 이다.
+   *
+   * `it.fails` 로 둔다 — 지금 실패하는 게 정상이므로 통과하고, 누가 #460 을
+   * 고치면 "예상대로 실패하지 않았다" 로 **이 테스트가 깨진다.** 그때 `it` 로
+   * 바꾸고 위 사실 1 도 함께 고친다. 결함을 정상으로 고정하지 않으면서
+   * 고쳐졌다는 신호를 받는 방법이다.
+   */
+  it.fails("모바일에도 진입점이 있다 — #460 이 정해지면 it 으로 바꾼다", () => {
+    const fab = read("components/agent/AgentFab.tsx");
+    const fabHiddenOnMobile = /hidden\s+md:flex/.test(fab);
+    const navSkipsAuthoring = /!isAuthoringRoute[\s\S]{0,200}MobileBottomNav/.test(layout);
+
+    expect(
+      fabHiddenOnMobile && navSkipsAuthoring,
+      "출제 화면(실행기가 붙은 유일한 라우트)에 모바일 진입점이 없다"
+    ).toBe(false);
+  });
+
   it("실행기가 서버가 내보내는 액션을 전부 처리한다", () => {
     const executor = read("components/agent/useAgentEditorExecutor.ts");
     // 서버 프롬프트가 지시하는 액션들. 하나라도 빠지면 그 지시는 조용히 버려진다.
