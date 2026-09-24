@@ -14,6 +14,7 @@ import {
   recordOnboardingEvent,
 } from "@/lib/onboarding-events";
 import { isDemoPreview } from "@/lib/demo-completion";
+import { isDisclosureAcknowledged } from "@/lib/exam-preflight";
 import { isQuotaGateMissing } from "@/lib/plan-limits";
 
 /** 5-second grace period for network latency (shared across heartbeat/initExamSession/feedback) */
@@ -441,7 +442,7 @@ export async function initExamSession(data: {
     // 2. Get all existing sessions (most recent first)
     const { data: existingSessions, error: checkError } = await getSupabase()
       .from("sessions")
-      .select("id, exam_id, student_id, submitted_at, is_active, status, started_at, attempt_timer_started_at, device_fingerprint, created_at, used_clarifications, compressed_session_data, compression_metadata, last_heartbeat_at")
+      .select("id, exam_id, student_id, submitted_at, is_active, status, started_at, attempt_timer_started_at, device_fingerprint, created_at, used_clarifications, compressed_session_data, compression_metadata, last_heartbeat_at, preflight_accepted_at")
       .eq("exam_id", exam.id)
       .eq("student_id", data.studentId)
       .order("created_at", { ascending: false });
@@ -908,10 +909,17 @@ export async function initExamSession(data: {
     // 고지를 이미 확인한 학생인가 (AC-15). preflight 자체는 시험마다 뜨지만
     // AI 사용 3줄 고지는 사람 단위로 최초 1회다. 조회가 실패하면 false 라
     // 고지를 한 번 더 보여주는 쪽으로 실패한다.
-    const disclosureAcknowledged = await hasOnboardingEvent(
-      data.studentId,
-      ONBOARDING_EVENTS.STUDENT_DISCLOSURE_ACK
-    );
+    //
+    // 데모 미리보기는 기록을 남기지 않으므로(#167) 이번 시도의 수락으로 대신
+    // 판정한다 — 아니면 새로고침마다 최초 고지를 다시 묻는다 (#478).
+    const disclosureAcknowledged = isDisclosureAcknowledged({
+      recorded: await hasOnboardingEvent(
+        data.studentId,
+        ONBOARDING_EVENTS.STUDENT_DISCLOSURE_ACK
+      ),
+      demoPreview: isDemoPreviewAttempt,
+      preflightAcceptedAt: session.preflight_accepted_at,
+    });
 
     return successJson({
       exam,

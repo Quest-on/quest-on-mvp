@@ -68,6 +68,27 @@ export function needsPreflight(init: PreflightInit): boolean {
 }
 
 /**
+ * 사람 단위 고지 확인을 이미 했다고 볼 것인가 (#478).
+ *
+ * 원칙은 기록(`student_disclosure_ack`)이다. 그런데 데모 미리보기는 그 기록을
+ * 남기지 않는다 — 교수자 id 가 학생 퍼널 지표에 섞이기 때문이다(#167). 기록으로만
+ * 판정하면 수락한 데모 시도에서 새로고침할 때마다 최초 고지를 처음부터 다시 묻는다.
+ *
+ * 그래서 데모 미리보기에 한해 **이번 시도의 세션 수락**을 확인으로 본다. 재응시는
+ * `restart_demo_attempt` 가 수락을 비우므로 새 시도는 고지를 다시 본다.
+ *
+ * 일반 학생에게는 세션 수락을 쳐 주지 않는다. 지각 승인·레거시 세션은 수락이
+ * 있어도 사람이 고지를 본 적이 없을 수 있다(AC-15, #150).
+ */
+export function isDisclosureAcknowledged(params: {
+  recorded: boolean;
+  demoPreview: boolean;
+  preflightAcceptedAt: string | null | undefined;
+}): boolean {
+  return params.recorded || (params.demoPreview && !!params.preflightAcceptedAt);
+}
+
+/**
  * preflight 수락 뒤의 서버 사실을 init 캐시에 옮긴다.
  *
  * 결과에 대해 `needsPreflight` 는 항상 거짓이어야 한다 — 수락했는데 다시

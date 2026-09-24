@@ -21,6 +21,7 @@ vi.mock("@/lib/onboarding-events", () => ({
 }));
 
 import { initExamSession } from "@/app/api/supa/handlers/session-handlers";
+import { needsPreflight } from "@/lib/exam-preflight";
 
 type QueryResult = { data: any; error: any };
 
@@ -255,5 +256,80 @@ describe("데모 세션 수명주기", () => {
     expect(result.isRetakeBlocked).toBe(true);
     expect(result.session.id).toBe(submitted.id);
     expect(chains.sessions[0].update).not.toHaveBeenCalled();
+  });
+});
+
+describe("데모 미리보기 새로고침은 고지를 다시 묻지 않는다 (#478)", () => {
+  // 데모 미리보기는 고지 확인(student_disclosure_ack)을 기록하지 않는다(#167 —
+  // 교수자가 학생 퍼널 지표에 섞인다). 이 파일은 hasOnboardingEvent 를 false 로
+  // 모킹하므로 "기록 없음" 이 기본 상태다. 그런데 init 이 그 기록으로만 판정해서,
+  // 수락한 데모 시도에서 새로고침할 때마다 최초 고지를 처음부터 다시 띄웠다.
+  const ACCEPTED_AT = "2026-08-11T00:00:05.000Z";
+
+  function reenter(sessionOverrides: Record<string, unknown>, examOverrides: Record<string, unknown> = {}) {
+    const existing = { ...NOW_SESSION, ...sessionOverrides };
+    queue({
+      exams: [{ data: exam(examOverrides), error: null }],
+      sessions: [
+        { data: [existing], error: null },
+        { data: existing, error: null },
+      ],
+      messages: [{ data: [], error: null }],
+      submissions: [{ data: [], error: null }],
+    });
+  }
+
+  it("수락한 데모 시도에 다시 들어오면 preflight 가 필요 없다", async () => {
+    reenter({ preflight_accepted_at: ACCEPTED_AT });
+
+    const result = await body({});
+
+    expect(result.status, JSON.stringify(result.body)).toBe(200);
+    expect(result.body.demoPreview).toBe(true);
+    expect(result.body.disclosureAcknowledged).toBe(true);
+    expect(needsPreflight(result.body), "수락한 데모에서 새로고침했더니 preflight 가 다시 떴다").toBe(false);
+  });
+
+  it("재응시 직후(수락이 비워진 시도)에는 최초 고지를 다시 보여준다", async () => {
+    // restart_demo_attempt 가 preflight_accepted_at 을 null 로 되돌린다(023).
+    reenter({ preflight_accepted_at: null });
+
+    const result = await body({});
+
+    expect(result.body.disclosureAcknowledged).toBe(false);
+    expect(needsPreflight(result.body)).toBe(true);
+  });
+
+  it("일반 학생은 세션을 수락했어도 기록이 없으면 고지를 다시 본다 (AC-15)", async () => {
+    // 지각 승인·레거시 세션이 고지를 우회하던 구멍(#150)이다. 세션 수락을
+    // 확인으로 쳐 주는 건 데모 미리보기에 한정해야 한다.
+    currentUserMock.mockResolvedValue({ id: "student-1" });
+    const existing = {
+      ...NOW_SESSION,
+      student_id: "student-1",
+      preflight_accepted_at: ACCEPTED_AT,
+    };
+    queue({
+      exams: [
+        {
+          data: exam({ is_demo: false, status: "running", started_at: "2026-08-11T00:00:00.000Z" }),
+          error: null,
+        },
+      ],
+      sessions: [
+        { data: [existing], error: null },
+        { data: existing, error: null },
+      ],
+      messages: [{ data: [], error: null }],
+      submissions: [{ data: [], error: null }],
+    });
+
+    const response = await initExamSession({ examCode: "DEMO", studentId: "student-1" });
+    const result = await response.json();
+
+    expect(response.status, JSON.stringify(result)).toBe(200);
+    expect(result.demoPreview).toBe(false);
+    expect(result.disclosureAcknowledged).toBe(false);
+    expect(needsPreflight(result)).toBe(true);
   });
 });
