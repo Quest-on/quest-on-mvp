@@ -101,6 +101,14 @@ test.describe("교수자 온보딩", () => {
     await expect(instructorPage.locator("body")).not.toContainText(
       /MISSING_MESSAGE|undefined/
     );
+
+    // URL 이 한순간 맞는 것과 그 화면에 머무는 것은 다르다. 예전에는 상세
+    // 화면이 역할 가드에 걸려 곧바로 대시보드로 튕겼는데(#476), URL 만 보던
+    // 이 테스트는 통과했다. 데모의 주 행동이 보여야 착지다.
+    await expect(instructorPage.getByRole("link", TRY_AS_STUDENT)).toBeVisible({
+      timeout: TIMEOUTS.PAGE_LOAD,
+    });
+    await expect(instructorPage).toHaveURL(/\/instructor\/[0-9a-f-]{36}$/);
   });
 
   test("건너뛰어도 데모는 만들어진다", async ({ instructorPage }) => {

@@ -178,6 +178,21 @@ export function AppAuthProvider({ children }: { children: React.ReactNode }) {
   // state.user 를 직접 읽는다. 별도 세션 조회를 하면 왕복이 하나 더 붙고,
   // 호출부는 이미 로그인된 상태에서만 부른다.
   const refreshProfile = useCallback(async () => {
+    // 테스트 바이패스에서는 프로필의 원천이 DB 가 아니라 쿠키다(위 초기화와 같다).
+    // 테스트 사용자는 profiles 행이 없어서 DB 를 다시 읽으면 profile 이 null 로
+    // 덮이고, 역할 가드가 교수자를 /student 로 돌려보낸다. 온보딩이 끝나며
+    // 부르는 갱신이 정확히 그 경로라 데모 상세 착지가 한 번도 실제로 검증되지
+    // 않았다 (#476).
+    const testUser = getTestBypassUser();
+    if (testUser) {
+      setState({
+        user: testUser.user,
+        profile: testUser.profile,
+        isLoaded: true,
+        isSignedIn: true,
+      });
+      return;
+    }
     if (!state.user) return;
     await loadProfile(state.user);
   }, [loadProfile, state.user]);
