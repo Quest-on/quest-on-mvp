@@ -7,6 +7,11 @@ import toast from "react-hot-toast";
 import { getDeviceFingerprint } from "@/lib/device-fingerprint";
 import { createSupabaseClient } from "@/lib/supabase-client";
 import { qk } from "@/lib/query-keys";
+import {
+  applyPreflightAccepted,
+  needsPreflight,
+  type PreflightAccepted,
+} from "@/lib/exam-preflight";
 
 interface Question {
   id: string;
@@ -268,22 +273,10 @@ export function useExamSession({
         initData.sessionStatus || initData.session.status || "not_joined";
       setSessionStatus(currentSessionStatus);
 
-      // 세션 수락 여부와 사람 단위 고지 확인은 별개다. 전자만 보면 레거시
-      // 장기 세션과 지각 입장이 AI 고지를 건너뛴다.
-      const needsPreflightStatuses = new Set([
-        "joined",
-        "waiting",
-        "late_pending",
-        "in_progress",
-      ]);
-      const completedSessionStatuses = new Set(["submitted", "auto_submitted"]);
-      const needsDisclosureAcknowledgement = !initData.disclosureAcknowledged;
-      if (
-        needsPreflightStatuses.has(currentSessionStatus) &&
-        !completedSessionStatuses.has(currentSessionStatus) &&
-        !initData.session.submitted_at &&
-        (!initData.session.preflight_accepted_at || needsDisclosureAcknowledgement)
-      ) {
+      // 판정은 lib/exam-preflight.ts 한 곳에 둔다. 수락 뒤 캐시 패치
+      // (applyPreflightAccepted)가 이 판정이 읽는 필드를 전부 고쳐야 하므로
+      // 둘이 같은 파일에 있어야 갈라지지 않는다 (이슈 #474).
+      if (needsPreflight(initData)) {
         setShowPreflight(true);
       }
 
@@ -506,14 +499,19 @@ export function useExamSession({
     setIsSubmitted,
     showPreflight,
     disclosureAcknowledged,
-    acknowledgeDisclosure: () => {
+    acknowledgeDisclosure: (accepted: PreflightAccepted) => {
       // staleTime 이 무한이라 로컬 상태만 바꾸면 재마운트가 이전 init 응답을
       // 다시 써서 고지가 되살아난다. 서버 확인 직후 캐시도 같은 사실로 맞춘다.
+      //
+      // 고지 확인만 고치면 안 된다 (이슈 #474). 캐시가 바뀌면 init effect 가
+      // 전체 다시 돌고, 캐시의 preflight_accepted_at 이 null 이면 모달을 한 번
+      // 더 연다. 게다가 세션 상태·남은 시간을 init 시점 값으로 되돌린다.
+      // preflight 응답이 말하는 사실을 전부 옮겨야 재실행이 무해하다.
       setDisclosureAcknowledged(true);
       queryClient.setQueryData(
         qk.session.init(examCode, user?.id, restartDemo),
         (current: typeof initData) =>
-          current?.ok ? { ...current, disclosureAcknowledged: true } : current
+          current ? applyPreflightAccepted(current, accepted) : current
       );
     },
     // 데모 미리보기 여부와 그 시험 id. 응시를 마친 교수자를 학생 대시보드가
