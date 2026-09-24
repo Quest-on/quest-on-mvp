@@ -207,6 +207,20 @@ test.describe("교수자 온보딩", () => {
       .getByRole("button", { name: /^제출하기$|^Submit$/ })
       .click({ timeout: TIMEOUTS.PAGE_LOAD });
 
+    // 제출이 끝날 때까지 기다린다. 확인을 누르면 저장 → 제출(POST /api/feedback)
+    // 이 비동기로 이어지는데, 곧바로 다른 화면으로 가면 제출 요청이 나가기도
+    // 전에 페이지가 사라진다 — 세션은 in-progress 로 남고 채점 링크는 영영 안
+    // 생긴다. CI 는 채점이 인라인이라 이 응답이 채점 뒤에 온다.
+    await expect(instructorPage.getByTestId("exam-submitted-state")).toBeVisible({
+      timeout: 120_000,
+    });
+
+    // 데모는 끝나면 학생 대시보드가 아니라 데모 상세로 돌아와야 한다 — 다음
+    // 단계(다시 해보기·채점 결과)가 거기 있다.
+    await instructorPage.waitForURL((url) => url.pathname === demoDetail, {
+      timeout: 30_000,
+    });
+
     // 4. 채점 결과를 연다. 완주는 "결과가 있는 채점 화면을 열었다" 로 기록된다.
     //
     // 결과가 아직 없을 때 열면 기록되지 않는다(`hasViewableGradingResult`).
