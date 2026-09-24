@@ -418,7 +418,9 @@ export default function ExamPage() {
       const response = await fetch(`/api/session/${sessionId}/preflight`, { method: "POST" });
       if (response.ok) {
         const body = await response.json();
-        session.acknowledgeDisclosure();
+        // 응답을 그대로 넘긴다. 훅이 init 캐시를 이 사실로 맞춰야 캐시 변경이
+        // init effect 를 다시 돌려도 모달이 또 뜨지 않는다 (이슈 #474).
+        session.acknowledgeDisclosure(body);
         session.setShowPreflight(false);
 
         if (body.status) {
