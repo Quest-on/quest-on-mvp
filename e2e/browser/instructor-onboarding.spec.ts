@@ -234,7 +234,13 @@ test.describe("교수자 온보딩", () => {
         async () => {
           await instructorPage.goto(demoDetail);
           const grade = instructorPage.locator('a[href*="/grade/"]:visible').first();
-          if (!(await grade.isVisible().catch(() => false))) return false;
+          // isVisible 는 기다리지 않는다. 막 이동한 화면은 학생 목록을 아직
+          // 불러오는 중이라, 바로 물으면 매번 "없다" 가 나온다.
+          const shown = await grade
+            .waitFor({ state: "visible", timeout: TIMEOUTS.PAGE_LOAD })
+            .then(() => true)
+            .catch(() => false);
+          if (!shown) return false;
           const graded = instructorPage.waitForResponse(
             (r) =>
               r.request().method() === "GET" &&
