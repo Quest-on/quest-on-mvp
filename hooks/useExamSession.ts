@@ -511,7 +511,7 @@ export function useExamSession({
       queryClient.setQueryData(
         qk.session.init(examCode, user?.id, restartDemo),
         (current: typeof initData) =>
-          current ? applyPreflightAccepted(current, accepted) : current
+          current?.ok ? { ...current, disclosureAcknowledged: true } : current
       );
     },
     // 데모 미리보기 여부와 그 시험 id. 응시를 마친 교수자를 학생 대시보드가
