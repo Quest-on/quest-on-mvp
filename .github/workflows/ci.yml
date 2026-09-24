@@ -300,6 +300,80 @@ jobs:
   #
   # needs 로 모든 검사를 앞에 세운다. "CI 가 초록일 때만 배포한다" 는 원칙이
   # conclusion 을 나중에 읽는 것보다 강하게 지켜진다 — 순서 자체가 강제된다.
+
+  browser-flows-probe:
+    # 뼈대(smoke/a11y/CSP/error-boundary)와 개인정보 동의 actual-auth flow를
+    # 필수 게이트로 둔다. 나머지 browser-flows는 UI 변경 민감도가 높아 로컬 전용이다.
+    name: PROBE browser-flows (measure only)
+    runs-on: ubuntu-latest
+    # 위 잡들과 같은 이유로 중복 실행을 건너뛴다.
+    if: github.event_name != 'pull_request' || !contains(fromJSON('["main","staging"]'), github.event.pull_request.head.ref)
+    timeout-minutes: 45
+    needs: [quality]
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/test-setup
+      - name: Run 14 non-consent browser-flows specs
+        run: |
+          mkdir -p test-results junit
+          PLAYWRIGHT_JUNIT_OUTPUT_NAME=junit/flows-probe-results.xml npx playwright test e2e/browser/flows/admin-ai-config-flow.spec.ts e2e/browser/flows/admin-flow.spec.ts e2e/browser/flows/error-scenarios.spec.ts e2e/browser/flows/full-exam-submission.spec.ts e2e/browser/flows/grade-to-report.spec.ts e2e/browser/flows/instructor-create-exam.spec.ts e2e/browser/flows/instructor-edit-exam.spec.ts e2e/browser/flows/instructor-exam.spec.ts e2e/browser/flows/onboarding-flow.spec.ts e2e/browser/flows/parallel-instructor-student.spec.ts e2e/browser/flows/student-dashboard.spec.ts e2e/browser/flows/student-exam.spec.ts e2e/browser/flows/student-exam-objective.spec.ts e2e/browser/flows/student-join-exam.spec.ts --project=browser-flows --config=e2e/playwright.config.ts --reporter=list,junit || true
+        env:
+          NODE_ENV: test
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WO_o0BQXj0V_fMnZXz7cz0yd2V0j2xN7OIRI
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          OPENAI_API_KEY: test-key
+          OPENAI_BASE_URL: http://localhost:4010/v1
+          ADMIN_USERNAME: test-admin
+          ADMIN_PASSWORD: test-password
+          ADMIN_SESSION_SECRET: test-secret-for-hmac-signing-minimum-32-chars
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_dummy
+          CLERK_SECRET_KEY: sk_test_dummy
+          TEST_BYPASS_SECRET: e2e-test-bypass-token-2024
+          INTERNAL_API_SECRET: test-internal-api-secret-ci
+          NEXT_PUBLIC_TEST_BYPASS_ENABLED: "true"
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-flows-probe
+          path: |
+            playwright-report/
+            test-results/
+            junit/
+          retention-days: 7
+      # 결과 요약은 보고용이다. 이 스텝이 실패해도 테스트 결과는 이미 나왔고
+      # 아티팩트로도 올라가 있다. 그런데 continue-on-error 가 없으면 액션
+      # 다운로드 실패만으로 잡 전체가 red 가 된다 — 실제로 codeload 가
+      # 429 Too Many Requests 를 내서 통과한 테스트가 실패로 보고됐다.
+      # 결과 요약. 예전에는 test-summary/action 을 썼는데 codeload 가 429 를
+      # 내면 잡 전체가 red 가 됐다. 액션 다운로드는 스텝 실행 **전** 단계라
+      # continue-on-error 가 닿지 않는다 — 실제로 걸어 보고 확인했다
+      # (로그 39줄, 테스트 스텝은 시작조차 못 함).
+      #
+      # 보고 때문에 테스트 신호를 잃을 이유가 없어 외부 의존을 없앴다.
+      - name: Test Summary
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          shopt -s nullglob
+          node scripts/ci-test-summary.mjs junit/*.xml
+
+  # 스테이징 자동 배포 (이슈 #209).
+  #
+  # deploy.yml 을 workflow_run 으로 걸면 기본 브랜치(main)의 파일 기준으로
+  # 트리거가 등록되는데, main 은 staging 보다 379 커밋 뒤처져 있고 그쪽
+  # deploy.yml 은 branches: [main] 이다. 그래서 자동 배포가 한 번도 걸린 적이
+  # 없었고, 배포 12건이 전부 수동 dispatch 였다.
+  #
+  # push 는 그 브랜치의 워크플로 파일을 쓴다. 여기서 직접 부르면 main 을
+  # 건드리지 않고(= 프로덕션 재배포를 유발하지 않고) 자동화가 산다.
+  #
+  # needs 로 모든 검사를 앞에 세운다. "CI 가 초록일 때만 배포한다" 는 원칙이
+  # conclusion 을 나중에 읽는 것보다 강하게 지켜진다 — 순서 자체가 강제된다.
   deploy-staging:
     name: Deploy (staging)
     needs:
