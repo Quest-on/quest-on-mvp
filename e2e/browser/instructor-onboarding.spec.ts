@@ -1,5 +1,6 @@
-import { test, expect } from "./fixtures/auth-browser.fixture";
-import { cleanupTestData } from "../helpers/seed";
+import { test, expect, TEST_INSTRUCTOR } from "./fixtures/auth-browser.fixture";
+import { cleanupTestData, clearOnboardingEvents } from "../helpers/seed";
+import { StudentExamPage } from "./pages";
 import { TIMEOUTS } from "../constants";
 
 /**
@@ -19,6 +20,7 @@ const SUBJECT_ENGINEERING = "#subject-engineering";
 const CONTINUE = { name: /^완료$|^Done$|^Submit$/ };
 const CREATE_DEMO = { name: /데모 시험 만들기|Create demo/ };
 const SKIP = { name: /^건너뛰기$|^Skip$/ };
+const TRY_AS_STUDENT = { name: /학생 시점으로 해보기|Try as a student/ };
 
 /**
  * 프로필 단계를 통과한다.
@@ -132,5 +134,100 @@ test.describe("교수자 온보딩", () => {
 
     // 같은 데모로 돌아와야 한다. 다르면 재진입할 때마다 데모가 쌓인다.
     expect(second).toBe(first);
+  });
+
+  test("데모를 학생 시점으로 끝까지 풀면 완주로 기록된다", async ({ instructorPage }) => {
+    // 에픽 #79 의 즉시 지표가 "데모 완주율" 이고, 완주 = 학생 시점 1문항 답변 +
+    // AI 채점 결과 열람이다(`isDemoCompleted` — demo_graded_viewed 하나로 판정).
+    // 위 테스트들은 데모 **생성**에서 멈춘다. 지표의 정의가 실제로 기록되는지
+    // 자동으로 보는 곳이 없었다 (#476).
+    //
+    // CI 에서 되는 근거: Vercel 이 아니라 QStash 없이 채점이 인라인으로
+    // 끝난 뒤 제출 응답이 돌아오고(lib/grading-trigger.ts), OpenAI 는 목 서버가
+    // 요약을 돌려준다. 즉 제출 직후 볼 채점 결과가 있다.
+    test.setTimeout(240_000);
+
+    // 두 마일스톤 모두 사람 단위 "최초 도달" 이라 cleanupTestData 가 안 지운다.
+    // 남아 있으면 완주 단정은 헛돌고(이미 참), 고지는 첫 응시가 아니게 되며
+    // CTA 도 "다시 풀기" 로 바뀐다. 재시도도 같은 상태에서 시작해야 한다.
+    await clearOnboardingEvents(TEST_INSTRUCTOR.id, [
+      "demo_graded_viewed",
+      "student_disclosure_ack",
+    ]);
+
+    await instructorPage.goto("/onboarding");
+    await fillProfile(instructorPage);
+    await instructorPage.locator(SUBJECT_ENGINEERING).click();
+    await instructorPage.getByRole("button", CREATE_DEMO).click();
+    await instructorPage.waitForURL(/\/instructor\/[0-9a-f-]{36}$/, {
+      timeout: TIMEOUTS.PAGE_LOAD,
+    });
+    const demoDetail = new URL(instructorPage.url()).pathname;
+
+    // 1. 학생 시점으로 들어간다.
+    await instructorPage.getByRole("link", TRY_AS_STUDENT).click();
+    await instructorPage.waitForURL(/\/exam\/[A-Z0-9]+/, { timeout: TIMEOUTS.PAGE_LOAD });
+
+    // 2. preflight 는 한 번이다 (#474).
+    //
+    // 예전에는 수락하면 고지 확인이 init 캐시를 고치고, 그게 init effect 를
+    // 다시 돌려 모달이 한 번 더 떴다. 재오픈은 캐시 패치 직후 한 번의 렌더로
+    // 일어나므로, 닫힌 뒤 잠깐 기다려도 계속 닫혀 있어야 한다.
+    //
+    // 두 번 뜨는 건 고지를 처음 확인할 때뿐이다. AI 로그 체크박스가 보인다는
+    // 게 "처음" 이라는 증거다 — acceptPreflight 가 그걸 누르므로, 이미 확인한
+    // 상태로 시작하면 여기서 멈춘다(위의 마일스톤 초기화가 빠진 경우).
+    const exam = new StudentExamPage(instructorPage);
+    await expect(exam.preflightHeading).toBeVisible({ timeout: TIMEOUTS.PAGE_LOAD });
+    await expect(exam.preflightAiLogCheckbox).toBeVisible();
+    await exam.acceptPreflight();
+    await expect(exam.preflightHeading).toBeHidden({ timeout: TIMEOUTS.API_RESPONSE });
+    await instructorPage.waitForTimeout(1500);
+    await expect(exam.preflightHeading, "수락한 preflight 가 다시 떴다 (#474)").toBeHidden();
+
+    // 3. 답하고 제출한다.
+    await expect(exam.answerArea).toBeVisible({ timeout: TIMEOUTS.ELEMENT_VISIBLE });
+    await exam.typeAnswer(
+      "쓰기 직후 캐시를 무효화하기 전 짧은 창에서 오래된 값을 읽는 문제를 고른다. " +
+        "게시판 조회수처럼 몇 초 늦어도 사용자가 손해 보지 않는 값이면 감수할 수 있다."
+    );
+    await exam.submitBtn.click();
+    // 확인 버튼은 몇 초 쿨다운 동안 "제출하기 (3초)" 로 비활성이다. 쿨다운 뒤
+    // 이름으로 고르면 click 이 활성화를 기다린다.
+    await instructorPage
+      .getByTestId("submit-confirm-dialog")
+      .getByRole("button", { name: /^제출하기$|^Submit$/ })
+      .click({ timeout: TIMEOUTS.PAGE_LOAD });
+
+    // 4. 채점 결과를 연다. 완주는 "결과가 있는 채점 화면을 열었다" 로 기록된다.
+    //
+    // 결과가 아직 없을 때 열면 기록되지 않는다(`hasViewableGradingResult`).
+    // 그래서 판정이 참이 될 때까지 채점 화면을 다시 연다 — 제품이 실제로
+    // 기록하는 경로 그대로다. 기록은 채점 화면이 부르는 GET 에서 일어나므로
+    // 그 응답을 기다린 뒤 상태를 읽는다. 그 GET 은 60초 브라우저 캐시가 걸려
+    // 있어(max-age=60) 결과가 늦으면 한 번은 캐시에서 나올 수 있다 — 제한
+    // 시간을 그보다 넉넉히 둔다.
+    await expect
+      .poll(
+        async () => {
+          await instructorPage.goto(demoDetail);
+          const grade = instructorPage.locator('a[href*="/grade/"]:visible').first();
+          if (!(await grade.isVisible().catch(() => false))) return false;
+          const graded = instructorPage.waitForResponse(
+            (r) =>
+              r.request().method() === "GET" &&
+              /^\/api\/session\/[^/]+\/grade$/.test(new URL(r.url()).pathname),
+            { timeout: TIMEOUTS.PAGE_LOAD }
+          );
+          await grade.click();
+          await graded.catch(() => null);
+          const status = await instructorPage.evaluate(() =>
+            fetch("/api/onboarding/demo/status", { cache: "no-store" }).then((r) => r.json())
+          );
+          return status?.completed === true;
+        },
+        { timeout: 150_000, intervals: [3_000, 5_000, 10_000] }
+      )
+      .toBe(true);
   });
 });
