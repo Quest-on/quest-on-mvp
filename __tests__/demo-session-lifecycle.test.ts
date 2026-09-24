@@ -254,7 +254,30 @@ describe("데모 세션 수명주기", () => {
     const result = await response.json();
 
     expect(result.isRetakeBlocked).toBe(true);
+    expect(result.demoPreview).toBe(false);
     expect(result.session.id).toBe(submitted.id);
+    expect(chains.sessions[0].update).not.toHaveBeenCalled();
+  });
+
+  it("소유자가 제출한 데모에 재응시 없이 다시 들어오면 데모 미리보기로 알려준다 (#483)", async () => {
+    // 이 응답에 demoPreview 가 없으면 클라이언트 프로필 게이트가 교수자를
+    // "프로필 없는 학생" 으로 보고 /student/profile-setup 으로 보낸다. 제출 화면의
+    // 나가기도 데모 상세가 아니라 /student 가 된다.
+    const submitted = { ...NOW_SESSION, submitted_at: "2026-08-10T00:00:00.000Z", status: "auto_submitted", is_active: false };
+    const chains = queue({
+      exams: [{ data: exam(), error: null }],
+      sessions: [{ data: [submitted], error: null }],
+      messages: [{ data: [], error: null }],
+      submissions: [{ data: [{ q_idx: 0, answer: "saved" }], error: null }],
+    });
+
+    const result = await body({});
+
+    expect(result.status, JSON.stringify(result.body)).toBe(200);
+    expect(result.body.isRetakeBlocked).toBe(true);
+    expect(result.body.demoPreview, "제출한 데모 재진입 응답이 데모 미리보기임을 말하지 않는다").toBe(true);
+    // 재응시를 요청하지 않았으니 아무것도 지우지 않는다.
+    expect(supabaseMock.rpc).not.toHaveBeenCalledWith("restart_demo_attempt", expect.anything());
     expect(chains.sessions[0].update).not.toHaveBeenCalled();
   });
 });

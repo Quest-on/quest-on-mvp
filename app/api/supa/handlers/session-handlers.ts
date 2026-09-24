@@ -516,6 +516,10 @@ export async function initExamSession(data: {
           messages,
           submissions: submittedSubmissions || [],
           isRetakeBlocked: true, // 재시험 차단 플래그
+          // 다른 init 응답과 같이 싣는다. 없으면 클라이언트 프로필 게이트가 제출한
+          // 데모에 돌아온 교수자를 "프로필 없는 학생" 으로 보고 학생 프로필
+          // 설정으로 보내고, 제출 화면의 나가기도 데모 상세가 아니게 된다 (#483).
+          demoPreview: isDemoPreviewAttempt,
         });
       }
     }
