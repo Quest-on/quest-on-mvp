@@ -205,6 +205,10 @@ async function applyRouteGuards(
   //
   // `/forgot-password` 는 예외가 아니다 — 이미 로그인한 사람이 거기 갈 이유가
   // 없으므로 대시보드로 보내는 게 맞다.
+  //
+  // `/student/profile-setup` 은 `/onboarding` 으로 넘기는 shim 이다. 오는 사람이
+  // **프로필 없는 로그인 학생**(시험 프로필 게이트·대시보드가 보낸다)이라, 여기서
+  // 대시보드로 돌리면 대시보드가 다시 이리로 보내고 폼에는 영영 못 간다 (#480).
   const resetIntent =
     pathname === PASSWORD_RESET_PATH &&
     hasPasswordResetIntent(request.cookies.get(PASSWORD_RESET_COOKIE)?.value);
@@ -212,7 +216,7 @@ async function applyRouteGuards(
   if (
     isPublicRoute(pathname) &&
     !resetIntent &&
-    !["/auth/callback", "/join", "/onboarding", "/legal"].some(
+    !["/auth/callback", "/join", "/onboarding", "/legal", "/student/profile-setup"].some(
       (route) => pathname === route || pathname.startsWith(route + "/")
     )
   ) {
