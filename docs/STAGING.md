@@ -25,7 +25,7 @@
 | `NEXT_PUBLIC_APP_ENV` | (미설정 또는 `production`) | **`staging` (필수)** |
 | Supabase | 프로덕션 프로젝트 | 스테이징 전용 프로젝트 |
 | Upstash Redis | 프로덕션 DB | 스테이징 전용 DB |
-| QStash | 공용 계정, 콜백 = quest-on.app | 공용 계정, 콜백 = staging.quest-on.app |
+| QStash | 공용 계정, 콜백 = quest-on.app | 공용 계정, 콜백 = quest-on-staging-two.vercel.app |
 | OpenAI | 프로덕션 키 | 예산 한도 건 별도 키 |
 
 **왜 preview 배포가 아니라 별도 프로젝트인가**
@@ -72,8 +72,8 @@ feat/xxx  ──PR──▶  staging  ──자동배포──▶  quest-on-stag
 - [ ] `database/*.sql` 을 **번호 순서대로** 전량 적용 (프로덕션에 적용된 것과 동일한 집합인지 확인)
 - [ ] Storage 버킷을 프로덕션과 같은 이름으로 생성 (업로드/텍스트추출 경로가 버킷명을 공유한다)
 - [ ] Auth → URL Configuration
-  - Site URL: `https://staging.quest-on.app`
-  - Redirect URLs: `https://staging.quest-on.app/auth/callback`
+  - Site URL: `https://quest-on-staging-two.vercel.app`
+  - Redirect URLs: `https://quest-on-staging-two.vercel.app/auth/callback`
 - [ ] Auth → Providers: Google 등 프로덕션에서 쓰는 프로바이더 동일하게 활성화
 - [ ] Google Cloud Console → OAuth 클라이언트에 스테이징 Supabase 콜백 URL 추가
 
@@ -89,7 +89,7 @@ feat/xxx  ──PR──▶  staging  ──자동배포──▶  quest-on-stag
 - [ ] Upstash Redis 스테이징 DB 생성
 - [ ] OpenAI 스테이징 전용 키 + 월 예산 한도 설정
 - [ ] `CRON_SECRET` / `INTERNAL_API_SECRET` / `ADMIN_SESSION_SECRET` 을 프로덕션과 **다른 값**으로 새로 생성
-- [ ] QStash: 콜백이 스테이징으로 가도록 `QSTASH_WORKER_BASE_URL=https://staging.quest-on.app`
+- [ ] QStash: 콜백이 스테이징으로 가도록 `QSTASH_WORKER_BASE_URL=https://quest-on-staging-two.vercel.app`
 
 ### 4. 시드
 - [ ] 관리자 계정 1개, 교수자 계정 1~2개, 학생 계정 5~10개를 Supabase Auth 에서 직접 생성
@@ -148,6 +148,25 @@ import 0건) 스테이징을 죽였던 스키마 드리프트가 프로덕션엔
 승격 순서는 아래 "DDL 변경 순서"를 따르되, **위 4건은 프로덕션 데이터에 미치는 영향을
 개별로 승인받고 진행한다.** 스키마 변경 없이 코드만 올리면 프로덕션이 스테이징과 같은
 방식으로 조용히 죽는다 — 그게 이슈 #324 였다.
+
+---
+
+## 로컬 비밀 파일
+
+전부 gitignore 다. 키 목록의 정본은 `.env.staging.example` 이고, 파일 배치는 이 표가 정본이다.
+
+| 파일 | 담는 것 | 쓰는 곳 |
+|---|---|---|
+| `.env.staging` | 스테이징의 **모든** 로컬 값 — 앱 런타임 값 + 맨 아래 '로컬 운영 전용' 절(QA 계정, DDL 자격증명) | staging QA, staging DDL, `env:check` |
+| `.env.prod` | 프로덕션 운영 자격증명(`PROD_DB_URL`) | 별도 명시 승인이 있을 때만 (AGENTS.md) |
+| `.env.supabase` | Supabase Management API 토큰(계정 단위 — 두 프로젝트 공용) | auth 설정 조회·변경 |
+| `.env.test` | 폐기 가능한 로컬 DB | 로컬 테스트 (AGENTS.md 의 멈춤 규칙) |
+| `.env.local` | `vercel pull` 산출물 | 테스트·검증에 절대 로드하지 않는다 |
+
+- 스테이징 값을 새 파일로 쪼개지 않는다. 쪼개면 "어느 파일에 있더라" 가 반복되고, 에이전트가 자격증명이 없다고 잘못 판단한다.
+- `PROD_DB_URL` 을 `.env.staging` 에 합치지 않는다. staging DDL 프리플라이트의 "프로덕션 자격증명이 아님" 을 파일 단위로 보장하려는 분리다.
+- `.env.production` 이라는 이름을 쓰지 않는다. `next build` 가 자동으로 읽는다.
+- `.env.staging` 을 통째로 Vercel 에 넣지 않는다. '로컬 운영 전용' 절은 앱 런타임 값이 아니다.
 
 ---
 
