@@ -84,10 +84,37 @@ describe("deriveOverallStatus", () => {
     ).toBe("manually_graded");
   });
 
-  it("일부만 채점되면 grading (다운로드 차단 상태)", () => {
+  // 사례형 점수는 제출 때 자동으로 매겨지지 않는다 — 교수자가 매긴다. 그러니
+  // "점수가 비어 있음" 은 진행 중이 아니라 교수자 차례다. 도는 작업이 없는데
+  // "채점중" 이라고 하면 교수자는 기다린다 (#492, staging 실측).
+  it("요약 파이프라인이 끝났고 사례형 점수가 비어 있으면 pending — 교수자 차례 (#492)", () => {
+    expect(
+      deriveOverallStatus({
+        ...base,
+        caseTotal: 1,
+        caseGraded: 0,
+        hasManualCase: false,
+        gradingProgress: { status: "completed", phase: "done" } as never,
+      }),
+    ).toBe("pending");
+  });
+
+  it("진행 기록이 없고 일부만 채점됐으면 pending (다운로드는 여전히 막힌다)", () => {
     expect(
       deriveOverallStatus({ ...base, caseTotal: 2, caseGraded: 1, hasManualCase: false }),
-    ).toBe("grading");
+    ).toBe("pending");
+  });
+
+  it("파이프라인이 실패했으면 failed", () => {
+    expect(
+      deriveOverallStatus({
+        ...base,
+        caseTotal: 1,
+        caseGraded: 0,
+        hasManualCase: false,
+        gradingProgress: { status: "failed" } as never,
+      }),
+    ).toBe("failed");
   });
 
   it("케이스 문항이 없는 객관식 전용 시험은 ai_graded", () => {

@@ -385,7 +385,8 @@ test.describe("GET /api/exam/[examId]/student-summaries", () => {
     expect(body.students).toHaveLength(1);
     expect(body.students[0].sessionId).toBe(session.id);
     expect(body.students[0].caseProgress).toEqual({ submitted: 0, graded: 0, total: 1 });
-    expect(body.students[0].overallStatus).toBe("grading");
+    // 사례형 점수는 교수자가 매긴다 — 도는 작업이 없으면 교수자 차례(#492).
+    expect(body.students[0].overallStatus).toBe("pending");
   });
 
   test("submitted case without final or proposed grade does not synthesize score", async ({
@@ -468,7 +469,8 @@ test.describe("GET /api/exam/[examId]/student-summaries", () => {
     expect(body.students[0].caseProgress).toEqual({ submitted: 1, graded: 0, total: 1 });
     expect(body.students[0].overallScore).toBeUndefined();
     expect(body.students[0].proposedOverallScore).toBe(90);
-    expect(body.students[0].overallStatus).toBe("grading");
+    // 확정 점수가 없으니 overallStatus 는 pending, 배지는 bulkGradeStatus 로 "가채점완료"(#492).
+    expect(body.students[0].overallStatus).toBe("pending");
     expect(body.students[0].bulkGradeStatus).toBe("proposed_ready");
   });
 
