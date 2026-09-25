@@ -20,7 +20,12 @@ import {
   seedStudentExamScenario,
   cleanupTestData,
 } from "../helpers/test-data-builder";
-import { seedExam, seedSession, seedStudentProfile } from "../../helpers/seed";
+import {
+  seedExam,
+  seedSession,
+  seedStudentProfile,
+  setStudentDisclosureAcknowledged,
+} from "../../helpers/seed";
 import { StudentExamPage } from "../pages";
 import { TIMEOUTS } from "../../constants";
 
@@ -204,6 +209,8 @@ async function seedMixedExamPreflight() {
   });
 
   await seedStudentProfile("test-student-id");
+  // 최초 고지(AI 로그 체크박스)를 보려면 고지를 처음 보는 학생이어야 한다.
+  await setStudentDisclosureAcknowledged("test-student-id", false);
 
   await seedSession(exam.id, "test-student-id", {
     status: "joined",

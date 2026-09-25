@@ -14,6 +14,7 @@ import { createAuthPage, BYPASS_SECRET } from "../helpers/auth-context";
 import {
   seedExam,
   seedStudentProfile,
+  setStudentDisclosureAcknowledged,
   cleanupTestData,
   getSession,
   getSessionsByExam,
@@ -48,6 +49,9 @@ test.describe("Parallel Instructor + Student — Full Cross-Role E2E", () => {
     // which is gated behind exam.grades_released in the report API.
     const exam = await seedExam({ status: "joinable", grades_released: true });
     await seedStudentProfile(TEST_STUDENT.id);
+    // 처음 보는 학생으로 시작한다 — 고지 확인(AC-15)은 사람 단위라 앞 스펙이 남긴
+    // 확인이 있으면 AI 기록 체크박스가 안 떠서 acceptPreflight 가 멈춘다 (#482).
+    await setStudentDisclosureAcknowledged(TEST_STUDENT.id, false);
 
     // ── Create two independent browser contexts (with baseURL) ──
     const studentCtx = await browser.newContext({ baseURL: url });
