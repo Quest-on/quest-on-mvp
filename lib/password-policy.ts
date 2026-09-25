@@ -33,3 +33,26 @@ export function validatePasswordPair(
   if (password !== confirm) return "passwordMismatch";
   return null;
 }
+
+/**
+ * `updateUser({ password })` 실패를 화면 문구 키로 옮긴다 (#447).
+ *
+ * SDK 의 `error.message` 는 영문 원문이라 그대로 띄우지 않는다.
+ *
+ * - `reauthentication_needed` — Supabase "Secure password change" 가 켜져 있고
+ *   세션이 24시간보다 오래됐다. 다시 로그인하면 풀린다.
+ * - `weak_password` — 서버 하한(Supabase `password_min_length`, #461)에 걸렸다.
+ *   화면 검증과 같은 값이라 보통은 여기까지 오지 않는다.
+ */
+export type PasswordUpdateErrorKey =
+  | "reauthRequired"
+  | "newPasswordTooShort"
+  | "updateFailed";
+
+export function passwordUpdateErrorKey(
+  code: string | undefined
+): PasswordUpdateErrorKey {
+  if (code === "reauthentication_needed") return "reauthRequired";
+  if (code === "weak_password") return "newPasswordTooShort";
+  return "updateFailed";
+}
