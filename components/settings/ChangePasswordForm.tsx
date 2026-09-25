@@ -11,6 +11,7 @@ import { Loader2 } from "lucide-react";
 import { PasswordField } from "@/components/auth/PasswordField";
 import {
   PASSWORD_MIN_LENGTH,
+  passwordUpdateErrorKey,
   validatePasswordPair,
 } from "@/lib/password-policy";
 import toast from "react-hot-toast";
@@ -106,7 +107,8 @@ export function ChangePasswordForm() {
         password: newPassword,
       });
       if (updateError) {
-        toast.error(updateError.message || t("updateFailed"));
+        // SDK 원문(영문)을 띄우지 않는다. 재인증 요구는 #447 참조.
+        toast.error(t(passwordUpdateErrorKey(updateError.code), { minLength: PASSWORD_MIN_LENGTH }));
         setIsSubmitting(false);
         return;
       }
