@@ -7,6 +7,7 @@ import { successJson, errorJson } from "@/lib/api-response";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { getAuthCallbackUrl } from "@/lib/auth-redirect";
 import { logError } from "@/lib/logger";
+import { isPasswordResetEnabled } from "@/lib/password-reset-availability";
 
 /**
  * POST /api/auth/password-reset
@@ -77,6 +78,11 @@ function clientIp(request: NextRequest): string {
 }
 
 export async function POST(request: NextRequest) {
+  // 재설정은 닫혀 있다 (#318). 메일을 보내도 받는 쪽 화면이 없다.
+  if (!isPasswordResetEnabled()) {
+    return errorJson("NOT_FOUND", "Not found", 404);
+  }
+
   try {
     let body: unknown;
     try {
