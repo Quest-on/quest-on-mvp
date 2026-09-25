@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { extractErrorMessage } from "@/lib/error-messages";
 import { createClientMessageId } from "@/lib/client-message-id";
+import { useClaimAgentCorner } from "@/components/agent/AgentPanelProvider";
 import type { ProposedGradesMap } from "@/lib/bulk-grading";
 import {
   dashboardStatus,
@@ -160,6 +161,8 @@ export function BulkGradingPanel({
 }: BulkGradingPanelProps) {
   const queryClient = useQueryClient();
   const t = useTranslations("grading");
+  // 이 드로어의 전송 버튼이 우하단에 있다 — 열려 있는 동안 에이전트 FAB 을 비킨다(#495).
+  useClaimAgentCorner(open);
 
   const PERMISSION_LABELS: Record<PermissionKey, string> = {
     review_before_commit: t("bulkGrading.permissionReviewLabel"),

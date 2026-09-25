@@ -25,6 +25,22 @@ interface AgentPanelContextValue {
   open: boolean;
   toggle: () => void;
   setOpen: (open: boolean) => void;
+  /** 에이전트가 아닌 다른 우측 드로어가 FAB 자리(우하단)를 쓰는 중이다. */
+  cornerClaimed: boolean;
+  /** 우하단을 점유한다. 돌려받은 함수를 부르면 놓는다. */
+  claimCorner: () => () => void;
+}
+
+/**
+ * FAB 을 숨길지 — 에이전트 패널이 열렸거나, 다른 우측 드로어가 우하단을 쓰는 중이면.
+ *
+ * 두 번째 조건이 없어서 CASE AI 가채점 패널의 전송 버튼을 FAB 이 덮었다(#495).
+ */
+export function shouldHideAgentFab(state: {
+  panelOpen: boolean;
+  cornerClaimed: boolean;
+}): boolean {
+  return state.panelOpen || state.cornerClaimed;
 }
 
 const AgentPanelContext = createContext<AgentPanelContextValue | null>(null);
@@ -59,8 +75,17 @@ export function AgentPanelProvider({ children }: { children: ReactNode }) {
     setOpen(!open);
   }, [open, setOpen]);
 
+  // 여러 드로어가 겹쳐 열릴 수 있으니 불리언이 아니라 점유 수를 센다.
+  const [cornerClaims, setCornerClaims] = useState(0);
+  const claimCorner = useCallback(() => {
+    setCornerClaims((n) => n + 1);
+    return () => setCornerClaims((n) => Math.max(0, n - 1));
+  }, []);
+
   return (
-    <AgentPanelContext.Provider value={{ open, toggle, setOpen }}>
+    <AgentPanelContext.Provider
+      value={{ open, toggle, setOpen, cornerClaimed: cornerClaims > 0, claimCorner }}
+    >
       {children}
     </AgentPanelContext.Provider>
   );
@@ -82,4 +107,16 @@ export function useAgentPanel(): AgentPanelContextValue {
  */
 export function useAgentPanelOptional(): AgentPanelContextValue | null {
   return useContext(AgentPanelContext);
+}
+
+/**
+ * 우측 전체를 덮는 드로어가 열려 있는 동안 에이전트 FAB 을 비키게 한다.
+ * Provider 바깥에서 불려도 아무 일도 하지 않는다.
+ */
+export function useClaimAgentCorner(active: boolean): void {
+  const claimCorner = useContext(AgentPanelContext)?.claimCorner;
+  useEffect(() => {
+    if (!active || !claimCorner) return;
+    return claimCorner();
+  }, [active, claimCorner]);
 }
