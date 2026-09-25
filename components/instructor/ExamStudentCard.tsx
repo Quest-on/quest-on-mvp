@@ -54,9 +54,15 @@ export function ExamStudentCard({
   onLiveMonitoring,
 }: ExamStudentCardProps) {
   const t = useTranslations("authoring");
+  const tg = useTranslations("grading");
+  const caseLabelMessage = caseStatusLabel(student.status, student.caseProgress);
+  const caseLabel = caseLabelMessage ? tg(caseLabelMessage.key, caseLabelMessage.values) : "—";
+  const scoreLabelMessage = overallScoreLabel(student);
+  const scoreLabel = scoreLabelMessage ? tg(scoreLabelMessage.key, scoreLabelMessage.values) : "—";
   const locale = useLocale() as "ko" | "en";
   const subInfo = [student.studentNumber, student.school].filter(Boolean).join(", ");
   const status = dashboardStatus(student);
+  const statusLabel = dashboardStatusLabel(status);
 
   return (
     <Card
@@ -83,7 +89,7 @@ export function ExamStudentCard({
                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-warning-solid" />
                   </span>
                 )}
-                {dashboardStatusLabel(status)}
+                {tg(statusLabel.key, statusLabel.values)}
               </Badge>
             </div>
             {subInfo ? (
@@ -122,13 +128,13 @@ export function ExamStudentCard({
           <div>
             <dt className="text-muted-foreground">{t("examStudentCard.labelEssay")}</dt>
             <dd className="font-medium tabular-nums">
-              {caseStatusLabel(student.status, student.caseProgress)}
+              {caseLabel}
             </dd>
           </div>
           <div>
             <dt className="text-muted-foreground">{t("examStudentCard.labelTotal")}</dt>
             <dd className="font-medium tabular-nums">
-              {overallScoreLabel(student)}
+              {scoreLabel}
             </dd>
           </div>
         </dl>

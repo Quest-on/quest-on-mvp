@@ -387,5 +387,19 @@
     "scoreLabel": "{score} pts",
     "monitoringButton": "Monitor",
     "gradeButton": "Grade"
+  },
+  "studentStatus": {
+    "notStarted": "Not started",
+    "inProgress": "In progress",
+    "pending": "Awaiting grading",
+    "grading": "Grading",
+    "proposedReady": "Draft ready",
+    "graded": "Graded",
+    "failed": "Grading failed",
+    "caseNotSubmitted": "Not submitted",
+    "casePartial": "Partly submitted {submitted}/{total}",
+    "caseSubmitted": "Submitted",
+    "scoreFinal": "{score} pts",
+    "scoreProposed": "Draft {score} pts"
   }
 }

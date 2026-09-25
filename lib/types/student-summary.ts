@@ -71,6 +71,19 @@ export type ExamStudentDashboardStatus =
   | "graded"
   | "failed";
 
+/**
+ * 화면 문구의 번역 키와 값. lib 는 로케일을 모른다 — 컴포넌트가
+ * `useTranslations("grading")` 의 `t(key, values)` 로 푼다. 예전에는 여기서
+ * 한국어 문구를 바로 돌려줘 영어 로케일에서도 "채점중" 이 나왔다 (#494).
+ *
+ * 빈 칸은 `null` 이다 — 문구가 아니라 표의 빈 칸 표시라서 컴포넌트가 다른 칸과
+ * 같은 기호로 그린다(메시지에 넣으면 ui-text-hygiene 의 앰대쉬 규칙에 걸린다).
+ */
+export interface StudentLabelMessage {
+  key: `studentStatus.${string}`;
+  values?: Record<string, string | number>;
+}
+
 function formatScoreNumber(score: number): string {
   if (Number.isInteger(score)) return String(score);
   return score.toFixed(1).replace(/\.0$/, "");
@@ -79,14 +92,20 @@ function formatScoreNumber(score: number): string {
 /** 채점 현황 카드/행의 "총점" 칸에 표시할 점수 텍스트. */
 export function overallScoreLabel(
   student: Pick<ExamStudentSummary, "overallScore" | "proposedOverallScore">,
-): string {
+): StudentLabelMessage | null {
   if (student.overallScore != null) {
-    return `${formatScoreNumber(student.overallScore)}점`;
+    return {
+      key: "studentStatus.scoreFinal",
+      values: { score: formatScoreNumber(student.overallScore) },
+    };
   }
   if (student.proposedOverallScore != null) {
-    return `가채점 ${formatScoreNumber(student.proposedOverallScore)}점`;
+    return {
+      key: "studentStatus.scoreProposed",
+      values: { score: formatScoreNumber(student.proposedOverallScore) },
+    };
   }
-  return "—";
+  return null;
 }
 
 /** 제출/채점/가채점 상태를 학생 목록용 단일 상태로 정리한다. */
@@ -135,23 +154,18 @@ export function dashboardStatus(
   return "pending";
 }
 
-export function dashboardStatusLabel(status: ExamStudentDashboardStatus): string {
-  switch (status) {
-    case "in-progress":
-      return "응시중";
-    case "pending":
-      return "채점대기";
-    case "grading":
-      return "채점중";
-    case "proposed-ready":
-      return "가채점완료";
-    case "graded":
-      return "채점완료";
-    case "failed":
-      return "채점실패";
-    default:
-      return "미시작";
-  }
+const DASHBOARD_STATUS_LABEL_KEY: Record<ExamStudentDashboardStatus, StudentLabelMessage["key"]> = {
+  "not-started": "studentStatus.notStarted",
+  "in-progress": "studentStatus.inProgress",
+  pending: "studentStatus.pending",
+  grading: "studentStatus.grading",
+  "proposed-ready": "studentStatus.proposedReady",
+  graded: "studentStatus.graded",
+  failed: "studentStatus.failed",
+};
+
+export function dashboardStatusLabel(status: ExamStudentDashboardStatus): StudentLabelMessage {
+  return { key: DASHBOARD_STATUS_LABEL_KEY[status] };
 }
 
 const DASHBOARD_STATUS_SORT_RANK: Record<ExamStudentDashboardStatus, number> = {
@@ -173,11 +187,14 @@ export function dashboardStatusSortRank(status: ExamStudentDashboardStatus): num
 export function caseStatusLabel(
   status: ExamStudentSessionStatus,
   caseProgress: CaseProgress,
-): string {
-  if (status !== "submitted" || caseProgress.total === 0) return "—";
-  if (caseProgress.submitted === 0) return "미제출";
+): StudentLabelMessage | null {
+  if (status !== "submitted" || caseProgress.total === 0) return null;
+  if (caseProgress.submitted === 0) return { key: "studentStatus.caseNotSubmitted" };
   if (caseProgress.submitted < caseProgress.total) {
-    return `일부 제출 ${caseProgress.submitted}/${caseProgress.total}`;
+    return {
+      key: "studentStatus.casePartial",
+      values: { submitted: caseProgress.submitted, total: caseProgress.total },
+    };
   }
-  return "제출됨";
+  return { key: "studentStatus.caseSubmitted" };
 }

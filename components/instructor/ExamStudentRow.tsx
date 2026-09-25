@@ -42,10 +42,12 @@ function dashboardStatusClass(status: ReturnType<typeof dashboardStatus>): strin
 }
 
 function DashboardStatusBadge({ student }: { student: ExamStudentSummary }) {
+  const tg = useTranslations("grading");
   const status = dashboardStatus(student);
+  const label = dashboardStatusLabel(status);
   return (
     <Badge className={dashboardStatusClass(status)}>
-      {dashboardStatusLabel(status)}
+      {tg(label.key, label.values)}
     </Badge>
   );
 }
@@ -67,6 +69,11 @@ export function ExamStudentRow({
   onLiveMonitoring,
 }: ExamStudentRowProps) {
   const t = useTranslations("authoring");
+  const tg = useTranslations("grading");
+  const caseLabelMessage = caseStatusLabel(student.status, student.caseProgress);
+  const caseLabel = caseLabelMessage ? tg(caseLabelMessage.key, caseLabelMessage.values) : "—";
+  const scoreLabelMessage = overallScoreLabel(student);
+  const scoreLabel = scoreLabelMessage ? tg(scoreLabelMessage.key, scoreLabelMessage.values) : "—";
   const locale = useLocale() as "ko" | "en";
   const subInfo = [student.studentNumber, student.school]
     .filter(Boolean)
@@ -135,10 +142,10 @@ export function ExamStudentRow({
             href={`/instructor/${examId}/grade/${student.sessionId}?questionType=case`}
             className="text-primary underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
           >
-            {caseStatusLabel(student.status, student.caseProgress)}
+            {caseLabel}
           </Link>
         ) : (
-          caseStatusLabel(student.status, student.caseProgress)
+          caseLabel
         )}
       </div>
 
@@ -146,7 +153,7 @@ export function ExamStudentRow({
         className="text-sm tabular-nums text-center font-medium"
         data-testid={`exam-student-total-${student.sessionId}`}
       >
-        {overallScoreLabel(student)}
+        {scoreLabel}
       </div>
 
       <div className="type-meta">
