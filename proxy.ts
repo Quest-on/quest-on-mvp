@@ -11,6 +11,7 @@ import {
 import { classifyRoute, ownsInProgressSession } from "@/lib/consent-route-policy";
 import { logInfo } from "@/lib/logger";
 import { safeInternalPath } from "@/lib/safe-redirect";
+import { isPasswordResetEnabled } from "@/lib/password-reset-availability";
 import {
   PASSWORD_RESET_COOKIE,
   PASSWORD_RESET_PATH,
@@ -210,6 +211,7 @@ async function applyRouteGuards(
   // **프로필 없는 로그인 학생**(시험 프로필 게이트·대시보드가 보낸다)이라, 여기서
   // 대시보드로 돌리면 대시보드가 다시 이리로 보내고 폼에는 영영 못 간다 (#480).
   const resetIntent =
+    isPasswordResetEnabled() &&
     pathname === PASSWORD_RESET_PATH &&
     hasPasswordResetIntent(request.cookies.get(PASSWORD_RESET_COOKIE)?.value);
 

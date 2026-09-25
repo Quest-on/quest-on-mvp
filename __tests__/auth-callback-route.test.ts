@@ -35,6 +35,11 @@ const RECOVERY_SESSION: ExchangeResult = {
 const exchangeCodeForSession = vi.fn(async (): Promise<ExchangeResult> => PASSWORD_SESSION);
 const cookieSet = vi.fn();
 
+// 재설정은 지금 닫혀 있다(#318, lib/password-reset-availability.ts). 이 파일은
+// **열었을 때** 메커니즘이 맞는지를 본다 — 다시 열 때 그대로 쓰려고 남긴다.
+// 닫혀 있을 때의 동작은 __tests__/password-reset-closed.test.ts 가 본다.
+vi.mock("@/lib/password-reset-availability", () => ({ isPasswordResetEnabled: () => true }));
+
 vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({
     auth: { exchangeCodeForSession },

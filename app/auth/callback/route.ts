@@ -7,6 +7,7 @@ import {
   isRecoverySession,
   passwordResetIntentCookie,
 } from "@/lib/password-reset-intent";
+import { isPasswordResetEnabled } from "@/lib/password-reset-availability";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -44,7 +45,11 @@ export async function GET(request: Request) {
       //
       // 그리고 그 사실을 HttpOnly 의도 쿠키로 남긴다 — `/reset-password` 가
       // "로그인했는가" 가 아니라 "복구로 왔는가" 로 문을 열 수 있게.
-      if (next === PASSWORD_RESET_PATH && isRecoverySession(data.session?.access_token)) {
+      if (
+        isPasswordResetEnabled() &&
+        next === PASSWORD_RESET_PATH &&
+        isRecoverySession(data.session?.access_token)
+      ) {
         const intent = passwordResetIntentCookie(
           new URL(request.url).protocol === "https:"
         );
@@ -53,7 +58,10 @@ export async function GET(request: Request) {
       }
 
       const onboardingUrl = new URL("/onboarding", origin);
-      if (next) onboardingUrl.searchParams.set("redirect", next);
+      // 재설정이 닫혀 있으면 그 화면을 목적지로 이어 주지 않는다 — 404 로 끝난다.
+      if (next && !(next === PASSWORD_RESET_PATH && !isPasswordResetEnabled())) {
+        onboardingUrl.searchParams.set("redirect", next);
+      }
       return NextResponse.redirect(onboardingUrl);
     }
   }
