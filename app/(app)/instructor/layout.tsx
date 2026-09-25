@@ -17,7 +17,7 @@ import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { UserMenu } from "@/components/auth/UserMenu";
 import AgentPanel, { AgentPanelGap } from "@/components/agent/AgentPanel";
-// import { AgentFab } from "@/components/agent/AgentFab"; // 임시 숨김 — 복구 시 주석 해제
+import { AgentFab } from "@/components/agent/AgentFab";
 import { AgentRunControllerProvider } from "@/components/agent/AgentRunController";
 import { AgentPresenceProvider } from "@/components/agent/AgentPresenceProvider";
 import { AgentPanelProvider } from "@/components/agent/AgentPanelProvider";
@@ -197,9 +197,24 @@ export default function InstructorLayout({
             {/* 실제 패널 본체 — 데스크톱: fixed 우측, 모바일: Sheet 오버레이 */}
             <AgentPanel />
 
-            {/* 우측 하단 고정 플로팅 버튼 — 패널 열기 (데스크톱/태블릿) */}
-            {/* TODO: AI 에이전트 버튼 임시 숨김. 복구 시 아래 주석 해제 + 위 import 복원. */}
-            {/* <AgentFab /> */}
+            {/*
+             * 우측 하단 고정 플로팅 버튼 — 패널 열기.
+             *
+             * **데스크톱에서만** 유일한 진입점이다. 모바일 하단 내비에도 에이전트
+             * 버튼이 있지만 `!isAuthoringRoute` 조건이라 `/instructor/new` 에서는
+             * 렌더되지 않는다. 그런데 에이전트 실행기(useAgentEditorExecutor)가
+             * 붙어 있는 곳이 바로 그 페이지다 — FAB 을 내리면 열 수 있는 자리와
+             * 동작하는 자리가 어긋나 기능이 통째로 도달 불가능해진다. 4개월간 그
+             * 상태였다 (이슈 #436).
+             *
+             * ⚠ FAB 은 `hidden md:flex` 로 데스크톱 전용이다. 여기에 모바일 내비가
+             * 없는 것을 겹치면 **768px 미만에서는 진입점이 하나도 없다.** 지금
+             * 상태가 그렇고, 어떤 방향으로 닫을지는 #460 이 정한다 — FAB 을
+             * 모바일에도 띄우거나, 축소된 내비를 렌더하거나, 모바일 미지원을
+             * 명시하거나. 이 커플링은 `__tests__/agent-entry-point.test.ts` 가
+             * 짝으로 고정한다.
+             */}
+            <AgentFab />
           </div>
         </AgentPanelProvider>
       </AgentPresenceProvider>

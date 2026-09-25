@@ -7,6 +7,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
+import { needsPreflight } from "@/lib/exam-preflight";
 
 const EXAM_ID = "11111111-1111-4111-8111-111111111111";
 const SESSION_ID = "22222222-2222-4222-8222-222222222222";
@@ -86,20 +87,34 @@ describe("지각 입장 고지 게이트 (#150)", () => {
     expect(update.mock.calls[0][0]).not.toHaveProperty("preflight_accepted_at");
   });
 
-  it("시험 유형과 무관하게 사람 단위 ACK가 없으면 preflight를 다시 띄운다", () => {
-    const hook = readFileSync("hooks/useExamSession.ts", "utf8");
+  // 판정이 lib/exam-preflight.ts 로 옮겨졌다 (#474). 예전에는 훅의 인라인
+  // 조건 텍스트를 단정했는데, 같은 성질을 이제 판정 함수의 동작으로 고정한다.
+  // 텍스트를 고정하면 판정을 옮기는 순간 성질과 무관하게 깨진다.
+  const init = (session: Record<string, unknown>, rest: Record<string, unknown> = {}) => ({
+    ok: true,
+    disclosureAcknowledged: false,
+    session: { preflight_accepted_at: "2026-09-01T00:00:00Z", submitted_at: null, ...session },
+    ...rest,
+  });
 
-    expect(hook).toMatch(/const needsDisclosureAcknowledgement = !initData\.disclosureAcknowledged;/);
+  it("시험 유형과 무관하게 사람 단위 ACK가 없으면 preflight를 다시 띄운다", () => {
+    // 세션은 이미 수락했지만(지각 승인 등) 사람 단위 ACK 가 없다.
+    expect(needsPreflight(init({ status: "late_pending" }))).toBe(true);
+    expect(needsPreflight(init({ status: "in_progress" }))).toBe(true);
+
+    // 판정은 문항을 보지 않는다 — AI 채팅 문항 유무로 고지를 건너뛰면 안 된다.
+    const gate = readFileSync("lib/exam-preflight.ts", "utf8");
+    expect(gate).not.toMatch(/questions|hasAiChatQuestions/);
+    const hook = readFileSync("hooks/useExamSession.ts", "utf8");
     expect(hook).not.toMatch(/hasAiChatQuestions\(initData\.exam\.questions\)/);
-    expect(hook).toMatch(/\|\| needsDisclosureAcknowledgement/);
-    expect(hook).toMatch(/"late_pending"/);
+    expect(hook).toMatch(/needsPreflight\(initData\)/);
   });
 
   it("제출된 세션에는 이미 보지 못한 고지도 다시 띄우지 않는다", () => {
-    const hook = readFileSync("hooks/useExamSession.ts", "utf8");
-
-    expect(hook).toMatch(/completedSessionStatuses = new Set\(\["submitted", "auto_submitted"\]\)/);
-    expect(hook).toMatch(/!completedSessionStatuses\.has\(currentSessionStatus\)/);
-    expect(hook).toMatch(/!initData\.session\.submitted_at/);
+    expect(needsPreflight(init({ status: "submitted" }))).toBe(false);
+    expect(needsPreflight(init({ status: "auto_submitted" }))).toBe(false);
+    expect(
+      needsPreflight(init({ status: "in_progress", submitted_at: "2026-09-02T00:00:00Z" }))
+    ).toBe(false);
   });
 });

@@ -5,67 +5,18 @@ import { useTranslations } from "next-intl";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
 import { createSupabaseClient } from "@/lib/supabase-client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { PasswordField } from "@/components/auth/PasswordField";
+import {
+  PASSWORD_MIN_LENGTH,
+  passwordUpdateErrorKey,
+  validatePasswordPair,
+} from "@/lib/password-policy";
 import toast from "react-hot-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/query-keys";
-
-const MIN_PASSWORD_LENGTH = 8;
-
-/** show/hide 토글이 달린 비밀번호 입력 필드 */
-function PasswordField({
-  id,
-  label,
-  value,
-  onChange,
-  show,
-  onToggleShow,
-  toggleAriaLabel,
-  autoComplete,
-  placeholder,
-  error,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  show: boolean;
-  onToggleShow: () => void;
-  toggleAriaLabel: string;
-  autoComplete: string;
-  placeholder: string;
-  error?: string | null;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <div className="relative">
-        <Input
-          id={id}
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          autoComplete={autoComplete}
-          placeholder={placeholder}
-          className="pr-10"
-        />
-        <button
-          type="button"
-          onClick={onToggleShow}
-          tabIndex={-1}
-          aria-label={toggleAriaLabel}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-        >
-          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
-      </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
-    </div>
-  );
-}
 
 export function ChangePasswordForm() {
   const t = useTranslations("auth.changePassword");
@@ -106,10 +57,8 @@ export function ChangePasswordForm() {
 
   const validate = (): string | null => {
     if (hasPassword && !currentPassword) return t("currentPasswordRequired");
-    if (newPassword.length < MIN_PASSWORD_LENGTH)
-      return t("newPasswordTooShort", { minLength: MIN_PASSWORD_LENGTH });
-    if (newPassword !== confirmPassword)
-      return t("passwordMismatch");
+    const pairError = validatePasswordPair(newPassword, confirmPassword);
+    if (pairError) return t(pairError, { minLength: PASSWORD_MIN_LENGTH });
     if (hasPassword && currentPassword === newPassword)
       return t("sameAsCurrentPassword");
     return null;
@@ -158,7 +107,8 @@ export function ChangePasswordForm() {
         password: newPassword,
       });
       if (updateError) {
-        toast.error(updateError.message || t("updateFailed"));
+        // SDK 원문(영문)을 띄우지 않는다. 재인증 요구는 #447 참조.
+        toast.error(t(passwordUpdateErrorKey(updateError.code), { minLength: PASSWORD_MIN_LENGTH }));
         setIsSubmitting(false);
         return;
       }
@@ -229,7 +179,7 @@ export function ChangePasswordForm() {
         onToggleShow={() => setShowNew((v) => !v)}
         toggleAriaLabel={showNew ? t("hidePassword") : t("showPassword")}
         autoComplete="new-password"
-        placeholder={t("newPasswordPlaceholder", { minLength: MIN_PASSWORD_LENGTH })}
+        placeholder={t("newPasswordPlaceholder", { minLength: PASSWORD_MIN_LENGTH })}
       />
 
       <PasswordField

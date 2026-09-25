@@ -16,7 +16,9 @@ Applies to all route handlers under `app/api/`. For broader product rules see ro
 Webhook, cron, and `/api/internal/*` routes substitute step 3 with signature verification. See SECURITY.md.
 
 ## Rate Limiting
-Import from `@/lib/rate-limit`. Always async (Upstash-backed with in-memory fallback). Key format: `"<route-slug>:<user.id-or-ip>"`. Predefined buckets: `chat`, `ai`, `general`, `upload`, `sessionRead`, `examControl`, `submission`, `adminLogin`, `pasteLog`, `finalAnswerSave`, `publicSearch`.
+Import from `@/lib/rate-limit`. Always async (Upstash-backed with in-memory fallback). Key format: `"<route-slug>:<user.id-or-ip>"`. Predefined buckets: `chat`, `ai`, `general`, `upload`, `sessionRead`, `examControl`, `submission`, `adminLogin`, `pasteLog`, `finalAnswerSave`, `publicSearch`, `bulkGenerate`, `passwordReset`.
+
+버킷 목록은 `lib/rate-limit.ts` 가 진실이다. 위 목록이 어긋나면 코드를 보고 이 문서를 고친다.
 
 ```ts
 const rl = await checkRateLimitAsync(`exam-start:${user.id}`, RATE_LIMITS.examControl);

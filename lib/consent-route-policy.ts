@@ -35,7 +35,18 @@ export const SUPA_CONTINUITY_ACTIONS = new Set([
   "submit_assignment",
 ]);
 
-const PUBLIC_PREFIXES = ["/legal/", "/auth/callback", "/sign-in", "/sign-up", "/sso", "/join", "/onboarding", "/student/profile-setup", "/instructor-pending"];
+// 비밀번호 복구 경로(#318)는 동의 게이트 앞에 선다.
+//
+// `/auth/callback` 이 복구 세션만 온보딩을 건너뛰어 `/reset-password` 로
+// 보내는데, 그 경로가 여기서 "protected" 로 분류되면 프록시가 한 홉 뒤에
+// 다시 `/onboarding` 으로 돌려보낸다 — 건너뛴 의미가 사라진다. 그러면
+// 사용자는 비밀번호를 바꾸기 전에 동의 화면에 갇히고, 거기서 탭을 닫으면
+// **로그인은 된 채 잊어버린 비밀번호는 그대로** 남는다.
+// 트레일링 슬래시를 붙인 건 `/legal/` 과 같은 이유다. 매칭이
+// `pathname === prefix.slice(0,-1) || pathname.startsWith(prefix)` 이라
+// 슬래시 없이 `"/reset-password"` 로 넣으면 `/reset-password-extra` 같은
+// 남의 경로까지 public 이 된다. 동의 게이트를 여는 구멍은 좁아야 한다.
+const PUBLIC_PREFIXES = ["/legal/", "/auth/callback", "/sign-in", "/sign-up", "/sso", "/join", "/onboarding", "/student/profile-setup", "/instructor-pending", "/forgot-password/", "/reset-password/"];
 const INTERNAL_PREFIXES = ["/api/admin/", "/api/internal/", "/api/cron/", "/api/health"];
 
 export function classifyRoute(pathname: string, method: string, action?: unknown): ConsentRouteClass {

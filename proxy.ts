@@ -11,6 +11,12 @@ import {
 import { classifyRoute, ownsInProgressSession } from "@/lib/consent-route-policy";
 import { logInfo } from "@/lib/logger";
 import { safeInternalPath } from "@/lib/safe-redirect";
+import { isPasswordResetEnabled } from "@/lib/password-reset-availability";
+import {
+  PASSWORD_RESET_COOKIE,
+  PASSWORD_RESET_PATH,
+  hasPasswordResetIntent,
+} from "@/lib/password-reset-intent";
 
 const isPublicRoute = (pathname: string) =>
   [
@@ -18,6 +24,14 @@ const isPublicRoute = (pathname: string) =>
     "/join",
     "/sign-in",
     "/sign-up",
+    // 비밀번호 복구 (#318). 로그인할 수 없는 사람이 쓰는 화면이므로 반드시
+    // 공개여야 한다. 빠뜨렸을 때 /sign-in 의 "비밀번호를 잊으셨나요?" 링크가
+    // /sign-in?redirect=/forgot-password 로 되돌아오는 닫힌 루프가 됐다.
+    "/forgot-password",
+    // /reset-password 도 공개다. 복구 링크가 세션을 만들어 주긴 하지만,
+    // 만료된 링크나 주소 직접 입력으로 세션 없이 오는 경우가 있다. 여기서
+    // 막으면 "링크가 만료되었습니다" 안내를 보여줄 기회 자체가 없어진다.
+    "/reset-password",
     "/onboarding",
     "/legal",
     "/student/profile-setup",
@@ -179,7 +193,35 @@ async function applyRouteGuards(
 ): Promise<NextResponse> {
   // 로그인된 유저가 공개 라우트(홈, 로그인 등)에 접근 → role에 맞는 대시보드로 리다이렉트
   // /onboarding과 legal 문서는 설정/정책 확인에 필요하므로 통과한다.
-  if (isPublicRoute(pathname) && !["/auth/callback", "/join", "/onboarding", "/legal"].some((route) => pathname === route || pathname.startsWith(route + "/"))) {
+  // `/reset-password` 는 **복구로 온 사람에게만** 통과시킨다 (이슈 #456).
+  //
+  // 복구 링크는 세션을 만든다. 그래서 이 화면에 도달하는 사람은 항상 로그인
+  // 상태이고, 공개 라우트 목록에만 넣으면 이 블록이 대시보드로 되돌려 보낸다.
+  // 그렇다고 로그인 전체에 열면 **아무 로그인 사용자나 옛 비밀번호 없이
+  // 비밀번호를 바꾸는 화면**이 열린다(#447 — Supabase 가 재인증을 강제하지
+  // 않는다).
+  //
+  // 그래서 콜백이 복구 세션에만 심는 HttpOnly 의도 쿠키를 본다. 쿠키는
+  // `/reset-password` 경로로 한정돼 있어 다른 요청에는 실리지도 않는다.
+  //
+  // `/forgot-password` 는 예외가 아니다 — 이미 로그인한 사람이 거기 갈 이유가
+  // 없으므로 대시보드로 보내는 게 맞다.
+  //
+  // `/student/profile-setup` 은 `/onboarding` 으로 넘기는 shim 이다. 오는 사람이
+  // **프로필 없는 로그인 학생**(시험 프로필 게이트·대시보드가 보낸다)이라, 여기서
+  // 대시보드로 돌리면 대시보드가 다시 이리로 보내고 폼에는 영영 못 간다 (#480).
+  const resetIntent =
+    isPasswordResetEnabled() &&
+    pathname === PASSWORD_RESET_PATH &&
+    hasPasswordResetIntent(request.cookies.get(PASSWORD_RESET_COOKIE)?.value);
+
+  if (
+    isPublicRoute(pathname) &&
+    !resetIntent &&
+    !["/auth/callback", "/join", "/onboarding", "/legal", "/student/profile-setup"].some(
+      (route) => pathname === route || pathname.startsWith(route + "/")
+    )
+  ) {
     if (!role) return NextResponse.redirect(new URL("/onboarding", request.url));
     if (role === "instructor") {
 

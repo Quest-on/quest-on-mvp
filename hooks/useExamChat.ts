@@ -113,6 +113,12 @@ export function useExamChat({
           errorMessage = "세션에 문제가 있습니다. 페이지를 새로고침하고 다시 시도해주세요.";
         } else if (errorData.error === "Missing required fields") {
           errorMessage = "필수 정보가 누락되었습니다. 다시 시도해주세요.";
+        } else if (errorData.error === "QUOTA_CHECK_UNAVAILABLE") {
+          // 한도 판정이 잠시 불가능한 상태다 (#326). 서버가 이 코드를 따로
+          // 만든 이유가 "일반 오류와 뭉개지 말라" 는 것인데, 여기서 안 받으면
+          // 학생은 "오류가 발생했습니다" 를 보고 다시 시도하지 않는다.
+          errorMessage =
+            "지금은 일시적으로 응답할 수 없습니다. 잠시 뒤 다시 시도해주세요.";
         }
         setChatHistory((prev) => [
           ...prev,

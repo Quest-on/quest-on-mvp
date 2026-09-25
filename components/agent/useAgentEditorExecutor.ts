@@ -14,7 +14,7 @@
  * 일반(비에이전트) 사용에는 어떤 영향도 주지 않는다 — 호출되지 않으면 무동작.
  */
 
-import { useCallback, useMemo, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 import { useAgentPresence } from "@/components/agent/AgentPresenceProvider";
 import { typeText } from "@/components/agent/typeText";
 import type { CaseQuestionGeneratorHandle } from "@/components/instructor/CaseQuestionGenerator";
@@ -90,12 +90,43 @@ export function useAgentEditorExecutor(
     route,
   } = deps;
 
+  /**
+   * 방금 쓴 값을 React 가 확인할 때까지 들고 있는다 (이슈 #441).
+   *
+   * 컨트롤러는 액션 배치가 끝나자마자 `getPageState()` 를 읽어 서버로 보낸다.
+   * 그런데 `setExamTitle` 은 업데이트를 **예약**만 하므로, 그 시점의 클로저는
+   * 아직 이전 값을 들고 있다 — 마지막 글자가 빠진 제목이 보고되고, 모델은
+   * 자기가 쓴 값과 다르니 실패로 판단해 재시도한다. 실제로는 성공한 작업인데
+   * "글자 수 제한" 같은 없는 원인을 지목했다.
+   *
+   * 타이밍(rAF 두 번 대기 등)에 기대지 않고, executor 가 **자기가 쓴 값**을
+   * 기억하게 한다.
+   *
+   * 비우는 조건은 "예약값과 props 가 같아지면" 이 아니라 **"props 가 조금이라도
+   * 움직이면"** 이다. 전자로 하면 에이전트가 X 를 쓴 뒤 사용자가 직접 Y 로
+   * 고쳤을 때 예약값이 영영 X 로 남아, 원래 버그보다 오래 거짓말한다.
+   * props 가 움직였다는 건 React 가 이미 커밋했다는 뜻이고, 그때부터는
+   * props 가 예약값보다 항상 최신이다. 그 판정은 아래 effect 가 한다.
+   */
+  const pendingTitleRef = useRef<string | null>(null);
+
+  // 비우는 일은 **커밋된 뒤에만** 한다 (이슈 #453).
+  //
+  // 처음엔 렌더 본문에서 `lastSeenTitleRef` 와 비교해 비웠다. React 19 동시
+  // 렌더링에는 시작됐다가 버려지는 렌더가 있고(트랜지션 중단·Suspense 재시도·
+  // 우선순위 선점), 버려진 렌더가 그 블록을 지나가면 예약값을 지우면서 커밋은
+  // 일어나지 않는다. 그 뒤 getPageState 는 낡은 제목을 돌려준다 — #441 이
+  // 그대로 재발한다. effect 는 실제 커밋 뒤에만 돌므로 그 창이 없다.
+  useEffect(() => {
+    pendingTitleRef.current = null;
+  }, [examTitle]);
+
   // ── 현재 편집기 상태 → AgentPageState ──────────────────────────
   const getPageState = useCallback((): AgentPageState => {
     return {
       route:
         typeof window !== "undefined" ? window.location.pathname : route,
-      examTitle,
+      examTitle: pendingTitleRef.current ?? examTitle,
       questionCount: questions.length,
       questions: questions.map((q, index) => ({
         index,
@@ -114,13 +145,24 @@ export function useAgentEditorExecutor(
       presence.setActive(true);
       try {
         await typeText({ target: text, onChange: setExamTitle });
+        // React 가 이 값을 반영하기 전에 컨트롤러가 pageState 를 읽는다 (#441).
+        pendingTitleRef.current = text;
         return { ok: true };
       } catch (err) {
-        // typeText 가 AbortError 면 무시하되 값은 최종값으로 확정.
+        // typeText 가 실패해도 값은 최종값으로 확정한다 — 사용자 화면에는
+        // 요청한 제목이 들어가는 게 맞다.
         setExamTitle(text);
         if (err instanceof Error && err.name === "AbortError") {
+          // 성공으로 보고하므로 예약값도 함께 보장한다.
+          pendingTitleRef.current = text;
           return { ok: true };
         }
+        // 실패로 보고할 때는 예약값을 심지 않는다 (이슈 #453).
+        //
+        // 심으면 컨트롤러가 "실패" 를 받은 직후 읽는 pageState 가 "이미
+        // 들어가 있다" 고 말한다. #441 의 거울상이다 — 그때는 성공을 실패로
+        // 보고했고, 여기서는 실패를 보고하면서 효과는 보이게 둔다. 모델이
+        // 재시도하거나 일어나지 않은 실패를 서술할 근거가 된다.
         return { ok: false, error: "제목 입력 중 오류가 발생했습니다." };
       } finally {
         presence.setActive(false);

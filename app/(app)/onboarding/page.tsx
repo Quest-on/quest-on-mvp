@@ -367,10 +367,20 @@ export default function OnboardingPage() {
       // off/shadow 에서는 서버가 503 을 내므로 호출 자체를 하지 않는다.
       // 그래야 아직 켜지지 않은 롤아웃 단계에서 사용자가 헛되이 막히지 않는다.
       if (consentCollecting === true) {
+        // 사용자가 실제로 체크한 값을 보낸다 (이슈 #445).
+        //
+        // 예전에는 리터럴 `true` 를 보냈다. 위의 제출 가드가 미체크를 막으니
+        // 통과할 값만 보낸 셈이라 버그는 아니었다. 그래도 **동의 기록은 법적
+        // 산출물**이고, 그 값이 사용자 입력과 분리돼 있으면 기록이 사실인지를
+        // 코드 한 줄이 아니라 "가드가 아직 제자리에 있는가" 로 확인해야 한다.
+        // 가드가 옮겨지는 순간 체크하지 않은 동의가 조용히 기록된다.
+        //
+        // 서버의 `z.literal(true)` 도 이 상태에서는 방어가 아니라 은폐였다 —
+        // 통과할 값만 보내니 거부 경로가 한 번도 실행되지 않는다.
         const consentRes = await fetch("/api/consents/onboarding", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ageOver14: true, terms: true }),
+          body: JSON.stringify({ ageOver14, terms }),
         });
         if (!consentRes.ok) {
           setError(consentRes.status === 503 ? tConsent("notActive") : tConsent("failed"));

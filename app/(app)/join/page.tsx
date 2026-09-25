@@ -48,6 +48,9 @@ export default function ExamCodeEntry() {
       // 설명하는 건 도움이 안 된다.
       publish_limit: t("publishLimitReached"),
       student_limit: t("studentLimitReached"),
+      // 정원이 찬 게 아니라 판정이 잠시 불가능한 상태다. 같은 문구로 뭉개면
+      // 학생이 "내 자리가 없구나" 로 읽고 다시 시도하지 않는다.
+      quota_unavailable: t("quotaUnavailable"),
     };
 
     // 코드를 복원한다. 이게 없으면 학생이 코드를 다시 받아야 재시도할 수 있다.

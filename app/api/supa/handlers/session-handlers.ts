@@ -6,6 +6,7 @@ import { auditLog } from "@/lib/audit";
 import { logError } from "@/lib/logger";
 import { triggerGradingIfNeeded } from "@/lib/grading-trigger";
 import { sanitizeUserInput } from "@/lib/sanitize";
+import { resolveAdmissionFallback, QUOTA_UNAVAILABLE_CODE } from "@/lib/quota-admission";
 import { stripSensitiveQuestionFields } from "@/lib/sanitize-exam-questions";
 import {
   ONBOARDING_EVENTS,
@@ -13,6 +14,7 @@ import {
   recordOnboardingEvent,
 } from "@/lib/onboarding-events";
 import { isDemoPreview } from "@/lib/demo-completion";
+import { isDisclosureAcknowledged } from "@/lib/exam-preflight";
 import { isQuotaGateMissing } from "@/lib/plan-limits";
 
 /** 5-second grace period for network latency (shared across heartbeat/initExamSession/feedback) */
@@ -249,11 +251,44 @@ export async function createOrGetSession(data: { examId: string; studentId: stri
     );
 
     if (admitError) {
-      // fail-open. 한도 계산 장애로 수업이 멈추는 것보다 낫다.
-      logError("[createOrGetSession] quota_fail_open", admitError, {
+      // 한도 판정 불가 (이슈 #326). 기존 세션이면 잇고, 없으면 막는다 —
+      // 여기서 만들어 주면 이 액션이 한도 우회로가 된다.
+      logError("[createOrGetSession] quota_check_unavailable", admitError, {
         path: "/api/supa/session-handlers",
         additionalData: { examId: data.examId, reason: "admit_rpc_failed" },
       });
+
+      const { data: existingSession, error: lookupError } = await getSupabase()
+        .from("sessions")
+        .select("id")
+        .eq("exam_id", data.examId)
+        .eq("student_id", data.studentId)
+        .maybeSingle();
+
+      // 조회가 실패하면 "세션 없음" 과 **같은 판정**을 하되 같은 취급은 하지
+      // 않는다 (이슈 #462).
+      //
+      // 모르는 채로 세션을 만들면 #326 이 재발하므로 deny 가 맞다. 다만
+      // 조용히 지나가면 응시 중인 학생이 쫓겨나도 아무도 모른다 — #324 가
+      // 그 무음으로 20일을 잃은 사고였다.
+      if (lookupError) {
+        logError("[createOrGetSession] fallback_lookup_failed", lookupError, {
+          path: "/api/supa/session-handlers",
+          additionalData: {
+            examId: data.examId,
+            reason: "existing_session_lookup_failed",
+          },
+        });
+      }
+
+      const fallback = resolveAdmissionFallback(existingSession?.id);
+      if (fallback.kind === "deny") {
+        return errorJson(
+          QUOTA_UNAVAILABLE_CODE,
+          "Entry is temporarily unavailable. Please try again in a moment.",
+          503
+        );
+      }
     }
 
     const verdict = Array.isArray(admission) ? admission[0] : admission;
@@ -407,7 +442,7 @@ export async function initExamSession(data: {
     // 2. Get all existing sessions (most recent first)
     const { data: existingSessions, error: checkError } = await getSupabase()
       .from("sessions")
-      .select("id, exam_id, student_id, submitted_at, is_active, status, started_at, attempt_timer_started_at, device_fingerprint, created_at, used_clarifications, compressed_session_data, compression_metadata, last_heartbeat_at")
+      .select("id, exam_id, student_id, submitted_at, is_active, status, started_at, attempt_timer_started_at, device_fingerprint, created_at, used_clarifications, compressed_session_data, compression_metadata, last_heartbeat_at, preflight_accepted_at")
       .eq("exam_id", exam.id)
       .eq("student_id", data.studentId)
       .order("created_at", { ascending: false });
@@ -481,6 +516,10 @@ export async function initExamSession(data: {
           messages,
           submissions: submittedSubmissions || [],
           isRetakeBlocked: true, // 재시험 차단 플래그
+          // 다른 init 응답과 같이 싣는다. 없으면 클라이언트 프로필 게이트가 제출한
+          // 데모에 돌아온 교수자를 "프로필 없는 학생" 으로 보고 학생 프로필
+          // 설정으로 보내고, 제출 화면의 나가기도 데모 상세가 아니게 된다 (#483).
+          demoPreview: isDemoPreviewAttempt,
         });
       }
     }
@@ -756,17 +795,21 @@ export async function initExamSession(data: {
         }
       );
 
-      // 한도 판정이 깨지면 학생을 들여보낸다(fail-open). 한도 계산 장애로
-      // 수업이 멈추는 것보다 잠시 한도가 풀리는 쪽이 낫다.
+      // 한도 판정이 깨졌을 때 (이슈 #326).
       //
-      // 로그만 남기고 넘어가면 fail-open 이 아니다 — RPC 가 세션을 못 만들었으니
-      // 아래 조회가 비어 500 이 된다. 그래서 여기서 직접 만들어 준다.
+      // 예전에는 여기서 세션을 직접 만들었다("수업이 멈추는 것보다 낫다").
+      // 그건 RPC 장애 = 모든 free 계정 무제한을 뜻했고, 그렇게 들어온 학생은
+      // 이후 "기존 학생 통과" 분기에 걸려 영구히 grandfather 됐다.
+      //
+      // 멈추면 안 되는 건 **이미 응시 중인 학생**이지 새 입장이 아니다.
+      // RPC 는 원래 그 둘을 가르는데(기존 세션이면 한도를 안 본다) 에러가 나면
+      // 그 구분을 잃는다. 그래서 여기서 직접 가른다 — 있으면 잇고, 없으면 막는다.
       if (admitError) {
         const gateMissing = isQuotaGateMissing(admitError);
         logError(
           gateMissing
             ? "[quota] quota_gate_missing"
-            : "[quota] quota_fail_open",
+            : "[quota] quota_check_unavailable",
           admitError,
           {
             path: "/api/supa/session-handlers",
@@ -779,41 +822,27 @@ export async function initExamSession(data: {
           }
         );
 
-        const { error: fallbackError } = await getSupabase()
-          .from("sessions")
-          .upsert(
-            {
-              exam_id: exam.id,
-              student_id: data.studentId,
-              used_clarifications: 0,
-              is_active: true,
-              last_heartbeat_at: now,
-              device_fingerprint: incomingFingerprint,
-              created_at: now,
-              status: initialStatus,
-              started_at: initialStatus === "in_progress" ? now : null,
-              attempt_timer_started_at: initialStatus === "in_progress" ? now : null,
-            },
-            { onConflict: "exam_id,student_id", ignoreDuplicates: true }
+        // 여기서 다시 조회하지 않는다 (이슈 #462).
+        //
+        // 이 블록이 도는 유일한 조건이 "admit RPC 가 실패했다" 인데, 그 원인이
+        // DB 장애면 바로 다음 조회도 실패한다. 예전 코드는 `error` 를 버려서
+        // 그 실패를 **"세션이 없다" 와 구분하지 못했다** — 응시 중인 학생이
+        // 503 으로 쫓겨났다. #438 이 지키겠다고 한 것의 정반대다.
+        //
+        // 필요한 정보는 이미 있다. 위(2단계)에서 `existingSessions` 를
+        // `checkError` 까지 처리해 읽어 뒀고, `unsubmittedSessions` 가 그
+        // 결과다. 왕복도 하나 준다.
+        const fallback = resolveAdmissionFallback(unsubmittedSessions[0]?.id);
+        if (fallback.kind === "deny") {
+          // 새 입장이다. 한도를 모르는 채로 들여보내면 되돌릴 수 없다.
+          // 막힌 학생은 RPC 가 돌아오면 정상 입장한다 — 영구 차단이 아니다.
+          return errorJson(
+            QUOTA_UNAVAILABLE_CODE,
+            "Entry is temporarily unavailable. Please try again in a moment.",
+            503
           );
-        if (fallbackError) throw fallbackError;
-
-        // 발행 시각도 함께 기록한다. 이걸 빼면 fail-open 으로 들어온 시험이
-        // 영영 "미발행"으로 남아 발행 한도가 조용히 새어 나간다 — 장애가
-        // 끝난 뒤에도 그 시험은 카운트되지 않는다.
-        if (exam.is_demo !== true) {
-          const { error: publicationError } = await getSupabase()
-            .from("exams")
-            .update({ first_published_at: now })
-            .eq("id", exam.id)
-            .is("first_published_at", null);
-          if (publicationError) {
-            logError("[initExamSession] quota_fail_open publication", publicationError, {
-              path: "/api/supa/session-handlers",
-              additionalData: { examId: exam.id },
-            });
-          }
         }
+
       }
 
       const verdict = Array.isArray(admission) ? admission[0] : admission;
@@ -884,10 +913,17 @@ export async function initExamSession(data: {
     // 고지를 이미 확인한 학생인가 (AC-15). preflight 자체는 시험마다 뜨지만
     // AI 사용 3줄 고지는 사람 단위로 최초 1회다. 조회가 실패하면 false 라
     // 고지를 한 번 더 보여주는 쪽으로 실패한다.
-    const disclosureAcknowledged = await hasOnboardingEvent(
-      data.studentId,
-      ONBOARDING_EVENTS.STUDENT_DISCLOSURE_ACK
-    );
+    //
+    // 데모 미리보기는 기록을 남기지 않으므로(#167) 이번 시도의 수락으로 대신
+    // 판정한다 — 아니면 새로고침마다 최초 고지를 다시 묻는다 (#478).
+    const disclosureAcknowledged = isDisclosureAcknowledged({
+      recorded: await hasOnboardingEvent(
+        data.studentId,
+        ONBOARDING_EVENTS.STUDENT_DISCLOSURE_ACK
+      ),
+      demoPreview: isDemoPreviewAttempt,
+      preflightAcceptedAt: session.preflight_accepted_at,
+    });
 
     return successJson({
       exam,

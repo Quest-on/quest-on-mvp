@@ -411,6 +411,25 @@ export async function cleanupTestData() {
   }
 }
 
+/**
+ * 한 사용자의 온보딩 마일스톤을 지운다.
+ *
+ * `onboarding_events` 는 (user_id, event) 당 한 줄인 "최초 도달" 기록이라
+ * cleanupTestData 가 지우지 않는다. 테스트 사용자는 id 가 고정이므로 한 번
+ * 기록되면 같은 CI 실행의 뒤 테스트와 재시도가 "이미 도달한" 상태로 시작한다.
+ * 최초 도달을 보는 테스트는 시작할 때 이걸로 지운다.
+ */
+export async function clearOnboardingEvents(userId: string, events: string[]) {
+  await waitForTestSupabaseReady();
+
+  const { error } = await supabase
+    .from("onboarding_events")
+    .delete()
+    .eq("user_id", userId)
+    .in("event", events);
+  if (error) throw new Error(`clearOnboardingEvents failed: ${error.message}`);
+}
+
 // --------------- Query helpers ---------------
 
 export async function getExam(examId: string) {
