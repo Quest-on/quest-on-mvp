@@ -1,7 +1,8 @@
 /** Deliberately small public-page vocabulary. Never send user-controlled paths. */
 const PUBLIC_PAGES: Record<string, string> = {
   "/": "home", "/sign-up": "sign_up", "/sign-in": "sign_in",
-  "/forgot-password": "forgot_password", "/reset-password": "reset_password",
+  "/forgot-password": "forgot_password", "/auth/recovery": "password_recovery",
+  "/reset-password": "reset_password",
   "/legal/privacy": "privacy", "/legal/cookies": "cookies",
   "/legal/terms": "terms", "/legal/security": "security",
 };
@@ -17,6 +18,7 @@ export const ANALYTICS_ROUTES = [
   "/student/profile-setup",
   "/admin/onboarding",
   "/forgot-password",
+  "/auth/recovery",
   "/admin/ai-config",
   "/admin/ai-usage",
   "/legal/security",

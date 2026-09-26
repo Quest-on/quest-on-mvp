@@ -278,4 +278,27 @@ export const RATE_LIMITS = {
    * 것처럼 느껴져 한 번 더 누르는 것도 흔하다.
    */
   passwordReset: { limit: 3, windowSec: 300 } satisfies RateLimitConfig,
+  /**
+   * 비밀번호 재설정 메일 발송 (받는 주소 기준): 1시간에 3회.
+   *
+   * IP 버킷과 따로 둔다. IP 를 돌리면 IP 버킷은 무력하고, 그러면 한 사람의
+   * 받은편지함에 메일이 계속 쌓인다. 게다가 **새 복구 메일은 이전 링크를
+   * 무효로 만든다** — 받는 사람이 링크를 누르기도 전에 다음 메일이 그걸 지운다.
+   *
+   * 이 버킷에 걸려도 호출자에게 429 를 주지 않는다. 주소별로 다른 응답이 나오면
+   * 그게 계정 존재 여부를 흘리는 통로가 된다. 라우트가 조용히 발송만 건너뛴다.
+   *
+   * 이 버킷이 막는 건 **우리 라우트를 거친 발송**뿐이다. anon 키는 공개값이라
+   * GoTrue `/auth/v1/recover` 를 직접 부르면 이 한도를 거치지 않는다. 그 경로는
+   * Supabase 쪽 한도(프로젝트 메일 발송 한도, 사용자별 재발송 간격)만 받는다.
+   */
+  passwordResetAddress: { limit: 3, windowSec: 3600 } satisfies RateLimitConfig,
+  /**
+   * 복구 링크 확인 (IP 기준): 5분에 10회.
+   *
+   * `token_hash` 는 추측할 수 있는 값이 아니지만, 이 요청은 세션을 만드는
+   * 유일한 비로그인 경로라 한도 없이 두지 않는다. 대학 NAT 에서 여러 사람이
+   * 같은 시각에 메일 링크를 누르는 경우를 위해 발송보다 넉넉하다.
+   */
+  passwordResetVerify: { limit: 10, windowSec: 300 } satisfies RateLimitConfig,
 } as const;

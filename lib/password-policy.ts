@@ -13,23 +13,43 @@
 
 export const PASSWORD_MIN_LENGTH = 8;
 
+/**
+ * 상한 — **UTF-8 바이트**다. Supabase(GoTrue)가 bcrypt 한계에 맞춰
+ * `len(password) > 72` 로 거절하고, Go 의 `len` 은 바이트를 센다. 한글은 한
+ * 글자가 3바이트라 24자가 끝이다. 글자 수로 세면 화면은 통과시키고 서버는
+ * 거절해, 사용자는 원인 모를 실패를 본다.
+ */
+export const PASSWORD_MAX_BYTES = 72;
+
 /** 비밀번호 쌍 검증 결과 — 화면이 next-intl 키로 바꿔 쓴다. */
 export type PasswordPairError =
   | "newPasswordTooShort"
+  | "passwordTooLong"
   | "passwordMismatch"
   | null;
+
+/** 문구 키가 쓰는 값. 두 화면이 같은 값을 넘기게 한 곳에 둔다. */
+export const PASSWORD_MESSAGE_VALUES = {
+  minLength: PASSWORD_MIN_LENGTH,
+  maxLength: PASSWORD_MAX_BYTES,
+} as const;
+
+const utf8 = new TextEncoder();
 
 /**
  * 새 비밀번호 + 확인란을 검증한다.
  *
  * 순서가 의미를 갖는다: 길이를 먼저 본다. 둘 다 틀렸을 때 "일치하지 않습니다"
  * 를 먼저 보여주면, 사용자가 확인란을 고친 뒤에야 길이 문제를 알게 된다.
+ *
+ * 서버 라우트도 `validatePasswordPair(p, p)` 로 같은 규칙을 쓴다.
  */
 export function validatePasswordPair(
   password: string,
   confirm: string
 ): PasswordPairError {
   if (password.length < PASSWORD_MIN_LENGTH) return "newPasswordTooShort";
+  if (utf8.encode(password).length > PASSWORD_MAX_BYTES) return "passwordTooLong";
   if (password !== confirm) return "passwordMismatch";
   return null;
 }

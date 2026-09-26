@@ -37,21 +37,30 @@ export const SUPA_CONTINUITY_ACTIONS = new Set([
 
 // 비밀번호 복구 경로(#318)는 동의 게이트 앞에 선다.
 //
-// `/auth/callback` 이 복구 세션만 온보딩을 건너뛰어 `/reset-password` 로
-// 보내는데, 그 경로가 여기서 "protected" 로 분류되면 프록시가 한 홉 뒤에
-// 다시 `/onboarding` 으로 돌려보낸다 — 건너뛴 의미가 사라진다. 그러면
-// 사용자는 비밀번호를 바꾸기 전에 동의 화면에 갇히고, 거기서 탭을 닫으면
-// **로그인은 된 채 잊어버린 비밀번호는 그대로** 남는다.
+// 복구 링크 확인(`/auth/recovery` → verify)이 세션을 만들고 `/reset-password`
+// 로 보내는데, 그 경로가 여기서 "protected" 로 분류되면 필수 동의가 남은
+// 사용자는 프록시가 `/onboarding` 으로 돌려보낸다. 그러면 비밀번호를 바꾸기
+// 전에 동의 화면에 갇히고, 거기서 탭을 닫으면 **로그인은 된 채 잊어버린
+// 비밀번호는 그대로** 남는다.
 // 트레일링 슬래시를 붙인 건 `/legal/` 과 같은 이유다. 매칭이
 // `pathname === prefix.slice(0,-1) || pathname.startsWith(prefix)` 이라
 // 슬래시 없이 `"/reset-password"` 로 넣으면 `/reset-password-extra` 같은
 // 남의 경로까지 public 이 된다. 동의 게이트를 여는 구멍은 좁아야 한다.
-const PUBLIC_PREFIXES = ["/legal/", "/auth/callback", "/sign-in", "/sign-up", "/sso", "/join", "/onboarding", "/student/profile-setup", "/instructor-pending", "/forgot-password/", "/reset-password/"];
+const PUBLIC_PREFIXES = ["/legal/", "/auth/callback", "/sign-in", "/sign-up", "/sso", "/join", "/onboarding", "/student/profile-setup", "/instructor-pending", "/forgot-password/", "/reset-password/", "/auth/recovery/"];
+
+// 복구의 두 쓰기 요청도 같은 이유로 게이트 앞에 선다. 복구 세션의 주인이
+// 동의 미완료면 `enforce` 에서 428 이 나 비밀번호를 못 바꾼다.
+// 접두어가 아니라 메서드·경로 정확 일치로 좁힌다.
+const RECOVERY_API = new Set([
+  "POST /api/auth/password-reset/verify",
+  "POST /api/auth/password-reset/complete",
+]);
 const INTERNAL_PREFIXES = ["/api/admin/", "/api/internal/", "/api/cron/", "/api/health"];
 
 export function classifyRoute(pathname: string, method: string, action?: unknown): ConsentRouteClass {
   const key = `${method.toUpperCase()} ${pathname}`;
   if (ONBOARDING_SUPPORT.has(key)) return "onboarding_support";
+  if (RECOVERY_API.has(key)) return "public";
   if (PUBLIC_PREFIXES.some((prefix) => pathname === prefix.slice(0, -1) || pathname.startsWith(prefix))) return "public";
   if (INTERNAL_PREFIXES.some((prefix) => pathname === prefix.slice(0, -1) || pathname.startsWith(prefix))) return "public";
   if (method.toUpperCase() === "GET" && (/^\/exam\/[^/]+$/.test(pathname) || /^\/assignment\/[^/]+$/.test(pathname))) return "exam_continuity";
