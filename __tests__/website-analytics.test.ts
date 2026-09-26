@@ -24,6 +24,8 @@ describe("website analytics coverage and data boundaries", () => {
   it("removes query data, hashes, and unknown path identifiers", () => {
     expect(sanitizeAnalyticsUrl("https://quest-on.app/sign-up?email=person@example.com&token=secret#code")).toBe("https://quest-on.app/sign-up");
     expect(sanitizeAnalyticsUrl("https://quest-on.app/exam/SECRET?code=SECRET")).toBe("https://quest-on.app/exam/[id]");
+    // The recovery link carries a one-time token in the query (#318).
+    expect(sanitizeAnalyticsUrl("https://quest-on.app/auth/recovery?token_hash=SECRET&type=recovery")).toBe("https://quest-on.app/auth/recovery");
     expect(sanitizeAnalyticsUrl("https://quest-on.app/unknown-person@example.com")).toBeNull();
   });
   it("only accepts campaign convention values, never arbitrary query data", () => {

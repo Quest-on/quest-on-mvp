@@ -155,6 +155,8 @@ flowchart LR
 
 **권위는 `profiles.role` 이다.** 가입 시 `user_metadata.role` 에 힌트가 들어가지만 라우팅 판단은 하지 않는다 (`lib/onboarding-role.ts` 참고). 관리자 인증은 사용자 인증과 완전히 분리된 별도 계통이다.
 
+**비밀번호 재설정은 `/auth/callback` 을 지나지 않는다.** 메일 링크가 `/auth/recovery` 로 오고, 버튼이 `POST /api/auth/password-reset/verify` 로 토큰을 확인해 복구 세션과 그 세션에 묶인 의도 쿠키를 만든다. `/reset-password` 와 `POST …/complete` 는 그 쿠키가 지금 세션과 같을 때만 열린다. 지금은 스테이징에서만 열려 있다 (`lib/password-reset-availability.ts`, 상세는 `docs/SECURITY.md`).
+
 `TEST_BYPASS_SECRET` 헤더 바이패스는 로컬(`development`)과 CI(`test`)에만 존재한다. 프로덕션·스테이징에서는 `lib/supabase-auth.ts` 가 요청 처리 중 throw 한다.
 
 ### 3-2. 응시 세션
