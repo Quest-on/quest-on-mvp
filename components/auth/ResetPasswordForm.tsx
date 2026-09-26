@@ -141,7 +141,12 @@ export function ResetPasswordForm({ email }: { email: string }) {
         <h1 className="text-3xl font-bold text-foreground dark:text-white">
           {t("title")}
         </h1>
-        <p className="text-muted-foreground">{t("subtitle", { email })}</p>
+        {/* 계정을 문장 속이 아니라 따로 크게 보인다. 남이 보낸 링크(공격자 자기
+            계정의 복구 링크)를 눌렀다면 여기서 알아채야 한다. */}
+        <p className="break-all text-lg font-semibold text-foreground dark:text-white">
+          {email}
+        </p>
+        <p className="text-muted-foreground">{t("subtitle")}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">

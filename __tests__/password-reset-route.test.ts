@@ -11,6 +11,13 @@
  * 링크는 메일 템플릿이 `{{ .TokenHash }}` 로 만든다. PKCE 로 보내면 GoTrue 가
  * 토큰에 `pkce_` 접두어를 붙여 그 해시로는 확인되지 않으므로, **implicit
  * 플로우 클라이언트**로 보내는지를 SDK 경계에서 본다.
+ *
+ * ## 응답이 발송을 기다리지 않는다
+ *
+ * 가입된 주소면 GoTrue 가 요청 안에서 SMTP 를 보내고, 아니면 바로 돌아온다.
+ * 응답이 그걸 기다리면 바이트가 같아도 **걸린 시간**이 가입 여부를 말한다.
+ * 그래서 발송은 `after()` 로 응답 뒤에 한다. 테스트에서는 `after` 에 넘긴
+ * 작업을 모아 두었다가 응답을 받은 뒤 돌린다.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -22,6 +29,8 @@ const checkRateLimitAsync = vi.hoisted(() =>
   }))
 );
 const logError = vi.hoisted(() => vi.fn());
+/** `after()` 에 넘긴 작업. 응답을 받은 뒤에 돌린다 — 실제 순서와 같다. */
+const afterTasks = vi.hoisted(() => [] as Array<() => unknown>);
 const logWarn = vi.hoisted(() => vi.fn(async () => undefined));
 const resetPasswordForEmail = vi.hoisted(() =>
   vi.fn(async (..._args: unknown[]) => ({
@@ -45,6 +54,16 @@ vi.mock("@/lib/rate-limit", async () => {
 vi.mock("@/lib/password-reset-availability", () => ({ isPasswordResetEnabled: () => true }));
 vi.mock("@/lib/logger", () => ({ logError, logWarn }));
 vi.mock("@supabase/supabase-js", () => ({ createClient }));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => {
+    afterTasks.push(task);
+  },
+}));
+
+async function drainAfter() {
+  for (const task of afterTasks.splice(0)) await task();
+}
 
 const ORIGIN = "https://quest-on-staging-two.vercel.app";
 
@@ -59,7 +78,9 @@ function makeRequest(body: unknown, headers: Record<string, string> = {}) {
 async function post(body: unknown, headers?: Record<string, string>) {
   const { POST } = await import("../app/api/auth/password-reset/route");
   const res = await POST(makeRequest(body, headers));
-  return { status: res.status, text: await res.text() };
+  const result = { status: res.status, text: await res.text() };
+  await drainAfter();
+  return result;
 }
 
 const IP = { "x-forwarded-for": "203.0.113.7" };
@@ -70,6 +91,7 @@ function keys() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  afterTasks.length = 0;
   checkRateLimitAsync.mockResolvedValue({ allowed: true });
   resetPasswordForEmail.mockResolvedValue({ error: null });
   // process.env 는 워커 공유다. stubEnv 로 넣고 afterEach 에서 되돌린다.
@@ -104,6 +126,34 @@ describe("POST /api/auth/password-reset", () => {
     expect(unknown).toEqual(existing);
     expect(broken).toEqual(existing);
     expect(addressLimited).toEqual(existing);
+  });
+
+  it("응답은 발송을 기다리지 않는다 — 걸린 시간이 가입 여부를 말하지 않게", async () => {
+    // 가입된 주소면 GoTrue 가 SMTP 를 끝낼 때까지 붙잡는다. 끝나지 않는 발송으로 흉내 낸다.
+    resetPasswordForEmail.mockImplementationOnce(() => new Promise(() => {}));
+    const { POST } = await import("../app/api/auth/password-reset/route");
+
+    const res = await POST(makeRequest({ email: "real@university.ac.kr" }, IP));
+
+    expect(res.status).toBe(200);
+    // 응답이 나갈 때 발송은 아직 시작도 안 했다. after() 에 하나가 걸려 있다.
+    expect(resetPasswordForEmail).not.toHaveBeenCalled();
+    expect(afterTasks).toHaveLength(1);
+
+    void afterTasks.splice(0)[0]();
+    expect(resetPasswordForEmail).toHaveBeenCalledWith("real@university.ac.kr");
+  });
+
+  it("발송이 던져도 뒤에서 잡아 로그로 남긴다", async () => {
+    resetPasswordForEmail.mockRejectedValueOnce(new Error("upstream down"));
+    const res = await post({ email: "someone@university.ac.kr" }, IP);
+
+    expect(res.status).toBe(200);
+    expect(logError).toHaveBeenCalledWith(
+      "[password-reset] recover_error",
+      expect.any(Error),
+      expect.anything()
+    );
   });
 
   it("주소 한도에 걸리면 보내지 않고 경고를 남긴다", async () => {

@@ -287,6 +287,10 @@ export const RATE_LIMITS = {
    *
    * 이 버킷에 걸려도 호출자에게 429 를 주지 않는다. 주소별로 다른 응답이 나오면
    * 그게 계정 존재 여부를 흘리는 통로가 된다. 라우트가 조용히 발송만 건너뛴다.
+   *
+   * 이 버킷이 막는 건 **우리 라우트를 거친 발송**뿐이다. anon 키는 공개값이라
+   * GoTrue `/auth/v1/recover` 를 직접 부르면 이 한도를 거치지 않는다. 그 경로는
+   * Supabase 쪽 한도(프로젝트 메일 발송 한도, 사용자별 재발송 간격)만 받는다.
    */
   passwordResetAddress: { limit: 3, windowSec: 3600 } satisfies RateLimitConfig,
   /**

@@ -22,8 +22,12 @@ import { RECOVERY_TOKEN_HASH_PATTERN } from "@/lib/password-reset-intent";
  */
 
 export const metadata: Metadata = {
-  // 주소에 1회용 토큰이 있다. 이 화면에서 나가는 요청에 실리면 안 된다.
-  referrer: "no-referrer",
+  // 주소에 1회용 토큰이 있다. 이 화면에서 나가는 요청에 실리면 안 된다 —
+  // 같은 origin 으로 가는 것도(Vercel 성능 비콘 등). strict-origin 은 Referer
+  // 에 origin 만 싣는다. no-referrer 는 쓰지 않는다: 폼 POST 의 Origin 까지
+  // `null` 이 돼 Sec-Fetch-Site 가 없는 구형 브라우저(Safari 16.4 미만 등)가
+  // verify 에서 늘 403 을 받는다. lib/same-origin.ts 참조.
+  referrer: "strict-origin",
   robots: { index: false, follow: false },
 };
 
@@ -72,7 +76,15 @@ export default async function Page({ searchParams }: { searchParams: SearchParam
         <p className="text-muted-foreground">{t("body")}</p>
       </div>
 
-      <form method="post" action="/api/auth/password-reset/verify" className="space-y-4">
+      {/* data-private: 세션 리플레이가 이 폼을 통째로 녹화하지 않는다. rrweb 의
+          입력 마스킹은 hidden 을 가리지 않아, 두면 쓰지 않은 토큰이 스냅샷에
+          실린다. lib/posthog-replay.ts 의 blockSelector 참조. */}
+      <form
+        method="post"
+        action="/api/auth/password-reset/verify"
+        className="space-y-4"
+        data-private=""
+      >
         <input type="hidden" name="token_hash" value={tokenHash} />
         <input type="hidden" name="type" value="recovery" />
         {error === "rate_limited" && (

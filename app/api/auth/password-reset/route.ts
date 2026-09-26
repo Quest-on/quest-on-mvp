@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { createHash } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -50,6 +50,11 @@ import { isPasswordResetIntentKeyConfigured } from "@/lib/password-reset-intent"
  * 확인해 주는 도구가 된다. 교수자 명단은 대학 홈페이지에 공개돼 있어 대조가
  * 쉽다. 성공·미가입·업스트림 오류·주소 한도를 구분하지 않고 전부 같은 200 을
  * 준다.
+ *
+ * 바이트만 같아서는 모자란다. 가입된 주소면 GoTrue 가 요청 안에서 SMTP 를
+ * 보내느라 늦게 돌아오고, 아니면 바로 돌아온다. 그래서 **발송은 응답 뒤에**
+ * (`after()`) 한다. 응답 전까지 하는 일(IP 한도·검증·주소 한도)은 가입 여부와
+ * 무관하다.
  */
 
 const PasswordResetSchema = z.object({
@@ -129,6 +134,22 @@ export async function POST(request: NextRequest) {
       return successJson(GENERIC_OK);
     }
 
+    after(() => sendRecoveryMail(supabaseUrl, anonKey, email));
+    return successJson(GENERIC_OK);
+  } catch (error) {
+    logError("Password reset request failed", error, { path: PATH });
+    // 여기서도 구분하지 않는다.
+    return successJson(GENERIC_OK);
+  }
+}
+
+/**
+ * 응답이 나간 뒤에 돈다. 여기서 난 실패는 사용자에게 갈 길이 없으니 로그로만
+ * 남긴다 — 조용히 사라지게 두지 않는다. 발송이 계속 실패하는데 화면은 늘
+ * "보냈습니다" 라고 말하는 상태가 가장 오래 안 들킨다.
+ */
+async function sendRecoveryMail(supabaseUrl: string, anonKey: string, email: string) {
+  try {
     const supabase = createClient(supabaseUrl, anonKey, {
       auth: {
         flowType: "implicit",
@@ -138,21 +159,14 @@ export async function POST(request: NextRequest) {
       },
     });
     const { error } = await supabase.auth.resetPasswordForEmail(email);
-
     if (error) {
-      // 사용자에게는 성공과 구분되지 않게 돌려주되, 조용히 사라지게 두지 않는다.
-      // 발송이 계속 실패하는데 화면은 늘 "보냈습니다" 라고 말하는 상태가
-      // 가장 오래 안 들킨다. 프로젝트 메일 한도 초과(429)도 여기로 온다.
+      // 프로젝트 메일 한도 초과(429)도 여기로 온다.
       logError("[password-reset] recover_failed", error, {
         path: PATH,
         additionalData: { status: error.status ?? null, code: error.code ?? null },
       });
     }
-
-    return successJson(GENERIC_OK);
   } catch (error) {
-    logError("Password reset request failed", error, { path: PATH });
-    // 여기서도 구분하지 않는다.
-    return successJson(GENERIC_OK);
+    logError("[password-reset] recover_error", error, { path: PATH });
   }
 }

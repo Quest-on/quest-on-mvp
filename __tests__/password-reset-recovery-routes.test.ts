@@ -180,6 +180,9 @@ describe("POST /api/auth/password-reset/verify", () => {
       { "sec-fetch-site": "same-site", origin: "https://x.vercel.app" },
       // Sec-Fetch-Site 가 없으면 Origin 으로 본다.
       { origin: "https://evil.example" },
+      // no-referrer 페이지에서 보낸 폼은 Origin 이 "null" 이다. 어디서 왔는지
+      // 모르는 건 같으니 열지 않는다. 그래서 확인 화면은 strict-origin 을 쓴다.
+      { origin: "null" },
       // 둘 다 없으면 모르는 것 — 열지 않는다.
       {},
     ];
@@ -189,6 +192,12 @@ describe("POST /api/auth/password-reset/verify", () => {
     }
     expect(auth.verifyOtp).not.toHaveBeenCalled();
     expect(cookieSet).not.toHaveBeenCalled();
+  });
+
+  it("Sec-Fetch-Site 가 없는 구형 브라우저도 Origin 이 같으면 통과한다", async () => {
+    const res = await verify(VALID, { origin: ORIGIN });
+    expect(res.status).toBe(303);
+    expect(location(res).pathname).toBe("/reset-password");
   });
 
   it.each([

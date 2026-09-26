@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { classifyRoute } from "../lib/consent-route-policy";
 
@@ -133,6 +133,24 @@ describe("#318 — 재설정 화면에 도달할 수 있다", () => {
     });
   });
 
+  describe("복구 토큰을 만드는 건 재설정 메일뿐이다", () => {
+    it("매직 링크 로그인(signInWithOtp)을 쓰지 않는다", () => {
+      // GoTrue 는 가입된 사용자의 매직 링크 토큰을 복구 토큰과 같은 자리에
+      // 둔다. 그래서 매직 링크의 token_hash 도 `type: "recovery"` 로 확인된다.
+      // 매직 링크를 도입하면 로그인 메일이 곧 재설정 링크가 된다 — 도입하려면
+      // verify 가 토큰의 출처를 가려낼 방법부터 정해야 한다.
+      const hits: string[] = [];
+      for (const dir of ["app", "lib", "components", "hooks"]) {
+        for (const file of readdirSync(join(process.cwd(), dir), { recursive: true })) {
+          const rel = `${dir}/${String(file).replaceAll("\\", "/")}`;
+          if (!/\.(ts|tsx)$/.test(rel)) continue;
+          if (code(rel).includes("signInWithOtp")) hits.push(rel);
+        }
+      }
+      expect(hits).toEqual([]);
+    });
+  });
+
   describe("확인 화면 → verify", () => {
     const page = code("app/auth/recovery/page.tsx");
 
@@ -143,7 +161,10 @@ describe("#318 — 재설정 화면에 도달할 수 있다", () => {
     });
 
     it("주소의 토큰을 다른 요청의 Referer 로 흘리지 않는다", () => {
-      expect(page).toMatch(/referrer:\s*"no-referrer"/);
+      // origin 만 싣는다. 같은 origin 요청(비콘 등)에도 경로·쿼리가 안 간다.
+      // no-referrer 는 폼 POST 의 Origin 을 null 로 만들어 구형 브라우저가
+      // verify 를 통과하지 못한다.
+      expect(page).toMatch(/referrer:\s*"strict-origin"/);
     });
   });
 
