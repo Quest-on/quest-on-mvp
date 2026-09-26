@@ -5,7 +5,8 @@
  *
  * - open 상태를 localStorage("agent-panel-open")에 동기화 (초기값 false).
  * - 데스크톱 레이아웃의 gap-div/fixed-panel 제어에 사용.
- * - 모바일에선 Sheet 오버레이로 전환 (본문 reflow 없음).
+ * - 모바일(<768px)은 에이전트를 지원하지 않는다(#460) — 진입점이 없으므로
+ *   저장된 열림 상태도 복원하지 않는다. 다시 열 때의 기록은 #500.
  */
 
 import {
@@ -16,6 +17,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { MOBILE_BREAKPOINT } from "@/hooks/use-mobile";
 // AgentRunPhase 타입만 참조 — 구현은 AgentRunController에 있음
 export type { AgentRunPhase } from "@/components/agent/AgentRunController";
 
@@ -43,6 +45,19 @@ export function shouldHideAgentFab(state: {
   return state.panelOpen || state.cornerClaimed;
 }
 
+/**
+ * 저장된 열림 상태를 마운트 때 되살릴지.
+ *
+ * 모바일에는 진입점이 없다(#460). 되살리면 휴대폰에서 Sheet 가 저절로 뜨고,
+ * 닫고 나면 다시 열 방법이 없다 — 되살리지 않는다.
+ */
+export function shouldRestoreAgentPanelOpen(state: {
+  stored: string | null;
+  viewportWidth: number;
+}): boolean {
+  return state.stored === "true" && state.viewportWidth >= MOBILE_BREAKPOINT;
+}
+
 const AgentPanelContext = createContext<AgentPanelContextValue | null>(null);
 
 export function AgentPanelProvider({ children }: { children: ReactNode }) {
@@ -53,7 +68,12 @@ export function AgentPanelProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      if (localStorage.getItem(LS_KEY) === "true") {
+      if (
+        shouldRestoreAgentPanelOpen({
+          stored: localStorage.getItem(LS_KEY),
+          viewportWidth: window.innerWidth,
+        })
+      ) {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 1회 localStorage 동기화
         _setOpen(true);
       }
