@@ -8,10 +8,14 @@
  *           → 본문이 패널 폭만큼 좁아지는 page reflow 방식.
  *
  * 모바일(<768px): shadcn Sheet(side=right) 오버레이 — 본문 reflow 없음.
+ *   모바일은 에이전트를 지원하지 않아(#460) 이 폭에서 여는 진입점이 없다.
+ *   데스크톱에서 연 채 창을 줄였을 때만 쓰인다. 모바일 지원을 다시 열 때
+ *   쓸 수 있게 남겨 둔다(#500).
  *
  * 개폐 트리거:
- *   - 데스크톱: DashboardSidebar의 SidebarFooter 위 "AI 에이전트" 버튼
- *   - 모바일: MobileBottomNav의 에이전트 아이템
+ *   - ≥768px: AgentFab (우하단), 768–1023px 에서는 MobileBottomNav 의
+ *     에이전트 아이템도
+ *   - <768px: 없음
  *
  * 닫기: 패널 헤더 X 버튼, ESC(running 중이면 ESC = cancelRun 우선).
  */

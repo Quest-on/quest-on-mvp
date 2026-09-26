@@ -17,6 +17,11 @@ interface MobileBottomNavProps {
 /**
  * 에이전트 버튼 내부 컴포넌트 — AgentRunControllerProvider 하위에서만 렌더.
  * showAgentButton=true일 때만 호출되므로 항상 provider 안에 있다.
+ *
+ * `hidden md:flex` — 모바일(<768px)은 에이전트를 지원하지 않는다(#460).
+ * 지우지 않고 숨기는 이유: 이 내비는 `lg:hidden` 이라 768–1023px 에서는
+ * FAB(`md:flex`)과 함께 뜨고, FAB 이 이 내비의 맨 오른쪽 칸을 덮는다. 그
+ * 칸이 이 버튼이어야 FAB 이 실제 링크를 가리지 않는다. 다시 열 때는 #500.
  */
 function AgentNavButton() {
   const panelCtx = useAgentPanelOptional();
@@ -34,7 +39,7 @@ function AgentNavButton() {
       onClick={toggle}
       aria-label={t("nav.aiAgent")}
       className={cn(
-        "relative flex-1 flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors",
+        "relative flex-1 hidden md:flex flex-col items-center justify-center gap-1 text-xs font-medium transition-colors",
         open
           ? "text-primary"
           : "text-muted-foreground hover:text-foreground"

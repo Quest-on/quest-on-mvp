@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { shouldRestoreAgentPanelOpen } from "@/components/agent/AgentPanelProvider";
 
 /**
  * 이슈 #436 — 에이전트를 열 수 있는 자리와 동작하는 자리가 어긋나면 안 된다.
@@ -58,45 +59,56 @@ describe("교수 에이전트에 진입점이 있다 (#436)", () => {
   });
 
   /**
-   * 반응형 노출까지 본다 (이슈 #460).
+   * 모바일(<768px)은 에이전트를 지원하지 않는다 — 결정이다 (이슈 #460).
    *
    * 위 두 검사는 소스의 **줄 순서**만 본다. 그래서 #439 가 FAB 에
-   * `hidden md:flex` 를 달아 데스크톱 전용으로 만든 것을 통과시켰다 —
-   * 768px 미만에서는 진입점이 하나도 없는데도.
+   * `hidden md:flex` 를 달아 데스크톱 전용으로 만든 것을 통과시켰고, 그 사이
+   * 모바일은 "비출제 화면에서는 내비로 열리는데 출제 화면에서는 못 연다" 는
+   * 반쪽 상태였다 — 내비로 열면 에이전트가 출제 화면으로 이동하고, 거기서
+   * 패널을 닫으면 다시 열 수 없었다.
    *
-   * 여기서 고정하는 것은 "지금 이게 맞다" 가 아니라 **두 사실이 짝으로
-   * 움직인다**는 것이다. 한쪽만 고치고 끝났다고 생각하는 걸 막는다.
-   */
-  it("진입점의 반응형 노출과 내비 가드를 짝으로 고정한다", () => {
-    const fab = read("components/agent/AgentFab.tsx");
-
-    // 사실 1: FAB 은 md 이상에서만 보인다.
-    expect(fab, "FAB 의 반응형 클래스가 바뀌었다 — #460 을 다시 읽고 아래 it.fails 도 함께 고친다").toMatch(
-      /hidden\s+md:flex/
-    );
-
-    // 사실 2: 모바일 내비는 출제 화면에서 렌더되지 않는다. 그런데 실행기가
-    // 붙어 있는 곳이 바로 그 화면이다.
-    expect(layout).toMatch(/!isAuthoringRoute[\s\S]{0,200}MobileBottomNav/);
-  });
-
-  /**
-   * 위 두 사실이 겹치면 모바일에는 진입점이 없다. 그게 #460 이다.
+   * #460 은 모바일 미지원으로 정했다. 좁은 화면에서는 패널(Sheet)이 편집기를
+   * 덮어, 에이전트가 타이핑으로 조작하는 모습을 보며 확인하는 이 기능의 핵심이
+   * 성립하지 않는다. 그래서 **모바일에는 진입점이 하나도 없어야 한다.**
    *
-   * `it.fails` 로 둔다 — 지금 실패하는 게 정상이므로 통과하고, 누가 #460 을
-   * 고치면 "예상대로 실패하지 않았다" 로 **이 테스트가 깨진다.** 그때 `it` 로
-   * 바꾸고 위 사실 1 도 함께 고친다. 결함을 정상으로 고정하지 않으면서
-   * 고쳐졌다는 신호를 받는 방법이다.
+   * 모바일 출제를 지원하게 되면 이 테스트가 깨지는 게 맞다. 그때 #500 을 읽고
+   * 새 결정에 맞춰 뒤집는다.
    */
-  it.fails("모바일에도 진입점이 있다 — #460 이 정해지면 it 으로 바꾼다", () => {
+  describe("모바일(<768px)에는 진입점이 없다 (#460)", () => {
     const fab = read("components/agent/AgentFab.tsx");
-    const fabHiddenOnMobile = /hidden\s+md:flex/.test(fab);
-    const navSkipsAuthoring = /!isAuthoringRoute[\s\S]{0,200}MobileBottomNav/.test(layout);
+    const nav = read("components/layout/mobile-bottom-nav.tsx");
+    // AgentNavButton 함수 본문만 — 내비 컨테이너의 `lg:hidden` 과 섞이지 않게.
+    const navAgentButton = nav.match(/function AgentNavButton\(\)[\s\S]*?\n}\n/)?.[0] ?? "";
 
-    expect(
-      fabHiddenOnMobile && navSkipsAuthoring,
-      "출제 화면(실행기가 붙은 유일한 라우트)에 모바일 진입점이 없다"
-    ).toBe(false);
+    it("FAB 은 md 이상에서만 보인다", () => {
+      expect(fab, "FAB 의 반응형 클래스가 바뀌었다 — #460·#500 을 읽고 이 describe 를 함께 고친다").toMatch(
+        /hidden\s+md:flex/
+      );
+    });
+
+    it("모바일 내비의 에이전트 버튼도 md 이상에서만 보인다", () => {
+      expect(navAgentButton, "AgentNavButton 을 찾지 못했다").not.toBe("");
+      expect(
+        navAgentButton,
+        "모바일 내비에서 에이전트를 열 수 있다 — 열면 출제 화면으로 이동한 뒤 닫으면 다시 못 연다(#460)"
+      ).toMatch(/hidden\s+md:flex/);
+    });
+
+    it("모바일 내비는 출제 화면에서 렌더되지 않는다", () => {
+      // 이게 바뀌면(출제 화면용 축소 내비) #500 의 2번 방향이다 — 위 두 검사와
+      // 함께 다시 정한다.
+      expect(layout).toMatch(/!isAuthoringRoute[\s\S]{0,200}MobileBottomNav/);
+    });
+
+    it("저장된 열림 상태를 모바일에서는 되살리지 않는다", () => {
+      // 되살리면 휴대폰에서 Sheet 가 저절로 뜨고, 닫으면 다시 열 방법이 없다.
+      expect(shouldRestoreAgentPanelOpen({ stored: "true", viewportWidth: 390 })).toBe(false);
+      expect(shouldRestoreAgentPanelOpen({ stored: "true", viewportWidth: 767 })).toBe(false);
+      expect(shouldRestoreAgentPanelOpen({ stored: "true", viewportWidth: 768 })).toBe(true);
+      expect(shouldRestoreAgentPanelOpen({ stored: "true", viewportWidth: 1440 })).toBe(true);
+      expect(shouldRestoreAgentPanelOpen({ stored: "false", viewportWidth: 1440 })).toBe(false);
+      expect(shouldRestoreAgentPanelOpen({ stored: null, viewportWidth: 1440 })).toBe(false);
+    });
   });
 
   it("실행기가 서버가 내보내는 액션을 전부 처리한다", () => {
