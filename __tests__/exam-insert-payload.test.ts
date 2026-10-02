@@ -55,6 +55,8 @@ type LegacyQuestion = {
   type: "multiple-choice" | "essay" | "short-answer";
   options?: string[];
   core_ability?: unknown;
+  /** 추출 전 로직은 이 필드를 몰랐고 그대로 통과시켰다. 동등성 격자에 넣기 위한 타입이다. */
+  ai_role?: string;
 };
 
 type LegacyData = {
