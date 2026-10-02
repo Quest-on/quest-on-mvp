@@ -7,11 +7,16 @@
  * 가른다. 이 파일은 그 판정과, 토글이 꺼졌을 때 하이라이트에 넘길 로그 선택,
  * 시험별 localStorage 저장을 고정한다.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   TAB_SWITCH_MARKER,
   classifyPasteLog,
+  countIntegritySignals,
+  createIntegrityPreferenceStore,
   integrityPreferenceKey,
+  logsForQuestion,
   partitionPasteLogs,
   readIntegrityPreference,
   selectLogsForHighlight,
@@ -67,6 +72,21 @@ describe("classifyPasteLog — 로그 종류 판정", () => {
     delete (noText as { pasted_text?: string }).pasted_text;
     expect(classifyPasteLog(noText)).toBe("external_paste");
   });
+
+  it("is_internal 이 true 면 본문이 마커와 같아도 내부 복사다 (내부 검사가 먼저)", () => {
+    // 학생 쪽 탭 전환 기록은 항상 isInternal=false 로 가므로 실제로는 안 생기는 조합이다.
+    // 그래도 내부 복사 표시가 있으면 탭 전환으로 분류돼 채점 정보(내부 복사)가 사라지면 안 된다.
+    const odd = log({
+      id: "i2",
+      length: 0,
+      pasted_text: TAB_SWITCH_MARKER,
+      is_internal: true,
+      suspicious: false,
+    });
+    expect(classifyPasteLog(odd)).toBe("internal_copy");
+    // suspicious 가 true 로 남아 있어도 같다.
+    expect(classifyPasteLog({ ...odd, suspicious: true })).toBe("internal_copy");
+  });
 });
 
 describe("partitionPasteLogs — 종류별 분리", () => {
@@ -92,8 +112,74 @@ describe("partitionPasteLogs — 종류별 분리", () => {
     expect(logs).toEqual(snapshot);
   });
 
+  it("signals 는 탭 전환과 외부 붙여넣기를 입력 순서대로 담는다 (내부 복사 제외)", () => {
+    const logs = [tabSwitch("t1"), internal("i1"), external("e1"), tabSwitch("t2")];
+    expect(partitionPasteLogs(logs).signals.map((l) => l.id)).toEqual(["t1", "e1", "t2"]);
+  });
+
+  it("is_internal 이 true 인 마커 행은 탭 전환이 아니라 내부 복사로 묶인다", () => {
+    const odd = log({
+      id: "i2",
+      length: 0,
+      pasted_text: TAB_SWITCH_MARKER,
+      is_internal: true,
+      suspicious: false,
+    });
+    const parts = partitionPasteLogs([odd]);
+    expect(parts.internal.map((l) => l.id)).toEqual(["i2"]);
+    expect(parts.tabSwitch).toEqual([]);
+    expect(parts.signals).toEqual([]);
+  });
+
   it("빈 입력이면 모두 빈 배열이다", () => {
-    expect(partitionPasteLogs([])).toEqual({ tabSwitch: [], external: [], internal: [] });
+    expect(partitionPasteLogs([])).toEqual({
+      tabSwitch: [],
+      external: [],
+      internal: [],
+      signals: [],
+    });
+  });
+});
+
+describe("logsForQuestion / countIntegritySignals — 숨기는 기록 수", () => {
+  const q1 = [external("e1"), tabSwitch("t1"), tabSwitch("t2"), internal("i1")];
+  const q2 = [log({ id: "e9", question_id: "q2", pasted_text: "다른 문항" })];
+
+  it("문항에 속한 로그만 고른다 (FinalAnswerCard 와 같은 기준)", () => {
+    expect(logsForQuestion([...q1, ...q2], "q1").map((l) => l.id)).toEqual([
+      "e1",
+      "t1",
+      "t2",
+      "i1",
+    ]);
+    // questionId 가 없으면 전부, 로그가 없으면 빈 배열.
+    expect(logsForQuestion([...q1, ...q2], undefined)).toHaveLength(5);
+    expect(logsForQuestion(undefined, "q1")).toEqual([]);
+  });
+
+  it("탭 전환과 외부 붙여넣기만 센다 (내부 복사는 꺼도 보이므로 세지 않는다)", () => {
+    expect(countIntegritySignals(q1, "q1")).toBe(3);
+  });
+
+  it("다른 문항의 기록은 세지 않는다", () => {
+    expect(countIntegritySignals([...q1, ...q2], "q1")).toBe(3);
+    expect(countIntegritySignals([...q1, ...q2], "q2")).toBe(1);
+  });
+
+  it("숨길 기록이 없으면 0 이다", () => {
+    expect(countIntegritySignals([internal("i1")], "q1")).toBe(0);
+    expect(countIntegritySignals([], "q1")).toBe(0);
+    expect(countIntegritySignals(undefined, "q1")).toBe(0);
+  });
+});
+
+describe("탭 전환 마커 — 학생 쪽 생산자와 같은 문자열", () => {
+  it("hooks/useExamGuards.ts 가 보내는 pasted_text 가 TAB_SWITCH_MARKER 와 같다", () => {
+    // 학생 쪽 파일은 이 이슈 범위 밖이라 수정하지 않고, 읽어서 비교한다.
+    // 한쪽만 바뀌면 표시 단계가 탭 전환을 못 알아보고 '0자 외부 붙여넣기' 가 되살아난다.
+    const source = readFileSync(resolve(__dirname, "..", "hooks", "useExamGuards.ts"), "utf8");
+    const sent = [...source.matchAll(/pasted_text:\s*"([^"]*)"/g)].map((m) => m[1]);
+    expect(sent).toEqual([TAB_SWITCH_MARKER]);
   });
 });
 
@@ -197,5 +283,150 @@ describe("의심 표시 설정 저장 (localStorage)", () => {
     };
     expect(readIntegrityPreference(broken, "exam-1")).toBe(true);
     expect(() => writeIntegrityPreference(broken, "exam-1", false)).not.toThrow();
+  });
+
+  it("쓰기는 저장됐는지를 돌려준다 (저장소가 없거나 던지면 false)", () => {
+    expect(writeIntegrityPreference(fakeStorage(), "exam-1", false)).toBe(true);
+    expect(writeIntegrityPreference(null, "exam-1", false)).toBe(false);
+    const broken = {
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+    };
+    expect(writeIntegrityPreference(broken, "exam-1", false)).toBe(false);
+  });
+});
+
+/** storage 이벤트를 받는 window 의 최소 흉내. */
+function fakeEventTarget() {
+  type Listener = (event: { key: string | null }) => void;
+  const listeners = new Set<Listener>();
+  return {
+    listeners,
+    addEventListener: (_type: "storage", listener: Listener) => void listeners.add(listener),
+    removeEventListener: (_type: "storage", listener: Listener) => void listeners.delete(listener),
+    emit: (key: string | null) => listeners.forEach((l) => l({ key })),
+  };
+}
+
+describe("의심 표시 설정 스토어 (useSyncExternalStore 용)", () => {
+  it("저장된 값이 없으면 켜짐이고, 저장된 꺼짐은 바로 읽힌다", () => {
+    const storage = fakeStorage({ "qon.grade.integrity.exam-2": "false" });
+    const store = createIntegrityPreferenceStore({
+      getStorage: () => storage,
+      getEventTarget: () => null,
+    });
+    expect(store.getSnapshot("exam-1")).toBe(true);
+    expect(store.getSnapshot("exam-2")).toBe(false);
+  });
+
+  it("setPreference 는 저장하고 구독자에게 알린다", () => {
+    const storage = fakeStorage();
+    const store = createIntegrityPreferenceStore({
+      getStorage: () => storage,
+      getEventTarget: () => null,
+    });
+    const onChange = vi.fn();
+    store.subscribe("exam-1", onChange);
+
+    store.setPreference("exam-1", false);
+
+    expect(storage.data.get("qon.grade.integrity.exam-1")).toBe("false");
+    expect(store.getSnapshot("exam-1")).toBe(false);
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("다른 탭의 변경(storage 이벤트)을 같은 키에 한해 알린다", () => {
+    const target = fakeEventTarget();
+    const store = createIntegrityPreferenceStore({
+      getStorage: () => fakeStorage(),
+      getEventTarget: () => target,
+    });
+    const onChange = vi.fn();
+    store.subscribe("exam-1", onChange);
+
+    target.emit("qon.grade.integrity.exam-2");
+    expect(onChange).not.toHaveBeenCalled();
+
+    target.emit("qon.grade.integrity.exam-1");
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    // localStorage.clear() 는 key 가 null 이다.
+    target.emit(null);
+    expect(onChange).toHaveBeenCalledTimes(2);
+  });
+
+  it("구독 해제하면 이벤트 리스너와 알림이 모두 사라진다", () => {
+    const target = fakeEventTarget();
+    const store = createIntegrityPreferenceStore({
+      getStorage: () => fakeStorage(),
+      getEventTarget: () => target,
+    });
+    const onChange = vi.fn();
+    const unsubscribe = store.subscribe("exam-1", onChange);
+    expect(target.listeners.size).toBe(1);
+
+    unsubscribe();
+    expect(target.listeners.size).toBe(0);
+    store.setPreference("exam-1", false);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("저장소를 못 쓰면 이 탭 메모리로 토글이 계속 동작한다", () => {
+    const broken = {
+      getItem: () => {
+        throw new Error("SecurityError");
+      },
+      setItem: () => {
+        throw new Error("SecurityError");
+      },
+    };
+    const store = createIntegrityPreferenceStore({
+      getStorage: () => broken,
+      getEventTarget: () => null,
+    });
+    expect(store.getSnapshot("exam-1")).toBe(true);
+    expect(() => store.setPreference("exam-1", false)).not.toThrow();
+    expect(store.getSnapshot("exam-1")).toBe(false);
+    store.setPreference("exam-1", true);
+    expect(store.getSnapshot("exam-1")).toBe(true);
+  });
+
+  it("저장소 자체가 없어도(null) 메모리로 동작하고 구독은 예외 없이 끝난다", () => {
+    const store = createIntegrityPreferenceStore({
+      getStorage: () => null,
+      getEventTarget: () => null,
+    });
+    expect(store.getSnapshot("exam-1")).toBe(true);
+    const unsubscribe = store.subscribe("exam-1", () => {});
+    store.setPreference("exam-1", false);
+    expect(store.getSnapshot("exam-1")).toBe(false);
+    expect(() => unsubscribe()).not.toThrow();
+  });
+
+  it("메모리 값은 다른 탭이 같은 키를 바꾸면 저장소 값에 자리를 내준다", () => {
+    const target = fakeEventTarget();
+    let writable = false;
+    const data = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => data.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        if (!writable) throw new Error("QuotaExceededError");
+        data.set(key, value);
+      },
+    };
+    const store = createIntegrityPreferenceStore({
+      getStorage: () => storage,
+      getEventTarget: () => target,
+    });
+    store.subscribe("exam-1", () => {});
+
+    store.setPreference("exam-1", false); // 쓰기 실패 → 메모리에만 꺼짐
+    expect(store.getSnapshot("exam-1")).toBe(false);
+
+    writable = true;
+    data.set("qon.grade.integrity.exam-1", "true"); // 다른 탭이 켬
+    target.emit("qon.grade.integrity.exam-1");
+    expect(store.getSnapshot("exam-1")).toBe(true);
   });
 });
