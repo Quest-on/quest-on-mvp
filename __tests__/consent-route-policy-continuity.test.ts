@@ -157,8 +157,12 @@ const SESSION_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const SESSION_OTHER = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const SESSION_ORPHAN = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const SESSION_DUP = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+const EXAM_LOWER = "44444444-4444-4444-8444-444444444444";
+const SESSION_LOWER = "ffffffff-ffff-4fff-8fff-ffffffffffff";
 const CODE_A = "ALPHA1";
 const CODE_B = "BRAVO2";
+// 대소문자만 다른 별개 시험의 코드. exams.code 는 텍스트라 `=` 가 대소문자와 공백을 그대로 구분한다.
+const CODE_A_LOWER = "alpha1";
 
 const examRow = (overrides: Row = {}): Row => ({ id: EXAM_A, code: CODE_A, ...overrides });
 const sessionRow = (overrides: Row = {}): Row => ({
@@ -389,6 +393,76 @@ describe("ownsInProgressSession (#531) — FK 가 없는 DB", () => {
         sessions: [sessionRow({ id: SESSION_B, exam_id: EXAM_B })],
       });
       await expect(owns(`/exam/${CODE_A}`)).resolves.toBe(true);
+    });
+
+    // 시험 코드는 정확 일치로만 맞춘다. 코드를 대문자로 바꾸거나 앞뒤 공백을 자르면, 요청한 코드와
+    // 다른 시험의 세션에 연속성 예외를 주게 된다.
+    describe("코드는 대소문자와 공백까지 정확히 일치해야 한다", () => {
+      const lowerExam = () => examRow({ id: EXAM_LOWER, code: CODE_A_LOWER });
+      const lowerSession = (overrides: Row = {}) => sessionRow({ id: SESSION_LOWER, exam_id: EXAM_LOWER, ...overrides });
+
+      it("본인은 ALPHA1 시험에만 진행 중이고 별도의 alpha1 시험이 있을 때 /exam/alpha1 은 false", async () => {
+        // 코드를 대문자로 바꿔 조회하면 ALPHA1 시험의 본인 세션이 잡혀 true 가 된다.
+        installDb({ exams: [...defaultExams(), lowerExam()] });
+        await expect(owns(`/exam/${CODE_A_LOWER}`)).resolves.toBe(false);
+        await expect(owns("/api/supa", { examCode: CODE_A_LOWER })).resolves.toBe(false);
+      });
+
+      it("반대로 본인이 alpha1 시험에만 진행 중이면 /exam/ALPHA1 은 false, /exam/alpha1 은 true", async () => {
+        installDb({
+          exams: [...defaultExams(), lowerExam()],
+          sessions: [lowerSession(), sessionRow({ status: "submitted", submitted_at: "2026-10-01T00:00:00Z" })],
+        });
+        await expect(owns(`/exam/${CODE_A}`)).resolves.toBe(false);
+        await expect(owns(`/exam/${CODE_A_LOWER}`)).resolves.toBe(true);
+      });
+
+      it("시험이 ALPHA1 하나뿐이어도 대소문자가 다른 코드(alpha1, Alpha1)는 false", async () => {
+        installDb();
+        await expect(owns(`/exam/${CODE_A_LOWER}`)).resolves.toBe(false);
+        await expect(owns("/api/supa", { examCode: "Alpha1" })).resolves.toBe(false);
+      });
+
+      it.each([
+        ["뒤 공백", "ALPHA1 "],
+        ["앞 공백", " ALPHA1"],
+        ["앞뒤 공백", " ALPHA1 "],
+        ["줄바꿈", "ALPHA1\n"],
+      ])("body.examCode 에 %s 이 붙으면 false (코드를 다듬어 맞추지 않는다)", async (_name, examCode) => {
+        installDb();
+        await expect(owns("/api/supa", { examCode })).resolves.toBe(false);
+        await expect(owns("/api/supa", { action: "create_or_get_session", examCode })).resolves.toBe(false);
+        expect(logErrorMock).not.toHaveBeenCalled();
+      });
+
+      it("공백이 붙은 코드를 그대로 exams 조회 필터로 건다 (다듬지 않는다)", async () => {
+        const queries = installDb();
+        await owns("/api/supa", { examCode: "ALPHA1 " });
+
+        expect(only(queries, "exams")[0].filters).toEqual([{ op: "eq", column: "code", value: "ALPHA1 " }]);
+      });
+
+      it("같은 학생이 ALPHA1 과 alpha1 두 시험 모두 진행 중이어도 요청한 코드의 시험 세션으로만 판정한다", async () => {
+        // 코드를 대소문자 무시로 맞추면 두 시험이 모두 잡혀 sessions 의 maybeSingle 이 다중 행 오류를 낸다.
+        const queries = installDb({ exams: [...defaultExams(), lowerExam()], sessions: [sessionRow(), lowerSession()] });
+
+        await expect(owns(`/exam/${CODE_A}`)).resolves.toBe(true);
+        await expect(owns(`/exam/${CODE_A_LOWER}`)).resolves.toBe(true);
+        expect(logErrorMock).not.toHaveBeenCalled();
+
+        // 각 요청은 자기 코드의 시험 id 하나로만 sessions 를 좁힌다.
+        const [upper, lower] = only(queries, "sessions");
+        expect(upper.filters).toContainEqual({ op: "in", column: "exam_id", value: [EXAM_A] });
+        expect(lower.filters).toContainEqual({ op: "in", column: "exam_id", value: [EXAM_LOWER] });
+      });
+
+      it("두 시험 모두 진행 중일 때 sessionId 와 코드가 서로 다른 시험을 가리키면 false", async () => {
+        installDb({ exams: [...defaultExams(), lowerExam()], sessions: [sessionRow(), lowerSession()] });
+
+        await expect(owns("/api/supa", { sessionId: SESSION_A, examCode: CODE_A_LOWER })).resolves.toBe(false);
+        await expect(owns("/api/supa", { sessionId: SESSION_LOWER, examCode: CODE_A })).resolves.toBe(false);
+        await expect(owns("/api/supa", { sessionId: SESSION_LOWER, examCode: CODE_A_LOWER })).resolves.toBe(true);
+      });
     });
   });
 
