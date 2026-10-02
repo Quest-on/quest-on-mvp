@@ -10,7 +10,7 @@ import {
   type ScoreWeights,
 } from "@/lib/grade-utils";
 import { buildCopiedExamPayload, type CopyableExamSource } from "@/lib/exam-copy";
-import { stripSensitiveQuestionFields } from "@/lib/sanitize-exam-questions";
+import { sanitizeExamForStudent } from "@/lib/sanitize-exam-questions";
 
 // Lazy Supabase client getter — creates a fresh client per invocation
 // to avoid stale connections in serverless environments
@@ -628,19 +628,10 @@ export async function getExam(data: { code: string }) {
       throw error;
     }
 
-    // Strip sensitive data from public endpoint:
-    // - Remove answer key / grading context from each question (correctOptionIndex,
-    //   ai_context, core_ability) so a bare exam code can't reveal answers.
-    // - Remove per-question rubric unless the instructor made the rubric public.
-    // - Null the top-level rubric when rubric_public is false (existing privacy gate).
-    const rubricPublic = exam.rubric_public === true;
-    const sanitizedExam = {
-      ...exam,
-      questions: stripSensitiveQuestionFields(exam.questions, { keepRubric: rubricPublic }),
-      ...(rubricPublic ? {} : { rubric: null }),
-    };
-
-    return successJson({ exam: sanitizedExam });
+    // Public endpoint: callers are unauthenticated, so they get exactly what a student
+    // gets (answer keys, grading context, materials and the top-level rubric are all
+    // withheld unless the instructor made the rubric public). One shared rule, see #506.
+    return successJson({ exam: sanitizeExamForStudent(exam) });
   } catch (error) {
     logError("[getExam] Failed to get exam", error, { path: "/api/supa/exam-handlers" });
     return errorJson("GET_EXAM_FAILED", "Failed to get exam", 500);

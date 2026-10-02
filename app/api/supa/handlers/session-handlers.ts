@@ -7,7 +7,7 @@ import { logError } from "@/lib/logger";
 import { triggerGradingIfNeeded } from "@/lib/grading-trigger";
 import { sanitizeUserInput } from "@/lib/sanitize";
 import { resolveAdmissionFallback, QUOTA_UNAVAILABLE_CODE } from "@/lib/quota-admission";
-import { stripSensitiveQuestionFields } from "@/lib/sanitize-exam-questions";
+import { sanitizeExamForStudent } from "@/lib/sanitize-exam-questions";
 import {
   ONBOARDING_EVENTS,
   hasOnboardingEvent,
@@ -430,14 +430,13 @@ export async function initExamSession(data: {
       }
     }
 
-    // 응시자에게 내려가는 문항에서 정답키/채점 컨텍스트(correctOptionIndex, ai_context)
-    // 와 레거시 core_ability 를 제거한다. 채점은 서버에서 원본 exam 을 다시 읽어 수행하므로
-    // 클라이언트에는 이 필드들이 필요 없다. rubric(채점 기준)은 강사가 공개한 경우에만 유지.
-    if (exam.questions && Array.isArray(exam.questions)) {
-      exam.questions = stripSensitiveQuestionFields(exam.questions, {
-        keepRubric: exam.rubric_public === true,
-      });
-    }
+    // 응시자에게 내려가는 exam 에서 교수 전용 필드를 걷어낸다 (#506).
+    //  - 문항: 정답키/채점 컨텍스트(correctOptionIndex, ai_context)와 레거시 core_ability.
+    //  - 자료: materials_text(추출 전문)는 제거, materials(파일 주소)는 빈 배열.
+    //  - rubric(채점 기준): 문항별, 최상위 모두 강사가 공개한 경우에만 유지.
+    // 채점과 AI 호출은 서버에서 원본 exam 을 다시 읽어 수행하므로 클라이언트에는 필요 없다.
+    // 아래 모든 반환 경로가 같은 exam 객체를 쓰므로 여기서 한 번만 정리한다.
+    Object.assign(exam, sanitizeExamForStudent(exam));
 
     // 2. Get all existing sessions (most recent first)
     const { data: existingSessions, error: checkError } = await getSupabase()
