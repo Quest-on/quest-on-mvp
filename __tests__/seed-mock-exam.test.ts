@@ -314,6 +314,38 @@ describe("validateMockExamSpec", () => {
     expect(errorsOf(raw).join("\n")).toMatch(/idx/);
   });
 
+  it("ai_role 은 선택이다: 준 값은 문항에 그대로 남고 생략한 문항에는 키가 없다", () => {
+    const r = validateMockExamSpec(FIXTURE);
+
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.spec.questions[0]).toEqual(expect.objectContaining({ id: "q1", ai_role: "case_author" }));
+      expect(r.spec.questions[1]).toEqual(expect.objectContaining({ id: "q2", ai_role: "analysis_partner" }));
+      expect(r.spec.questions[2]).not.toHaveProperty("ai_role");
+    }
+  });
+
+  it.each([
+    ["알 수 없는 값", "analyst"],
+    ["대소문자가 다른 값", "ANALYSIS_PARTNER"],
+    ["앞뒤 공백이 붙은 값", " analysis_partner"],
+    ["빈 문자열", ""],
+    ["null", null],
+    ["숫자", 3],
+    ["불리언", true],
+    ["객체", { role: "analysis_partner" }],
+  ])("ai_role 이 %s 이면 거부한다", (_label, aiRole) => {
+    const raw = good();
+    raw.questions = [{ id: "q1", text: "x", type: "essay", ai_role: aiRole }];
+
+    const text = errorsOf(raw).join("\n");
+
+    expect(text).toContain("questions[0].ai_role");
+    // 허용 값을 알려 줘서 오타를 바로 고칠 수 있게 한다.
+    expect(text).toContain("case_author");
+    expect(text).toContain("analysis_partner");
+  });
+
   it("문항 id 중복과 빈 text 를 거부한다", () => {
     const raw = good();
     raw.questions = [
@@ -533,6 +565,18 @@ describe("seedMockExam dry-run", () => {
       instructor_id: INSTRUCTOR,
     });
     expect(Array.isArray(report.planned?.exams.rubric)).toBe(true);
+  });
+
+  it("문항의 ai_role 은 만들 exams 행에 그대로 실린다 (AI 역할 지정, #519)", async () => {
+    const db = createFakeDb(verifiedWorld);
+
+    const { report } = await run(db);
+
+    const questions = report.planned?.exams.questions as Row[];
+    expect(questions.map((q) => q.ai_role)).toEqual(["case_author", "analysis_partner", undefined]);
+    expect(questions[2]).not.toHaveProperty("ai_role");
+    // 빌더의 문항 정제는 core_ability 만 지운다. 나머지 필드는 스펙 그대로다.
+    expect(questions).toEqual(spec.questions);
   });
 
   it("문항에는 idx 를 넣지 않는다 (배열 위치가 q_idx)", async () => {
@@ -857,6 +901,17 @@ describe("seedMockExam --apply", () => {
       sort_order: 4,
     });
     expect(report.result).toEqual({ examId: examRow.id, code: "AAAAAA", nodeId: nodeRow?.id });
+  });
+
+  it("INSERT 되는 행의 문항에 ai_role 이 살아 있다 - 정제 단계에서 지워지지 않는다", async () => {
+    const db = createFakeDb(verifiedWorld);
+
+    await run(db, apply);
+
+    const questions = db.tables.exams[0].questions as Row[];
+    expect(questions.map((q) => q.ai_role)).toEqual(["case_author", "analysis_partner", undefined]);
+    expect(questions[2]).not.toHaveProperty("ai_role");
+    expect(questions).toEqual(spec.questions);
   });
 
   it("입장 RPC·시작 라우트가 소유한 값은 건드리지 않는다", async () => {

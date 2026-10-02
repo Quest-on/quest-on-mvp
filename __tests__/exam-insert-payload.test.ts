@@ -140,6 +140,13 @@ const questionVariants: Array<[string, LegacyQuestion[]]> = [
   ["서술형 5개", [1, 2, 3, 4, 5].map((n) => ({ id: `q${n}`, text: `문항 ${n}`, type: "essay" as const }))],
   ["객관식+서술형", [MCQ, ESSAY]],
   ["core_ability 가 붙은 문항", [{ ...ESSAY, core_ability: "분석력" }, { ...MCQ, core_ability: ["a", "b"] }]],
+  [
+    "ai_role 이 붙은 문항",
+    [
+      { ...ESSAY, ai_role: "analysis_partner" },
+      { ...ESSAY, id: "q9", ai_role: "case_author", core_ability: "분석력" },
+    ],
+  ],
 ];
 
 const validMixedWeights: ScoreWeights = {
@@ -321,6 +328,25 @@ describe("빌더 계약", () => {
     });
   });
 
+  it("문항 정제는 core_ability 만 지운다 - ai_role 같은 나머지 문항 필드는 그대로 남는다 (#519)", () => {
+    const built = buildExamInsertPayload({
+      ...mockExam,
+      questions: [
+        { id: "q1", text: "분석", type: "essay", ai_role: "analysis_partner", core_ability: "분석력" },
+        { id: "q2", text: "사례", type: "essay", ai_role: "case_author" },
+        { id: "q3", text: "기본", type: "essay" },
+      ],
+    });
+
+    expect(built.ok && built.payload.questions).toEqual([
+      { id: "q1", text: "분석", type: "essay", ai_role: "analysis_partner" },
+      { id: "q2", text: "사례", type: "essay", ai_role: "case_author" },
+      { id: "q3", text: "기본", type: "essay" },
+    ]);
+    // 값이 없는 문항에 ai_role: undefined 같은 키를 만들어 넣지도 않는다.
+    expect(built.ok && (built.payload.questions as object[])[2]).not.toHaveProperty("ai_role");
+  });
+
   it("rubric 은 배열 그대로 실린다 (문자열로 바꾸지 않는다)", () => {
     const built = buildExamInsertPayload(mockExam);
 
@@ -471,6 +497,29 @@ describe("createExam 은 공용 빌더로 exams 행을 만든다", () => {
 
     const arg = vi.mocked(buildExamInsertPayload).mock.calls[0][0] as unknown as Record<string, unknown>;
     expect(arg).not.toHaveProperty("language");
+  });
+
+  it("createExam 경로도 문항의 ai_role 을 INSERT 까지 보존한다 (#519)", async () => {
+    const exams = mockCreate();
+
+    const res = await createExam({
+      title: "AI 역할",
+      code: "ABC123",
+      duration: 30,
+      questions: [
+        { id: "q1", text: "분석", type: "essay", ai_role: "analysis_partner", core_ability: "분석력" },
+        { id: "q2", text: "기본", type: "essay" },
+      ] as never,
+      status: "draft",
+      created_at: NOW,
+      updated_at: NOW,
+    });
+
+    expect(res.status).toBe(200);
+    expect(exams.inserted[0].questions).toEqual([
+      { id: "q1", text: "분석", type: "essay", ai_role: "analysis_partner" },
+      { id: "q2", text: "기본", type: "essay" },
+    ]);
   });
 
   it("DB 로 가는 값이 추출 전 로직의 출력과 같다 (대표 입력)", async () => {

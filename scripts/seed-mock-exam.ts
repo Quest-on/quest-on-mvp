@@ -36,7 +36,15 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 // 스펙: 입력 JSON 한 개. 문항과 루브릭 문구는 이 저장소에 두지 않고 별도로 받는다.
 // ─────────────────────────────────────────────────────────────────────────────
-export type MockExamQuestion = { id: string; text: string; type: "essay" };
+/**
+ * 문항 단위 AI 역할 (#519). 문항 JSON 의 `ai_role` 로 저장되고 학생 시험 채팅이 읽는다.
+ * 생략하면 기본 역할(사례형 출제자)이다. 허용 값은 이 둘뿐이다 - 오타가 조용히 기본 역할로
+ * 떨어지면 분석 문항이 사례형으로 응시된다.
+ */
+export const MOCK_EXAM_AI_ROLES = ["case_author", "analysis_partner"] as const;
+export type MockExamAiRole = (typeof MOCK_EXAM_AI_ROLES)[number];
+
+export type MockExamQuestion = { id: string; text: string; type: "essay"; ai_role?: MockExamAiRole };
 
 export type MockExamSpec = {
   title: string;
@@ -47,7 +55,7 @@ export type MockExamSpec = {
 };
 
 const SPEC_KEYS = ["title", "questions", "rubric", "rubric_public", "language"];
-const QUESTION_KEYS = ["id", "text", "type"];
+const QUESTION_KEYS = ["id", "text", "type", "ai_role"];
 const RUBRIC_KEYS = ["evaluationArea", "detailedCriteria"];
 /** createExamSchema 의 title 상한과 같다. */
 const MAX_TITLE_LENGTH = 500;
@@ -126,8 +134,26 @@ export function validateMockExamSpec(
           `${at}.type 은 "essay" 만 허용합니다 (받은 값: ${JSON.stringify(q.type)}). 이 스크립트는 서술형만 다룹니다.`
         );
       }
-      if (isNonEmptyString(q.id) && isNonEmptyString(q.text) && q.type === "essay") {
-        questions.push({ id: q.id, text: q.text, type: "essay" });
+      // ai_role 은 선택이다. 키가 있으면 허용 값이어야 하고, 없으면 문항에도 키를 만들지 않는다.
+      let aiRole: MockExamAiRole | undefined;
+      let aiRoleValid = true;
+      if ("ai_role" in q) {
+        if ((MOCK_EXAM_AI_ROLES as readonly unknown[]).includes(q.ai_role)) {
+          aiRole = q.ai_role as MockExamAiRole;
+        } else {
+          aiRoleValid = false;
+          errors.push(
+            `${at}.ai_role 은 ${MOCK_EXAM_AI_ROLES.map((r) => `"${r}"`).join(" 또는 ")} 이어야 합니다 (생략하면 기본 역할). 받은 값: ${JSON.stringify(q.ai_role)}`
+          );
+        }
+      }
+      if (isNonEmptyString(q.id) && isNonEmptyString(q.text) && q.type === "essay" && aiRoleValid) {
+        questions.push({
+          id: q.id,
+          text: q.text,
+          type: "essay",
+          ...(aiRole ? { ai_role: aiRole } : {}),
+        });
       }
     });
   }
@@ -218,7 +244,7 @@ export const USAGE = `사용법:
 기본은 dry-run 입니다. DB 에 아무것도 쓰지 않고, 읽기 전용 사전 점검과 만들 행을 출력합니다.
 
 필수:
-  --spec <경로>                  스펙 JSON (title, questions, rubric, rubric_public, language)
+  --spec <경로>                  스펙 JSON (title, questions, rubric, rubric_public, language; 문항의 ai_role 은 선택)
   --instructor-id <id>           시험 소유자(profiles.id = exams.instructor_id)
 
 옵션:

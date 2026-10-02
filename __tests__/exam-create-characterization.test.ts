@@ -156,6 +156,41 @@ describe("createExam 성공 응답과 소유자", () => {
   });
 });
 
+describe("문항 필드 보존 (#519 ai_role)", () => {
+  const questions = [
+    { id: "q1", text: "분석", type: "essay" as const, ai_role: "analysis_partner", core_ability: "분석력" },
+    { id: "q2", text: "사례", type: "essay" as const, ai_role: "case_author" },
+    { id: "q3", text: "기본", type: "essay" as const },
+  ];
+
+  it("INSERT 되는 문항은 core_ability 만 빠지고 ai_role 은 남는다", async () => {
+    const { exams } = mockDb();
+
+    await createExam({ ...base, questions: questions as never });
+
+    expect(exams.inserted[0].questions).toEqual([
+      { id: "q1", text: "분석", type: "essay", ai_role: "analysis_partner" },
+      { id: "q2", text: "사례", type: "essay", ai_role: "case_author" },
+      { id: "q3", text: "기본", type: "essay" },
+    ]);
+  });
+
+  it("라우트의 입력 검증(createExamSchema)이 문항의 ai_role 을 떨구지 않는다", async () => {
+    const { createExamSchema } = await import("@/lib/validations");
+
+    const parsed = createExamSchema.safeParse({ ...base, questions });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.questions.map((q) => (q as Record<string, unknown>).ai_role)).toEqual([
+        "analysis_partner",
+        "case_author",
+        undefined,
+      ]);
+    }
+  });
+});
+
 describe("코드 중복 사전 검사", () => {
   it("이미 있는 코드면 6자 새 코드로 바꿔 넣는다", async () => {
     // Math.random 이 0 이면 알파벳 첫 글자만 나온다 - 생성기의 알파벳과 길이를 함께 고정한다.

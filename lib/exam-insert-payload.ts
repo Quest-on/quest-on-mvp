@@ -103,6 +103,8 @@ export function buildExamInsertPayload<Q extends { type?: string | null }>(
   data: ExamInsertInput<Q>
 ): ExamInsertPayloadResult {
   // NOTE: core_ability(핵심 역량) 필드는 제거되었으므로 저장 시 항상 제거한다.
+  // 지우는 것은 이 필드 하나뿐이다. 문항 JSON 의 나머지 필드는 그대로 통과시킨다 - 특히 문항별 AI
+  // 역할 `ai_role`("case_author" | "analysis_partner", #519)을 지우면 분석 문항이 기본 역할로 응시된다.
   const sanitizedQuestions = (data.questions || []).map((q) => {
     const rest = { ...q } as Q & { core_ability?: unknown };
     delete rest.core_ability;
