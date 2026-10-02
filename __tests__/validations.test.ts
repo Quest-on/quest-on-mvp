@@ -68,6 +68,30 @@ describe("chatRequestSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  // #523: 서버가 받은 값이 학생이 쓴 값과 같아야 한다. 부등호 사이 문장이 지워지면 AI 입력과
+  // 저장값이 둘 다 변질된다.
+  it.each([
+    ["income < 3000 이고 age > 40 인 행만 남겨 주세요"],
+    ["p < 0.05 이므로 유의, 다음은 x>5"],
+    ["df[df['x'] < 5] 와 df[df['y'] > 2]"],
+  ])("keeps comparison expressions in message untouched: %s", (message) => {
+    const result = chatRequestSchema.safeParse({ message, sessionId: "abc-123" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.message).toBe(message);
+  });
+
+  it("still strips tag-shaped XSS payloads from message", () => {
+    const parse = (message: string) => {
+      const result = chatRequestSchema.safeParse({ message, sessionId: "abc-123" });
+      if (!result.success) throw new Error("parse failed");
+      return result.data.message;
+    };
+    expect(parse("<script>alert(1)</script>질문")).toBe("질문");
+    expect(parse("<img src=x onerror=alert(1)>질문")).toBe("질문");
+    expect(parse("<<b>img src=x onerror=alert(1)>질문")).toBe("질문");
+    expect(parse("a < b <svg onload=alert(1)> c > d")).toBe("a < b  c > d");
+  });
 });
 
 describe("grading chat clientMessageId schemas", () => {
