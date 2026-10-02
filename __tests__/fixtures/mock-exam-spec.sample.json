@@ -1,0 +1,14 @@
+{
+  "title": "합성 모의시험 (예시 데이터)",
+  "questions": [
+    { "id": "q1", "text": "예시 문항 1. 이 문장은 테스트용 합성 데이터이며 실제 시험 문항이 아닙니다.", "type": "essay" },
+    { "id": "q2", "text": "예시 문항 2. 이 문장은 테스트용 합성 데이터이며 실제 시험 문항이 아닙니다.", "type": "essay" },
+    { "id": "q3", "text": "예시 문항 3. 이 문장은 테스트용 합성 데이터이며 실제 시험 문항이 아닙니다.", "type": "essay" }
+  ],
+  "rubric": [
+    { "evaluationArea": "예시 평가 영역 A", "detailedCriteria": "예시 세부 기준 A. 합성 데이터입니다." },
+    { "evaluationArea": "예시 평가 영역 B", "detailedCriteria": "예시 세부 기준 B. 합성 데이터입니다." }
+  ],
+  "rubric_public": true,
+  "language": "ko"
+}
