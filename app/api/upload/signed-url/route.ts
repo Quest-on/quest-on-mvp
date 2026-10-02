@@ -8,6 +8,7 @@ import { randomUUID } from "crypto";
 import { logError } from "@/lib/logger";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 
+import { UPLOAD_ALLOWED_EXTENSIONS, UPLOAD_ALLOWED_MIME_TYPES } from "@/lib/upload-allowlist";
 const supabase = getSupabaseServer();
 
 function errorJson(
@@ -30,32 +31,6 @@ function makeSafeObjectKey(originalName: string, extFallback = ".bin") {
   const ext = m ? `.${m[1].toLowerCase()}` : extFallback;
   return `${ts}_${id}${ext}`;
 }
-
-const ALLOWED_EXTENSIONS = new Set([
-  ".pdf", ".ppt", ".pptx", ".doc", ".docx",
-  ".txt", ".hwp", ".hwpx", ".zip",
-  ".jpg", ".jpeg", ".png", ".gif", ".webp",
-]);
-
-const ALLOWED_MIME_TYPES = new Set([
-  "application/pdf",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "text/plain",
-  "application/x-hwp",
-  "application/haansofthwp",
-  "application/vnd.hancom.hwp",
-  "application/vnd.hancom.hwpx",
-  "application/zip",
-  "application/x-zip-compressed",
-  "application/octet-stream",
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-]);
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -95,7 +70,7 @@ export async function POST(request: NextRequest) {
     // Validate extension
     const extMatch = fileName.match(/\.([a-zA-Z0-9]+)$/);
     const fileExtension = extMatch ? `.${extMatch[1].toLowerCase()}` : "";
-    if (!fileExtension || !ALLOWED_EXTENSIONS.has(fileExtension)) {
+    if (!fileExtension || !UPLOAD_ALLOWED_EXTENSIONS.has(fileExtension)) {
       return errorJson(
         "INVALID_FILE_EXTENSION",
         "허용되지 않는 파일 확장자입니다.",
@@ -105,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate MIME type
-    if (!ALLOWED_MIME_TYPES.has(contentType)) {
+    if (!UPLOAD_ALLOWED_MIME_TYPES.has(contentType)) {
       return errorJson(
         "INVALID_FILE_TYPE",
         "지원되지 않는 파일 형식입니다.",

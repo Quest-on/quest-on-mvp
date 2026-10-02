@@ -17,7 +17,7 @@ interface ExtractedText {
   fileName: string;
 }
 
-// Text-extractable extensions (must also be in upload route ALLOWED_EXTENSIONS)
+// Text-extractable extensions (must also be in lib/upload-allowlist.ts UPLOAD_ALLOWED_EXTENSIONS)
 const TEXT_EXTRACTABLE = new Set(["pdf", "docx", "pptx"]);
 
 function getExtension(fileName: string): string {

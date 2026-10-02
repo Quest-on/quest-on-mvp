@@ -9,6 +9,7 @@ import { randomUUID } from "crypto";
 import { logError } from "@/lib/logger";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 
+import { UPLOAD_ALLOWED_EXTENSIONS, UPLOAD_ALLOWED_MIME_TYPES } from "@/lib/upload-allowlist";
 // Initialize Supabase client with service role key for server-side operations
 const supabase = getSupabaseServer();
 
@@ -97,42 +98,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file extension (whitelist, last extension only to prevent double-extension attacks)
-    const ALLOWED_EXTENSIONS = new Set([
-      ".pdf", ".ppt", ".pptx", ".doc", ".docx",
-      ".txt", ".hwp", ".hwpx", ".zip",
-      ".jpg", ".jpeg", ".png", ".gif", ".webp",
-    ]);
     const extMatch = originalName.match(/\.([a-zA-Z0-9]+)$/);
     const fileExtension = extMatch ? `.${extMatch[1].toLowerCase()}` : "";
-    if (!fileExtension || !ALLOWED_EXTENSIONS.has(fileExtension)) {
+    if (!fileExtension || !UPLOAD_ALLOWED_EXTENSIONS.has(fileExtension)) {
       return errorJson(
         "INVALID_FILE_EXTENSION",
         "허용되지 않는 파일 확장자입니다.",
-        { fileName: originalName, extension: fileExtension, allowedExtensions: [...ALLOWED_EXTENSIONS] },
+        { fileName: originalName, extension: fileExtension, allowedExtensions: [...UPLOAD_ALLOWED_EXTENSIONS] },
         400
       );
     }
 
     // Validate file type (화이트리스트)
-    const allowedTypes = [
-      "application/pdf",
-      "application/vnd.ms-powerpoint",
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "text/plain",
-      "application/x-hwp",
-      "application/haansofthwp",
-      "application/vnd.hancom.hwp",
-      "application/vnd.hancom.hwpx",
-      "application/zip",
-      "application/x-zip-compressed",
-      "application/octet-stream", // Some browsers send .hwp/.hwpx as octet-stream
-      "image/jpeg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-    ];
+    const allowedTypes = [...UPLOAD_ALLOWED_MIME_TYPES];
 
     if (!allowedTypes.includes(file.type)) {
       return errorJson(
