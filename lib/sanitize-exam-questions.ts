@@ -39,9 +39,11 @@ export function stripSensitiveQuestionFields<T>(
  * the two paths cannot drift apart.
  *
  *  - questions: instructor-only fields are stripped (see stripSensitiveQuestionFields).
- *  - materials_text: removed. The extracted text exists for the server-side AI only.
- *  - materials: emptied. Students get no file list until the instructor marks files as
- *    student-visible (a separate feature); until then no URL leaves the server.
+ *  - materials_text: emptied to []. The extracted text exists for the server-side AI only.
+ *  - materials: emptied to []. Students get no file list until the instructor marks files
+ *    as student-visible (a separate feature); until then no URL leaves the server.
+ *    Callers should not select these columns for student paths at all; this is the
+ *    second line of defence.
  *  - rubric: kept only when `rubric_public === true`.
  *
  * Pure function: does not mutate its input. Keys that are absent stay absent, so a

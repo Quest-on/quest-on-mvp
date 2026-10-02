@@ -617,7 +617,7 @@ export async function getExam(data: { code: string }) {
   try {
     const { data: exam, error } = await getSupabase()
       .from("exams")
-      .select("id, title, code, description, duration, questions, rubric, rubric_public, chat_weight, score_weights, status, instructor_id, materials, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, type, deadline, assignment_prompt")
+      .select("id, title, code, description, duration, questions, rubric, rubric_public, chat_weight, score_weights, status, instructor_id, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, type, deadline, assignment_prompt")
       .eq("code", data.code)
       .single();
 
