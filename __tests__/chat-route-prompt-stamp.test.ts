@@ -6,7 +6,7 @@
  *
  *   1) 지시문 조립을 `lib/chat-instructions.ts` 로 옮기기 전과 후에 최종 지시문이 바이트 단위로
  *      같다 — 세 상태(자료 없음, 관련성 낮음, 정상) × 두 경로(정규 세션, 서버 저장 없는 temp 경로)
- *      × 두 언어. 아래 해시는 추출 **전** 라우트(staging b8287303)에서 측정한 값이다.
+ *      × 두 언어. 아래 해시는 추출 **전** 라우트(staging 15106bba, 이 라우트는 b8287303 과 같다)에서 측정한 값이다.
  *   2) AI 응답 기록(`messages.metadata`, `ai_events.metadata`)에 어느 스펙으로 답했는지 남고,
  *      기존 `rag`/`usage` 키는 그대로이며, 기록 실패가 학생 응답을 막지 않는다.
  *
@@ -184,8 +184,9 @@ function chatRequest(path: Path) {
   }) as unknown as Parameters<typeof POST>[0];
 }
 
+/** 모델에 간 지시문을 있는 그대로 해시한다 (줄바꿈 정규화 없음 — CR 이 섞이면 해시가 달라진다). */
 function sha256(text: string): string {
-  return createHash("sha256").update(text.replace(/\r\n/g, "\n"), "utf8").digest("hex");
+  return createHash("sha256").update(text, "utf8").digest("hex");
 }
 
 /** 추출 전 라우트에서 측정한 최종 지시문의 SHA-256. 두 경로가 같은 입력이면 같은 값이어야 한다. */
@@ -244,6 +245,7 @@ describe("모델에 간 최종 지시문은 추출 전과 바이트 단위로 �
     expect(h.responsesCreate).toHaveBeenCalledTimes(1);
     const args = h.responsesCreate.mock.calls[0][0] as Row;
     const instructions = args.instructions as string;
+    expect(instructions, "모델에 간 지시문에 CR(\\r)이 섞였습니다").not.toContain("\r");
     const actual = sha256(instructions);
     const expected = INSTRUCTIONS_SHA256[lang][state];
     expect(
