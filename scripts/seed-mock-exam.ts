@@ -26,8 +26,8 @@
  * 로컬 스택은 ref 를 확신할 수 없어 거부한다.
  *
  * 문항 본문(`questions[].text`)은 HTML 이다 (#537). 화면이 거른 HTML 을 그대로 렌더링하므로 평문 줄바꿈은
- * 공백으로 접힌다. 문단은 `<p>`, 목록은 `<ul><li>` 로 쓴다. 줄바꿈이 있는데 블록 태그가 없으면 스펙
- * 검증이 막는다(줄바꿈 없는 평문 한 줄은 통과).
+ * 공백으로 접힌다. 문단은 `<p>`, 목록은 `<ul><li>` 로 쓴다. 줄바꿈이 있는데 인식하는 블록 태그(`<p>`,
+ * `<ul>` 등, 목록은 `BLOCK_HTML_TAG_RE`)가 없으면 스펙 검증이 막는다(줄바꿈 없는 평문 한 줄은 통과).
  *
  * 이 스크립트가 하지 않는 것: 시험 시작/종료, 첫 발행 기록, 학생 수 집계 - 입장 RPC 와 시작
  * 라우트의 몫이다. 만든 시험은 draft 로 끝난다.
@@ -86,6 +86,7 @@ const RUBRIC_SHAPE = '[{"evaluationArea": "...", "detailedCriteria": "..."}]';
 /**
  * 문항 본문이 HTML 이라는 표시로 보는 블록 태그 (#537). 태그명 뒤는 공백, `>`, `/` 여야 한다 -
  * `x<3` 같은 부등호 평문이나 `<param>` 같은 다른 태그가 걸리지 않게 이 목록 기준으로만 판정한다.
+ * 그래서 목록에 없는 태그(`<hr>`, `<tr>`, 인라인 태그)만 있는 본문은 줄바꿈이 있으면 막힌다.
  */
 const BLOCK_HTML_TAG_RE = /<(?:p|br|ul|ol|li|div|h[1-6]|blockquote|pre|table)(?=[\s/>])/i;
 
@@ -163,7 +164,7 @@ export function validateMockExamSpec(
         errors.push(`${at}.text 는 비어 있지 않은 문자열이어야 합니다.`);
       } else if (isPlainTextWithLineBreaks(q.text)) {
         errors.push(
-          `${at}.text${isNonEmptyString(q.id) ? ` (id "${q.id}")` : ""} 에 줄바꿈이 있는데 HTML 블록 태그가 하나도 없습니다. 문항 본문은 HTML 이라 평문 줄바꿈은 화면에서 공백으로 접혀 한 문단으로 보입니다. 문단은 <p>...</p>, 목록은 <ul><li>...</li></ul> 로 감싸세요.`
+          `${at}.text${isNonEmptyString(q.id) ? ` (id "${q.id}")` : ""} 에 줄바꿈이 있는데 인식하는 블록 태그(<p>, <ul> 등)가 하나도 없습니다. 문항 본문은 HTML 이라 평문 줄바꿈은 화면에서 공백으로 접혀 한 문단으로 보입니다. 문단은 <p>...</p>, 목록은 <ul><li>...</li></ul> 로 감싸세요.`
         );
       }
       if (q.type !== "essay") {
@@ -285,7 +286,7 @@ export const USAGE = `사용법:
   --instructor-id <id>           시험 소유자(profiles.id = exams.instructor_id)
 
 문항 본문(questions[].text)은 HTML 입니다. 문단은 <p>, 목록은 <ul><li> 로 쓰세요.
-줄바꿈이 있는데 블록 태그가 없는 평문은 화면에서 한 문단으로 접히므로 스펙 검증이 막습니다.
+줄바꿈이 있는데 인식하는 블록 태그(<p>, <ul> 등)가 없는 본문은 화면에서 한 문단으로 접히므로 스펙 검증이 막습니다.
 
 옵션:
   --parent-folder-id <uuid>      드라이브에서 시험을 둘 폴더(exam_nodes.id). 없으면 루트

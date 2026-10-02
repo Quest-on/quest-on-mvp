@@ -429,8 +429,11 @@ describe("validateMockExamSpec", () => {
       expect(errors[0]).toContain("questions[0].text");
       expect(errors[0]).toContain('id "q1"');
       expect(errors[0]).toContain("본문은 HTML");
-      expect(errors[0]).toContain("<p>");
-      expect(errors[0]).toContain("<ul><li>");
+      expect(errors[0]).toContain("<p>...</p>");
+      expect(errors[0]).toContain("<ul><li>...</li></ul>");
+      // 목록에 있는 태그만 인식한다는 점을 밝힌다 (<hr> 같은 다른 블록 태그만 있어도 막히므로 "하나도 없다" 는 사실이 아니다).
+      expect(errors[0]).toContain("인식하는 블록 태그");
+      expect(errors[0]).not.toContain("HTML 블록 태그가 하나도");
     });
 
     it("<p> 와 <ul><li> 로 감싼 HTML 은 통과한다", () => {
@@ -490,6 +493,7 @@ describe("validateMockExamSpec", () => {
       ["<param> (<p 로 시작하지만 다른 태그)", "<param>값</param>\n둘째 줄"],
       ["<ulx> (<ul 로 시작하지만 다른 태그)", "<ulx>값</ulx>\n둘째 줄"],
       ["<b> 같은 인라인 태그뿐", "<b>굵게</b>\n둘째 줄"],
+      ["<hr> (목록에 없는 블록 태그는 인식하지 않는다)", "위\n<hr>\n아래"],
       ["닫는 태그 </p> 뿐 (여는 태그 없음)", "첫 줄</p>\n둘째 줄"],
       ["< p (꺾쇠 뒤 공백)", "a < p and q\n둘째 줄"],
     ])("블록 태그가 아니면 줄바꿈이 있을 때 막는다: %s", (_label, text) => {
@@ -516,6 +520,10 @@ describe("validateMockExamSpec", () => {
 
     it("윈도우 줄바꿈(\\r\\n)도 줄바꿈으로 본다", () => {
       expect(errorsOf(withText("첫 줄\r\n둘째 줄"))).toHaveLength(1);
+    });
+
+    it("단독 \\r 도 줄바꿈으로 본다 (HTML 파서는 CR 을 LF 로 정규화해 똑같이 접는다)", () => {
+      expect(errorsOf(withText("첫 줄\r둘째 줄"))).toHaveLength(1);
     });
 
     it("앞뒤에만 붙은 줄바꿈은 구조가 아니므로 평문 한 줄은 통과한다", () => {
