@@ -16,6 +16,7 @@ import { AIConversationsCard } from "@/components/instructor/AIConversationsCard
 import { FinalAnswerCard } from "@/components/instructor/FinalAnswerCard";
 import { IntegritySignalsToggle } from "@/components/instructor/IntegritySignalsToggle";
 import { useIntegritySignalsPreference } from "@/hooks/useIntegritySignalsPreference";
+import { countIntegritySignals } from "@/lib/integrity-signals";
 import { ObjectiveGradeCard } from "@/components/instructor/ObjectiveGradeCard";
 import { CaseGradingChat } from "@/components/instructor/CaseGradingChat";
 import {
@@ -374,6 +375,17 @@ export default function GradeStudentPage({
     | Grade
     | undefined;
 
+  // 현재 문항의 붙여넣기 로그. 카드(표시)와 토글(숨긴 기록 수)이 같은 목록을 쓴다.
+  const currentPasteLogs = currentQuestion
+    ? sessionData.pasteLogs?.[currentQuestion.id] ||
+      sessionData.pasteLogs?.[String(selectedQuestionQIdx)] ||
+      sessionData.pasteLogs?.[String(selectedQuestionIdx)]
+    : undefined;
+  const integritySignalCount = countIntegritySignals(
+    currentPasteLogs,
+    currentQuestion?.id,
+  );
+
   const caseGradeInitialScore =
     currentGrade?.stage_grading?.answer?.score ?? currentGrade?.score;
   const caseGradeInitialComment =
@@ -692,16 +704,11 @@ export default function GradeStudentPage({
                     <IntegritySignalsToggle
                       checked={showIntegritySignals}
                       onCheckedChange={setShowIntegritySignals}
+                      signalCount={integritySignalCount}
                     />
                     <FinalAnswerCard
                       submission={currentSubmission}
-                      pasteLogs={
-                        currentQuestion
-                          ? sessionData.pasteLogs?.[currentQuestion.id] ||
-                            sessionData.pasteLogs?.[String(selectedQuestionQIdx)] ||
-                            sessionData.pasteLogs?.[String(selectedQuestionIdx)]
-                          : undefined
-                      }
+                      pasteLogs={currentPasteLogs}
                       questionId={currentQuestion?.id}
                       showIntegritySignals={showIntegritySignals}
                     />

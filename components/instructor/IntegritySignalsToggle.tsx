@@ -8,6 +8,12 @@ import { Switch } from "@/components/ui/switch";
 interface IntegritySignalsToggleProps {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
+  /**
+   * 이 문항에서 의심 표시 대상인 기록 수(탭 전환 + 외부 붙여넣기).
+   * 꺼져 있고 1건 이상이면 "숨긴 기록 N건"을 보여, 기록이 없어서 깨끗한 것과
+   * 숨겨서 깨끗한 것을 구분하게 한다.
+   */
+  signalCount?: number;
 }
 
 /**
@@ -17,6 +23,7 @@ interface IntegritySignalsToggleProps {
 export function IntegritySignalsToggle({
   checked,
   onCheckedChange,
+  signalCount = 0,
 }: IntegritySignalsToggleProps) {
   const t = useTranslations("authoring");
   const switchId = useId();
@@ -31,6 +38,11 @@ export function IntegritySignalsToggle({
         <p id={hintId} className="type-hint">
           {t("finalAnswerCard.integrityToggleHint")}
         </p>
+        {!checked && signalCount > 0 && (
+          <p className="type-meta">
+            {t("finalAnswerCard.integrityHiddenCount", { count: signalCount })}
+          </p>
+        )}
       </div>
       <Switch
         id={switchId}

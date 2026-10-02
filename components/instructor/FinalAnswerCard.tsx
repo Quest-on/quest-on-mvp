@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { FileText, AlertTriangle, ArrowLeftRight } from "lucide-react";
+import { FileText, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useTranslations, useLocale } from "next-intl";
 import { formatTime } from "@/lib/i18n/format";
@@ -16,7 +16,12 @@ import {
   textToHtml,
   type PasteLog,
 } from "@/lib/highlight-paste";
-import { partitionPasteLogs, selectLogsForHighlight } from "@/lib/integrity-signals";
+import {
+  classifyPasteLog,
+  logsForQuestion,
+  partitionPasteLogs,
+  selectLogsForHighlight,
+} from "@/lib/integrity-signals";
 
 interface Submission {
   id: string;
@@ -81,18 +86,18 @@ export function FinalAnswerCard({
   }
 
   // 현재 문제에 해당하는 로그만 필터링
-  const relevantLogs =
-    pasteLogs?.filter((log) => !questionId || log.question_id === questionId) ||
-    [];
-  // 탭 전환은 서버에서 suspicious=true 로 저장되지만 외부 붙여넣기가 아니므로
-  // 표시 단계에서 갈라 따로 센다. (데이터는 그대로 둔다.)
+  const relevantLogs = logsForQuestion(pasteLogs, questionId);
+  // 탭 전환은 서버에서 suspicious=true 로 저장되지만 외부 붙여넣기가 아니다. 표시 단계에서
+  // 이름과 집계만 갈라 "탭 전환 N회" / "외부 붙여넣기 N건" 으로 센다(데이터는 그대로 둔다).
+  // 심각도 표현은 변경 전과 같다 — 둘 다 같은 빨간 뱃지와 경고 박스에 담는다.
   const partitioned = partitionPasteLogs(relevantLogs);
   const internalLogs = partitioned.internal;
-  const suspiciousLogs = showIntegritySignals ? partitioned.external : [];
+  const externalLogs = showIntegritySignals ? partitioned.external : [];
   const tabSwitchLogs = showIntegritySignals ? partitioned.tabSwitch : [];
+  const signalLogs = showIntegritySignals ? partitioned.signals : [];
   const highlightLogs = selectLogsForHighlight(relevantLogs, showIntegritySignals);
   // 범례는 본문에 칠해지는 종류가 있을 때만 그린다. 탭 전환은 본문을 칠하지 않는다.
-  const hasLegend = suspiciousLogs.length > 0 || internalLogs.length > 0;
+  const hasLegend = externalLogs.length > 0 || internalLogs.length > 0;
   const formatLogTime = (timestamp: string) =>
     formatTime(timestamp, locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
@@ -104,19 +109,16 @@ export function FinalAnswerCard({
             <FileText className="w-5 h-5 text-success-text" />
             <CardTitle>{t("finalAnswerCard.cardTitle")}</CardTitle>
           </div>
-          <div className="flex items-center gap-2">
-            {suspiciousLogs.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {externalLogs.length > 0 && (
               <Badge variant="destructive" className="flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" />
-                {t("finalAnswerCard.badgeSuspicious", { count: suspiciousLogs.length })}
+                {t("finalAnswerCard.badgeSuspicious", { count: externalLogs.length })}
               </Badge>
             )}
             {tabSwitchLogs.length > 0 && (
-              <Badge
-                variant="secondary"
-                className="flex items-center gap-1 bg-warning-subtle text-warning-text hover:bg-warning-subtle"
-              >
-                <ArrowLeftRight className="w-3 h-3" />
+              <Badge variant="destructive" className="flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
                 {t("finalAnswerCard.badgeTabSwitch", { count: tabSwitchLogs.length })}
               </Badge>
             )}
@@ -136,7 +138,7 @@ export function FinalAnswerCard({
       <CardContent>
         {submission ? (
           <div className="space-y-3">
-            {suspiciousLogs.length > 0 && (
+            {signalLogs.length > 0 && (
               <div className="bg-destructive/10 border border-destructive rounded-md p-3">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
@@ -145,29 +147,11 @@ export function FinalAnswerCard({
                       {t("finalAnswerCard.suspiciousTitle")}
                     </p>
                     <div className="text-xs text-destructive space-y-1">
-                      {suspiciousLogs.map((log) => (
+                      {signalLogs.map((log) => (
                         <p key={log.id}>
-                          {t("finalAnswerCard.suspiciousLog", { chars: log.length.toLocaleString(), time: formatLogTime(log.timestamp) })}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {tabSwitchLogs.length > 0 && (
-              <div className="bg-warning-surface border border-warning-border rounded-md p-3">
-                <div className="flex items-start gap-2">
-                  <ArrowLeftRight className="w-4 h-4 text-warning-text flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-warning-text mb-1">
-                      {t("finalAnswerCard.tabSwitchTitle")}
-                    </p>
-                    {/* 탭 전환은 수십 번도 쌓이므로 목록 높이를 제한한다. */}
-                    <div className="text-xs text-warning-text space-y-1 max-h-32 overflow-y-auto">
-                      {tabSwitchLogs.map((log) => (
-                        <p key={log.id}>
-                          {t("finalAnswerCard.tabSwitchLog", { time: formatLogTime(log.timestamp) })}
+                          {classifyPasteLog(log) === "tab_switch"
+                            ? t("finalAnswerCard.tabSwitchLog", { time: formatLogTime(log.timestamp) })
+                            : t("finalAnswerCard.suspiciousLog", { chars: log.length.toLocaleString(), time: formatLogTime(log.timestamp) })}
                         </p>
                       ))}
                     </div>
@@ -196,7 +180,7 @@ export function FinalAnswerCard({
             )}
             {hasLegend && (
               <div className="flex items-center gap-4 text-xs text-muted-foreground px-1">
-                {suspiciousLogs.length > 0 && (
+                {externalLogs.length > 0 && (
                   <span className="flex items-center gap-1.5">
                     <span className="inline-block w-3 h-3 rounded bg-destructive/25" />
                     {t("finalAnswerCard.legendExternal")}

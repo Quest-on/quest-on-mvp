@@ -37,6 +37,18 @@ describe("채점 페이지 의심 표시 배선", () => {
     expect(toggle.slice(0, 200)).toContain("onCheckedChange={setShowIntegritySignals}");
   });
 
+  it("토글에 현재 문항의 숨길 기록 수를 넘긴다 (카드와 같은 문항 필터)", () => {
+    expect(page).toContain('from "@/lib/integrity-signals"');
+    const toggle = page.slice(page.indexOf("<IntegritySignalsToggle"));
+    expect(toggle.slice(0, 300)).toContain("signalCount={integritySignalCount}");
+    expect(page).toMatch(
+      /const integritySignalCount = countIntegritySignals\(\s*currentPasteLogs,\s*currentQuestion\?\.id,?\s*\)/,
+    );
+    // 카드에도 같은 로그 목록을 넘겨 두 곳의 기록이 갈라지지 않게 한다.
+    const card = page.slice(page.indexOf("<FinalAnswerCard"));
+    expect(card.slice(0, 300)).toContain("pasteLogs={currentPasteLogs}");
+  });
+
   it("토글은 FinalAnswerCard 바로 위에 붙는다 (학생 답안 근처)", () => {
     expect(page.indexOf("<IntegritySignalsToggle")).toBeGreaterThan(page.indexOf("<AIConversationsCard"));
     expect(page.indexOf("<IntegritySignalsToggle")).toBeLessThan(page.indexOf("<FinalAnswerCard"));
