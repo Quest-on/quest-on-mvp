@@ -83,6 +83,8 @@ export const examQuestionItemSchema = z.object({
   type: z.string().optional(),
   idx: z.number().optional(),
   ai_context: z.string().optional().nullable(),
+  /** 학생 채팅 AI 역할 (`lib/exam-ai-profile.ts`). 모르는 값은 해석 단계에서 사례형으로 떨어진다. */
+  ai_role: z.string().optional().nullable(),
   options: z.array(z.string()).optional(),
   correctOptionIndex: z.number().int().min(0).optional(),
   points: z.number().optional(),

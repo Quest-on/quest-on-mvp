@@ -29,6 +29,12 @@ export interface Question {
   /** 배점. UI/저장 전반에서 선택값으로 통일 — 미설정 시 표시하지 않는다. */
   points?: number;
   rubric?: Array<{ evaluationArea: string; detailedCriteria: string }>;
+  /**
+   * 학생 시험 채팅 AI 의 역할 (`analysis_partner` 이면 분석 파트너, 없거나 그 밖이면 사례형 출제자).
+   * 화면에서 편집하지 않는다(입력칸 없음). 문항 JSON 에 있는 값이 new/edit 저장에서 지워지지 않게
+   * 타입에 적어 둔다. 해석은 `lib/exam-ai-profile.ts` 가 한다.
+   */
+  ai_role?: string;
 }
 
 /** 문제 유형별 i18n 키 맵 */
