@@ -965,13 +965,29 @@ export async function submitExam(data: {
     }
     const verifiedStudentId = user.id;
 
+    // 세션 조회에는 PostgREST 임베드(`exams(duration)` 등)를 쓰지 않는다. (#525)
+    // 임베드는 DB 에 sessions.exam_id → exams.id 외래키가 있어야만 동작한다. 스테이징과
+    // 운영 DB 에는 그 FK 가 없어서 조회가 PGRST200 으로 실패했고, 아래 검사가 그 실패를
+    // "세션 없음" 으로 읽어 유효한 세션의 제출이 전부 404 가 됐다. duration 은 아래의
+    // exams 조회에서 함께 읽는다.
     const { data: sessionCheck, error: sessionCheckError } = await getSupabase()
       .from("sessions")
-      .select("id, student_id, exam_id, submitted_at, attempt_timer_started_at, status, exams(duration)")
+      .select("id, student_id, exam_id, submitted_at, attempt_timer_started_at, status")
       .eq("id", data.sessionId)
       .single();
 
-    if (sessionCheckError || !sessionCheck) {
+    // 404 는 세션이 정말 없을 때(PGRST116: 0행)만이다. 그 밖의 조회 오류(DB 오류, 스키마
+    // 불일치 등)를 404 로 위장하면 클라이언트는 "세션이 없다" 로 알아듣고 재시도하지 않으며,
+    // 운영자는 로그에서 원인을 찾을 수 없다. 500 으로 응답하고 원인을 남긴다.
+    if (sessionCheckError && sessionCheckError.code !== "PGRST116") {
+      logError("[submitExam] Session lookup failed", sessionCheckError, {
+        path: "/api/supa/session-handlers",
+        additionalData: { sessionId: data.sessionId, examId: data.examId },
+      });
+      return errorJson("SUBMIT_EXAM_FAILED", "Failed to submit exam", 500);
+    }
+
+    if (!sessionCheck) {
       return errorJson("SESSION_NOT_FOUND", "Session not found", 404);
     }
 
@@ -987,9 +1003,37 @@ export async function submitExam(data: {
       return errorJson("ALREADY_SUBMITTED", "This session has already been submitted", 409);
     }
 
+    // 마감 검사(duration), 문항 수 검증(questions), 데모 미리보기 판정(is_demo, instructor_id)이
+    // 모두 시험 한 건의 컬럼이라 조회를 한 번에 합쳤다. 학생 전원이 지나는 경로라 왕복을
+    // 늘리지 않는다. duration 은 예전에 세션 조회의 `exams(duration)` 임베드로 읽었다. (#525)
+    const { data: examForValidation, error: examValError } = await getSupabase()
+      .from("exams")
+      .select("questions, is_demo, instructor_id, duration")
+      .eq("id", data.examId)
+      .single();
+
+    // 시험 조회가 실패하면 제출을 막는다(fail-closed). 임베드를 쓰던 때는 duration 이 세션
+    // 조회와 같은 요청으로 왔기 때문에, 세션을 읽었다면 마감 검사는 언제나 이루어졌다. 이제
+    // duration 이 이 두 번째 조회에 달려 있으므로, 조회 실패를 건너뛰고 제출을 받으면
+    // 마감이 지난 제출이 검사 없이 통과하는 새 약화가 된다. 읽기 한 번이 흔들려 제출이
+    // 500 이 되어도 학생 답안은 save_draft 계열로 이미 저장돼 있고, 마감 뒤에는 하트비트
+    // 자동 제출이 저장된 답안으로 세션을 닫는다.
+    // 404 는 시험 행이 정말 없을 때(PGRST116)만이다. 세션 조회와 같은 이유로 DB 오류를
+    // 404 로 위장하지 않는다.
+    if (examValError && examValError.code !== "PGRST116") {
+      logError("[submitExam] Exam lookup failed", examValError, {
+        path: "/api/supa/session-handlers",
+        additionalData: { sessionId: data.sessionId, examId: data.examId },
+      });
+      return errorJson("SUBMIT_EXAM_FAILED", "Failed to submit exam", 500);
+    }
+
+    if (!examForValidation) {
+      return errorJson("EXAM_NOT_FOUND", "Exam not found", 404);
+    }
+
     // Server-side deadline enforcement (uses shared utility)
-    const examsRaw = sessionCheck.exams as { duration: number } | { duration: number }[] | null;
-    const examDuration = Array.isArray(examsRaw) ? examsRaw[0]?.duration : examsRaw?.duration;
+    const examDuration = examForValidation.duration as number | null | undefined;
 
     if (examDuration && examDuration > 0 && sessionCheck.status === "in_progress") {
       const remaining = getSessionTimeRemainingMs(sessionCheck.attempt_timer_started_at, examDuration);
@@ -999,13 +1043,7 @@ export async function submitExam(data: {
     }
 
     // Validate answers array length against exam question count
-    const { data: examForValidation, error: examValError } = await getSupabase()
-      .from("exams")
-      .select("questions, is_demo, instructor_id")
-      .eq("id", data.examId)
-      .single();
-
-    if (!examValError && examForValidation?.questions && Array.isArray(examForValidation.questions)) {
+    if (examForValidation.questions && Array.isArray(examForValidation.questions)) {
       const questionCount = examForValidation.questions.length;
       if (data.answers.length > questionCount) {
         return errorJson("VALIDATION_ERROR", `Too many answers: got ${data.answers.length}, expected at most ${questionCount}`, 400);
