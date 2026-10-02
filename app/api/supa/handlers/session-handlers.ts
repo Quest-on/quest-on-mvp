@@ -1012,19 +1012,28 @@ export async function submitExam(data: {
       .eq("id", data.examId)
       .single();
 
-    if (examValError) {
-      // 시험 조회 실패는 제출을 막지 않는다. 문항 수 검증을 건너뛰던 기존 동작과 같고, 마감
-      // 검사도 같은 쪽으로 처리한다 — 읽기 한 번이 흔들렸다고 학생이 이미 쓴 답안을 버리게
-      // 만들 수 없다. duration 을 알 수 없을 때 마감 검사를 건너뛰는 것도 기존 동작이다.
-      // 대신 원인을 남겨 마감 검사가 빠진 제출을 운영자가 찾을 수 있게 한다.
-      logError("[submitExam] Exam lookup failed; skipping deadline and question-count checks", examValError, {
+    // 시험 조회가 실패하면 제출을 막는다(fail-closed). 임베드를 쓰던 때는 duration 이 세션
+    // 조회와 같은 요청으로 왔기 때문에, 세션을 읽었다면 마감 검사는 언제나 이루어졌다. 이제
+    // duration 이 이 두 번째 조회에 달려 있으므로, 조회 실패를 건너뛰고 제출을 받으면
+    // 마감이 지난 제출이 검사 없이 통과하는 새 약화가 된다. 읽기 한 번이 흔들려 제출이
+    // 500 이 되어도 학생 답안은 save_draft 계열로 이미 저장돼 있고, 마감 뒤에는 하트비트
+    // 자동 제출이 저장된 답안으로 세션을 닫는다.
+    // 404 는 시험 행이 정말 없을 때(PGRST116)만이다. 세션 조회와 같은 이유로 DB 오류를
+    // 404 로 위장하지 않는다.
+    if (examValError && examValError.code !== "PGRST116") {
+      logError("[submitExam] Exam lookup failed", examValError, {
         path: "/api/supa/session-handlers",
         additionalData: { sessionId: data.sessionId, examId: data.examId },
       });
+      return errorJson("SUBMIT_EXAM_FAILED", "Failed to submit exam", 500);
+    }
+
+    if (!examForValidation) {
+      return errorJson("EXAM_NOT_FOUND", "Exam not found", 404);
     }
 
     // Server-side deadline enforcement (uses shared utility)
-    const examDuration = examForValidation?.duration as number | null | undefined;
+    const examDuration = examForValidation.duration as number | null | undefined;
 
     if (examDuration && examDuration > 0 && sessionCheck.status === "in_progress") {
       const remaining = getSessionTimeRemainingMs(sessionCheck.attempt_timer_started_at, examDuration);
@@ -1034,7 +1043,7 @@ export async function submitExam(data: {
     }
 
     // Validate answers array length against exam question count
-    if (!examValError && examForValidation?.questions && Array.isArray(examForValidation.questions)) {
+    if (examForValidation.questions && Array.isArray(examForValidation.questions)) {
       const questionCount = examForValidation.questions.length;
       if (data.answers.length > questionCount) {
         return errorJson("VALIDATION_ERROR", `Too many answers: got ${data.answers.length}, expected at most ${questionCount}`, 400);
