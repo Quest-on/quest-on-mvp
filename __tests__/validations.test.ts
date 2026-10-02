@@ -81,6 +81,27 @@ describe("chatRequestSchema", () => {
     if (result.success) expect(result.data.message).toBe(message);
   });
 
+  // 이 검증은 `/api/chat` 에서 인증과 속도 제한보다 먼저 돈다(`validateRequest` 가 `currentUser()` 앞).
+  // 그래서 상한(10,000자) 크기의 최악 입력에서도 빨리 끝나야 한다. 한 겹씩만 벗겨지는 입력 + 닫히지 않는
+  // 태그 꼬리는 반복 정규식 구현에서 9~14초가 걸렸다.
+  it.each([
+    ["<script ", 1111],
+    ["<a", 1111],
+    ["<!", 1111],
+  ])("parses a worst-case 10,000 char message quickly (nested layers + %j tail)", (unit, layers) => {
+    const head = "<".repeat(layers) + "b>".repeat(layers);
+    const tail = (unit as string).repeat(Math.ceil((10000 - head.length) / (unit as string).length));
+    const message = (head + tail).slice(0, 10000);
+    expect(message).toHaveLength(10000);
+
+    const started = performance.now();
+    const result = chatRequestSchema.safeParse({ message, sessionId: "abc-123" });
+    const elapsed = performance.now() - started;
+
+    expect(result.success).toBe(true);
+    expect(elapsed, `${elapsed.toFixed(0)}ms`).toBeLessThan(300);
+  });
+
   it("still strips tag-shaped XSS payloads from message", () => {
     const parse = (message: string) => {
       const result = chatRequestSchema.safeParse({ message, sessionId: "abc-123" });
