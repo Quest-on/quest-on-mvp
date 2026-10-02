@@ -4,6 +4,11 @@
  * 확장자와 MIME 을 모두 검사한다(마지막 확장자만 본다). 목록에 형식을 더할 때는 여기 한
  * 곳만 고친다. 텍스트 추출 대상(pdf, docx, pptx)은 hooks/useFileUpload.ts 가 따로 정하며,
  * 스프레드시트와 CSV 는 추출하지 않고 파일로만 저장된다.
+ *
+ * .xlsm 은 일부러 넣지 않았다. VBA 매크로를 담는 것을 전제로 하는 형식을 새로 열지 않는다는
+ * 뜻이지 매크로 방어책은 아니다. 구형 .xls 와 이미 허용 중인 .doc, .ppt, .zip 도 매크로나 실행
+ * 파일을 담을 수 있다. 그쪽 방어선은 이 목록이 아니라 받는 사람의 Office 보호된 보기와 인터넷
+ * 출처 표시다.
  */
 
 export const UPLOAD_ALLOWED_EXTENSIONS: ReadonlySet<string> = new Set([
