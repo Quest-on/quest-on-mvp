@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
   responsesCreate: vi.fn(),
   searchChunks: vi.fn(),
   inserts: { messages: [] as Row[], ai_events: [] as Row[] },
+  failNextAiMessageInsert: { value: false },
   db: {
     session: null as Row | null,
     exam: null as Row | null,
@@ -67,6 +68,7 @@ function makeSupabase() {
     rpc: vi.fn(async () => ({ data: null, error: null })),
     from(table: string) {
       const builder: Record<string, unknown> = {};
+      let writeResult: { data: null; error: Row | null } = { data: null, error: null };
       for (const method of ["select", "eq", "neq", "is", "not", "in", "order", "limit"]) {
         builder[method] = () => builder;
       }
@@ -74,12 +76,16 @@ function makeSupabase() {
         const rows = Array.isArray(payload) ? payload : [payload];
         if (table === "messages") h.inserts.messages.push(...rows);
         if (table === "ai_events") h.inserts.ai_events.push(...rows);
+        // AI 메시지 저장을 한 번 실패시켜 재시도 경로를 태운다.
+        if (table === "messages" && rows[0]?.role === "ai" && h.failNextAiMessageInsert.value) {
+          h.failNextAiMessageInsert.value = false;
+          writeResult = { data: null, error: { message: "boom" } };
+        }
         return builder;
       };
       builder.single = async () => resultFor(table);
       builder.maybeSingle = async () => resultFor(table);
-      builder.then = (resolve: (value: unknown) => unknown) =>
-        Promise.resolve({ data: null, error: null }).then(resolve);
+      builder.then = (resolve: (value: unknown) => unknown) => Promise.resolve(writeResult).then(resolve);
       return builder;
     },
   };
@@ -131,6 +137,7 @@ function searchResultsFor(state: RagState) {
 function setup(params: { lang: Lang; state: RagState }) {
   h.inserts.messages.length = 0;
   h.inserts.ai_events.length = 0;
+  h.failNextAiMessageInsert.value = false;
   h.currentUser.mockResolvedValue({ id: STUDENT_ID, role: "student" });
   h.searchChunks.mockResolvedValue(searchResultsFor(params.state));
   h.responsesCreate.mockResolvedValue(openaiResponse());
@@ -201,6 +208,22 @@ const STATE_LABEL: Record<RagState, string> = {
   normal: "정상",
 };
 
+// 렌더 해시(`lib/student-chat-spec.ts` 의 case@1)의 앞 16자.
+const KO_TEMPLATE_SHA = "a9280876b978b02c";
+const EN_TEMPLATE_SHA = "e3b41726291f5eb5";
+const RESPONSE_MODEL = "gpt-5.6-luna-2026-09-01";
+const USAGE_METADATA = {
+  input_tokens: 100,
+  output_tokens: 20,
+  total_tokens: 120,
+  cached_input_tokens: 0,
+  reasoning_tokens: 5,
+};
+
+const aiMessages = () => h.inserts.messages.filter((row) => row.role === "ai");
+const userMessages = () => h.inserts.messages.filter((row) => row.role === "user");
+const studentChatEvents = () => h.inserts.ai_events.filter((row) => row.feature === "student_chat");
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -246,6 +269,40 @@ describe("모델에 간 최종 지시문은 추출 전과 바이트 단위로 �
   });
 });
 
+describe("언어 조회 경로의 차이는 그대로다 (정규 경로와 temp 경로)", () => {
+  // 정규 경로는 세션의 시험 행에서 language 를 읽고, temp 경로는 examId 가 있을 때만 시험을 따로
+  // 조회한다. 지시문 조립을 한 함수로 모았어도 이 차이는 호출부에 남아 있어야 한다.
+  it("temp 경로에 examId 가 없으면 시험 언어를 조회하지 않고 ko 프롬프트로 간다", async () => {
+    setup({ lang: "en", state: "normal" });
+    const request = new Request("https://example.test/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        message: "질문이요",
+        questionIdx: 0,
+        sessionId: "temp_1700000000000_abc123",
+      }),
+    }) as unknown as Parameters<typeof POST>[0];
+
+    const res = await POST(request);
+    expect(res.status).toBe(200);
+
+    const instructions = (h.responsesCreate.mock.calls[0][0] as Row).instructions as string;
+    expect(instructions).toContain("역할(Role):");
+    expect(instructions).not.toContain("The default language for this exam is English");
+    expect(studentChatEvents()[0].metadata).toMatchObject({ template_sha: KO_TEMPLATE_SHA });
+  });
+
+  it("정규 경로는 세션의 시험 행 language 를 따른다", async () => {
+    setup({ lang: "en", state: "normal" });
+    await POST(chatRequest("regular"));
+
+    const instructions = (h.responsesCreate.mock.calls[0][0] as Row).instructions as string;
+    expect(instructions).toContain("The default language for this exam is English");
+    expect(aiMessages()[0].metadata).toMatchObject({ template_sha: EN_TEMPLATE_SHA });
+  });
+});
+
 describe("모델 선택 동작은 바뀌지 않았다", () => {
   it("요청한 모델은 AI_MODEL 이고 추론 강도(reasoning)는 넘기지 않는다", async () => {
     setup({ lang: "ko", state: "normal" });
@@ -260,5 +317,159 @@ describe("모델 선택 동작은 바뀌지 않았다", () => {
       store: true,
     });
     expect(args).not.toHaveProperty("reasoning");
+  });
+});
+
+describe("AI 응답 기록에 어느 스펙으로 답했는지 남는다", () => {
+  it("정규 경로: AI 메시지 metadata 에 스탬프가 들어가고 rag/usage 는 그대로다", async () => {
+    setup({ lang: "ko", state: "normal" });
+
+    const res = await POST(chatRequest("regular"));
+    expect(res.status).toBe(200);
+
+    expect(aiMessages()).toHaveLength(1);
+    const [ai] = aiMessages();
+    expect(ai).toMatchObject({
+      session_id: SESSION_ID,
+      q_idx: 0,
+      role: "ai",
+      content: "답변입니다.",
+      response_id: "resp_test_1",
+      tokens_used: 120,
+    });
+    expect(ai.metadata).toEqual({
+      // 기존 키 — 값까지 그대로.
+      rag: { topSimilarity: 0.5, resultsCount: 1, method: "vector" },
+      usage: USAGE_METADATA,
+      // 새 키.
+      spec: "case@1",
+      template_sha: KO_TEMPLATE_SHA,
+      response_model: RESPONSE_MODEL,
+      response_model_source: "response",
+      effort: "unspecified",
+    });
+  });
+
+  it("영어 시험은 영어 템플릿의 해시를 남긴다", async () => {
+    setup({ lang: "en", state: "normal" });
+    await POST(chatRequest("regular"));
+    expect(aiMessages()[0].metadata).toMatchObject({ spec: "case@1", template_sha: EN_TEMPLATE_SHA });
+  });
+
+  it("학생 메시지의 metadata 는 건드리지 않는다", async () => {
+    setup({ lang: "ko", state: "normal" });
+    await POST(chatRequest("regular"));
+
+    expect(userMessages()).toHaveLength(1);
+    expect(userMessages()[0].metadata).toEqual({
+      rag: { topSimilarity: 0.5, resultsCount: 1, method: "vector" },
+    });
+  });
+
+  it("ai_events.metadata 에도 같은 스탬프가 들어가고 기존 키와 모델 컬럼은 그대로다", async () => {
+    setup({ lang: "ko", state: "normal" });
+    await POST(chatRequest("regular"));
+
+    const args = h.responsesCreate.mock.calls[0][0] as Row;
+    const [event] = studentChatEvents();
+    expect(event).toMatchObject({
+      feature: "student_chat",
+      route: "/api/chat",
+      status: "success",
+      // 요청한 모델이다. 응답이 돌려준 모델은 metadata.response_model 에 따로 남는다.
+      model: "gpt-test-requested",
+      response_id: "resp_test_1",
+    });
+    expect(event.metadata).toMatchObject({
+      spec: "case@1",
+      template_sha: KO_TEMPLATE_SHA,
+      response_model: RESPONSE_MODEL,
+      response_model_source: "response",
+      effort: "unspecified",
+      // 기존 키 — 학생 메시지가 섞인 호출별 해시라 버전 식별에는 못 쓰지만 그대로 둔다.
+      input_chars: `${args.instructions}\n\n질문이요`.length,
+      output_chars: "답변입니다.".length,
+      prompt_hash: createHash("sha256").update(`${args.instructions}\n\n질문이요`).digest("hex"),
+    });
+  });
+
+  it("temp 경로(서버 저장 없음): ai_events 에만 스탬프가 남고 messages 는 건드리지 않는다", async () => {
+    setup({ lang: "ko", state: "normal" });
+    const res = await POST(chatRequest("temp"));
+    expect(res.status).toBe(200);
+
+    expect(h.inserts.messages).toEqual([]);
+    const [event] = studentChatEvents();
+    expect(event.metadata).toMatchObject({
+      spec: "case@1",
+      template_sha: KO_TEMPLATE_SHA,
+      response_model: RESPONSE_MODEL,
+      response_model_source: "response",
+      effort: "unspecified",
+    });
+  });
+
+  it("응답에 model 이 없으면 요청한 모델명으로 대체하고 대체했다고 구분해 남긴다", async () => {
+    setup({ lang: "ko", state: "normal" });
+    const response = openaiResponse();
+    delete response.model;
+    h.responsesCreate.mockResolvedValue(response);
+
+    await POST(chatRequest("regular"));
+
+    const expected = { response_model: "gpt-test-requested", response_model_source: "request" };
+    expect(aiMessages()[0].metadata).toMatchObject(expected);
+    expect(studentChatEvents()[0].metadata).toMatchObject(expected);
+  });
+
+  it("AI 메시지 저장을 재시도해도 같은 스탬프가 남는다", async () => {
+    setup({ lang: "ko", state: "normal" });
+    h.failNextAiMessageInsert.value = true;
+
+    const res = await POST(chatRequest("regular"));
+    expect(res.status).toBe(200);
+
+    expect(aiMessages()).toHaveLength(2);
+    const [first, retried] = aiMessages();
+    expect(first.metadata).toMatchObject({ spec: "case@1", template_sha: KO_TEMPLATE_SHA });
+    expect(retried.metadata).toEqual({
+      rag: { topSimilarity: 0.5, resultsCount: 1, method: "vector" },
+      usage: USAGE_METADATA,
+      spec: "case@1",
+      template_sha: KO_TEMPLATE_SHA,
+      response_model: RESPONSE_MODEL,
+      response_model_source: "response",
+      effort: "unspecified",
+      _retried: true,
+    });
+  });
+
+  it("기록을 만들다 던져도 학생 응답은 그대로 나간다 (model 을 읽으면 던지는 응답)", async () => {
+    setup({ lang: "ko", state: "normal" });
+    const response = openaiResponse();
+    Object.defineProperty(response, "model", {
+      enumerable: true,
+      get() {
+        throw new Error("boom");
+      },
+    });
+    h.responsesCreate.mockResolvedValue(response);
+
+    const res = await POST(chatRequest("regular"));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.response).toBe("답변입니다.");
+    // 메시지와 이벤트는 그대로 저장된다. 모델명만 요청한 값으로 대체되어 구분 표시가 붙는다.
+    expect(aiMessages()).toHaveLength(1);
+    expect(aiMessages()[0].metadata).toMatchObject({
+      rag: { topSimilarity: 0.5, resultsCount: 1, method: "vector" },
+      usage: USAGE_METADATA,
+      spec: "case@1",
+      response_model: "gpt-test-requested",
+      response_model_source: "request",
+    });
+    expect(studentChatEvents()).toHaveLength(1);
+    expect(studentChatEvents()[0].status).toBe("success");
   });
 });
