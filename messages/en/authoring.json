@@ -164,16 +164,21 @@
     "cardTitle": "Final Answer",
     "badgeSuspicious": "{count, plural, one {# external paste} other {# external pastes}}",
     "badgeInternal": "{count, plural, one {# internal copy} other {# internal copies}}",
+    "badgeTabSwitch": "{count, plural, one {# tab switch} other {# tab switches}}",
     "cardDescription": "The student's final submitted answer",
     "suspiciousTitle": "Suspicious activity detected",
     "suspiciousLog": "• {chars} characters pasted externally ({time})",
+    "tabSwitchTitle": "Tab switch activity",
+    "tabSwitchLog": "• Switched tabs ({time})",
     "internalTitle": "Internal copy activity",
     "internalLog": "• {chars} characters copied internally ({time})",
     "legendExternal": "External paste",
     "legendInternal": "Internal copy (AI response)",
     "legendModified": "Modified after paste",
     "emptyAnswer": "No answer provided.",
-    "noSubmission": "No submission found."
+    "noSubmission": "No submission found.",
+    "integrityToggleLabel": "Suspicion markers",
+    "integrityToggleHint": "Show or hide tab switch and external paste markers. The records themselves are kept."
   },
   "generatedQuestionCard": {
     "presetHarder": "Make harder",
