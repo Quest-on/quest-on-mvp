@@ -45,7 +45,7 @@ Additional ownership checks:
 - **화면과 complete** 는 검증된 세션(`getClaims`)이 의도 쿠키의 대상과 같을 때만 연다. 세션이 "있는가" 가 아니라 "복구 링크가 만든 바로 그 세션인가" 를 본다.
 - **complete** 는 비밀번호를 바꾼 뒤 모든 세션을 끊고(`signOut({ scope: "global" })`) 의도 쿠키를 지운다.
 - **verify·complete** 는 `lib/same-origin.ts` 로 다른 사이트에서 시작된 요청을 거절한다(로그인 CSRF). 두 경로는 `consent-route-policy` 에서 POST 만 공개다.
-- 메일 템플릿 링크: `{{ .SiteURL }}/auth/recovery?token_hash={{ .TokenHash }}&type=recovery`. 발송은 implicit 플로우여야 한다 — PKCE 면 토큰에 `pkce_` 가 붙어 이 해시로 확인되지 않는다. **템플릿을 먼저 바꾸고 배포한다**: 기본 템플릿(`{{ .ConfirmationURL }}`)으로 나간 링크는 GoTrue 가 바로 세션을 만들어 의도 없는 로그인이 된다.
+- 메일 템플릿 링크: `{{ .SiteURL }}/auth/recovery?token_hash={{ .TokenHash }}&type=recovery`. 발송은 implicit 플로우여야 한다 — PKCE 면 토큰에 `pkce_` 가 붙어 이 해시로 확인되지 않는다. **순서는 ① `/auth/recovery` 가 그 환경에 배포돼 있고 ② 템플릿을 바꾸고 ③ 스위치를 여는 것이다.** 템플릿이 라우트보다 앞서면 `proxy.ts` 가 `/sign-in?redirect=…token_hash…` 로 보내 1회용 토큰이 주소(쿼리)에 실린다 — 서버 로그와, `lib/speed-insights.ts` 가 아직 없는 환경의 Speed Insights 로 샌다(2026-10-02 production 에서 실측, #504). 라우트가 있어도 템플릿이 기본(`{{ .ConfirmationURL }}`)이면 GoTrue 가 바로 세션을 만들어 의도 없는 로그인이 된다. 그래서 production 은 라우트가 올라가기 전까지 `recovery.legacy.html`(기본 링크)을 쓴다. 템플릿 원본과 적용 절차는 `docs/email-templates/README.md`.
 - **토큰이 새는 길**: 확인 화면 주소와 폼에 1회용 토큰이 있다. Referer 는 `strict-origin`(origin 만 — `no-referrer` 는 폼 POST 의 Origin 을 `null` 로 만들어 구형 브라우저의 verify 를 막는다), 세션 리플레이는 폼을 `data-private` 로 통째로 막는다(rrweb 입력 마스킹은 hidden 을 가리지 않는다), Speed Insights 비콘은 `lib/speed-insights.ts` 가 쿼리를 떼고 보낸다. PostHog 이벤트 URL 은 `sanitizeAnalyticsUrl` 이 이미 쿼리를 버린다.
 - 매직 링크(`signInWithOtp`)는 쓰지 않는다. GoTrue 는 매직 링크 토큰도 `type: "recovery"` 로 확인해 주므로, 도입하면 로그인 메일이 곧 재설정 링크가 된다.
 
