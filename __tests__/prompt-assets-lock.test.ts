@@ -501,13 +501,13 @@ describe("buildStudentChatSystemPrompt 현행본 스냅샷 (사람이 diff 로 �
 // 않았으므로 @2 없이 @1 을 고쳤다. 이후에는 이 해시를 고치려면 새 스펙 버전을 낸다.
 // ---------------------------------------------------------------------------
 
-const PARTNER_KO_FULL_SHA256 = "0f991fcfcb8311d3d71e71dc2eca0ec423db5e1260fae100f16af114c2271b73";
+const PARTNER_KO_FULL_SHA256 = "51256c0ed3a92cfefa9e7a2b0857e561567817ad204637619ef6b6edb6dadbfa";
 
 const PARTNER_BUILDER_LOCKS: LockCase[] = [
   {
     name: "분석 파트너 ko 최소",
     render: () => buildAnalysisPartnerV1SystemPrompt(MINIMAL_INPUT),
-    sha256: "58c8c744b4dd76332f2982f984345047e2dc323d333b625cab9ba149e4d29b4f",
+    sha256: "142d8743915742aa0ec18513ad0f02081b03ca5474c56275cbcd3370b0d370cf",
     snapshot: "./__snapshots__/prompt-assets-lock/analysis-partner.ko.minimal.txt",
   },
   {
@@ -584,9 +584,9 @@ describe("assembleStudentChatInstructions 분석 파트너 세 상태 해시 잠
   };
 
   const PINS: Array<{ state: State; sha256: string }> = [
-    { state: "no_materials", sha256: "bf2c16223524a01bf10d14095ba1c6dcf85a5b13022d41c9f17abc6edf946e04" },
-    { state: "low_relevance", sha256: "b9a7451557085d99431aa0b8fda4a82579d71be30ef6266b0b0840ba0175e98f" },
-    { state: "normal", sha256: "b9a7451557085d99431aa0b8fda4a82579d71be30ef6266b0b0840ba0175e98f" },
+    { state: "no_materials", sha256: "7d440540583f6511b54392d1d5a5256a9fb11585495c1778f4e37b2dd1fcec70" },
+    { state: "low_relevance", sha256: "c19cff3e016b6c85547aba38d01b5aba291779df6a44a1ae990e1c578bb94f36" },
+    { state: "normal", sha256: "c19cff3e016b6c85547aba38d01b5aba291779df6a44a1ae990e1c578bb94f36" },
   ];
 
   it.each(PINS)("ko / $state 의 최종 지시문 SHA-256 이 기준값과 같다", ({ state, sha256: expected }) => {

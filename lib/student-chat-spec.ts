@@ -134,7 +134,7 @@ const ANALYSIS_PARTNER_V1: AnalysisPartnerStudentChatSpec = Object.freeze({
   effortLabel: "미지정(공급사 기본값)",
   build: buildAnalysisPartnerV1SystemPrompt,
   renderSha256: Object.freeze({
-    ko: "0f991fcfcb8311d3d71e71dc2eca0ec423db5e1260fae100f16af114c2271b73",
+    ko: "51256c0ed3a92cfefa9e7a2b0857e561567817ad204637619ef6b6edb6dadbfa",
   }),
   note: "분석 파트너 v1(2026-10-03). 한국어만, 도구 없음 문단. 자료 검색 경고 문장은 붙지 않는다. 문항 ai_role 이 analysis_partner 일 때만 쓴다.",
 });
