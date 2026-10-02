@@ -68,6 +68,51 @@ describe("chatRequestSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  // #523: 서버가 받은 값이 학생이 쓴 값과 같아야 한다. 부등호 사이 문장이 지워지면 AI 입력과
+  // 저장값이 둘 다 변질된다.
+  it.each([
+    ["income < 3000 이고 age > 40 인 행만 남겨 주세요"],
+    ["p < 0.05 이므로 유의, 다음은 x>5"],
+    ["df[df['x'] < 5] 와 df[df['y'] > 2]"],
+  ])("keeps comparison expressions in message untouched: %s", (message) => {
+    const result = chatRequestSchema.safeParse({ message, sessionId: "abc-123" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.message).toBe(message);
+  });
+
+  // 이 검증은 `/api/chat` 에서 인증과 속도 제한보다 먼저 돈다(`validateRequest` 가 `currentUser()` 앞).
+  // 그래서 상한(10,000자) 크기의 최악 입력에서도 빨리 끝나야 한다. 한 겹씩만 벗겨지는 입력 + 닫히지 않는
+  // 태그 꼬리는 반복 정규식 구현에서 9~14초가 걸렸다.
+  it.each([
+    ["<script ", 1111],
+    ["<a", 1111],
+    ["<!", 1111],
+  ])("parses a worst-case 10,000 char message quickly (nested layers + %j tail)", (unit, layers) => {
+    const head = "<".repeat(layers) + "b>".repeat(layers);
+    const tail = (unit as string).repeat(Math.ceil((10000 - head.length) / (unit as string).length));
+    const message = (head + tail).slice(0, 10000);
+    expect(message).toHaveLength(10000);
+
+    const started = performance.now();
+    const result = chatRequestSchema.safeParse({ message, sessionId: "abc-123" });
+    const elapsed = performance.now() - started;
+
+    expect(result.success).toBe(true);
+    expect(elapsed, `${elapsed.toFixed(0)}ms`).toBeLessThan(300);
+  });
+
+  it("still strips tag-shaped XSS payloads from message", () => {
+    const parse = (message: string) => {
+      const result = chatRequestSchema.safeParse({ message, sessionId: "abc-123" });
+      if (!result.success) throw new Error("parse failed");
+      return result.data.message;
+    };
+    expect(parse("<script>alert(1)</script>질문")).toBe("질문");
+    expect(parse("<img src=x onerror=alert(1)>질문")).toBe("질문");
+    expect(parse("<<b>img src=x onerror=alert(1)>질문")).toBe("질문");
+    expect(parse("a < b <svg onload=alert(1)> c > d")).toBe("a < b  c > d");
+  });
 });
 
 describe("grading chat clientMessageId schemas", () => {
