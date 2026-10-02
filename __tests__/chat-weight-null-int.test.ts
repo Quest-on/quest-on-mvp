@@ -30,9 +30,17 @@ describe("chat_weight null 보존", () => {
 
   it("시험 생성 경로도 그대로 유지된다", () => {
     // #222 에서 고친 것. 되돌아오면 같은 버그가 재발한다.
-    expect(read("app/api/supa/handlers/exam-handlers.ts")).toMatch(
-      /chat_weight: data\.chat_weight \?\? null/
-    );
+    //
+    // #513 으로 exams 행 구성이 공용 빌더(lib/exam-insert-payload.ts)로 옮겨 갔다. 이 검사는
+    // 소스 문자열을 보므로 코드를 따라 옮긴다: null 을 접지 않는 한 줄은 빌더에 있고,
+    // createExam 은 그 빌더를 거쳐야 한다. 실제 저장 값은 chat-weight-persistence.test.ts 가 본다.
+    const builder = read("lib/exam-insert-payload.ts");
+    expect(builder).toMatch(/chat_weight: data\.chat_weight \?\? null/);
+    expect(builder).not.toMatch(/chat_weight: data\.chat_weight \?\? 50/);
+
+    const handler = read("app/api/supa/handlers/exam-handlers.ts");
+    expect(handler).toContain("buildExamInsertPayload(");
+    expect(handler).not.toMatch(/chat_weight: data\.chat_weight \?\? 50/);
   });
 
   it("채점은 여전히 ?? 50 으로 방어한다", () => {

@@ -10,6 +10,7 @@ import {
   type ScoreWeights,
 } from "@/lib/grade-utils";
 import { buildCopiedExamPayload, type CopyableExamSource } from "@/lib/exam-copy";
+import { buildExamInsertPayload, generateExamCode } from "@/lib/exam-insert-payload";
 import { stripSensitiveQuestionFields } from "@/lib/sanitize-exam-questions";
 
 // Lazy Supabase client getter — creates a fresh client per invocation
@@ -131,15 +132,6 @@ export async function createExam(data: {
 
     if (existingExam) {
       // 중복 시 새 코드 생성
-      const generateExamCode = () => {
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        let result = "";
-        for (let i = 0; i < 6; i++) {
-          result += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return result;
-      };
-
       const MAX_CODE_ATTEMPTS = 10;
       let newCode = generateExamCode();
       let attempts = 0;
@@ -163,60 +155,31 @@ export async function createExam(data: {
       examCode = newCode;
     }
 
-    // Create exam with the correct schema
-    // NOTE: core_ability(핵심 역량) 필드는 제거되었으므로 저장 시 항상 제거한다.
-    const sanitizedQuestions = (data.questions || []).map((q) => {
-      const rest = { ...q } as QuestionData & { core_ability?: unknown };
-      delete rest.core_ability;
-      return rest;
-    });
-    const normalizedScoreWeights = normalizeScoreWeights(data.score_weights);
-    if (data.score_weights !== null && data.score_weights !== undefined && !normalizedScoreWeights) {
-      return errorJson(
-        "INVALID_SCORE_WEIGHTS",
-        "유효하지 않은 점수 배점입니다.",
-        400
-      );
-    }
-    const scoreWeights =
-      normalizedScoreWeights ??
-      buildDefaultScoreWeightsForQuestionTypes(
-        sanitizedQuestions.map((q) => q.type)
-      );
-    const scoreWeightErrors = validateScoreWeightsForQuestions(
-      scoreWeights,
-      sanitizedQuestions.map((q) => q.type)
-    );
-    if (scoreWeightErrors.length > 0) {
-      return errorJson("INVALID_SCORE_WEIGHTS", scoreWeightErrors[0], 400, {
-        errors: scoreWeightErrors,
-      });
-    }
-
-    const examData: Record<string, unknown> = {
+    // exams 행 페이로드는 시드 스크립트와 공유하는 빌더가 만든다(lib/exam-insert-payload.ts).
+    // language 는 일부러 넘기지 않는다: 아래에서 INSERT 뒤 UPDATE 로 따로 쓴다.
+    const built = buildExamInsertPayload({
       title: data.title,
       code: examCode,
-      description: null, // description 필드는 nullable이므로 null로 설정
       duration: data.duration,
-      questions: sanitizedQuestions,
-      materials: data.materials || [],
-      materials_text: data.materials_text || [], // 추출된 텍스트 저장
-      // null 은 "교수자가 안 건드림" 을 뜻한다. 여기서 50 으로 접으면 그 사실이
-      // 사라져, 편집으로 다시 들어왔을 때 손대지 않은 시험도 사용자 지정으로
-      // 보인다. 컬럼은 Int? 이고 DB 기본값이 50 이며, 채점은 lib/grading.ts:789
-      // 에서 chat_weight ?? 50 으로 이미 방어하므로 null 을 그대로 보존한다.
-      chat_weight: data.chat_weight ?? null,
-      score_weights: scoreWeights,
+      questions: data.questions,
+      materials: data.materials,
+      materials_text: data.materials_text,
+      chat_weight: data.chat_weight,
+      score_weights: data.score_weights,
+      course_id: data.course_id,
       status: data.status,
-      instructor_id: user.id, // Clerk user ID (e.g., "user_31ihNg56wMaE27ft10H4eApjc1J")
+      instructor_id: user.id,
       created_at: data.created_at,
       updated_at: data.updated_at,
-      ...(data.type ? { type: data.type } : {}),
-      ...(data.assignment_prompt ? { assignment_prompt: data.assignment_prompt } : {}),
-      ...(data.rubric ? { rubric: data.rubric } : {}),
-      ...(data.course_id !== undefined ? { course_id: data.course_id } : {}),
-      ...(data.is_demo ? { is_demo: true } : {}),
-    };
+      type: data.type,
+      assignment_prompt: data.assignment_prompt,
+      rubric: data.rubric,
+      is_demo: data.is_demo,
+    });
+    if (!built.ok) {
+      return errorJson("INVALID_SCORE_WEIGHTS", built.message, 400, built.details);
+    }
+    const examData = built.payload;
 
     const parentId = data.parent_folder_id || null;
 
@@ -239,11 +202,7 @@ export async function createExam(data: {
 
       // Postgres UNIQUE violation = code 23505 → 코드 재생성 후 재시도
       if (insertError.code === "23505" && attempt < MAX_INSERT_RETRIES - 1) {
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        let retryCode = "";
-        for (let i = 0; i < 6; i++) {
-          retryCode += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
+        const retryCode = generateExamCode();
         examData.code = retryCode;
         examCode = retryCode;
         continue;
