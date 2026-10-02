@@ -8,19 +8,33 @@
  * 렌더 테스트(`password-reset-recovery-page.test.ts`)처럼 `react-dom/server` 로
  * 렌더한다. next-intl 훅이 있으므로 실제 ko/en 메시지를 넣은 Provider 로 감싼다.
  *
- * 한계: Radix 의 시트 내용은 Portal 이라 서버 렌더에서는 비어 있다(닫힌 상태와
- * 같다). 그래서 시트 안쪽 목록은 `RubricList` 를 따로 렌더해 보고, 시트가 그 목록을
- * 스크롤 영역에 담아 쓰는지는 소스로 고정한다. 열고 닫는 동작은 브라우저의 몫이다.
+ * 시트 안쪽: Radix 의 `Portal` 은 서버 렌더에서 `null` 이다(`document` 가 없어
+ * 컨테이너를 못 찾는다). 그대로 두면 열린 시트도 마크업이 비어서, 시트 안쪽을
+ * 렌더로는 아무것도 못 본다. 그래서 이 파일에서만 `Portal` 을 "자식을 그 자리에
+ * 그대로 그린다" 로 바꾸고(아래 vi.mock), `defaultOpen` 으로 연 시트를 렌더한다.
+ * 나머지 Radix(Root, Content, Title, Trigger)는 실제 코드다.
+ *
+ * 한계: 열고 닫는 동작(클릭, Esc, 포커스 이동), 실제 스크롤, 좁은 화면 배치는
+ * 브라우저의 몫이다. 여기서는 "열렸을 때 무엇이 그려지는가" 까지만 본다.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createElement, type ReactElement } from "react";
+import { createElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 
 import koExam from "../messages/ko/exam.json";
 import enExam from "../messages/en/exam.json";
+
+vi.mock("@radix-ui/react-dialog", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@radix-ui/react-dialog")>();
+  const { createElement: h, Fragment } = await import("react");
+  return {
+    ...actual,
+    Portal: ({ children }: { children?: ReactNode }) => h(Fragment, null, children),
+  };
+});
 
 function read(rel: string): string {
   return readFileSync(join(process.cwd(), rel), "utf8");
@@ -41,7 +55,13 @@ const ITEMS = [
 ];
 
 const BUTTON_KO = 'aria-label="평가 기준 보기"';
-const BUTTON_EN = 'aria-label="View evaluation criteria"';
+const BUTTON_EN = 'aria-label="View rubric"';
+
+/** 영어 화면용 항목 — 한글이 섞이면 "ko 전용 문구가 새는지" 를 한글 검사로 잡을 수 있다. */
+const ITEMS_EN = [
+  { id: "e1", evaluationArea: "Understanding the problem", detailedCriteria: "Identifies the core issue accurately" },
+  { id: "e2", evaluationArea: "Use of evidence", detailedCriteria: "Supports claims with evidence\nCites sources" },
+];
 
 describe("getPublicRubricItems — 학생에게 보여 줄 항목만 고른다", () => {
   async function pick(rubric: unknown, rubricPublic: unknown) {
@@ -126,7 +146,7 @@ describe("RubricSheet — 버튼은 볼 기준이 있을 때만 있다", () => {
   it("영어 화면이면 버튼 문구가 영어다", async () => {
     const html = await render("en", { rubric: ITEMS, rubricPublic: true });
     expect(html).toContain(BUTTON_EN);
-    expect(html).toContain("Evaluation criteria");
+    expect(html).toContain(">Rubric</span>");
     expect(html).not.toContain("평가 기준");
   });
 });
@@ -155,6 +175,13 @@ describe("RubricList — 시트 안에서 항목을 읽기 전용으로 나열�
     const html = await renderList("ko", ITEMS);
     expect(html).toContain("whitespace-pre-wrap");
     expect(html).toContain("break-words");
+  });
+
+  it("글자 크기는 디자인 시스템 클래스(type-field-label, type-hint)로 정한다", async () => {
+    const html = await renderList("ko", ITEMS);
+    expect(html).toMatch(/<h3 class="[^"]*\btype-field-label\b/);
+    expect(html).toMatch(/<p class="[^"]*\btype-hint\b/);
+    expect(html).not.toMatch(/\btext-sm\b/);
   });
 
   it("스크립트 문자열은 이스케이프된다 (HTML 로 해석하지 않는다)", async () => {
@@ -219,25 +246,216 @@ describe("RubricSheet 구조 — 스크롤, 접근성, 문구", () => {
   });
 });
 
-describe("메시지 — ko/en 키가 같고 비어 있지 않다", () => {
-  const keys = ["button", "buttonAriaLabel", "title", "description", "close"] as const;
+/** 평가 기준 시트가 쓰는 메시지 키 전부. 키를 더하거나 빼면 이 목록과 소스·ko·en 이 함께 바뀌어야 한다. */
+const SHEET_KEYS = ["button", "buttonAriaLabel", "title", "description", "close"] as const;
 
-  for (const [locale, messages] of [["ko", koExam], ["en", enExam]] as const) {
-    it(`${locale}: exam.rubric 의 문구가 모두 있다`, () => {
-      const rubric = (messages as unknown as { rubric?: Record<string, string> }).rubric;
+function rubricMessages(locale: Locale): Record<string, string> {
+  const messages = (locale === "ko" ? koExam : enExam) as unknown as { rubric: Record<string, string> };
+  return messages.rubric;
+}
+
+describe("메시지 — 시트가 쓰는 키 전부가 ko/en 에 있다", () => {
+  it("소스가 t('rubric.*') 로 부르는 키는 SHEET_KEYS 와 정확히 같다 (빠지거나 남지 않는다)", () => {
+    const source = read("components/exam/RubricSheet.tsx");
+    const used = [...source.matchAll(/\bt\("rubric\.([A-Za-z]+)"\)/g)].map((m) => m[1]);
+    expect([...new Set(used)].sort()).toEqual([...SHEET_KEYS].sort());
+  });
+
+  for (const locale of ["ko", "en"] as const) {
+    it(`${locale}: exam.rubric 의 키는 SHEET_KEYS 와 정확히 같고 모두 비어 있지 않다`, () => {
+      const rubric = rubricMessages(locale);
       expect(rubric, `${locale} exam.rubric 가 없다`).toBeTruthy();
-      for (const key of keys) {
-        expect(typeof rubric?.[key], `${locale} exam.rubric.${key}`).toBe("string");
-        expect(rubric?.[key]?.trim().length, `${locale} exam.rubric.${key}`).toBeGreaterThan(0);
+      expect(Object.keys(rubric).sort()).toEqual([...SHEET_KEYS].sort());
+      for (const key of SHEET_KEYS) {
+        expect(typeof rubric[key], `${locale} exam.rubric.${key}`).toBe("string");
+        expect(rubric[key].trim().length, `${locale} exam.rubric.${key}`).toBeGreaterThan(0);
       }
     });
   }
 
   it("교수자 안내는 '읽기 전용' 임을 말한다", () => {
-    expect((koExam as unknown as { rubric: { description: string } }).rubric.description).toContain("읽기 전용");
-    expect((enExam as unknown as { rubric: { description: string } }).rubric.description.toLowerCase()).toContain(
-      "read-only",
-    );
+    expect(rubricMessages("ko").description).toContain("읽기 전용");
+    expect(rubricMessages("en").description.toLowerCase()).toContain("read-only");
+  });
+
+  it("영어 문구는 용어집(docs/i18n/glossary.md)의 '루브릭 → Rubric' 을 따른다", () => {
+    const glossary = read("docs/i18n/glossary.md");
+    const row = glossary.match(/^\|\s*루브릭\s*\|\s*([^|]+?)\s*\|/m);
+    expect(row, "용어집에 루브릭 행이 없다").toBeTruthy();
+    const term = row![1];
+    const en = rubricMessages("en");
+    expect(en.button).toBe(term);
+    expect(en.title).toContain(term);
+    expect(en.description).toContain(term);
+    expect(en.buttonAriaLabel).toContain(term.toLowerCase());
+  });
+
+  it("한국어 버튼 라벨은 '평가 기준' 이다 (이슈 문구)", () => {
+    expect(rubricMessages("ko").button).toBe("평가 기준");
+  });
+});
+
+describe("열린 시트 — 시트 안쪽을 렌더해서 본다 (Portal 대체)", () => {
+  async function renderOpen(locale: Locale, rubric: unknown) {
+    const { RubricSheet } = await import("@/components/exam/RubricSheet");
+    return withIntl(locale, createElement(RubricSheet, { rubric, rubricPublic: true, defaultOpen: true }));
+  }
+
+  /** 여는 태그 하나를 통째로 꺼낸다. 속성 순서에 기대지 않으려고 속성별로 따로 본다. */
+  function openingTag(html: string, attr: string): string {
+    const m = html.match(new RegExp(`<[a-z0-9]+\\b[^>]*\\b${attr}[^>]*>`));
+    expect(m, `${attr} 를 가진 요소가 없다`).toBeTruthy();
+    return m![0];
+  }
+
+  function attrOf(tag: string, name: string): string | undefined {
+    return tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1];
+  }
+
+  /** `<div ...>` 로 시작하는 요소의 안쪽 마크업. div 중첩 깊이를 세어 짝이 맞는 닫는 태그까지 자른다. */
+  function innerOfDiv(html: string, openTag: string): string {
+    const start = html.indexOf(openTag);
+    expect(start, `${openTag.slice(0, 40)} 가 없다`).toBeGreaterThan(-1);
+    const from = start + openTag.length;
+    const tags = /<(\/?)div\b[^>]*>/g;
+    tags.lastIndex = from;
+    let depth = 1;
+    for (let m = tags.exec(html); m; m = tags.exec(html)) {
+      depth += m[1] ? -1 : 1;
+      if (depth === 0) return html.slice(from, m.index);
+    }
+    throw new Error("div 의 닫는 태그를 찾지 못했다");
+  }
+
+  it("열려 있으면 트리거가 열림 상태이고 시트(role=dialog)가 그려진다", async () => {
+    const html = await renderOpen("ko", ITEMS);
+    const trigger = openingTag(html, 'aria-haspopup="dialog"');
+    expect(attrOf(trigger, "aria-expanded")).toBe("true");
+    expect(attrOf(trigger, "data-state")).toBe("open");
+    expect(html).toContain('role="dialog"');
+    expect(html).toContain('data-slot="sheet-content"');
+  });
+
+  it("시트 안에 항목이 전부, 읽기 전용 목록으로 들어 있다 (빈 목록이 아니다)", async () => {
+    const html = await renderOpen("ko", ITEMS);
+    const dialog = html.slice(html.indexOf('role="dialog"'));
+    expect((dialog.match(/<li\b/g) ?? []).length).toBe(2);
+    for (const text of ["문제 이해", "문제의 핵심 쟁점을 정확히 파악했는가", "근거 제시", "출처를 밝혔는가"]) {
+      expect(dialog, text).toContain(text);
+    }
+    expect(dialog).not.toMatch(/<(input|textarea|select)\b/);
+  });
+
+  it("항목이 9개여도 시트 안에 모두 있다", async () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({
+      evaluationArea: `영역 ${i + 1}`,
+      detailedCriteria: "세부 기준 ".repeat(40),
+    }));
+    const html = await renderOpen("ko", many);
+    const dialog = html.slice(html.indexOf('role="dialog"'));
+    expect((dialog.match(/<li\b/g) ?? []).length).toBe(9);
+    expect(dialog).toContain("영역 9");
+  });
+
+  it("시트 제목·부제·닫기가 한국어 메시지로 그려진다", async () => {
+    const html = await renderOpen("ko", ITEMS);
+    const ko = rubricMessages("ko");
+    const dialog = html.slice(html.indexOf('role="dialog"'));
+    expect(dialog).toMatch(new RegExp(`<h2\\b[^>]*>(<span\\b[^>]*>)?${ko.title}`)); // 제목은 h2 안에 있다
+    expect(dialog).toContain(ko.description);
+    expect(dialog).toContain(`>${ko.close}</button>`);
+  });
+
+  it("영어 시트는 영어 메시지만 쓴다 — 한글도, 빠진 키의 경로(exam.rubric.*)도 없다", async () => {
+    const html = await renderOpen("en", ITEMS_EN);
+    const en = rubricMessages("en");
+    const dialog = html.slice(html.indexOf('role="dialog"'));
+    for (const key of ["title", "description", "close"] as const) {
+      expect(dialog, `en ${key}`).toContain(en[key]);
+    }
+    expect(html.replace(/<[^>]*>/g, " ")).not.toMatch(/[가-힣]/);
+    expect(html).not.toMatch(/exam\.rubric\./);
+    expect(attrOf(openingTag(html, 'aria-haspopup="dialog"'), "aria-label")).toBe(en.buttonAriaLabel);
+  });
+
+  it("한국어 시트에도 빠진 키의 경로가 새지 않는다", async () => {
+    expect(await renderOpen("ko", ITEMS)).not.toMatch(/exam\.rubric\./);
+  });
+
+  it("스크롤 영역은 키보드로 닿는다 — tabindex=0, role=region, 제목으로 이름 붙음", async () => {
+    const html = await renderOpen("ko", ITEMS);
+    const region = openingTag(html, 'role="region"');
+    expect(attrOf(region, "tabindex")).toBe("0");
+    expect(region).toContain("overflow-y-auto");
+    // 보이는 포커스 링 — Button 과 같은 토큰
+    expect(region).toMatch(/\bfocus-visible:ring-\[3px\]/);
+    expect(region).toMatch(/\bfocus-visible:ring-ring\/50/);
+    expect(region).toMatch(/\boutline-none\b/);
+
+    const labelledBy = attrOf(region, "aria-labelledby");
+    expect(labelledBy, "region 에 aria-labelledby 가 없다").toBeTruthy();
+    // 그 id 를 가진 요소가 실제로 있고, 시트 제목 글자를 담는다
+    const escaped = labelledBy!.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const labelEl = html.match(new RegExp(`<[a-z0-9]+\\b[^>]*\\bid="${escaped}"[^>]*>([^<]*)<`));
+    expect(labelEl, "aria-labelledby 가 가리키는 요소가 없다").toBeTruthy();
+    expect(labelEl![1]).toBe(rubricMessages("ko").title);
+  });
+
+  it("스크롤 영역(region)이 목록을 담고, 닫기 버튼은 그 밖에 있다", async () => {
+    const html = await renderOpen("ko", ITEMS);
+    const inner = innerOfDiv(html, openingTag(html, 'role="region"'));
+    expect((inner.match(/<li\b/g) ?? []).length).toBe(2);
+    expect(inner).toContain("문제 이해");
+    // 머리말(제목·부제)과 닫기 버튼은 스크롤 영역 밖에 있다 — 목록이 길어도 항상 보인다
+    expect(inner).not.toContain("<button");
+    expect(inner).not.toContain(rubricMessages("ko").description);
+    expect(html.indexOf(">닫기</button>")).toBeGreaterThan(html.indexOf(inner) + inner.length);
+  });
+
+  it("Radix 가 붙인 시트 제목 id 는 그대로다 — 시트(role=dialog)의 이름이 제목을 가리킨다", async () => {
+    const html = await renderOpen("ko", ITEMS);
+    const dialog = openingTag(html, 'role="dialog"');
+    const titleId = attrOf(dialog, "aria-labelledby");
+    expect(titleId).toBeTruthy();
+    const h2 = html.match(/<h2\b[^>]*>/)?.[0] ?? "";
+    expect(attrOf(h2, "id")).toBe(titleId);
+  });
+
+  it("닫혀 있으면(기본) 시트가 그려지지 않는다", async () => {
+    const { RubricSheet } = await import("@/components/exam/RubricSheet");
+    const html = withIntl("ko", createElement(RubricSheet, { rubric: ITEMS, rubricPublic: true }));
+    expect(html).not.toContain('role="dialog"');
+    expect(attrOf(openingTag(html, 'aria-haspopup="dialog"'), "aria-expanded")).toBe("false");
+  });
+});
+
+describe("RubricSheet 배선 — 소스 구조 (렌더로 못 보는 연결을 고정)", () => {
+  const source = () => read("components/exam/RubricSheet.tsx");
+
+  it("항목은 getPublicRubricItems 한 곳에서 만들고, 그 items 를 패널에 그대로 넘긴다", () => {
+    const s = source();
+    expect(s).toMatch(/const items = getPublicRubricItems\(rubric, rubricPublic\);/);
+    expect(s).toMatch(/<SheetContent\b[^>]*>\s*<RubricSheetPanel items=\{items\} \/>\s*<\/SheetContent>/);
+  });
+
+  it("열림 상태는 상태로 들고 Sheet 에 그대로 넘긴다 (open 을 상수로 고정하지 않는다)", () => {
+    const s = source();
+    expect(s).toMatch(/const \[open, setOpen\] = useState\(defaultOpen\);/);
+    expect(s).toMatch(/<Sheet open=\{open\} onOpenChange=\{setOpen\}>/);
+    expect(s).not.toMatch(/<Sheet\b[^>]*\bopen=\{(true|false)\}/);
+  });
+
+  it("defaultOpen 의 기본값은 닫힘이다", () => {
+    expect(source()).toMatch(/defaultOpen = false/);
+  });
+
+  it("스크롤 영역은 제목 span 의 id(useId)로 이름 붙이고, Radix 제목 id 는 덮어쓰지 않는다", () => {
+    const s = source();
+    expect(s).toMatch(/const headingId = useId\(\);/);
+    expect(s).toMatch(/aria-labelledby=\{headingId\}/);
+    expect(s).toMatch(/<span id=\{headingId\}>\{t\("rubric\.title"\)\}<\/span>/);
+    // <SheetTitle id=...> 로 덮어쓰면 Radix 의 제목 경고(DialogContent 에 제목 없음)가 난다
+    expect(s).not.toMatch(/<SheetTitle[^>]*\bid=/);
   });
 });
 
