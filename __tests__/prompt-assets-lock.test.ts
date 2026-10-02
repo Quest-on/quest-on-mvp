@@ -22,6 +22,12 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { buildStudentChatSystemPrompt } from "@/lib/prompts";
+import {
+  assembleStudentChatInstructions,
+  buildRagNotice,
+  classifyRagState,
+} from "@/lib/chat-instructions";
+import { STUDENT_CHAT_SPECS } from "@/lib/student-chat-spec";
 
 /** 줄바꿈 형식(CRLF/LF)이 해시를 흔들지 않게 LF 로 맞춘 뒤 해시한다. */
 function normalizeNewlines(text: string): string {
@@ -53,6 +59,10 @@ const FULL_INPUT = {
   rubric: [{ evaluationArea: "영역1", detailedCriteria: "기준1" }],
 };
 
+/** 전체 입력 렌더의 기준값. 스펙 레지스트리(`case@1`)의 렌더 해시와 같아야 한다. */
+const KO_FULL_SHA256 = "a9280876b978b02cd24d1637bc8a8a7ab7ee3f55e824f986b0a40d72c5d4f313";
+const EN_FULL_SHA256 = "e3b41726291f5eb5f5f7f10db208a3bfc9d1cb7afa33acf8c60cfa62fa66a620";
+
 type LockCase = {
   name: string;
   render: () => string;
@@ -71,7 +81,7 @@ const BUILDER_LOCKS: LockCase[] = [
   {
     name: "ko 전체",
     render: () => buildStudentChatSystemPrompt(FULL_INPUT),
-    sha256: "a9280876b978b02cd24d1637bc8a8a7ab7ee3f55e824f986b0a40d72c5d4f313",
+    sha256: KO_FULL_SHA256,
     snapshot: "./__snapshots__/prompt-assets-lock/student-chat.ko.full.txt",
   },
   {
@@ -83,7 +93,7 @@ const BUILDER_LOCKS: LockCase[] = [
   {
     name: "en 전체",
     render: () => buildStudentChatSystemPrompt({ ...FULL_INPUT, language: "en" }),
-    sha256: "e3b41726291f5eb5f5f7f10db208a3bfc9d1cb7afa33acf8c60cfa62fa66a620",
+    sha256: EN_FULL_SHA256,
     snapshot: "./__snapshots__/prompt-assets-lock/student-chat.en.full.txt",
   },
 ];
@@ -117,6 +127,142 @@ describe("줄바꿈 정규화", () => {
 
   it("줄바꿈이 아닌 차이는 해시를 바꾼다", () => {
     expect(sha256("a\nb")).not.toBe(sha256("a\n b"));
+  });
+});
+
+describe("스펙 레지스트리의 렌더 해시", () => {
+  it("case@1 의 ko/en 렌더 해시는 전체 입력 렌더의 현행 기준값과 같다", () => {
+    const { renderSha256 } = STUDENT_CHAT_SPECS["case@1"];
+    expect(renderSha256.ko, CHANGE_NOTICE).toBe(KO_FULL_SHA256);
+    expect(renderSha256.en, CHANGE_NOTICE).toBe(EN_FULL_SHA256);
+  });
+
+  it("case@1 의 빌더는 잠금 대상 빌더와 같은 함수다", () => {
+    expect(STUDENT_CHAT_SPECS["case@1"].build).toBe(buildStudentChatSystemPrompt);
+  });
+});
+
+/**
+ * 라우트가 모델에 보내는 최종 지시문 = 빌더 출력 + 자료 검색 결과에 따른 덧붙임 문장.
+ * 세 상태(검색 0건, 관련성 낮음, 정상)별로 잠근다. 기준값은 지시문 조립을 route.ts 에서
+ * `lib/chat-instructions.ts` 로 옮기기 **전** 라우트에서 측정한 값이고
+ * (`chat-route-prompt-stamp.test.ts` 가 라우트 수준에서 같은 값을 확인한다),
+ * 옮긴 뒤에도 같다.
+ */
+describe("assembleStudentChatInstructions 세 상태 해시 잠금", () => {
+  const ROUTE_LIKE_INPUT = {
+    examTitle: "시험 제목",
+    examCode: "TST001",
+    questionId: "q-1",
+    currentQuestionText: "문제 본문입니다",
+    currentQuestionAiContext: "채점 맥락",
+  };
+  const MATERIALS = "[자료 1: a.pdf]\n자료 본문입니다";
+
+  type State = "no_materials" | "low_relevance" | "normal";
+  const RAG: Record<State, { relevantMaterialsText: string; resultsCount: number; topSimilarity: number | null }> = {
+    no_materials: { relevantMaterialsText: "", resultsCount: 0, topSimilarity: null },
+    low_relevance: { relevantMaterialsText: MATERIALS, resultsCount: 1, topSimilarity: 0.25 },
+    normal: { relevantMaterialsText: MATERIALS, resultsCount: 1, topSimilarity: 0.5 },
+  };
+
+  const PINS: Array<{ language: "ko" | "en"; state: State; sha256: string }> = [
+    { language: "ko", state: "no_materials", sha256: "31ac35ae196c03e0f6aeba8c89f952ced195f64c33bb106c3017f7e8b2f75160" },
+    { language: "ko", state: "low_relevance", sha256: "631c57335f9b02b3e10f86a79358c00f5d04f9bfac25c1e1798056115e74178c" },
+    { language: "ko", state: "normal", sha256: "e106ef0c8abce58728af45ffd38b9b9d26692923d8e5307deaa2e6cdce2a725b" },
+    { language: "en", state: "no_materials", sha256: "27921b3f412abb8cb17b543e39501d9d0feed13065cb2f57205fd99e40b3ad77" },
+    { language: "en", state: "low_relevance", sha256: "b8b92a71375a78cee31c576118dc3d66e9f5df7f58348e8c130c61bb43e79fa3" },
+    { language: "en", state: "normal", sha256: "ba6e395575899ca9d74564ed239fc8af69ca5dcacecc7bdda055f86b19f9d1bf" },
+  ];
+
+  it.each(PINS)("$language / $state 의 최종 지시문 SHA-256 이 현행 기준값과 같다", ({ language, state, sha256: expected }) => {
+    const { instructions } = assembleStudentChatInstructions({ ...ROUTE_LIKE_INPUT, language, rag: RAG[state] });
+    const actual = sha256(instructions);
+    expect(
+      actual,
+      `${CHANGE_NOTICE}\n  대상: assembleStudentChatInstructions (${language}, ${state})\n  기준값: ${expected}\n  현재값: ${actual}`
+    ).toBe(expected);
+  });
+
+  it("정상 상태의 지시문은 빌더 출력과 글자 하나까지 같다 (덧붙이는 것이 없다)", () => {
+    const { instructions } = assembleStudentChatInstructions({
+      ...ROUTE_LIKE_INPUT,
+      language: "ko",
+      rag: RAG.normal,
+    });
+    expect(instructions).toBe(
+      buildStudentChatSystemPrompt({
+        ...ROUTE_LIKE_INPUT,
+        relevantMaterialsText: MATERIALS,
+        language: "ko",
+      })
+    );
+  });
+
+  it("덧붙이는 문장은 빌더 출력 뒤에만 붙는다", () => {
+    for (const state of ["no_materials", "low_relevance"] as const) {
+      const base = buildStudentChatSystemPrompt({
+        ...ROUTE_LIKE_INPUT,
+        relevantMaterialsText: RAG[state].relevantMaterialsText,
+        language: "ko",
+      });
+      const { instructions } = assembleStudentChatInstructions({
+        ...ROUTE_LIKE_INPUT,
+        language: "ko",
+        rag: RAG[state],
+      });
+      expect(instructions.startsWith(base)).toBe(true);
+      expect(instructions.slice(base.length)).toBe(buildRagNotice(RAG[state]));
+      expect(instructions.length).toBeGreaterThan(base.length);
+    }
+  });
+
+  it("학생 메시지는 지시문에 섞이지 않는다 (해시 입력은 순수 함수 출력이다)", () => {
+    const clean = assembleStudentChatInstructions({ ...ROUTE_LIKE_INPUT, language: "ko", rag: RAG.normal });
+    const withMessage = assembleStudentChatInstructions({
+      ...ROUTE_LIKE_INPUT,
+      message: "학생이 보낸 질문 12345",
+      language: "ko",
+      rag: RAG.normal,
+    } as never);
+    expect(withMessage.instructions).toBe(clean.instructions);
+    expect(clean.instructions).not.toContain("12345");
+  });
+
+  it("같은 입력은 항상 같은 지시문이다 (시각이나 난수가 섞이지 않는다)", () => {
+    const first = assembleStudentChatInstructions({ ...ROUTE_LIKE_INPUT, language: "en", rag: RAG.low_relevance });
+    const second = assembleStudentChatInstructions({ ...ROUTE_LIKE_INPUT, language: "en", rag: RAG.low_relevance });
+    expect(second.instructions).toBe(first.instructions);
+  });
+
+  it("어떤 스펙과 언어로 만들었는지 함께 돌려준다 (응답 기록용)", () => {
+    expect(assembleStudentChatInstructions({ ...ROUTE_LIKE_INPUT, language: "en", rag: RAG.normal })).toMatchObject({
+      specId: "case@1",
+      language: "en",
+    });
+    // language 를 안 주면 빌더와 같이 ko 다.
+    expect(assembleStudentChatInstructions({ ...ROUTE_LIKE_INPUT, rag: RAG.normal })).toMatchObject({
+      specId: "case@1",
+      language: "ko",
+    });
+  });
+});
+
+describe("자료 검색 상태 판정 (route.ts 의 조건을 그대로 옮긴 것)", () => {
+  it("검색 0건이면 관련성 수치와 무관하게 자료 없음이다", () => {
+    expect(classifyRagState({ resultsCount: 0, topSimilarity: null })).toBe("no_materials");
+    expect(classifyRagState({ resultsCount: 0, topSimilarity: 0.1 })).toBe("no_materials");
+  });
+
+  it("유사도가 0.3 미만이면 관련성 낮음이고 0.3 은 정상이다", () => {
+    expect(classifyRagState({ resultsCount: 1, topSimilarity: 0.2999 })).toBe("low_relevance");
+    expect(classifyRagState({ resultsCount: 1, topSimilarity: 0.3 })).toBe("normal");
+    expect(classifyRagState({ resultsCount: 5, topSimilarity: 0.9 })).toBe("normal");
+  });
+
+  it("키워드 검색 결과(유사도 null)는 정상이다", () => {
+    expect(classifyRagState({ resultsCount: 1, topSimilarity: null })).toBe("normal");
+    expect(buildRagNotice({ resultsCount: 1, topSimilarity: null })).toBe("");
   });
 });
 
