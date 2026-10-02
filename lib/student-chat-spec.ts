@@ -10,6 +10,16 @@
  *   2. 프롬프트를 바꾸면 `__tests__/prompt-assets-lock.test.ts` 가 깨진다. 의도한 변경이면
  *      새 스펙 버전을 추가하고 해시와 변경 사유(note)를 함께 갱신한다.
  *   3. 동작이 바뀌는 곳은 `CURRENT_STUDENT_CHAT_SPEC_ID` 한 줄뿐이다. 포인터 변경은 따로 한 줄 PR 로 낸다.
+ *   4. 한 번 낸 버전의 빌더는 새 버전을 낼 때 고정 사본으로 떼어 둔다. 지금 `case@1.build` 는 고정 사본이
+ *      아니라 live 함수(`lib/prompts.ts` 의 `buildStudentChatSystemPrompt`)를 가리킨다. 그래서
+ *      `prompts.ts` 를 바꾸려면 새 버전(`case@2`)을 만들고, `case@1` 은 옛 빌더를 옮겨 둔 사본을 가리켜야
+ *      한다. 그러지 않으면 `case@1` 의 렌더 해시가 어긋나 `prompt-assets-lock.test.ts` 가 깨진다
+ *      (그 테스트가 레지스트리의 모든 스펙을 순회하며 `renderSha256` 과 대조한다). 이 PR 은 새 버전이
+ *      없어서 사본을 만들지 않았다.
+ *
+ * 알려진 한계: 자료 검색 결과에 따라 지시문 끝에 붙는 문장(`lib/chat-instructions.ts` 의 상수)은 아직
+ * 스펙 필드가 아니다. 그 문장을 바꿔도 이 레지스트리의 `renderSha256` 과 `template_sha` 는 달라지지
+ * 않고, 최종 지시문 해시 잠금(`prompt-assets-lock.test.ts`)만 깨진다.
  *
  * 이 PR 은 모델과 추론 강도를 **바꾸지 않는다.** 모델은 지금처럼 `AI_MODEL`(환경변수 또는 기본값)이
  * 정하고, 추론 강도는 요청에 넘기지 않아 공급사 기본값을 따른다. 아래 `model` 과 `effort` 는 그
@@ -70,7 +80,7 @@ const CASE_V1: StudentChatSpec = Object.freeze({
     ko: "a9280876b978b02cd24d1637bc8a8a7ab7ee3f55e824f986b0a40d72c5d4f313",
     en: "e3b41726291f5eb5f5f7f10db208a3bfc9d1cb7afa33acf8c60cfa62fa66a620",
   }),
-  note: "현행 사례형 출제자 프롬프트(staging b8287303, 2026-10-03 기준)를 바이트 단위로 보존한다.",
+  note: "현행 사례형 출제자 프롬프트(staging 15106bba, 2026-10-03 기준)를 바이트 단위로 보존한다.",
 });
 
 export const STUDENT_CHAT_SPECS: Readonly<Record<StudentChatSpecId, StudentChatSpec>> = Object.freeze({
