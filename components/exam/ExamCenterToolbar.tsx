@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { ExamTimer } from "@/components/exam/ExamTimer";
+import { RubricSheet } from "@/components/exam/RubricSheet";
 import { cn } from "@/lib/utils";
 
 interface ExamCenterToolbarProps {
@@ -18,6 +19,9 @@ interface ExamCenterToolbarProps {
   showQuestionToggle?: boolean;
   isQuestionVisible?: boolean;
   onToggleQuestion?: () => void;
+  /** 서버가 내려 준 시험 rubric 그대로. 공개 여부와 모양은 RubricSheet 가 판정한다. */
+  rubric?: unknown;
+  rubricPublic?: boolean | null;
   className?: string;
 }
 
@@ -32,6 +36,8 @@ export function ExamCenterToolbar({
   showQuestionToggle = false,
   isQuestionVisible = true,
   onToggleQuestion,
+  rubric,
+  rubricPublic,
   className,
 }: ExamCenterToolbarProps) {
   const t = useTranslations("exam");
@@ -63,6 +69,7 @@ export function ExamCenterToolbar({
             )}
           </Button>
         )}
+        <RubricSheet rubric={rubric} rubricPublic={rubricPublic} />
         <h2 className="text-sm sm:text-base font-semibold text-foreground truncate min-w-0">
           {examTitle}
         </h2>

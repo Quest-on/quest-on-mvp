@@ -44,6 +44,13 @@
     "submitting": "제출 중...",
     "submitAriaLabel": "시험 제출하기"
   },
+  "rubric": {
+    "button": "평가 기준",
+    "buttonAriaLabel": "평가 기준 보기",
+    "title": "이 시험의 평가 기준",
+    "description": "교수자가 공개한 기준입니다. 읽기 전용입니다.",
+    "close": "닫기"
+  },
   "timer": {
     "ariaLabel": "남은 시간 {time}",
     "expiredTitle": "시험 시간이 종료되었습니다",
