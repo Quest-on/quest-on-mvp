@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildExamInsertPayload } from "../lib/exam-insert-payload";
 import {
   deriveProjectRef,
+  isPlainTextWithLineBreaks,
   main,
   parseArgs,
   resolveConnection,
@@ -409,6 +410,189 @@ describe("validateMockExamSpec", () => {
     const errors = errorsOf({ title: "", questions: [], rubric: "x" });
 
     expect(errors.length).toBeGreaterThanOrEqual(3);
+  });
+
+  // 문항 text 는 HTML 로 저장되고 화면이 그대로 렌더링한다. 평문 줄바꿈은 공백으로 접혀 한 문단이 된다 (#537).
+  describe("문항 본문은 HTML (#537)", () => {
+    const withText = (...texts: string[]) => {
+      const raw = good();
+      raw.questions = texts.map((text, i) => ({ id: `q${i + 1}`, text, type: "essay" }));
+      return raw;
+    };
+    const PLAIN_WITH_LINES = "다음 변수를 보세요.\n\n- Customer_ID: 고객 번호\n- Age: 나이";
+    const HTML_BODY = "<p>다음 변수를 보세요.</p><ul><li>Customer_ID: 고객 번호</li><li>Age: 나이</li></ul>";
+
+    it("평문에 줄바꿈이 있으면 오류로 막고, 문항 식별자와 HTML 안내를 적는다", () => {
+      const errors = errorsOf(withText(PLAIN_WITH_LINES));
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain("questions[0].text");
+      expect(errors[0]).toContain('id "q1"');
+      expect(errors[0]).toContain("본문은 HTML");
+      expect(errors[0]).toContain("<p>...</p>");
+      expect(errors[0]).toContain("<ul><li>...</li></ul>");
+      // 목록에 있는 태그만 인식한다는 점을 밝힌다 (<hr> 같은 다른 블록 태그만 있어도 막히므로 "하나도 없다" 는 사실이 아니다).
+      expect(errors[0]).toContain("인식하는 블록 태그");
+      expect(errors[0]).not.toContain("HTML 블록 태그가 하나도");
+    });
+
+    it("<p> 와 <ul><li> 로 감싼 HTML 은 통과한다", () => {
+      expect(validateMockExamSpec(withText(HTML_BODY)).ok).toBe(true);
+    });
+
+    it("줄바꿈이 없는 평문 한 줄은 통과한다", () => {
+      expect(validateMockExamSpec(withText("줄바꿈이 없는 평문 한 줄입니다.")).ok).toBe(true);
+    });
+
+    it("태그 사이에 줄바꿈이 있는 HTML 은 통과한다", () => {
+      const pretty = "<p>다음 변수를 보세요.</p>\n<ul>\n  <li>Customer_ID</li>\n  <li>Age</li>\n</ul>\n";
+
+      expect(validateMockExamSpec(withText(pretty)).ok).toBe(true);
+    });
+
+    it("부등호 평문(x<3 and y>5)은 태그로 오인하지 않아 줄바꿈이 있으면 막는다", () => {
+      const errors = errorsOf(withText("x<3 and y>5\n둘째 줄"));
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain("questions[0].text");
+    });
+
+    it("부등호 평문이어도 줄바꿈이 없으면 통과한다", () => {
+      expect(validateMockExamSpec(withText("x<3 and y>5 이면 어떻게 되는가")).ok).toBe(true);
+    });
+
+    it.each(["<P>첫 문단</P>\n<P>둘째 문단</P>", "첫 줄<BR>둘째 줄\n셋째 줄", "<UL>\n<LI>하나</LI>\n</UL>"])(
+      "태그는 대소문자를 가리지 않는다: %j",
+      (text) => {
+        expect(validateMockExamSpec(withText(text)).ok).toBe(true);
+      }
+    );
+
+    it.each([
+      ["<p>", "<p>첫\n둘째</p>"],
+      ["<br>", "첫<br>둘째\n셋째"],
+      ["<br/>", "첫<br/>둘째\n셋째"],
+      ["<br />", "첫<br />둘째\n셋째"],
+      // 태그 하나만 단독으로 둔다 - <ul><li> 처럼 묶으면 한쪽을 목록에서 빼도 다른 쪽이 잡아 준다.
+      ["<ul>", "<ul>하나\n둘</ul>"],
+      ["<ol>", "<ol>하나\n둘</ol>"],
+      ["<li>", "하나\n<li>둘</li>"],
+      ["<div>", "<div>첫\n둘째</div>"],
+      ["<h1>", "<h1>제목</h1>\n본문"],
+      ["<h6>", "<h6>제목</h6>\n본문"],
+      ["<blockquote>", "<blockquote>인용\n두 줄</blockquote>"],
+      ["<pre>", "<pre>코드\n두 줄</pre>"],
+      ["<table>", "<table>\n<tr><td>칸</td></tr>\n</table>"],
+      ["속성이 붙은 <p class>", '<p class="a">첫\n둘째</p>'],
+    ])("블록 태그 %s 가 있으면 줄바꿈이 있어도 통과한다", (_label, text) => {
+      expect(validateMockExamSpec(withText(text)).ok).toBe(true);
+    });
+
+    it.each([
+      ["<h7> (h1~h6 이 아님)", "<h7>제목</h7>\n본문"],
+      ["<param> (<p 로 시작하지만 다른 태그)", "<param>값</param>\n둘째 줄"],
+      ["<ulx> (<ul 로 시작하지만 다른 태그)", "<ulx>값</ulx>\n둘째 줄"],
+      ["<b> 같은 인라인 태그뿐", "<b>굵게</b>\n둘째 줄"],
+      ["<hr> (목록에 없는 블록 태그는 인식하지 않는다)", "위\n<hr>\n아래"],
+      ["닫는 태그 </p> 뿐 (여는 태그 없음)", "첫 줄</p>\n둘째 줄"],
+      ["< p (꺾쇠 뒤 공백)", "a < p and q\n둘째 줄"],
+    ])("블록 태그가 아니면 줄바꿈이 있을 때 막는다: %s", (_label, text) => {
+      expect(errorsOf(withText(text))).toHaveLength(1);
+    });
+
+    it("문항이 여러 개일 때 잘못된 문항만 지목한다", () => {
+      const errors = errorsOf(withText(HTML_BODY, PLAIN_WITH_LINES, "평문 한 줄"));
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain("questions[1].text");
+      expect(errors[0]).toContain('id "q2"');
+      expect(errors[0]).not.toContain("questions[0]");
+      expect(errors[0]).not.toContain("questions[2]");
+    });
+
+    it("잘못된 문항이 여럿이면 모두 지목한다", () => {
+      const errors = errorsOf(withText(PLAIN_WITH_LINES, HTML_BODY, "첫\n둘"));
+
+      expect(errors).toHaveLength(2);
+      expect(errors[0]).toContain("questions[0].text");
+      expect(errors[1]).toContain("questions[2].text");
+    });
+
+    it("윈도우 줄바꿈(\\r\\n)도 줄바꿈으로 본다", () => {
+      expect(errorsOf(withText("첫 줄\r\n둘째 줄"))).toHaveLength(1);
+    });
+
+    it("단독 \\r 도 줄바꿈으로 본다 (HTML 파서는 CR 을 LF 로 정규화해 똑같이 접는다)", () => {
+      expect(errorsOf(withText("첫 줄\r둘째 줄"))).toHaveLength(1);
+    });
+
+    it("앞뒤에만 붙은 줄바꿈은 구조가 아니므로 평문 한 줄은 통과한다", () => {
+      expect(validateMockExamSpec(withText("\n평문 한 줄\n")).ok).toBe(true);
+    });
+
+    it("id 가 없는 문항은 순번으로 지목한다 (id 오류와 함께)", () => {
+      const raw = good();
+      raw.questions = [{ text: "첫\n둘", type: "essay" }];
+
+      const text = errorsOf(raw).join("\n");
+
+      expect(text).toContain("questions[0].id");
+      expect(text).toMatch(/questions\[0\]\.text 에 줄바꿈/);
+    });
+
+    it("본문 오류는 다른 오류와 함께 모두 모아 돌려준다", () => {
+      const raw = withText(PLAIN_WITH_LINES);
+      raw.rubric = "문자열";
+
+      const text = errorsOf(raw).join("\n");
+
+      expect(text).toContain("questions[0].text");
+      expect(text).toContain("rubric");
+    });
+
+    it("isPlainTextWithLineBreaks 는 같은 판정을 순수 함수로 돌려준다", () => {
+      expect(isPlainTextWithLineBreaks(PLAIN_WITH_LINES)).toBe(true);
+      expect(isPlainTextWithLineBreaks(HTML_BODY)).toBe(false);
+      expect(isPlainTextWithLineBreaks("평문 한 줄")).toBe(false);
+      expect(isPlainTextWithLineBreaks("x<3 and y>5\n둘째 줄")).toBe(true);
+    });
+
+    it("실제 스펙과 같은 모양(title, questions[].text/ai_role, rubric, rubric_public, language)이 HTML 본문이면 통과한다", () => {
+      // 시험 문구는 저장소에 두지 않는다. 키와 구조만 실제 스펙과 같고 문구는 합성이다.
+      const realShape = {
+        title: "합성 모의시험 (본문 HTML 모양 확인)",
+        language: "ko",
+        rubric_public: true,
+        questions: [
+          {
+            id: "q1",
+            type: "essay",
+            ai_role: "analysis_partner",
+            text:
+              "<p>합성 문항 1 입니다. 아래 변수를 쓰세요.</p><ul><li>Customer_ID: 합성 변수</li><li>Age: 합성 변수</li></ul><p>x&lt;3 인 경우를 설명하세요.</p>",
+          },
+          { id: "q2", type: "essay", ai_role: "analysis_partner", text: "<p>합성 문항 2 입니다.</p>" },
+          { id: "q3", type: "essay", ai_role: "analysis_partner", text: "줄바꿈 없는 합성 문항 3 입니다." },
+        ],
+        rubric: [
+          { evaluationArea: "합성 영역 A", detailedCriteria: "합성 기준 A" },
+          { evaluationArea: "합성 영역 B", detailedCriteria: "합성 기준 B" },
+        ],
+      };
+
+      const r = validateMockExamSpec(realShape);
+
+      expect(r.ok).toBe(true);
+      if (r.ok) {
+        expect(r.spec.questions).toHaveLength(3);
+        expect(r.spec.questions[0].text).toBe(realShape.questions[0].text);
+        expect(r.spec.questions.every((q) => q.ai_role === "analysis_partner")).toBe(true);
+        expect(r.spec.rubric).toHaveLength(2);
+        expect(r.spec.rubric_public).toBe(true);
+        expect(r.spec.language).toBe("ko");
+        expect(r.spec.title).toBe(realShape.title);
+      }
+    });
   });
 });
 
@@ -1514,6 +1698,20 @@ describe("main", () => {
     expect(await h.code).toBe(2);
     expect(h.createClient).not.toHaveBeenCalled();
     expect(h.err.join("\n")).toContain("rubric");
+  });
+
+  it("줄바꿈이 있는 평문 문항 본문은 dry-run 에서 2 로 끝나고 클라이언트를 만들지 않는다 (#537)", async () => {
+    const plain = JSON.stringify({
+      ...(FIXTURE as object),
+      questions: [{ id: "q1", text: "다음 변수를 보세요.\n- Age: 나이", type: "essay" }],
+    });
+    const h = harness(baseArgv, { SUPABASE_URL: `https://${PROJECT_REF}.supabase.co`, SUPABASE_SERVICE_ROLE_KEY: SECRET_KEY }, { specText: plain });
+
+    expect(await h.code).toBe(2);
+    expect(h.createClient).not.toHaveBeenCalled();
+    expect(h.db.writes).toEqual([]);
+    expect(h.err.join("\n")).toContain("questions[0].text");
+    expect(h.err.join("\n")).toContain("본문은 HTML");
   });
 
   it("스펙 파일이 JSON 이 아니거나 읽을 수 없으면 2 로 끝난다", async () => {
