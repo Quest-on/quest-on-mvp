@@ -34,7 +34,7 @@ type QueryResult = { data: any; error: any };
 
 function createChain(result: QueryResult) {
   const chain = {
-    select: vi.fn(() => chain),
+    select: vi.fn((_columns?: string) => chain),
     eq: vi.fn(() => chain),
     is: vi.fn(() => chain),
     order: vi.fn(() => chain),
