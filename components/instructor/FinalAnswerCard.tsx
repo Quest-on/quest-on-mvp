@@ -16,6 +16,12 @@ import {
   textToHtml,
   type PasteLog,
 } from "@/lib/highlight-paste";
+import {
+  classifyPasteLog,
+  logsForQuestion,
+  partitionPasteLogs,
+  selectLogsForHighlight,
+} from "@/lib/integrity-signals";
 
 interface Submission {
   id: string;
@@ -33,6 +39,12 @@ interface FinalAnswerCardProps {
    * plain text로 안전하게 렌더한다. (XSS 안전)
    */
   finalAnswerText?: string;
+  /**
+   * 의심 표시(탭 전환, 외부 붙여넣기)를 보일지. 기본 true(현행 동작).
+   * false 면 빨간 뱃지, 경고 박스, 범례의 의심 항목, 본문의 외부 붙여넣기 하이라이트를
+   * 숨긴다. 내부 복사(파란색)는 채점 정보라 계속 보인다. 로그 자체는 지우지 않는다.
+   */
+  showIntegritySignals?: boolean;
 }
 
 export function FinalAnswerCard({
@@ -40,6 +52,7 @@ export function FinalAnswerCard({
   pasteLogs,
   questionId,
   finalAnswerText,
+  showIntegritySignals = true,
 }: FinalAnswerCardProps) {
   const t = useTranslations("authoring");
   const locale = useLocale() as "ko" | "en";
@@ -73,13 +86,20 @@ export function FinalAnswerCard({
   }
 
   // 현재 문제에 해당하는 로그만 필터링
-  const relevantLogs =
-    pasteLogs?.filter((log) => !questionId || log.question_id === questionId) ||
-    [];
-  const suspiciousLogs = relevantLogs.filter(
-    (log) => log.is_internal !== true && log.suspicious
-  );
-  const internalLogs = relevantLogs.filter((log) => log.is_internal === true);
+  const relevantLogs = logsForQuestion(pasteLogs, questionId);
+  // 탭 전환은 서버에서 suspicious=true 로 저장되지만 외부 붙여넣기가 아니다. 표시 단계에서
+  // 이름과 집계만 갈라 "탭 전환 N회" / "외부 붙여넣기 N건" 으로 센다(데이터는 그대로 둔다).
+  // 심각도 표현은 변경 전과 같다 — 둘 다 같은 빨간 뱃지와 경고 박스에 담는다.
+  const partitioned = partitionPasteLogs(relevantLogs);
+  const internalLogs = partitioned.internal;
+  const externalLogs = showIntegritySignals ? partitioned.external : [];
+  const tabSwitchLogs = showIntegritySignals ? partitioned.tabSwitch : [];
+  const signalLogs = showIntegritySignals ? partitioned.signals : [];
+  const highlightLogs = selectLogsForHighlight(relevantLogs, showIntegritySignals);
+  // 범례는 본문에 칠해지는 종류가 있을 때만 그린다. 탭 전환은 본문을 칠하지 않는다.
+  const hasLegend = externalLogs.length > 0 || internalLogs.length > 0;
+  const formatLogTime = (timestamp: string) =>
+    formatTime(timestamp, locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
   return (
     <Card>
@@ -89,11 +109,17 @@ export function FinalAnswerCard({
             <FileText className="w-5 h-5 text-success-text" />
             <CardTitle>{t("finalAnswerCard.cardTitle")}</CardTitle>
           </div>
-          <div className="flex items-center gap-2">
-            {suspiciousLogs.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {externalLogs.length > 0 && (
               <Badge variant="destructive" className="flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" />
-                {t("finalAnswerCard.badgeSuspicious", { count: suspiciousLogs.length })}
+                {t("finalAnswerCard.badgeSuspicious", { count: externalLogs.length })}
+              </Badge>
+            )}
+            {tabSwitchLogs.length > 0 && (
+              <Badge variant="destructive" className="flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                {t("finalAnswerCard.badgeTabSwitch", { count: tabSwitchLogs.length })}
               </Badge>
             )}
             {internalLogs.length > 0 && (
@@ -112,7 +138,7 @@ export function FinalAnswerCard({
       <CardContent>
         {submission ? (
           <div className="space-y-3">
-            {suspiciousLogs.length > 0 && (
+            {signalLogs.length > 0 && (
               <div className="bg-destructive/10 border border-destructive rounded-md p-3">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
@@ -121,9 +147,11 @@ export function FinalAnswerCard({
                       {t("finalAnswerCard.suspiciousTitle")}
                     </p>
                     <div className="text-xs text-destructive space-y-1">
-                      {suspiciousLogs.map((log) => (
+                      {signalLogs.map((log) => (
                         <p key={log.id}>
-                          {t("finalAnswerCard.suspiciousLog", { chars: log.length.toLocaleString(), time: formatTime(log.timestamp, locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" }) })}
+                          {classifyPasteLog(log) === "tab_switch"
+                            ? t("finalAnswerCard.tabSwitchLog", { time: formatLogTime(log.timestamp) })
+                            : t("finalAnswerCard.suspiciousLog", { chars: log.length.toLocaleString(), time: formatLogTime(log.timestamp) })}
                         </p>
                       ))}
                     </div>
@@ -142,7 +170,7 @@ export function FinalAnswerCard({
                     <div className="text-xs text-info-text space-y-1">
                       {internalLogs.map((log) => (
                         <p key={log.id}>
-                          {t("finalAnswerCard.internalLog", { chars: log.length.toLocaleString(), time: formatTime(log.timestamp, locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" }) })}
+                          {t("finalAnswerCard.internalLog", { chars: log.length.toLocaleString(), time: formatLogTime(log.timestamp) })}
                         </p>
                       ))}
                     </div>
@@ -150,9 +178,9 @@ export function FinalAnswerCard({
                 </div>
               </div>
             )}
-            {relevantLogs.length > 0 && (
+            {hasLegend && (
               <div className="flex items-center gap-4 text-xs text-muted-foreground px-1">
-                {suspiciousLogs.length > 0 && (
+                {externalLogs.length > 0 && (
                   <span className="flex items-center gap-1.5">
                     <span className="inline-block w-3 h-3 rounded bg-destructive/25" />
                     {t("finalAnswerCard.legendExternal")}
@@ -164,10 +192,12 @@ export function FinalAnswerCard({
                     {t("finalAnswerCard.legendInternal")}
                   </span>
                 )}
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-3 h-3 rounded bg-destructive/15 opacity-60 border border-destructive" />
-                  {t("finalAnswerCard.legendModified")}
-                </span>
+                {showIntegritySignals && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block w-3 h-3 rounded bg-destructive/15 opacity-60 border border-destructive" />
+                    {t("finalAnswerCard.legendModified")}
+                  </span>
+                )}
               </div>
             )}
             <div className="bg-muted rounded-lg p-4">
@@ -177,7 +207,7 @@ export function FinalAnswerCard({
                   __html:
                     highlightPastedContent(
                       submission.answer || "",
-                      relevantLogs
+                      highlightLogs
                     ) || textToHtml(t("finalAnswerCard.emptyAnswer")),
                 }}
               />
