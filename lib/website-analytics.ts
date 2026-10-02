@@ -62,6 +62,29 @@ export function analyticsPath(pathname: string): string | null {
   return null;
 }
 
+// 학생이 시험·과제를 푸는 중인 화면. 선택 기록이 없어도 첫 동의 카드를 띄우지 않는다 (이슈 #538).
+// 카드가 오른쪽 아래에서 AI 입력창·최종 답안 버튼·제출 버튼을 덮고, 응시 중에 처음 보는
+// 학생이 멈칫하거나 잘못 누른다. 포함 기준은 "학생이 답을 쓰는 중"이다:
+//   /exam/[id]                    시험 응시 (AI 채팅 + 답안)
+//   /assignment/[id]              과제 수행 (AI 채팅 + 최종 답안 버튼)
+//   /student/session/[id]/quiz    과제 제출 직후 초 단위 타임어택 퀴즈 (제출 버튼이 오른쪽 아래)
+// 제외: /assignment/[id]/review (제출 뒤 읽기 전용), 교수·채점·대시보드·가입·법적 고지.
+export const CONSENT_PROMPT_SUPPRESSED_ROUTES: ReadonlyArray<(typeof ANALYTICS_ROUTES)[number]> = [
+  "/exam/[id]",
+  "/assignment/[id]",
+  "/student/session/[id]/quiz",
+];
+
+/**
+ * 이 경로에서는 선택 기록이 없을 때 동의 카드를 띄우지 않는다.
+ * 동의 의미는 그대로다 — 기록이 없으면 여전히 거부 상태이고, 카드만 다른 페이지로 미룬다.
+ * 판정은 analyticsPath() 의 템플릿으로만 한다. 코드·ID 가 든 실제 경로는 비교 밖으로 새지 않는다.
+ */
+export function suppressConsentPromptOn(pathname: string): boolean {
+  const route = analyticsPath(pathname);
+  return route !== null && CONSENT_PROMPT_SUPPRESSED_ROUTES.some((suppressed) => suppressed === route);
+}
+
 export function sanitizeAnalyticsUrl(raw: string): string | null {
   try {
     const url = new URL(raw);

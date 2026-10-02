@@ -10,7 +10,7 @@ import { createSupabaseClient } from "@/lib/supabase-client";
 import { postHogConfig, sanitizePostHogProperties, syncAnalyticsIdentity } from "@/lib/posthog-config";
 import {
   ANALYTICS_CHOICE_KEY, ANALYTICS_CHOICE_COOKIE, type AnalyticsChoice, campaignParameters,
-  marketingPage, readAnalyticsChoice, safeReferrer, sanitizeAnalyticsUrl,
+  marketingPage, readAnalyticsChoice, safeReferrer, sanitizeAnalyticsUrl, suppressConsentPromptOn,
 } from "@/lib/website-analytics";
 
 import { sessionReplayConfig, replayProperties } from "@/lib/posthog-replay";
@@ -135,6 +135,10 @@ export function WebsiteAnalytics() {
   }
 
   if (!config || !ready || !supportedPage) return null;
+  // 응시 중인 학생 화면에서는 첫 선택 카드를 띄우지 않는다 — 입력창·답안·제출 버튼을 덮는다 (이슈 #538).
+  // 위 효과는 choice 만 보므로 기록이 없는 동안은 여전히 거부 상태(쿠키 denied, 캡처 없음)다.
+  // 직접 연 설정 패널(editing)과 이미 선택한 사용자의 pill 은 그대로 둔다.
+  if (!choice && !editing && suppressConsentPromptOn(pathname)) return null;
   return !choice || editing ? (
     <aside
       aria-label={t("title")}
