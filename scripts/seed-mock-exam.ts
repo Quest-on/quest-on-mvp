@@ -16,12 +16,24 @@
  * 접속 정보는 **환경변수로만** 받는다. 파일에서 읽지 않는다 (AGENTS.md).
  *   SUPABASE_URL (없으면 NEXT_PUBLIC_SUPABASE_URL), SUPABASE_SERVICE_ROLE_KEY
  *
- * 기본은 dry-run 이다. 쓰기에는 `--apply` 와 접속한 프로젝트 ref 와 일치하는
- * `--confirm-project-ref` 가 둘 다 필요하다. **운영 DB 실행은 별도 명시 승인이 있어야 한다.**
- * 스테이징 리허설을 먼저 한다.
+ * 기본은 dry-run 이다. 쓰기에는 `--apply` 가 필요하고, **접속 정보가 있어 DB 를 읽는 모든 실행
+ * (dry-run 포함)** 에는 접속한 프로젝트 ref 와 일치하는 `--confirm-project-ref` 가 필요하다.
+ * ref 는 독립된 출처에서 확인해 직접 넘긴다 - 스크립트는 기대하는 ref 를 오류 안내에 알려 주지
+ * 않는다(복사해 붙이면 확인이 되지 않는다). 접속 정보 없이 도는 오프라인 dry-run 만 예외다.
+ * **운영 DB 실행은 별도 명시 승인이 있어야 한다.** 스테이징 리허설을 먼저 한다.
+ *
+ * 접속 URL 은 `https://<ref>.supabase.co` 형식만 받는다. 커스텀 도메인, `db.<ref>...`, pooler,
+ * 로컬 스택은 ref 를 확신할 수 없어 거부한다.
  *
  * 이 스크립트가 하지 않는 것: 시험 시작/종료, 첫 발행 기록, 학생 수 집계 - 입장 RPC 와 시작
  * 라우트의 몫이다. 만든 시험은 draft 로 끝난다.
+ *
+ * createExam 과 다른 점(알고 있는 차이):
+ *   - 제목: `createExamSchema` 는 title 에 `sanitizeUserInput`(HTML 태그 제거·엔티티 해제)을 적용하지만
+ *     이 스크립트는 `trim` 만 한다. 스펙 파일을 우리가 직접 만들기 때문에 이번에는 맞추지 않았다.
+ *     태그나 엔티티가 든 제목을 넣으면 정제되지 않은 채 저장된다.
+ *   - 응답이 유실된 INSERT: PG 오류 코드가 없는 실패는 "거부" 가 아니라 "결과 불명" 으로 보고
+ *     같은 코드로 exams 를 다시 읽어 판정한다(createExam 은 이 경우를 따로 다루지 않는다).
  */
 
 import { readFileSync } from "fs";
@@ -250,15 +262,18 @@ export const USAGE = `사용법:
 옵션:
   --parent-folder-id <uuid>      드라이브에서 시험을 둘 폴더(exam_nodes.id). 없으면 루트
   --apply                        실제로 씁니다. --confirm-project-ref 도 함께 필요합니다
-  --confirm-project-ref <ref>    접속한 Supabase 프로젝트 ref. 환경변수의 URL 에서 읽은 값과 정확히 같아야 합니다
-  --allow-duplicate-title        같은 소유자에게 같은 제목의 시험이 이미 있어도 진행합니다
+  --confirm-project-ref <ref>    접속 정보가 있어 DB 를 읽는 모든 실행(dry-run 포함)에 필요합니다. 독립된 출처
+                                 (Supabase 대시보드, 승인 문서)에서 확인한 프로젝트 ref 를 직접 넘기세요.
+                                 환경변수의 URL 에서 읽은 값과 정확히 같아야 하며, 틀려도 기대값은 알려 주지 않습니다
+  --allow-duplicate-title        같은 소유자에게 같은 제목의 시험이 이미 있어도 진행합니다.
+                                 먼저 그 행을 직접 조회해 확인한 뒤에만 쓰세요
   --help                         이 도움말
 
 환경변수 (파일에서 읽지 않습니다):
-  SUPABASE_URL                   (없으면 NEXT_PUBLIC_SUPABASE_URL)
+  SUPABASE_URL                   (없으면 NEXT_PUBLIC_SUPABASE_URL). https://<ref>.supabase.co 형식만 받습니다
   SUPABASE_SERVICE_ROLE_KEY
 
-접속 정보가 없으면 dry-run 은 스펙 검증과 만들 행 미리보기만 하고 읽기 점검을 건너뜁니다.
+접속 정보가 없으면 dry-run 은 스펙 검증과 만들 행 미리보기만 하고 읽기 점검을 건너뜁니다(ref 확인 불필요).
 운영 DB 실행은 별도 명시 승인이 있어야 합니다. 스테이징 리허설을 먼저 하세요.`;
 
 export function parseArgs(argv: string[]): { ok: true; args: SeedArgs } | { ok: false; error: string } {
@@ -316,21 +331,27 @@ export function parseArgs(argv: string[]): { ok: true; args: SeedArgs } | { ok: 
   return { ok: true, args };
 }
 
+/** `<ref>.supabase.co` 단 한 겹. `db.<ref>`·다단계 서브도메인·pooler 는 맞지 않는다. */
+const SUPABASE_HOST_RE = /^([a-z0-9]+)\.supabase\.co$/;
+
 /**
- * 접속 URL 에서 프로젝트 ref 를 뽑는다. `https://<ref>.supabase.co` 의 첫 라벨이다.
- * 그 밖의 호스트(로컬 스택 등)는 호스트 이름 전체를 ref 로 본다.
+ * 접속 URL 에서 프로젝트 ref 를 뽑는다. `https://<ref>.supabase.co` 만 받는다.
+ *
+ * 스킴은 https 뿐이다(서비스 롤 키를 평문으로 보내지 않는다). 포트와 계정 정보가 붙은 주소,
+ * 커스텀 도메인, `db.<ref>.supabase.co`, pooler, 로컬 스택은 ref 를 확신할 수 없어 null 이다.
  */
 export function deriveProjectRef(url: string | null | undefined): string | null {
   if (!url) return null;
-  let host: string;
+  let parsed: URL;
   try {
-    host = new URL(url).hostname;
+    parsed = new URL(url);
   } catch {
     return null;
   }
-  if (!host) return null;
-  if (host.endsWith(".supabase.co")) return host.split(".")[0] || null;
-  return host;
+  if (parsed.protocol !== "https:") return null;
+  if (parsed.username || parsed.password || parsed.port) return null;
+  const match = SUPABASE_HOST_RE.exec(parsed.hostname);
+  return match ? match[1] : null;
 }
 
 export type Connection = {
@@ -374,7 +395,11 @@ export function resolveConnection(env: Record<string, string | undefined>): Conn
 
   const projectRef = deriveProjectRef(url);
   if (!projectRef) {
-    return { ...empty, error: "SUPABASE_URL 에서 프로젝트 ref 를 읽을 수 없습니다. URL 형식을 확인하세요." };
+    return {
+      ...empty,
+      error:
+        "접속 URL 이 https://<ref>.supabase.co 형식이 아닙니다 (값은 출력하지 않습니다). 커스텀 도메인, db.<ref>.supabase.co, pooler, 로컬 스택 URL 은 이 스크립트가 지원하지 않습니다.",
+    };
   }
   return { url, serviceRoleKey: key, projectRef, error: null };
 }
@@ -407,6 +432,11 @@ export type SeedReport = {
   planned: { exams: Record<string, unknown>; examNode: Record<string, unknown> } | null;
   result: { examId: string; code: string; nodeId: string } | null;
   compensation: "not-needed" | "deleted" | "failed";
+  /**
+   * exams INSERT 가 PG 오류 코드 없이 끝난 경우(응답 유실 등)의 판정.
+   * none: 해당 없음 / adopted: 서버에 행이 있어 이어서 씀 / absent: 행이 없음 확인 / unknown: 확인도 실패
+   */
+  ambiguousInsert: "none" | "adopted" | "absent" | "unknown";
 };
 
 type Row = Record<string, unknown>;
@@ -454,6 +484,45 @@ async function compensateExam(client: SupabaseClient, examId: string): Promise<"
   }
 }
 
+/** PG 오류 코드가 있으면 서버가 INSERT 를 거부한 것이다. 코드가 없으면(`""`, undefined) 결과를 모른다. */
+function isDefiniteRejection(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" && code.length > 0;
+}
+
+type InsertVerdict =
+  | { state: "ours"; id: string }
+  | { state: "absent" }
+  | { state: "foreign" }
+  | { state: "unknown"; reason: string };
+
+/**
+ * 응답을 잃은 INSERT 가 서버에 반영됐는지 같은 코드로 다시 읽어 판정한다.
+ * code 는 UNIQUE 라서 우리 행이면 최대 한 건이다. 코드가 같아도 소유자와 제목이 다르면 남의 시험이다.
+ */
+async function verifyInsertedExam(
+  client: SupabaseClient,
+  code: string,
+  instructorId: string,
+  title: string
+): Promise<InsertVerdict> {
+  try {
+    const { data, error } = await client
+      .from("exams")
+      .select("id, code, title, instructor_id")
+      .eq("code", code)
+      .maybeSingle();
+    if (error) return { state: "unknown", reason: errText(error) };
+    if (!data) return { state: "absent" };
+    const row = data as Row;
+    return row.instructor_id === instructorId && row.title === title
+      ? { state: "ours", id: String(row.id) }
+      : { state: "foreign" };
+  } catch (e) {
+    return { state: "unknown", reason: errText(e) };
+  }
+}
+
 export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
   const {
     client,
@@ -479,39 +548,54 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
     planned: null,
     result: null,
     compensation: "not-needed",
+    ambiguousInsert: "none",
   };
 
+  let readStarted = false;
   const block = (): SeedReport => {
     out("");
     out("중단 사유:");
     for (const b of blockers) out(`  - ${b}`);
-    out("아무것도 쓰지 않았습니다.");
+    out(
+      readStarted
+        ? "아무것도 쓰지 않았습니다 (읽기 전용 점검만 했습니다)."
+        : "DB 를 읽지도 쓰지도 않았습니다."
+    );
     report.status = "blocked";
     report.exitCode = 1;
     return report;
   };
 
   out(apply ? "모의시험 시드 - --apply (DB 에 씁니다)" : "모의시험 시드 - dry-run (DB 에 쓰지 않습니다)");
-  out(`접속 프로젝트 - project ref: ${projectRef ?? "(접속 정보 없음)"}`);
   out(`소유자(instructor_id): ${instructorId}`);
 
   // ── 프로젝트 ref 확인: DB 를 읽기 전에 닫는다 ───────────────────────────────
-  if (apply) {
-    if (!client || !projectRef) {
-      blockers.push("--apply 에는 접속 정보(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY 환경변수)가 필요합니다.");
-    }
+  // 접속한 실행은 dry-run 이어도 DB 를 읽는다(운영 데이터에 닿는다). 그래서 쓰기뿐 아니라 읽기도
+  // 확인된 ref 가 있어야 시작한다. 접속 정보 없는 오프라인 dry-run 만 예외다.
+  //
+  // 오류 안내에는 접속한 ref 를 싣지 않는다. 안내가 값을 알려 주면 사용자가 그대로 복사해 붙여
+  // 확인이 아니라 통과 의식이 된다. ref 는 독립된 출처에서 확인해 직접 넘기게 한다.
+  if (apply && (!client || !projectRef)) {
+    blockers.push("--apply 에는 접속 정보(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY 환경변수)가 필요합니다.");
+  }
+  if (client !== null || apply) {
+    const when = apply ? "--apply" : "접속 정보가 있어 DB 를 읽는 실행(dry-run 포함)";
     if (confirmProjectRef === null) {
       blockers.push(
-        `--apply 에는 --confirm-project-ref <ref> 가 필요합니다. 접속한 프로젝트 ref 는 "${projectRef ?? "알 수 없음"}" 입니다. 의도한 프로젝트인지 확인한 뒤 그 값을 직접 입력하세요.`
+        `${when}에는 --confirm-project-ref <ref> 가 필요합니다. 독립된 출처(Supabase 대시보드, 승인 문서)에서 확인한 프로젝트 ref 를 직접 넘기세요. 이 스크립트는 접속 대상의 ref 를 오류 안내에 알려 주지 않습니다.`
+      );
+    } else if (projectRef !== null && confirmProjectRef !== projectRef) {
+      blockers.push(
+        `--confirm-project-ref("${confirmProjectRef}") 가 환경변수가 가리키는 프로젝트와 다릅니다. 독립된 출처에서 확인한 ref 를 직접 넘기고, SUPABASE_URL 이 의도한 프로젝트를 가리키는지 확인하세요.`
       );
     }
   }
-  if (confirmProjectRef !== null && projectRef !== null && confirmProjectRef !== projectRef) {
-    blockers.push(
-      `--confirm-project-ref 가 접속한 프로젝트와 다릅니다: 접속 ref="${projectRef}", 확인 ref="${confirmProjectRef}". 환경변수가 의도한 프로젝트를 가리키는지 확인하세요.`
-    );
-  }
   if (blockers.length > 0) return block();
+  out(
+    client
+      ? `접속 프로젝트 - project ref: ${projectRef} (--confirm-project-ref 와 일치)`
+      : "접속 프로젝트 - project ref: (접속 정보 없음)"
+  );
 
   // ── 읽기 전용 사전 점검 ──────────────────────────────────────────────────────
   let sortOrder: number | null = null;
@@ -522,6 +606,7 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
     out("접속 정보가 없어 읽기 전용 사전 점검을 건너뜁니다 (스펙 검증과 만들 행 미리보기만 합니다).");
     out("코드 중복 확인과 sort_order 계산은 접속한 뒤에야 가능합니다.");
   } else {
+    readStarted = true;
     out("");
     out("[읽기 전용 사전 점검]");
 
@@ -544,7 +629,7 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
       }
       if (profile.plan !== "verified") {
         warnings.push(
-          `경고: profiles.plan 이 "${String(profile.plan)}" 입니다. verified 가 아니면 시험당 학생 5명까지만 입장할 수 있어 53명 입장이 불가합니다 (STUDENT_LIMIT_REACHED). plan 을 verified 로 올린 뒤 진행하세요.`
+          `경고: profiles.plan 이 "${String(profile.plan)}" 입니다. verified 가 아니면 (1) 시험당 학생 5명까지만 입장할 수 있어 53명 입장이 불가하고 (STUDENT_LIMIT_REACHED), (2) 발행(첫 학생 입장으로 기록되는 최초 발행) 3회 한도가 있어 이미 3개를 발행한 소유자의 새 시험에는 첫 학생부터 입장할 수 없습니다 (PUBLISH_LIMIT_REACHED). plan 을 verified 로 올린 뒤 진행하세요.`
         );
       }
     }
@@ -612,7 +697,7 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
         warnings.push(`경고: 같은 제목의 시험이 이미 있지만 --allow-duplicate-title 로 진행합니다 (${list}).`);
       } else {
         blockers.push(
-          `이 소유자에게 같은 제목의 시험이 이미 있습니다 (${list}). apply 를 두 번 돌린 것이 아닌지 확인하세요. 의도한 것이면 --allow-duplicate-title 을 쓰세요.`
+          `이 소유자에게 같은 제목의 시험이 이미 있습니다 (${list}). 이전 실행이 중간에 끊겼거나 apply 를 두 번 돌렸을 수 있습니다. 먼저 위 id/code 로 exams 와 exam_nodes 를 직접 조회해 이 행이 이미 쓸 수 있는 시험인지(드라이브에 노드가 연결돼 있는지 포함) 확인하세요. 행이 없다고 믿고 --allow-duplicate-title 을 쓰지 마세요. 같은 제목을 의도적으로 한 번 더 만들 때만 그 옵션을 쓰세요.`
         );
       }
     } else {
@@ -691,7 +776,11 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
   if (!apply) {
     out("");
     out("dry-run 입니다. DB 에 아무것도 쓰지 않았습니다.");
-    out("쓰려면 --apply --confirm-project-ref <접속한 프로젝트 ref> 를 함께 주세요.");
+    out(
+      client
+        ? "쓰려면 같은 명령에 --apply 를 더하세요 (--confirm-project-ref 는 이미 확인됐습니다)."
+        : "쓰려면 접속 정보를 환경변수로 주고 --apply --confirm-project-ref <독립된 출처에서 확인한 ref> 를 함께 주세요."
+    );
     return report;
   }
 
@@ -702,11 +791,18 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
     let currentCode = code;
     let lastError: unknown = null;
     for (let attempt = 0; attempt < MAX_INSERT_ATTEMPTS; attempt++) {
-      const { data, error } = await db
-        .from("exams")
-        .insert({ ...examRow, code: currentCode })
-        .select()
-        .single();
+      let data: unknown = null;
+      let error: unknown = null;
+      try {
+        ({ data, error } = await db
+          .from("exams")
+          .insert({ ...examRow, code: currentCode })
+          .select()
+          .single());
+      } catch (e) {
+        // 요청이 던져졌다. 서버가 커밋했는지 모르는 점은 코드 없는 오류와 같다.
+        error = { code: "", message: errText(e) };
+      }
       if (!error) {
         insertedId = String((data as Row).id);
         code = currentCode;
@@ -720,16 +816,63 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
         continue;
       }
       lastError = error;
-      break;
+      break; // 모르는 결과를 다시 INSERT 하면 같은 시험이 둘 생길 수 있다 - 재시도하지 않는다.
     }
+
+    if (insertedId === null && !isDefiniteRejection(lastError)) {
+      // PG 오류 코드가 없다. postgrest-js 는 fetch 실패를 던지지 않고 `{ code: "", message: "TypeError:
+      // fetch failed" }` 로 돌려준다. 서버는 커밋했는데 응답만 잃었을 수 있으므로 "쓴 행이 없다" 고
+      // 말할 수 없다. 방금 쓴 코드로 exams 를 다시 읽어 판정한다.
+      out(`exams INSERT 의 결과를 알 수 없습니다 (PG 오류 코드 없음): ${errText(lastError)}`);
+      out(`서버가 커밋했는지 확인하려고 코드 ${currentCode} 로 exams 를 다시 읽습니다.`);
+      const verdict = await verifyInsertedExam(db, currentCode, instructorId, spec.title);
+
+      if (verdict.state === "ours") {
+        insertedId = verdict.id;
+        code = currentCode;
+        report.ambiguousInsert = "adopted";
+        const note = `경고: exams INSERT 응답은 유실됐지만 서버에 행이 있었습니다 (id=${insertedId} code=${code}). 이 행을 이어서 씁니다.`;
+        warnings.push(note);
+        out(note);
+      } else if (verdict.state === "unknown") {
+        report.ambiguousInsert = "unknown";
+        out(`다시 읽기도 실패했습니다: ${verdict.reason}`);
+        out(
+          `결과 불명. 수동 확인 필요: 코드 ${currentCode} 로 exams 를 조회하세요 (소유자 "${instructorId}", 제목 "${spec.title}").`
+        );
+        out("행이 있으면 그 id 로 exam_nodes 가 연결돼 있는지 보고, 노드가 없으면 그 행을 지운 뒤 다시 실행하세요.");
+        out("확인 전에는 --allow-duplicate-title 로 다시 실행하지 마세요. 이 스크립트는 아무것도 더 쓰지 않고 끝납니다.");
+        report.status = "failed";
+        report.exitCode = 1;
+        return report;
+      } else {
+        report.ambiguousInsert = "absent";
+        if (verdict.state === "foreign") {
+          out(`확인됨: 코드 ${currentCode} 는 다른 시험이 쓰고 있어 이 INSERT 는 반영되지 않았습니다 (남의 행은 건드리지 않았습니다).`);
+        } else {
+          out(`확인됨: 재조회 시점에 코드 ${currentCode} 의 exams 행이 없습니다. 아무것도 만들어지지 않았습니다.`);
+        }
+        out(
+          `드물게 응답 유실 직후 늦게 커밋될 수 있으니, 다시 실행하기 전에 코드 ${currentCode} 또는 같은 제목의 시험이 없는지 한 번 더 조회하세요.`
+        );
+        report.status = "failed";
+        report.exitCode = 1;
+        return report;
+      }
+    }
+
     if (insertedId === null) {
       out(`exams INSERT 에 실패했습니다: ${errText(lastError)}`);
-      out("exams 에 쓴 행이 없으므로 보상 삭제는 필요하지 않습니다.");
+      out("서버가 거부했으므로 exams 에 쓴 행이 없습니다. 보상 삭제는 필요하지 않습니다.");
       report.status = "failed";
       report.exitCode = 1;
       return report;
     }
-    out(`exams 행을 만들었습니다: id=${insertedId} code=${code}`);
+    out(
+      report.ambiguousInsert === "adopted"
+        ? `exams 행을 확인했습니다: id=${insertedId} code=${code}`
+        : `exams 행을 만들었습니다: id=${insertedId} code=${code}`
+    );
 
     const sort = await nextSortOrder(db, instructorId, parentFolderId);
     if (sort.error) throw new Error(`exam_nodes 형제 조회에 실패했습니다: ${sort.error}`);
@@ -760,8 +903,9 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
   } catch (e) {
     out(`실패: ${errText(e)}`);
     if (insertedId === null) {
-      // 요청이 던져졌다면 서버가 INSERT 를 끝냈는지 알 수 없다. 다시 돌리기 전에 확인시킨다.
-      out(`exams INSERT 응답을 받지 못했습니다. 다시 실행하기 전에 소유자 "${instructorId}" 의 같은 제목 시험이 생겼는지 확인하세요.`);
+      // INSERT 단계의 예외는 위에서 모두 오류로 바꿨다. 여기 오는 것은 그 밖의 예기치 않은 예외다.
+      // 서버가 INSERT 를 끝냈는지 모르므로 다시 돌리기 전에 확인시킨다.
+      out(`exams 가 만들어졌는지 알 수 없습니다. 다시 실행하기 전에 소유자 "${instructorId}" 의 같은 제목 시험이 생겼는지 조회하세요.`);
       report.status = "failed";
       report.exitCode = 1;
       return report;
@@ -834,12 +978,22 @@ export async function main(
     return 2;
   }
 
-  const client =
-    connection.url && connection.serviceRoleKey
-      ? createClient(connection.url, connection.serviceRoleKey, {
-          auth: { autoRefreshToken: false, persistSession: false },
-        })
-      : null;
+  // 오류 문구에 서비스 롤 키가 섞여 나가지 않게 한다 (SDK 가 잘못된 키를 메시지에 되풀이할 수 있다).
+  const redact = (text: string) =>
+    connection.serviceRoleKey ? text.split(connection.serviceRoleKey).join("***") : text;
+
+  let client: SupabaseClient | null = null;
+  if (connection.url && connection.serviceRoleKey) {
+    try {
+      client = createClient(connection.url, connection.serviceRoleKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+    } catch (e) {
+      // createClient 는 형식이 틀린 URL/키에서 던진다. 스택 대신 깔끔한 접속 정보 오류로 끝낸다.
+      err(`오류: 접속 클라이언트를 만들 수 없습니다: ${redact(errText(e))}`);
+      return 2;
+    }
+  }
 
   try {
     const report = await seedMockExam({
@@ -857,7 +1011,7 @@ export async function main(
     });
     return report.exitCode;
   } catch (e) {
-    err(`예기치 않은 오류: ${errText(e)}`);
+    err(`예기치 않은 오류: ${redact(errText(e))}`);
     return 1;
   }
 }

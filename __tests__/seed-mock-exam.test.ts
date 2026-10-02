@@ -43,13 +43,23 @@ type DbError = { code?: string; message: string };
 
 type Write = { table: string; op: "insert" | "update" | "delete"; payload?: Row; filters: string[] };
 
+/** 훅이 현재 상태를 보고 시나리오를 만들 수 있게 넘기는 내부 상태. */
+type FakeCtx = { tables: Record<string, Row[]>; writes: Write[]; reads: string[] };
+
 function createFakeDb(
   seed: Partial<Record<"profiles" | "instructor_profiles" | "exam_nodes" | "exams", Row[]>> = {},
   hooks: {
-    /** insert 를 실패시키려면 오류를 돌려준다. n 은 그 테이블의 몇 번째 insert 시도인지(1부터). */
-    failInsert?: (table: string, payload: Row, n: number) => DbError | null;
+    /** insert 를 실패시키려면 오류를 돌려준다(행은 들어가지 않는다). n 은 그 테이블의 몇 번째 insert 시도인지(1부터). */
+    failInsert?: (table: string, payload: Row, n: number, ctx: FakeCtx) => DbError | null;
+    /**
+     * 서버는 **커밋했는데 응답이 유실된** 상황. 행은 들어가고 호출자는 오류를 받는다.
+     * postgrest-js 는 fetch 실패를 던지지 않고 `{ code: "", message: "TypeError: fetch failed" }` 로 돌려준다.
+     */
+    commitThenFail?: (table: string, payload: Row, n: number, ctx: FakeCtx) => DbError | null;
+    /** 커밋한 뒤 요청 Promise 가 거부되는 상황. */
+    commitThenThrow?: (table: string, payload: Row, n: number) => Error | null;
     failDelete?: (table: string) => DbError | null;
-    failRead?: (table: string) => DbError | null;
+    failRead?: (table: string, ctx: FakeCtx) => DbError | null;
   } = {}
 ) {
   const tables: Record<string, Row[]> = {
@@ -63,6 +73,7 @@ function createFakeDb(
   const reads: string[] = [];
   const insertAttempts: Record<string, number> = {};
   let seq = 0;
+  const ctx: FakeCtx = { tables, writes, reads };
 
   function from(table: string) {
     if (!(table in tables)) throw new Error(`Unexpected table: ${table}`);
@@ -77,7 +88,7 @@ function createFakeDb(
     function run(mode: "many" | "single" | "maybeSingle"): Promise<{ data: unknown; error: DbError | null }> {
       if (op === "select") {
         reads.push(table);
-        const failure = hooks.failRead?.(table);
+        const failure = hooks.failRead?.(table, ctx);
         if (failure) return Promise.resolve({ data: null, error: failure });
         let rows = tables[table].filter((r) => preds.every((p) => p(r)));
         if (order) {
@@ -101,10 +112,15 @@ function createFakeDb(
       if (op === "insert") {
         insertAttempts[table] = (insertAttempts[table] ?? 0) + 1;
         writes.push({ table, op, payload: structuredClone(payload!), filters: [] });
-        const failure = hooks.failInsert?.(table, payload!, insertAttempts[table]);
+        const n = insertAttempts[table];
+        const failure = hooks.failInsert?.(table, payload!, n, ctx);
         if (failure) return Promise.resolve({ data: null, error: failure });
         const row: Row = { id: `${table}-${++seq}`, ...structuredClone(payload!) };
         tables[table].push(row);
+        const lost = hooks.commitThenFail?.(table, payload!, n, ctx);
+        if (lost) return Promise.resolve({ data: null, error: lost });
+        const thrown = hooks.commitThenThrow?.(table, payload!, n);
+        if (thrown) return Promise.reject(thrown);
         return Promise.resolve({ data: selecting ? { ...row } : null, error: null });
       }
       if (op === "delete") {
@@ -183,7 +199,8 @@ function run(db: ReturnType<typeof createFakeDb>, overrides: Partial<SeedOptions
     instructorId: INSTRUCTOR,
     apply: false,
     projectRef: PROJECT_REF,
-    confirmProjectRef: null,
+    // 접속한 실행은 dry-run 이어도 ref 확인이 있어야 DB 를 읽는다. 기본은 확인한 상태로 둔다.
+    confirmProjectRef: PROJECT_REF,
     now: () => NOW,
     generateCode: () => codes.shift() ?? "ZZZZZZ",
     out: (line) => lines.push(line),
@@ -462,8 +479,27 @@ describe("deriveProjectRef / resolveConnection", () => {
     expect(deriveProjectRef("https://abcdefghijklmnop.supabase.co/rest/v1/")).toBe("abcdefghijklmnop");
   });
 
-  it("supabase.co 가 아니면 호스트 전체를 ref 로 본다 (로컬은 127.0.0.1)", () => {
-    expect(deriveProjectRef("http://127.0.0.1:54321")).toBe("127.0.0.1");
+  it.each([
+    ["db. 접두 호스트", "https://db.abcdefghijklmnop.supabase.co"],
+    ["다단계 서브도메인", "https://a.b.supabase.co"],
+    ["pooler 호스트", "https://aws-0-ap-northeast-2.pooler.supabase.com"],
+    ["supabase.com 도메인", "https://abcdefghijklmnop.supabase.com"],
+    ["supabase.co 를 접미로 흉내 낸 호스트", "https://abcdefghijklmnop.supabase.co.evil.example"],
+    ["supabase.co 를 접두로 흉내 낸 호스트", "https://evilsupabase.co"],
+    ["커스텀 도메인", "https://db.quest-on.example"],
+    ["로컬 스택", "http://127.0.0.1:54321"],
+    ["localhost", "http://localhost:54321"],
+    ["평문 http", "http://abcdefghijklmnop.supabase.co"],
+    ["https 가 아닌 스킴", "ftp://abcdefghijklmnop.supabase.co"],
+    ["포트가 붙은 주소", "https://abcdefghijklmnop.supabase.co:8443"],
+    ["계정 정보가 붙은 주소", "https://user:secret@abcdefghijklmnop.supabase.co"],
+    ["postgres 연결 문자열", "postgresql://postgres:pw@db.abcdefghijklmnop.supabase.co:5432/postgres"],
+  ])("<ref>.supabase.co 가 아니면 ref 를 읽지 않는다: %s", (_label, url) => {
+    expect(deriveProjectRef(url)).toBeNull();
+  });
+
+  it("호스트 대소문자는 소문자로 정규화한다", () => {
+    expect(deriveProjectRef("https://ABCDEFGHIJKLMNOP.SUPABASE.CO")).toBe("abcdefghijklmnop");
   });
 
   it("URL 이 아니거나 비면 null 이다", () => {
@@ -503,6 +539,17 @@ describe("deriveProjectRef / resolveConnection", () => {
   it("URL 과 키 중 하나만 있으면 오류다 - 반쪽 접속 정보로 조용히 오프라인이 되지 않는다", () => {
     expect(resolveConnection({ SUPABASE_URL: "https://aaa.supabase.co" }).error).toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
     expect(resolveConnection({ SUPABASE_SERVICE_ROLE_KEY: "k" }).error).toMatch(/SUPABASE_URL/);
+  });
+
+  it("지원하지 않는 URL 은 형식과 이유를 알려 주는 오류다 (커스텀 도메인·pooler·로컬 스택)", () => {
+    for (const url of ["https://db.quest-on.example", "http://127.0.0.1:54321", "https://db.abc.supabase.co"]) {
+      const r = resolveConnection({ SUPABASE_URL: url, SUPABASE_SERVICE_ROLE_KEY: "secret-key" });
+
+      expect(r.error).toMatch(/https:\/\/<ref>\.supabase\.co/);
+      expect(r.error).toMatch(/커스텀 도메인/);
+      expect(r.url).toBeNull();
+      expect(r.error).not.toContain("secret-key");
+    }
   });
 
   it("둘 다 없으면 오류 없이 비어 있다 (오프라인 dry-run)", () => {
@@ -660,6 +707,10 @@ describe("seedMockExam dry-run", () => {
     expect(output).toMatch(/53명/);
     expect(output).toContain("verified");
     expect(report.warnings.join("\n")).toMatch(/53명/);
+    // free 플랜은 시험당 학생 5명 말고도 발행 3회 한도가 있다 (database/018 plan_limits, 026 admit_exam_session).
+    expect(report.warnings.join("\n")).toMatch(/학생 5명/);
+    expect(report.warnings.join("\n")).toMatch(/발행.*3회/);
+    expect(report.warnings.join("\n")).toContain("PUBLISH_LIMIT_REACHED");
     // 경고일 뿐 막지는 않는다 (이슈: "경고한다").
     expect(report.status).toBe("dry-run");
     expect(report.exitCode).toBe(0);
@@ -750,6 +801,22 @@ describe("seedMockExam 사전 조건", () => {
     expect(db.writes).toEqual([]);
   });
 
+  it("같은 제목 가드의 안내는 '행이 없다고 믿고 이 옵션을 쓰지 말고 먼저 조회로 확인하라' 는 취지다", async () => {
+    const db = createFakeDb({
+      ...verifiedWorld,
+      exams: [{ id: "e1", code: "OLD111", title: spec.title, instructor_id: INSTRUCTOR, status: "draft" }],
+    });
+
+    const { report } = await run(db, { apply: true, confirmProjectRef: PROJECT_REF });
+
+    const text = report.blockers.join("\n");
+    expect(text).toMatch(/먼저.*조회/);
+    expect(text).toMatch(/없다고 믿고/);
+    // 이전 실행이 응답 유실로 끊겨 남긴 행일 수 있다 - 옵션을 권하는 문장이 앞서 나오면 안 된다.
+    expect(text).toMatch(/이전 실행/);
+    expect(text.indexOf("조회")).toBeLessThan(text.indexOf("--allow-duplicate-title"));
+  });
+
   it("--allow-duplicate-title 이면 경고만 하고 진행한다", async () => {
     const db = createFakeDb({
       ...verifiedWorld,
@@ -801,7 +868,35 @@ describe("seedMockExam 프로젝트 ref 확인", () => {
     expect(output).toContain("--confirm-project-ref");
   });
 
-  it("확인한 ref 가 접속한 프로젝트와 다르면 거부한다", async () => {
+  it("접속한 dry-run 도 ref 확인이 없으면 DB 를 읽지 않고 거부한다 (읽기도 운영 데이터에 닿는다)", async () => {
+    const db = createFakeDb(verifiedWorld);
+
+    const { report, output } = await run(db, { apply: false, confirmProjectRef: null });
+
+    expect(report.status).toBe("blocked");
+    expect(report.exitCode).toBe(1);
+    expect(db.reads).toEqual([]);
+    expect(db.writes).toEqual([]);
+    expect(output).toContain("--confirm-project-ref");
+    expect(output).toMatch(/dry-run/);
+  });
+
+  it("거부 안내는 기대 ref 값을 알려 주지 않는다 - 복사해 붙여넣게 만들지 않는다", async () => {
+    for (const confirm of [null, "someotherproject"]) {
+      for (const apply of [false, true]) {
+        const db = createFakeDb(verifiedWorld);
+
+        const { report, output } = await run(db, { apply, confirmProjectRef: confirm });
+
+        expect(report.status).toBe("blocked");
+        expect(output).not.toContain(PROJECT_REF);
+        expect(report.blockers.join("\n")).not.toContain(PROJECT_REF);
+        expect(output).toMatch(/독립/);
+      }
+    }
+  });
+
+  it("확인한 ref 가 접속한 프로젝트와 다르면 거부하고, 사용자가 넘긴 값만 되풀이한다", async () => {
     const db = createFakeDb(verifiedWorld);
 
     const { report, output } = await run(db, { apply: true, confirmProjectRef: "someotherproject" });
@@ -809,8 +904,8 @@ describe("seedMockExam 프로젝트 ref 확인", () => {
     expect(report.status).toBe("blocked");
     expect(db.reads).toEqual([]);
     expect(db.writes).toEqual([]);
-    expect(output).toContain(PROJECT_REF);
     expect(output).toContain("someotherproject");
+    expect(output).not.toContain(PROJECT_REF);
   });
 
   it("dry-run 에서도 틀린 ref 를 주면 조기에 드러낸다", async () => {
@@ -821,6 +916,15 @@ describe("seedMockExam 프로젝트 ref 확인", () => {
     expect(report.status).toBe("blocked");
     expect(report.exitCode).toBe(1);
     expect(db.reads).toEqual([]);
+  });
+
+  it("ref 가 일치할 때만 접속 프로젝트 ref 를 정보 출력에 보여준다", async () => {
+    const db = createFakeDb(verifiedWorld);
+
+    const { report, output } = await run(db);
+
+    expect(report.status).toBe("dry-run");
+    expect(output).toContain(`project ref: ${PROJECT_REF}`);
   });
 
   it("접속 정보가 없는데 --apply 하면 거부한다", async () => {
@@ -841,14 +945,36 @@ describe("seedMockExam 프로젝트 ref 확인", () => {
     expect(lines.join("\n")).toMatch(/접속 정보/);
   });
 
+  it("접속 정보 없는 오프라인 dry-run 은 ref 확인 없이 허용한다 (DB 에 닿지 않는다)", async () => {
+    const lines: string[] = [];
+
+    const report = await seedMockExam({
+      client: null,
+      spec,
+      instructorId: INSTRUCTOR,
+      apply: false,
+      projectRef: null,
+      confirmProjectRef: null,
+      now: () => NOW,
+      generateCode: () => "AAAAAA",
+      out: (l) => lines.push(l),
+    });
+
+    expect(report.status).toBe("dry-run");
+    expect(report.exitCode).toBe(0);
+  });
+
   it("ref 비교는 정확히 일치해야 한다 (대소문자, 앞뒤 공백, 접두 일치 모두 불일치)", async () => {
     for (const confirm of [PROJECT_REF.toUpperCase(), ` ${PROJECT_REF}`, PROJECT_REF.slice(0, 8), `${PROJECT_REF}x`]) {
-      const db = createFakeDb(verifiedWorld);
+      for (const apply of [false, true]) {
+        const db = createFakeDb(verifiedWorld);
 
-      const { report } = await run(db, { apply: true, confirmProjectRef: confirm });
+        const { report } = await run(db, { apply, confirmProjectRef: confirm });
 
-      expect(report.status).toBe("blocked");
-      expect(db.writes).toEqual([]);
+        expect(report.status).toBe("blocked");
+        expect(db.reads).toEqual([]);
+        expect(db.writes).toEqual([]);
+      }
     }
   });
 });
@@ -1035,6 +1161,170 @@ describe("seedMockExam --apply", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// INSERT 응답 유실: 서버는 커밋했는데 호출자는 오류만 받는 경우
+//
+// postgrest-js 는 fetch 가 실패해도 던지지 않고 `{ error: { message: "TypeError: fetch failed",
+// code: "" } }` 를 돌려준다. PG 오류 코드가 없으면 "INSERT 가 거부됐다" 가 아니라 "결과를 모른다" 다.
+// 모르는 채로 "쓴 행이 없다" 고 말하면 고아 exams 행이 남고, 재실행하면 같은 제목 가드가 중복을
+// 만들게 안내하게 된다.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("seedMockExam INSERT 응답 유실", () => {
+  const apply = { apply: true, confirmProjectRef: PROJECT_REF } as const;
+  const LOST = { code: "", message: "TypeError: fetch failed" };
+  const wrote = (db: ReturnType<typeof createFakeDb>) => db.writes.map((w) => `${w.op}:${w.table}`);
+
+  it("서버가 커밋했고 재조회로 행이 보이면 그 행을 이어서 써서 노드까지 만든다 (INSERT 를 다시 하지 않는다)", async () => {
+    const db = createFakeDb(verifiedWorld, {
+      commitThenFail: (table, _p, n) => (table === "exams" && n === 1 ? LOST : null),
+    });
+
+    const { report, output } = await run(db, apply);
+
+    expect(report.status).toBe("applied");
+    expect(report.exitCode).toBe(0);
+    expect(report.ambiguousInsert).toBe("adopted");
+    // 재시도 INSERT(=중복 시험)도, 삭제도 없다. 쓰기는 exams 1건과 노드 1건뿐이다.
+    expect(wrote(db)).toEqual(["insert:exams", "insert:exam_nodes"]);
+    expect(db.tables.exams).toHaveLength(1);
+    const examId = String(db.tables.exams[0].id);
+    expect(db.tables.exam_nodes.find((n) => n.exam_id === examId)).toBeTruthy();
+    expect(report.result).toMatchObject({ examId, code: "AAAAAA" });
+    expect(output).toContain(examId);
+    expect(output).toMatch(/응답.*유실/);
+    expect(report.warnings.join("\n")).toMatch(/유실/);
+  });
+
+  it("요청 Promise 가 거부돼도 같은 방식으로 재조회해 이어 쓴다", async () => {
+    const db = createFakeDb(verifiedWorld, {
+      commitThenThrow: (table, _p, n) => (table === "exams" && n === 1 ? new Error("socket hang up") : null),
+    });
+
+    const { report } = await run(db, apply);
+
+    expect(report.status).toBe("applied");
+    expect(report.ambiguousInsert).toBe("adopted");
+    expect(wrote(db)).toEqual(["insert:exams", "insert:exam_nodes"]);
+  });
+
+  it("서버가 커밋하지 않았고 재조회에도 행이 없으면 실패로 끝내고, 아무것도 지우지 않는다", async () => {
+    const db = createFakeDb(verifiedWorld, {
+      failInsert: (table, _p, n) => (table === "exams" && n === 1 ? LOST : null),
+    });
+
+    const { report, output } = await run(db, apply);
+
+    expect(report.status).toBe("failed");
+    expect(report.exitCode).toBe(1);
+    expect(report.ambiguousInsert).toBe("absent");
+    expect(wrote(db)).toEqual(["insert:exams"]);
+    expect(db.tables.exams).toEqual([]);
+    expect(output).toContain("AAAAAA");
+    expect(output).toMatch(/재조회/);
+    // 확인된 사실만 말한다: 행이 없음이 확인됐고, 늦게 커밋될 가능성은 다시 조회하라고 안내한다.
+    expect(output).not.toMatch(/결과 불명/);
+    expect(output).toMatch(/다시 실행하기 전에/);
+  });
+
+  it("재조회까지 실패하면 '결과 불명, 수동 확인 필요' 로 비정상 종료하고 아무것도 더 쓰지 않는다", async () => {
+    const db = createFakeDb(verifiedWorld, {
+      commitThenFail: (table, _p, n) => (table === "exams" && n === 1 ? LOST : null),
+      failRead: (table, ctx) => (table === "exams" && ctx.writes.length > 0 ? LOST : null),
+    });
+
+    const { report, output } = await run(db, apply);
+
+    expect(report.status).toBe("failed");
+    expect(report.exitCode).toBe(1);
+    expect(report.ambiguousInsert).toBe("unknown");
+    expect(report.result).toBeNull();
+    expect(output).toMatch(/결과 불명/);
+    expect(output).toMatch(/수동 확인 필요/);
+    expect(output).toMatch(/코드 AAAAAA/);
+    // 어느 쪽인지 모르는 채로 노드를 만들지도, 지우지도 않는다.
+    expect(wrote(db)).toEqual(["insert:exams"]);
+    expect(db.tables.exams).toHaveLength(1);
+    // 재실행 안내: 확인 전에는 --allow-duplicate-title 로 우회하지 말라.
+    expect(output).toMatch(/확인 전에는.*--allow-duplicate-title/);
+  });
+
+  it("23505 로 코드를 바꾼 뒤의 시도에서 응답이 유실돼도, 그때 쓴 코드로 재조회한다", async () => {
+    const db = createFakeDb(verifiedWorld, {
+      failInsert: (table, _p, n) => (table === "exams" && n === 1 ? { code: "23505", message: "duplicate key" } : null),
+      commitThenFail: (table, _p, n) => (table === "exams" && n === 2 ? LOST : null),
+    });
+
+    const { report } = await run(db, apply);
+
+    expect(report.status).toBe("applied");
+    expect(report.ambiguousInsert).toBe("adopted");
+    expect(report.result?.code).toBe("BBBBBB");
+    expect(db.tables.exams).toHaveLength(1);
+    expect(db.tables.exams[0].code).toBe("BBBBBB");
+  });
+
+  it("그 코드를 다른 소유자의 시험이 쓰고 있으면 우리 행이 아니다 - 남의 행은 건드리지 않는다", async () => {
+    const db = createFakeDb(verifiedWorld, {
+      failInsert: (table, payload, n, ctx) => {
+        if (table !== "exams" || n !== 1) return null;
+        ctx.tables.exams.push({ id: "other-1", code: payload.code, title: "다른 시험", instructor_id: OTHER_INSTRUCTOR });
+        return LOST;
+      },
+    });
+
+    const { report, output } = await run(db, apply);
+
+    expect(report.status).toBe("failed");
+    expect(report.ambiguousInsert).toBe("absent");
+    expect(output).toMatch(/다른 시험이 쓰고 있/);
+    expect(wrote(db)).toEqual(["insert:exams"]);
+    expect(db.tables.exams.map((r) => r.id)).toEqual(["other-1"]);
+  });
+
+  it("이어 쓴 행에 노드를 만들지 못하면 그 행을 보상 삭제한다", async () => {
+    const db = createFakeDb(verifiedWorld, {
+      commitThenFail: (table, _p, n) => (table === "exams" && n === 1 ? LOST : null),
+      failInsert: (table) => (table === "exam_nodes" ? { code: "XX000", message: "node failed" } : null),
+    });
+
+    const { report } = await run(db, apply);
+
+    expect(report.status).toBe("failed");
+    expect(report.compensation).toBe("deleted");
+    expect(wrote(db)).toEqual(["insert:exams", "insert:exam_nodes", "delete:exams"]);
+    expect(db.tables.exams).toEqual([]);
+  });
+
+  it("PG 오류 코드가 있는 거부는 재조회 없이 '쓴 행이 없다' 로 끝낸다", async () => {
+    let readsAfterInsert = 0;
+    const db = createFakeDb(verifiedWorld, {
+      failInsert: (table) => (table === "exams" ? { code: "42501", message: "denied" } : null),
+      failRead: (_table, ctx) => {
+        if (ctx.writes.length > 0) readsAfterInsert++;
+        return null;
+      },
+    });
+
+    const { report, output } = await run(db, apply);
+
+    expect(report.status).toBe("failed");
+    expect(report.ambiguousInsert).toBe("none");
+    expect(readsAfterInsert).toBe(0);
+    expect(output).toMatch(/쓴 행이 없/);
+  });
+
+  it("코드 없는 오류(undefined)도 '모름' 으로 다룬다", async () => {
+    const db = createFakeDb(verifiedWorld, {
+      commitThenFail: (table, _p, n) => (table === "exams" && n === 1 ? { message: "Bad Gateway" } : null),
+    });
+
+    const { report } = await run(db, apply);
+
+    expect(report.ambiguousInsert).toBe("adopted");
+    expect(report.status).toBe("applied");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 오프라인 dry-run
 // ─────────────────────────────────────────────────────────────────────────────
 describe("seedMockExam 오프라인 (client 없음)", () => {
@@ -1071,12 +1361,16 @@ describe("main", () => {
   function harness(
     argv: string[],
     env: Record<string, string | undefined>,
-    opts: { specText?: string; db?: ReturnType<typeof createFakeDb> } = {}
+    opts: {
+      specText?: string;
+      db?: ReturnType<typeof createFakeDb>;
+      createClientImpl?: () => SupabaseClient;
+    } = {}
   ) {
     const out: string[] = [];
     const err: string[] = [];
     const db = opts.db ?? createFakeDb(verifiedWorld);
-    const createClient = vi.fn(() => db.client);
+    const createClient = vi.fn(opts.createClientImpl ?? (() => db.client));
     const readFile = vi.fn((p: string) => {
       if (p !== "spec.json") throw new Error(`ENOENT: ${p}`);
       return opts.specText ?? specJson;
@@ -1100,16 +1394,74 @@ describe("main", () => {
     expect(h.out.join("\n")).toContain("dry-run");
   });
 
-  it("접속 정보가 있어도 --apply 가 없으면 쓰지 않는다", async () => {
-    const h = harness(baseArgv, {
+  it("접속한 dry-run 은 일치하는 --confirm-project-ref 가 있으면 읽기만 하고 쓰지 않는다", async () => {
+    const h = harness([...baseArgv, "--confirm-project-ref", PROJECT_REF], {
       SUPABASE_URL: `https://${PROJECT_REF}.supabase.co`,
       SUPABASE_SERVICE_ROLE_KEY: SECRET_KEY,
     });
 
     expect(await h.code).toBe(0);
     expect(h.createClient).toHaveBeenCalledTimes(1);
+    expect(h.db.reads.length).toBeGreaterThan(0);
     expect(h.db.writes).toEqual([]);
     expect(h.out.join("\n")).toContain(`project ref: ${PROJECT_REF}`);
+  });
+
+  it("접속한 dry-run 에 --confirm-project-ref 가 없으면 DB 를 읽지 않고 1 로 끝난다", async () => {
+    const h = harness(baseArgv, {
+      SUPABASE_URL: `https://${PROJECT_REF}.supabase.co`,
+      SUPABASE_SERVICE_ROLE_KEY: SECRET_KEY,
+    });
+
+    expect(await h.code).toBe(1);
+    // createClient 는 객체를 만들 뿐 네트워크에 나가지 않는다. 읽기와 쓰기가 0건인 것이 증거다.
+    expect(h.db.reads).toEqual([]);
+    expect(h.db.writes).toEqual([]);
+    const shown = [...h.out, ...h.err].join("\n");
+    expect(shown).toContain("--confirm-project-ref");
+    expect(shown).not.toContain(PROJECT_REF);
+    expect(shown).not.toContain(SECRET_KEY);
+  });
+
+  it("접속한 dry-run 의 ref 가 틀리면 DB 를 읽지 않고 1 로 끝난다", async () => {
+    const h = harness([...baseArgv, "--confirm-project-ref", "wrongref"], {
+      SUPABASE_URL: `https://${PROJECT_REF}.supabase.co`,
+      SUPABASE_SERVICE_ROLE_KEY: SECRET_KEY,
+    });
+
+    expect(await h.code).toBe(1);
+    expect(h.db.reads).toEqual([]);
+    expect(h.db.writes).toEqual([]);
+  });
+
+  it("지원하지 않는 URL(커스텀 도메인 등)은 2 로 끝나고 클라이언트를 만들지 않는다", async () => {
+    const h = harness(baseArgv, {
+      SUPABASE_URL: "https://db.quest-on.example",
+      SUPABASE_SERVICE_ROLE_KEY: SECRET_KEY,
+    });
+
+    expect(await h.code).toBe(2);
+    expect(h.createClient).not.toHaveBeenCalled();
+    expect(h.err.join("\n")).toMatch(/커스텀 도메인/);
+  });
+
+  it("클라이언트 생성이 던지면 예외 없이 2 로 끝나고 키는 출력하지 않는다", async () => {
+    const h = harness(
+      [...baseArgv, "--confirm-project-ref", PROJECT_REF],
+      { SUPABASE_URL: `https://${PROJECT_REF}.supabase.co`, SUPABASE_SERVICE_ROLE_KEY: SECRET_KEY },
+      {
+        createClientImpl: () => {
+          throw new Error(`Invalid supabaseKey: ${SECRET_KEY}`);
+        },
+      }
+    );
+
+    await expect(h.code).resolves.toBe(2);
+    const shown = [...h.out, ...h.err].join("\n");
+    expect(shown).toContain("Invalid supabaseKey");
+    expect(shown).not.toContain(SECRET_KEY);
+    expect(h.db.reads).toEqual([]);
+    expect(h.db.writes).toEqual([]);
   });
 
   it("--apply 와 일치하는 --confirm-project-ref 가 있으면 쓴다", async () => {
@@ -1220,6 +1572,13 @@ describe("스크립트 소스 가드", () => {
     expect(SCRIPT_SOURCE).not.toMatch(/status:\s*["']running["']/);
     expect(SCRIPT_SOURCE).not.toMatch(/started_at\s*:/);
     expect(SCRIPT_SOURCE).not.toMatch(/first_published_at\s*:/);
+  });
+
+  it("머리 주석이 createExamSchema 와 제목 정제가 다르다는 사실을 밝힌다", () => {
+    // 스키마는 title 에 sanitizeUserInput(태그 제거·엔티티 해제)을 적용하고 이 스크립트는 trim 만 한다.
+    const header = SCRIPT_SOURCE.slice(0, SCRIPT_SOURCE.indexOf("import "));
+    expect(header).toContain("sanitizeUserInput");
+    expect(header).toMatch(/trim/);
   });
 
   it("예시 스펙은 합성 데이터임을 스스로 밝힌다", () => {

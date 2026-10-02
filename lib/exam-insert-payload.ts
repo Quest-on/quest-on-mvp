@@ -78,8 +78,10 @@ export type ExamInsertInput<Q extends { type?: string | null } = ExamInsertQuest
   /** false 도 그대로 싣는다. `undefined` 일 때만 키를 뺀다 (DB 기본값 false). */
   rubric_public?: boolean;
   /**
-   * INSERT 에 직접 싣는 호출자용(시드 스크립트, 시험 복사).
+   * INSERT 에 직접 싣는 호출자용. 지금 쓰는 곳은 시드 스크립트(`scripts/seed-mock-exam.ts`)뿐이다.
    * `createExam` 은 넘기지 않는다 - 기본 `ko` 는 DB 기본값에 맡기고 `en` 만 INSERT 뒤 UPDATE 로 쓴다.
+   * (시험 복사 `copyExam` 은 이 빌더를 쓰지 않는다. `lib/exam-copy.ts` 의 `buildCopiedExamPayload`
+   * 가 language 를 자기 페이로드에 직접 싣는다.)
    */
   language?: "ko" | "en";
   /**
