@@ -8,18 +8,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildStudentChatSystemPrompt } from "@/lib/prompts";
 import {
+  CURRENT_ANALYSIS_PARTNER_SPEC_ID,
   CURRENT_STUDENT_CHAT_SPEC_ID,
   STUDENT_CHAT_SPECS,
   TEMPLATE_SHA_LENGTH,
   buildResponseModelStamp,
   buildStudentChatSpecStamp,
+  getCurrentAnalysisPartnerSpec,
   getCurrentStudentChatSpec,
   getStudentChatSpec,
 } from "@/lib/student-chat-spec";
 
 describe("스펙 레지스트리", () => {
-  it("현재는 case@1 하나뿐이다", () => {
-    expect(Object.keys(STUDENT_CHAT_SPECS)).toEqual(["case@1"]);
+  it("현재는 case@1 과 analysis-partner@1 두 개다 (#519 가 분석 파트너를 더했다)", () => {
+    expect(Object.keys(STUDENT_CHAT_SPECS)).toEqual(["case@1", "analysis-partner@1"]);
     expect(CURRENT_STUDENT_CHAT_SPEC_ID).toBe("case@1");
     expect(getCurrentStudentChatSpec()).toBe(STUDENT_CHAT_SPECS["case@1"]);
     expect(getStudentChatSpec("case@1")).toBe(STUDENT_CHAT_SPECS["case@1"]);
@@ -156,6 +158,51 @@ describe("buildResponseModelStamp", () => {
     expect(buildResponseModelStamp(response, REQUESTED)).toEqual({
       response_model: REQUESTED,
       response_model_source: "request",
+    });
+  });
+});
+
+describe("analysis-partner@1 스펙 (이슈 #519)", () => {
+  const spec = STUDENT_CHAT_SPECS["analysis-partner@1"];
+
+  it("분석 파트너 포인터는 사례형 포인터와 따로 있고 각자 자기 스펙을 가리킨다", () => {
+    expect(CURRENT_ANALYSIS_PARTNER_SPEC_ID).toBe("analysis-partner@1");
+    expect(getCurrentAnalysisPartnerSpec()).toBe(spec);
+    expect(getStudentChatSpec("analysis-partner@1")).toBe(spec);
+    expect(CURRENT_STUDENT_CHAT_SPEC_ID).toBe("case@1");
+  });
+
+  it("모델 선택 방식과 추론 강도 기록은 사례형과 같다 (이 PR 은 모델을 바꾸지 않는다)", () => {
+    expect(spec.model).toEqual(STUDENT_CHAT_SPECS["case@1"].model);
+    expect(spec.effort).toBe("unspecified");
+    expect(spec.effortLabel).toBe("미지정(공급사 기본값)");
+  });
+
+  it("레지스트리의 모든 스펙은 불변이고 렌더 해시를 가진다", () => {
+    for (const id of Object.keys(STUDENT_CHAT_SPECS) as Array<keyof typeof STUDENT_CHAT_SPECS>) {
+      const each = STUDENT_CHAT_SPECS[id];
+      expect(each.id).toBe(id);
+      expect(Object.isFrozen(each), id).toBe(true);
+      expect(Object.isFrozen(each.model), id).toBe(true);
+      expect(Object.isFrozen(each.renderSha256), id).toBe(true);
+      expect(each.renderSha256.ko, id).toMatch(/^[0-9a-f]{64}$/);
+    }
+    expect(() => {
+      (spec as { note: string }).note = "덮어쓰기";
+    }).toThrow(TypeError);
+  });
+
+  it("스탬프는 spec 과 ko 템플릿 해시 앞 16자와 effort 를 돌려준다", () => {
+    expect(buildStudentChatSpecStamp({ specId: "analysis-partner@1", language: "ko" })).toEqual({
+      spec: "analysis-partner@1",
+      template_sha: spec.renderSha256.ko.slice(0, 16),
+      effort: "unspecified",
+    });
+  });
+
+  it("영어 템플릿이 없으므로 영어를 물어도 ko 해시를 돌려준다 (영어 시험은 애초에 이 스펙에 오지 않는다)", () => {
+    expect(buildStudentChatSpecStamp({ specId: "analysis-partner@1", language: "en" })).toMatchObject({
+      template_sha: spec.renderSha256.ko.slice(0, 16),
     });
   });
 });

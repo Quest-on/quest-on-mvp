@@ -40,6 +40,8 @@ import {
   classifyRagState,
 } from "@/lib/chat-instructions";
 import { STUDENT_CHAT_SPECS } from "@/lib/student-chat-spec";
+import { buildAnalysisPartnerV1SystemPrompt } from "@/lib/prompts-analysis-partner";
+import { resolveExamAiProfile } from "@/lib/exam-ai-profile";
 
 /** 출력 문자열을 있는 그대로 해시한다 (줄바꿈 정규화 없음). */
 function sha256(text: string): string {
@@ -304,14 +306,19 @@ describe("스펙 레지스트리의 렌더 해시", () => {
   });
 
   it.each(Object.values(STUDENT_CHAT_SPECS))(
-    "$id 의 빌더를 전체 입력으로 렌더한 SHA-256 이 그 스펙의 renderSha256 과 같다 (ko/en)",
+    "$id 의 빌더를 전체 입력으로 렌더한 SHA-256 이 그 스펙의 renderSha256 과 같다 (스펙이 가진 언어)",
     (spec) => {
-      for (const language of ["ko", "en"] as const) {
+      // 스펙이 가진 언어만 본다. 분석 파트너(analysis-partner@1)는 한국어 본문 하나뿐이라 `en` 키가
+      // 없다(영어 시험은 사례형으로 폴백한다). 키가 없는 언어를 렌더해 비교하지는 않는다.
+      const languages = Object.keys(spec.renderSha256) as Array<keyof typeof spec.renderSha256>;
+      expect(languages, `${spec.id} 는 ko 해시를 가져야 한다`).toContain("ko");
+      for (const language of languages) {
+        const expected = spec.renderSha256[language] as string;
         const actual = sha256(spec.build({ ...FULL_INPUT, language }));
         expect(
           actual,
-          `${CHANGE_NOTICE}\n  스펙: ${spec.id} (${language})\n  renderSha256: ${spec.renderSha256[language]}\n  현재값: ${actual}`
-        ).toBe(spec.renderSha256[language]);
+          `${CHANGE_NOTICE}\n  스펙: ${spec.id} (${language})\n  renderSha256: ${expected}\n  현재값: ${actual}`
+        ).toBe(expected);
       }
     }
   );
@@ -480,6 +487,142 @@ describe("buildStudentChatSystemPrompt 현행본 스냅샷 (사람이 diff 로 �
   // 해시 테스트가 먼저 실패해 이유를 알려 준다. 이 스냅샷은 "무엇이 바뀌었는지" 를 PR diff 로
   // 보여 주기 위한 것이라 같은 변경에서 함께 갱신된다 (`npx vitest run -u <이 파일>`).
   it.each(BUILDER_LOCKS.filter((lock) => lock.snapshot))("$name 렌더가 스냅샷과 같다", async ({ render, snapshot }) => {
+    await expect(render()).toMatchFileSnapshot(snapshot as string);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 분석 파트너 analysis-partner@1 (이슈 #519)
+//
+// 사례형과 같은 방식으로 잠근다: 고정 입력 두 벌(최소, 전체)의 렌더 SHA-256 과 사람이 읽는 스냅샷.
+// 입력은 위 사례형과 같은 MINIMAL_INPUT, FULL_INPUT 이다(전체 입력에는 공개 루브릭이 있어 8절이 들어간다).
+// 이 값은 새 자산을 렌더해 측정한 기준값이다. 본문은 초안 3.2절을 옮긴 것이고, 독립 리뷰(PR #522)를 반영해
+// 3절(도구 없음 문단)과 10절 4번을 고친 뒤에 다시 측정했다. `analysis-partner@1` 은 그때까지 어떤 응답에도 쓰이지
+// 않았으므로 @2 없이 @1 을 고쳤다. 이후에는 이 해시를 고치려면 새 스펙 버전을 낸다.
+// ---------------------------------------------------------------------------
+
+const PARTNER_KO_FULL_SHA256 = "51256c0ed3a92cfefa9e7a2b0857e561567817ad204637619ef6b6edb6dadbfa";
+
+const PARTNER_BUILDER_LOCKS: LockCase[] = [
+  {
+    name: "분석 파트너 ko 최소",
+    render: () => buildAnalysisPartnerV1SystemPrompt(MINIMAL_INPUT),
+    sha256: "142d8743915742aa0ec18513ad0f02081b03ca5474c56275cbcd3370b0d370cf",
+    snapshot: "./__snapshots__/prompt-assets-lock/analysis-partner.ko.minimal.txt",
+  },
+  {
+    name: "분석 파트너 ko 전체",
+    render: () => buildAnalysisPartnerV1SystemPrompt(FULL_INPUT),
+    sha256: PARTNER_KO_FULL_SHA256,
+    snapshot: "./__snapshots__/prompt-assets-lock/analysis-partner.ko.full.txt",
+  },
+];
+
+describe("analysis-partner@1 빌더 해시 잠금", () => {
+  it.each(PARTNER_BUILDER_LOCKS)("$name 입력의 렌더 SHA-256 이 기준값과 같다", ({ name, render, sha256: expected }) => {
+    const actual = sha256(render());
+    expect(
+      actual,
+      `${CHANGE_NOTICE}\n  대상: buildAnalysisPartnerV1SystemPrompt (${name})\n  기준값: ${expected}\n  현재값: ${actual}`
+    ).toBe(expected);
+  });
+
+  it("같은 입력을 두 번 렌더하면 같고 CR 이 섞이지 않는다", () => {
+    for (const { render } of PARTNER_BUILDER_LOCKS) {
+      expect(render()).toBe(render());
+      expect(render()).not.toContain("\r");
+    }
+  });
+
+  it("스펙의 도구 상태를 따로 주지 않아도 v1 은 도구 없음으로 고정이다 (@1 의 출력은 입력의 tools 로 바뀌지 않는다)", () => {
+    expect(buildAnalysisPartnerV1SystemPrompt({ ...FULL_INPUT, tools: { kind: "none" } })).toBe(
+      buildAnalysisPartnerV1SystemPrompt(FULL_INPUT)
+    );
+    // 타입을 우회해 다른 도구 상태를 넣어도 @1 의 문단은 그대로다.
+    expect(buildAnalysisPartnerV1SystemPrompt({ ...FULL_INPUT, tools: { kind: "hosted_python" } as never })).toBe(
+      buildAnalysisPartnerV1SystemPrompt(FULL_INPUT)
+    );
+  });
+});
+
+describe("스펙 레지스트리: analysis-partner@1", () => {
+  const spec = STUDENT_CHAT_SPECS["analysis-partner@1"];
+
+  it("렌더 해시(ko)는 전체 입력 렌더의 기준값과 같고 영어 템플릿은 없다 (v1 은 한국어만)", () => {
+    expect(spec.renderSha256.ko, CHANGE_NOTICE).toBe(PARTNER_KO_FULL_SHA256);
+    expect(spec.renderSha256.ko).toMatch(/^[0-9a-f]{64}$/);
+    expect("en" in spec.renderSha256).toBe(false);
+  });
+
+  it("빌더는 v1 전용 함수다", () => {
+    expect(spec.id).toBe("analysis-partner@1");
+    expect(spec.mode).toBe("analysis-partner");
+    expect(spec.build).toBe(buildAnalysisPartnerV1SystemPrompt);
+    expect(spec.note.length).toBeGreaterThan(0);
+  });
+});
+
+describe("assembleStudentChatInstructions 분석 파트너 세 상태 해시 잠금", () => {
+  const PARTNER_PROFILE = resolveExamAiProfile({
+    exam: { questions: [{ ai_role: "analysis_partner" }], language: "ko" },
+    qIdx: 0,
+  });
+  const ROUTE_LIKE_INPUT = {
+    examTitle: "시험 제목",
+    examCode: "TST001",
+    questionId: "q-1",
+    currentQuestionText: "문제 본문입니다",
+    currentQuestionAiContext: "채점 맥락",
+  };
+  const MATERIALS = "[자료 1: a.pdf]\n자료 본문입니다";
+
+  type State = "no_materials" | "low_relevance" | "normal";
+  const RAG: Record<State, { relevantMaterialsText: string; resultsCount: number; topSimilarity: number | null }> = {
+    no_materials: { relevantMaterialsText: "", resultsCount: 0, topSimilarity: null },
+    low_relevance: { relevantMaterialsText: MATERIALS, resultsCount: 1, topSimilarity: 0.25 },
+    normal: { relevantMaterialsText: MATERIALS, resultsCount: 1, topSimilarity: 0.5 },
+  };
+
+  const PINS: Array<{ state: State; sha256: string }> = [
+    { state: "no_materials", sha256: "7d440540583f6511b54392d1d5a5256a9fb11585495c1778f4e37b2dd1fcec70" },
+    { state: "low_relevance", sha256: "c19cff3e016b6c85547aba38d01b5aba291779df6a44a1ae990e1c578bb94f36" },
+    { state: "normal", sha256: "c19cff3e016b6c85547aba38d01b5aba291779df6a44a1ae990e1c578bb94f36" },
+  ];
+
+  it.each(PINS)("ko / $state 의 최종 지시문 SHA-256 이 기준값과 같다", ({ state, sha256: expected }) => {
+    const { instructions } = assembleStudentChatInstructions({
+      ...ROUTE_LIKE_INPUT,
+      language: "ko",
+      rag: RAG[state],
+      profile: PARTNER_PROFILE,
+    });
+    const actual = sha256(instructions);
+    expect(
+      actual,
+      `${CHANGE_NOTICE}\n  대상: assembleStudentChatInstructions (분석 파트너, ${state})\n  기준값: ${expected}\n  현재값: ${actual}`
+    ).toBe(expected);
+  });
+
+  it("자료 검색 상태가 달라도 덧붙는 문장이 없다 (관련성 낮음과 정상의 지시문이 같다)", () => {
+    const low = assembleStudentChatInstructions({
+      ...ROUTE_LIKE_INPUT,
+      language: "ko",
+      rag: RAG.low_relevance,
+      profile: PARTNER_PROFILE,
+    });
+    const normal = assembleStudentChatInstructions({
+      ...ROUTE_LIKE_INPUT,
+      language: "ko",
+      rag: RAG.normal,
+      profile: PARTNER_PROFILE,
+    });
+    expect(low.instructions).toBe(normal.instructions);
+  });
+});
+
+describe("analysis-partner@1 스냅샷 (사람이 diff 로 읽는 용도)", () => {
+  // 해시 테스트가 먼저 실패해 이유를 알려 준다. 이 스냅샷은 PR diff 로 무엇이 바뀌었는지 보여 주기 위한 것이다.
+  it.each(PARTNER_BUILDER_LOCKS)("$name 렌더가 스냅샷과 같다", async ({ render, snapshot }) => {
     await expect(render()).toMatchFileSnapshot(snapshot as string);
   });
 });

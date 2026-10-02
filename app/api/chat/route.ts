@@ -10,6 +10,7 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { searchRelevantMaterials } from "@/lib/material-search";
 import type { PromptLanguage } from "@/lib/prompts";
 import { assembleStudentChatInstructions } from "@/lib/chat-instructions";
+import { resolveExamAiProfile, type ResolvedExamAiProfile } from "@/lib/exam-ai-profile";
 import {
   buildResponseModelStamp,
   buildStudentChatSpecStamp,
@@ -437,6 +438,8 @@ async function handleChatLogic(params: {
   currentQuestionAiContext?: string;
   userId?: string;
   language?: PromptLanguage;
+  /** 이 문항의 AI 역할. 안 주면 사례형(현행). 두 경로 모두 서버가 로드한 시험 행에서 해석한다. */
+  aiProfile?: ResolvedExamAiProfile;
 }): Promise<{
   aiResponse: string;
   responseId: string;
@@ -456,6 +459,7 @@ async function handleChatLogic(params: {
     currentQuestionAiContext,
     userId,
     language,
+    aiProfile,
   } = params;
   const warnings: string[] = [];
 
@@ -523,6 +527,7 @@ async function handleChatLogic(params: {
     currentQuestionAiContext,
     language,
     rag,
+    profile: aiProfile,
   });
 
   const { response: aiResponse, responseId, tokensUsed, usage, stamp } = await getAIResponse(
@@ -710,6 +715,8 @@ export async function POST(request: NextRequest) {
       // (ai_context)를 서버에서 직접 파생하기 위함(클라이언트는 ai_context 를 받지 않음).
       let tempExamLanguage: PromptLanguage = "ko";
       let currentQuestionAiContext: string | undefined;
+      // 시험 행을 못 얻으면(examId 없음, 조회 실패) 역할도 못 정하므로 사례형(현행)이다.
+      let tempAiProfile: ResolvedExamAiProfile | undefined;
       if (examId) {
         const { data: examLangRow } = await getSupabase()
           .from("exams")
@@ -723,6 +730,10 @@ export async function POST(request: NextRequest) {
           examLangRow?.questions,
           safeQIdx
         );
+        tempAiProfile = resolveExamAiProfile({
+          exam: { language: examLangRow?.language, questions: examLangRow?.questions },
+          qIdx: safeQIdx,
+        });
       }
 
       // temp_로 남아있는 경우(DB 적재 불가): AI 응답은 하되 DB 저장은 생략
@@ -748,6 +759,7 @@ export async function POST(request: NextRequest) {
           currentQuestionAiContext,
           language: tempExamLanguage,
           rag,
+          profile: tempAiProfile,
         });
 
         const previousResponseId = null;
@@ -784,6 +796,7 @@ export async function POST(request: NextRequest) {
         currentQuestionAiContext,
         userId: user?.id ?? studentId,
         language: tempExamLanguage,
+        aiProfile: tempAiProfile,
       });
 
       return successJson({
@@ -860,6 +873,13 @@ export async function POST(request: NextRequest) {
     // 서버가 로드한 원본 exam.questions 에서 직접 파생한다.
     const currentQuestionAiContext = extractQuestionAiContext(exam.questions, safeQIdx);
 
+    // 이 문항의 AI 역할(문항 JSON 의 ai_role). 분석 파트너는 ai_role 이 analysis_partner 이고 시험 언어가
+    // ko 일 때만이다. 그 밖(키 없음, 알 수 없는 값, 영어 시험)은 사례형(현행)이다.
+    const aiProfile = resolveExamAiProfile({
+      exam: { language: exam.language, questions: exam.questions },
+      qIdx: safeQIdx,
+    });
+
     const { aiResponse, warnings } = await handleChatLogic({
       sessionId,
       message,
@@ -873,6 +893,7 @@ export async function POST(request: NextRequest) {
       currentQuestionAiContext,
       userId: user?.id ?? session.student_id,
       language: examLanguage,
+      aiProfile,
     });
 
     return successJson({
