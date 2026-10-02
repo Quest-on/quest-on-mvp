@@ -44,6 +44,13 @@
     "submitting": "Submitting...",
     "submitAriaLabel": "Submit exam"
   },
+  "rubric": {
+    "button": "Evaluation criteria",
+    "buttonAriaLabel": "View evaluation criteria",
+    "title": "Evaluation criteria for this exam",
+    "description": "Criteria shared by your instructor. Read-only.",
+    "close": "Close"
+  },
   "timer": {
     "ariaLabel": "Time remaining: {time}",
     "expiredTitle": "Time is up",
