@@ -306,14 +306,19 @@ describe("스펙 레지스트리의 렌더 해시", () => {
   });
 
   it.each(Object.values(STUDENT_CHAT_SPECS))(
-    "$id 의 빌더를 전체 입력으로 렌더한 SHA-256 이 그 스펙의 renderSha256 과 같다 (ko/en)",
+    "$id 의 빌더를 전체 입력으로 렌더한 SHA-256 이 그 스펙의 renderSha256 과 같다 (스펙이 가진 언어)",
     (spec) => {
-      for (const language of ["ko", "en"] as const) {
+      // 스펙이 가진 언어만 본다. 분석 파트너(analysis-partner@1)는 한국어 본문 하나뿐이라 `en` 키가
+      // 없다(영어 시험은 사례형으로 폴백한다). 키가 없는 언어를 렌더해 비교하지는 않는다.
+      const languages = Object.keys(spec.renderSha256) as Array<keyof typeof spec.renderSha256>;
+      expect(languages, `${spec.id} 는 ko 해시를 가져야 한다`).toContain("ko");
+      for (const language of languages) {
+        const expected = spec.renderSha256[language] as string;
         const actual = sha256(spec.build({ ...FULL_INPUT, language }));
         expect(
           actual,
-          `${CHANGE_NOTICE}\n  스펙: ${spec.id} (${language})\n  renderSha256: ${spec.renderSha256[language]}\n  현재값: ${actual}`
-        ).toBe(spec.renderSha256[language]);
+          `${CHANGE_NOTICE}\n  스펙: ${spec.id} (${language})\n  renderSha256: ${expected}\n  현재값: ${actual}`
+        ).toBe(expected);
       }
     }
   );
@@ -616,6 +621,6 @@ describe("assembleStudentChatInstructions 분석 파트너 세 상태 해시 잠
 describe("analysis-partner@1 스냅샷 (사람이 diff 로 읽는 용도)", () => {
   // 해시 테스트가 먼저 실패해 이유를 알려 준다. 이 스냅샷은 PR diff 로 무엇이 바뀌었는지 보여 주기 위한 것이다.
   it.each(PARTNER_BUILDER_LOCKS)("$name 렌더가 스냅샷과 같다", async ({ render, snapshot }) => {
-    await expect(normalizeNewlines(render())).toMatchFileSnapshot(snapshot);
+    await expect(render()).toMatchFileSnapshot(snapshot as string);
   });
 });
