@@ -229,10 +229,14 @@ describe.each(routes)("POST $label", ({ call, successStatus }) => {
 });
 
 describe("POST /api/upload 응답", () => {
-  it("스프레드시트도 원본 이름과 MIME 을 메타데이터로 돌려주고 같은 MIME 으로 저장한다", async () => {
+  it("스프레드시트도 공개 URL 과 원본 이름, MIME 메타를 돌려주고 같은 MIME 으로 저장한다", async () => {
     const { status, body } = await callUpload("data.xlsx", XLSX_MIME);
 
     expect(status).toBe(201);
+    expect(body.url).toMatch(
+      /^https:\/\/storage\.test\/public\/exam-materials\/instructor-instructor-1\/.*\.xlsx$/
+    );
+    expect(body.objectKey).toMatch(/^instructor-instructor-1\/.*\.xlsx$/);
     expect(body.meta).toEqual({ originalName: "data.xlsx", size: 3, mime: XLSX_MIME });
     expect(storageBucketMock.upload).toHaveBeenCalledWith(
       expect.stringMatching(/\.xlsx$/),
