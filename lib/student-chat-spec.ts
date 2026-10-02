@@ -26,6 +26,11 @@
  * 않고, 최종 지시문 해시 잠금(`prompt-assets-lock.test.ts`)만 깨진다. (분석 파트너에는 그 문장이 붙지
  * 않으므로 이 한계가 해당하지 않는다.)
  *
+ * 알려진 한계: 버전이 고정하는 것은 **본문**(빌더 안의 문자열)까지다. 지시문 머리에서 시험 제목, 문제, 교수 메모,
+ * 자료를 정리하는 `sanitizeForPrompt` 와 길이 상한 `FIELD_MAX_LENGTHS`(`lib/prompts.ts`)는 두 스펙이 함께 쓰는
+ * 살아 있는 코드라서, 그 함수를 바꾸면 `case@1` 과 `analysis-partner@1` 의 렌더가 같이 달라진다(해시 잠금이
+ * 깨져서 알려 주지만, 버전 번호로 구분되지는 않는다). 그 함수를 바꿀 때는 새 스펙 버전을 함께 낸다.
+ *
  * 이 PR 은 모델과 추론 강도를 **바꾸지 않는다.** 모델은 지금처럼 `AI_MODEL`(환경변수 또는 기본값)이
  * 정하고, 추론 강도는 요청에 넘기지 않아 공급사 기본값을 따른다. 아래 `model` 과 `effort` 는 그
  * 현재 동작을 **기록만** 한다. (`__tests__/student-chat-spec.test.ts` 가 기록과 실제가 같은지 본다.)
@@ -129,7 +134,7 @@ const ANALYSIS_PARTNER_V1: AnalysisPartnerStudentChatSpec = Object.freeze({
   effortLabel: "미지정(공급사 기본값)",
   build: buildAnalysisPartnerV1SystemPrompt,
   renderSha256: Object.freeze({
-    ko: "a7c9f3bb8ef0f2cb0d7e0971da17fde08fafe6c451e6c2109d856c6dba35d043",
+    ko: "0f991fcfcb8311d3d71e71dc2eca0ec423db5e1260fae100f16af114c2271b73",
   }),
   note: "분석 파트너 v1(2026-10-03). 한국어만, 도구 없음 문단. 자료 검색 경고 문장은 붙지 않는다. 문항 ai_role 이 analysis_partner 일 때만 쓴다.",
 });

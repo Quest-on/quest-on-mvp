@@ -496,16 +496,18 @@ describe("buildStudentChatSystemPrompt 현행본 스냅샷 (사람이 diff 로 �
 //
 // 사례형과 같은 방식으로 잠근다: 고정 입력 두 벌(최소, 전체)의 렌더 SHA-256 과 사람이 읽는 스냅샷.
 // 입력은 위 사례형과 같은 MINIMAL_INPUT, FULL_INPUT 이다(전체 입력에는 공개 루브릭이 있어 8절이 들어간다).
-// 이 값은 새 자산의 첫 렌더에서 측정한 기준값이다. 본문은 초안 3.2절(도구 없음 변형)을 옮긴 것이다.
+// 이 값은 새 자산을 렌더해 측정한 기준값이다. 본문은 초안 3.2절을 옮긴 것이고, 독립 리뷰(PR #522)를 반영해
+// 3절(도구 없음 문단)과 10절 4번을 고친 뒤에 다시 측정했다. `analysis-partner@1` 은 그때까지 어떤 응답에도 쓰이지
+// 않았으므로 @2 없이 @1 을 고쳤다. 이후에는 이 해시를 고치려면 새 스펙 버전을 낸다.
 // ---------------------------------------------------------------------------
 
-const PARTNER_KO_FULL_SHA256 = "a7c9f3bb8ef0f2cb0d7e0971da17fde08fafe6c451e6c2109d856c6dba35d043";
+const PARTNER_KO_FULL_SHA256 = "0f991fcfcb8311d3d71e71dc2eca0ec423db5e1260fae100f16af114c2271b73";
 
 const PARTNER_BUILDER_LOCKS: LockCase[] = [
   {
     name: "분석 파트너 ko 최소",
     render: () => buildAnalysisPartnerV1SystemPrompt(MINIMAL_INPUT),
-    sha256: "2818e89aee7f8b60a062743d6d97aa0f2d1a91adc228b9a98cd928bc32e209e9",
+    sha256: "58c8c744b4dd76332f2982f984345047e2dc323d333b625cab9ba149e4d29b4f",
     snapshot: "./__snapshots__/prompt-assets-lock/analysis-partner.ko.minimal.txt",
   },
   {
@@ -582,9 +584,9 @@ describe("assembleStudentChatInstructions 분석 파트너 세 상태 해시 잠
   };
 
   const PINS: Array<{ state: State; sha256: string }> = [
-    { state: "no_materials", sha256: "ae41ad61c02f7b5b931d845db233dfb07493d09b8037c329acf36ade00b70d1b" },
-    { state: "low_relevance", sha256: "01de6d1edc0fe6f5b0392fddd7b49565403de77f13f42e1aa2a81f2509d7dd52" },
-    { state: "normal", sha256: "01de6d1edc0fe6f5b0392fddd7b49565403de77f13f42e1aa2a81f2509d7dd52" },
+    { state: "no_materials", sha256: "bf2c16223524a01bf10d14095ba1c6dcf85a5b13022d41c9f17abc6edf946e04" },
+    { state: "low_relevance", sha256: "b9a7451557085d99431aa0b8fda4a82579d71be30ef6266b0b0840ba0175e98f" },
+    { state: "normal", sha256: "b9a7451557085d99431aa0b8fda4a82579d71be30ef6266b0b0840ba0175e98f" },
   ];
 
   it.each(PINS)("ko / $state 의 최종 지시문 SHA-256 이 기준값과 같다", ({ state, sha256: expected }) => {
