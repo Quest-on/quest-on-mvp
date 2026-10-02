@@ -1,13 +1,11 @@
 /**
- * 교수 자료 업로드 허용 목록 가드 (#507)
+ * 교수 자료 업로드 허용 목록 모듈 가드 (#507)
  *
  * 교수자가 데이터 분석 시험용 xlsx, xls, csv 를 올리려 하면 파일 선택창은 허용하지만
- * 서버가 확장자와 MIME 을 거부(INVALID_FILE_EXTENSION)했다. 허용 목록을 한 모듈로 모아
- * /api/upload 와 /api/upload/signed-url 이 같은 목록을 쓰게 하고, 두 경로가 어긋나지
- * 않음을 잠근다. 허용 목록 밖(실행 파일, 스크립트, HTML 등)은 계속 거부해야 한다.
+ * 서버가 확장자와 MIME 을 거부(INVALID_FILE_EXTENSION)했다. 허용 목록을 한 모듈로 모았고
+ * 여기서는 그 목록의 내용을 잠근다. 두 라우트(/api/upload, /api/upload/signed-url)가 이 목록을
+ * 실제로 쓰는지는 핸들러를 직접 호출하는 __tests__/upload-routes.test.ts 가 잠근다.
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   UPLOAD_ALLOWED_EXTENSIONS,
@@ -55,18 +53,4 @@ describe("upload allowlist", () => {
       expect(ext).toMatch(/^\.[a-z0-9]+$/);
     }
   });
-});
-
-describe("두 업로드 라우트가 같은 허용 목록을 쓴다", () => {
-  const root = join(__dirname, "..");
-  const routes = ["app/api/upload/route.ts", "app/api/upload/signed-url/route.ts"];
-
-  for (const rel of routes) {
-    it(`${rel} 는 공용 모듈을 가져오고 자체 목록을 두지 않는다`, () => {
-      const src = readFileSync(join(root, rel), "utf8");
-      expect(src).toContain('@/lib/upload-allowlist');
-      expect(src).not.toMatch(/new Set\(\s*\[\s*"\.pdf"/);
-      expect(src).not.toMatch(/"application\/x-hwp",\s*\n\s*"application\/haansofthwp"/);
-    });
-  }
 });

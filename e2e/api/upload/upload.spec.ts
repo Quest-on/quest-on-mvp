@@ -7,6 +7,19 @@ const MINIMAL_PDF = Buffer.from(
   "utf-8"
 );
 
+// 스프레드시트와 CSV 는 텍스트 추출 없이 파일로만 저장되므로 내용은 검사되지 않는다 (#507).
+const SMALL_DATA_BUFFER = Buffer.from("a,b\n1,2\n", "utf-8");
+const SPREADSHEET_UPLOADS = [
+  {
+    name: "data.xlsx",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  },
+  { name: "legacy.xls", mimeType: "application/vnd.ms-excel" },
+  { name: "data.csv", mimeType: "text/csv" },
+  // Windows 의 일부 브라우저는 .csv 를 application/vnd.ms-excel 로 보낸다.
+  { name: "excel-data.csv", mimeType: "application/vnd.ms-excel" },
+] as const;
+
 test.describe("Upload API — /api/upload", () => {
   test.afterEach(async () => {
     await cleanupTestData();
@@ -33,6 +46,45 @@ test.describe("Upload API — /api/upload", () => {
     expect(body.url).toBeTruthy();
     expect(body.objectKey).toBeTruthy();
     expect(body.meta.originalName).toBe("test-document.pdf");
+  });
+
+  // ── Spreadsheet / CSV (#507) ──
+
+  for (const { name, mimeType } of SPREADSHEET_UPLOADS) {
+    test(`instructor uploads ${name} (${mimeType}) → 201`, async ({
+      instructorRequest,
+    }) => {
+      const res = await instructorRequest.post("/api/upload", {
+        multipart: {
+          file: { name, mimeType, buffer: SMALL_DATA_BUFFER },
+        },
+      });
+
+      expect(res.status()).toBe(201);
+      const body = await res.json();
+      expect(body.ok).toBe(true);
+      expect(body.url).toBeTruthy();
+      expect(body.meta.originalName).toBe(name);
+      expect(body.meta.mime).toBe(mimeType);
+    });
+  }
+
+  test("macro-enabled .xlsm → 400 INVALID_FILE_EXTENSION", async ({
+    instructorRequest,
+  }) => {
+    const res = await instructorRequest.post("/api/upload", {
+      multipart: {
+        file: {
+          name: "macro.xlsm",
+          mimeType: "application/vnd.ms-excel.sheet.macroEnabled.12",
+          buffer: SMALL_DATA_BUFFER,
+        },
+      },
+    });
+
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("INVALID_FILE_EXTENSION");
   });
 
   // ── Student (forbidden) ──
@@ -117,6 +169,112 @@ test.describe("Upload API — /api/upload", () => {
     expect(res.status()).toBe(405);
     const body = await res.json();
     expect(body.code).toBe("METHOD_NOT_ALLOWED");
+  });
+});
+
+// 4MB 를 넘는 파일은 클라이언트가 /api/upload/signed-url 로 서명 URL 을 받아 올린다.
+// 여기서는 URL 발급 판정(확장자·MIME 허용 목록)만 본다. 오브젝트는 만들어지지 않는다.
+test.describe("Upload API — /api/upload/signed-url", () => {
+  test.afterEach(async () => {
+    await cleanupTestData();
+  });
+
+  for (const { name, mimeType } of SPREADSHEET_UPLOADS) {
+    test(`instructor gets signed URL for ${name} (${mimeType}) → 200`, async ({
+      instructorRequest,
+    }) => {
+      const res = await instructorRequest.post("/api/upload/signed-url", {
+        data: { fileName: name, fileSize: 5 * 1024 * 1024, contentType: mimeType },
+      });
+
+      expect(res.status()).toBe(200);
+      const body = await res.json();
+      expect(body.ok).toBe(true);
+      expect(body.signedUrl).toBeTruthy();
+      expect(body.publicUrl).toBeTruthy();
+      expect(body.storagePath).toMatch(
+        new RegExp(`\\.${name.split(".").pop()}$`)
+      );
+      expect(body.meta.originalName).toBe(name);
+    });
+  }
+
+  test("macro-enabled .xlsm → 400 INVALID_FILE_EXTENSION", async ({
+    instructorRequest,
+  }) => {
+    const res = await instructorRequest.post("/api/upload/signed-url", {
+      data: {
+        fileName: "macro.xlsm",
+        fileSize: 5 * 1024 * 1024,
+        contentType: "application/vnd.ms-excel.sheet.macroEnabled.12",
+      },
+    });
+
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("INVALID_FILE_EXTENSION");
+  });
+
+  test("unsupported file type → 400 INVALID_FILE_EXTENSION", async ({
+    instructorRequest,
+  }) => {
+    const res = await instructorRequest.post("/api/upload/signed-url", {
+      data: {
+        fileName: "malicious.exe",
+        fileSize: 5 * 1024 * 1024,
+        contentType: "application/x-msdownload",
+      },
+    });
+
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("INVALID_FILE_EXTENSION");
+  });
+
+  test("allowed extension with unsupported MIME → 400 INVALID_FILE_TYPE", async ({
+    instructorRequest,
+  }) => {
+    const res = await instructorRequest.post("/api/upload/signed-url", {
+      data: {
+        fileName: "data.xlsx",
+        fileSize: 5 * 1024 * 1024,
+        contentType: "text/html",
+      },
+    });
+
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("INVALID_FILE_TYPE");
+  });
+
+  test("student cannot get signed URL → 403", async ({ studentRequest }) => {
+    const res = await studentRequest.post("/api/upload/signed-url", {
+      data: {
+        fileName: "data.xlsx",
+        fileSize: 5 * 1024 * 1024,
+        contentType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      },
+    });
+
+    expect(res.status()).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe("FORBIDDEN");
+  });
+
+  test("anon cannot get signed URL → 401", async ({ anonRequest }) => {
+    const res = await anonRequest.post("/api/upload/signed-url", {
+      data: {
+        fileName: "data.xlsx",
+        fileSize: 5 * 1024 * 1024,
+        contentType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      },
+    });
+
+    expect(res.status()).toBe(401);
+    const body = await res.json();
+    expect(body.code).toBe("UNAUTHORIZED");
   });
 });
 
