@@ -19,10 +19,22 @@
  *   - 정리하면 사례형 시험의 응답이 바뀌므로 이 PR 에서는 하지 않고 현행 그대로 보존한다.
  *     정리할 때는 이 문장이 아니라 새 스펙 버전(`lib/student-chat-spec.ts`)으로 낸다.
  *   - 두 문장은 한국어로 고정이다. 영어 시험(`language: "en"`)에도 한국어 문장이 붙는다. 이것도 현행 그대로다.
+ *
+ * 역할 분기 (이슈 #519)
+ *   - 문항의 AI 역할(`lib/exam-ai-profile.ts`)이 사례형 출제자이거나 주어지지 않으면 **위의 현행 경로를 그대로
+ *     호출한다.** 재조립하지 않는다. 사례형 출력은 바이트 단위로 같다.
+ *   - 분석 파트너이면 전용 빌더(`analysis-partner@1`)를 부르고 위의 "자료 없음/관련성 낮음" 문장 두 가지를
+ *     붙이지 않는다. 그 문장은 "자료에 없으면 모른다고 답하라" 는 사례형 충돌의 한쪽이고, 분석 파트너
+ *     본문은 이미 자료에 없는 사실을 만들지 않고 없다고 말하도록 쓰여 있다.
  */
 
-import type { PromptLanguage } from "@/lib/prompts";
-import { getCurrentStudentChatSpec, type StudentChatSpecId } from "@/lib/student-chat-spec";
+import type { PromptLanguage, RubricItem } from "@/lib/prompts";
+import type { ResolvedExamAiProfile } from "@/lib/exam-ai-profile";
+import {
+  getCurrentAnalysisPartnerSpec,
+  getCurrentStudentChatSpec,
+  type StudentChatSpecId,
+} from "@/lib/student-chat-spec";
 
 /** 이 값 미만이면 "관련성 낮음". route.ts 에 인라인으로 있던 숫자 그대로다. */
 const LOW_RELEVANCE_THRESHOLD = 0.3;
@@ -74,6 +86,16 @@ export type StudentChatInstructionsInput = {
   /** 시험 언어. 안 주면 빌더와 같이 ko. */
   language?: PromptLanguage;
   rag: RagNoticeInput & { relevantMaterialsText: string };
+  /**
+   * 이 문항의 AI 역할 해석 결과(`resolveExamAiProfile`). 안 주면 사례형 출제자(현행)다.
+   * 영어 시험의 폴백은 해석 함수가 이미 했다 — 여기서 언어로 다시 판단하지 않는다.
+   */
+  profile?: ResolvedExamAiProfile;
+  /**
+   * 학생에게 공개된 평가 기준. 분석 파트너만 쓴다. 사례형은 받아도 쓰지 않는다(현행: 사례형 지시문에
+   * 루브릭이 안 간다). 라우트는 아직 이 값을 넘기지 않는다 — 루브릭 공개 연동은 별도 이슈다.
+   */
+  publicRubric?: RubricItem[];
 };
 
 export type StudentChatInstructions = {
@@ -93,8 +115,28 @@ export type StudentChatInstructions = {
 export function assembleStudentChatInstructions(
   input: StudentChatInstructionsInput
 ): StudentChatInstructions {
-  const spec = getCurrentStudentChatSpec();
   const { rag } = input;
+
+  if (input.profile?.role === "analysis_partner") {
+    // 분석 파트너는 한국어 본문 하나뿐이고(v1) 자료 검색 경고 문장을 붙이지 않는다.
+    const partnerSpec = getCurrentAnalysisPartnerSpec();
+    return {
+      instructions: partnerSpec.build({
+        examTitle: input.examTitle,
+        examCode: input.examCode,
+        questionId: input.questionId,
+        currentQuestionText: input.currentQuestionText,
+        currentQuestionAiContext: input.currentQuestionAiContext,
+        relevantMaterialsText: rag.relevantMaterialsText,
+        rubric: input.publicRubric,
+      }),
+      specId: partnerSpec.id,
+      language: "ko",
+    };
+  }
+
+  // 사례형 출제자(현행). 아래는 #515 에서 옮긴 그대로다.
+  const spec = getCurrentStudentChatSpec();
 
   const instructions =
     spec.build({
