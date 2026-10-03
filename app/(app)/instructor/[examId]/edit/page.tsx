@@ -21,6 +21,7 @@ import { SimpleExamAuthoringForm } from "@/components/instructor/SimpleExamAutho
 import { useTranslations } from "next-intl";
 import type { Question } from "@/components/instructor/QuestionEditor";
 import { useFileUpload } from "@/hooks/useFileUpload";
+import { pickStudentMaterials } from "@/lib/student-materials";
 import {
   buildDefaultScoreWeightsForQuestionTypes,
   validateScoreWeightsForQuestions,
@@ -63,6 +64,24 @@ export default function EditExam({
   const [scoreWeights, setScoreWeights] = useState<ScoreWeights | null>(null);
   const [hasSessions, setHasSessions] = useState(false);
   const fileUpload = useFileUpload();
+  // 학생에게 공개로 표시한 자료 URL (#544). 불러온 시험의 student_materials 로 시작한다.
+  // 저장할 때는 지금 자료 목록과의 교집합만 싣는다(pickStudentMaterials).
+  const [sharedMaterialUrls, setSharedMaterialUrls] = useState<Set<string>>(() => new Set());
+  const handleMaterialShareChange = useCallback((url: string, shared: boolean) => {
+    setSharedMaterialUrls((prev) => {
+      const next = new Set(prev);
+      if (shared) next.add(url);
+      else next.delete(url);
+      return next;
+    });
+  }, []);
+  const uploadedUrlByName = useMemo(
+    () =>
+      new Map(
+        Array.from(fileUpload.uploadedFiles.entries()).map(([name, file]) => [name, file.url])
+      ),
+    [fileUpload.uploadedFiles]
+  );
   const isSubmittingRef = useRef(false);
   const initialScoreWeightsRef = useRef<ScoreWeights | null>(null);
   const initialCourseIdRef = useRef<string | null>(null);
@@ -104,6 +123,13 @@ export default function EditExam({
         setScoreWeights(loadedScoreWeights);
         setHasSessions(Boolean(exam.has_sessions));
         fileUpload.initExistingData(exam.materials || [], exam.materials_text);
+        setSharedMaterialUrls(
+          new Set(
+            Array.isArray(exam.student_materials)
+              ? exam.student_materials.filter((v: unknown): v is string => typeof v === "string")
+              : []
+          )
+        );
       } catch {
         toast.error(t("editExam.toastLoadFail"));
         router.push(`/instructor/${resolvedParams.examId}`);
@@ -220,9 +246,18 @@ export default function EditExam({
     const newMaterials = examData.materials.filter((_, i) => i !== index);
     validateAndManageFileSize(newMaterials);
     setExamData((prev) => ({ ...prev, materials: newMaterials }));
-    if (removed) fileUpload.removeFile(removed.name);
+    if (removed) {
+      // 지운 파일은 학생 공개 목록에서도 뺀다 (#544).
+      const removedUrl = fileUpload.uploadedFiles.get(removed.name)?.url;
+      if (removedUrl) handleMaterialShareChange(removedUrl, false);
+      fileUpload.removeFile(removed.name);
+    }
   };
-  const removeExistingFile = (index: number) => fileUpload.removeExistingUrl(index);
+  const removeExistingFile = (index: number) => {
+    const removedUrl = fileUpload.existingUrls[index];
+    if (removedUrl) handleMaterialShareChange(removedUrl, false);
+    fileUpload.removeExistingUrl(index);
+  };
 
   const getFileIcon = (fileName: string) => (
     <FileTypeIcon fileName={fileName} />
@@ -232,6 +267,10 @@ export default function EditExam({
     try { return decodeURIComponent(new URL(url).pathname.split("/").pop() || t("editExam.filenameFallback")); }
     catch { return t("editExam.filenameFallback"); }
   };
+  // 저장 경로에는 원래 이름이 없다. 텍스트를 추출한 파일(pdf, docx, pptx)은 추출 때 남긴 원래 이름을 쓴다.
+  // 공개 스위치를 켤 때 어떤 파일인지 알아볼 수 있게 한다.
+  const getExistingFileName = (url: string) =>
+    fileUpload.extractedTexts.get(url)?.fileName || getFileNameFromUrl(url);
 
   // ── 문제 CRUD ──────────────────────────────────────────────────────────────
   const addQuestion = useCallback((type?: Question["type"], count?: number) => {
@@ -281,6 +320,7 @@ export default function EditExam({
       const defaultScoreWeights = buildDefaultScoreWeightsForQuestionTypes(
         questions.map((question) => question.type)
       );
+      const materialUrls = fileUpload.getUploadedUrls();
       const shouldOmitAutoDefaultScoreWeights =
         hasSessions &&
         initialScoreWeightsRef.current === null &&
@@ -297,6 +337,7 @@ export default function EditExam({
         course_id?: string | null;
         materials: string[];
         materials_text: Array<{ url: string; text: string; fileName: string }>;
+        student_materials: string[];
         language: "ko" | "en";
         updated_at: string;
       } = {
@@ -305,8 +346,10 @@ export default function EditExam({
         duration: examData.duration,
         questions,
         chat_weight: chatWeight,
-        materials: fileUpload.getUploadedUrls(),
+        materials: materialUrls,
         materials_text: fileUpload.getMaterialsText(),
+        // 학생에게 공개할 자료 (#544). materials 의 부분집합, materials 순서. 서버가 다시 검증한다.
+        student_materials: pickStudentMaterials(materialUrls, sharedMaterialUrls),
         language: examData.language,
         updated_at: new Date().toISOString(),
       };
@@ -335,7 +378,7 @@ export default function EditExam({
       setIsLoading(false);
       isSubmittingRef.current = false;
     }
-  }, [examData, questions, chatWeight, scoreWeights, courseId, hasSessions, fileUpload, resolvedParams.examId, t]);
+  }, [examData, questions, chatWeight, scoreWeights, courseId, hasSessions, fileUpload, sharedMaterialUrls, resolvedParams.examId, t]);
 
   // ── 제출 사유 ─────────────────────────────────────────────────────────────
   const submitReasons = useMemo(() => {
@@ -430,6 +473,10 @@ export default function EditExam({
             onDragAreaClick={handleDragAreaClick}
             onRemoveFile={removeFile}
             getFileIcon={getFileIcon}
+            // ── 학생 공개 자료 (#544) ───────────────────────────────────────
+            sharedMaterialUrls={sharedMaterialUrls}
+            onMaterialShareChange={handleMaterialShareChange}
+            uploadedUrlByName={uploadedUrlByName}
             // ── 문제 관리 ───────────────────────────────────────────────────
             questions={questions}
             onQuestionAdd={addQuestion}
@@ -452,7 +499,7 @@ export default function EditExam({
             submitButtonText={t("editExam.submitButtonText")}
             existingFiles={fileUpload.existingUrls.map((url, i) => ({
               url,
-              name: getFileNameFromUrl(url),
+              name: getExistingFileName(url),
               index: i,
             }))}
             onRemoveExistingFile={removeExistingFile}

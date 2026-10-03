@@ -38,6 +38,8 @@ interface Exam {
     detailedCriteria: string;
   }>;
   rubric_public?: boolean;
+  /** 교수자가 학생에게 공개한 자료. 모양은 화면(MaterialsSheet)이 다시 확인한다 (#544). */
+  student_materials?: unknown;
   allow_draft_in_waiting?: boolean;
   allow_chat_in_waiting?: boolean;
 }

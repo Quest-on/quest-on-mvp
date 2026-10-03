@@ -1,0 +1,84 @@
+/**
+ * database/040 — exams.student_materials (#544)
+ *
+ * SQL 을 실제로 실행하지는 않는다(AGENTS.md 의 DB 안전 규칙). CI 의 테스트 DB 셋업
+ * (.github/actions/test-setup/action.yml)이 prisma db push 뒤에 이 파일을 두 번 적용해 문법과 멱등성을
+ * 확인한다. 여기서는 (1) 추가 전용이고 멱등인지, (2) 배열 CHECK 제약이 이름을 갖고 중복 없이 붙는지,
+ * (3) 머리말에 선적용 규칙, 확인 쿼리, 주석 처리된 롤백이 있는지, (4) prisma schema, 스키마 매니페스트,
+ * CI 셋업이 같은 컬럼을 알고 있는지를 잠근다.
+ */
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+
+const root = path.resolve(__dirname, "..");
+const FILE = "040_exam_student_materials.sql";
+const read = (rel: string) => readFileSync(path.join(root, rel), "utf8").replace(/\r\n/g, "\n");
+
+const sql = read(`database/${FILE}`);
+const header = sql.slice(0, sql.indexOf("BEGIN;"));
+const executable = sql
+  .split("\n")
+  .filter((line) => !line.trimStart().startsWith("--"))
+  .join("\n");
+
+describe("040 exams.student_materials 마이그레이션", () => {
+  it("040 이 database 디렉터리에서 유일한 순번이다", () => {
+    const files = readdirSync(path.join(root, "database"));
+    expect(files).toContain(FILE);
+    expect(files.filter((f) => f.startsWith("040_"))).toHaveLength(1);
+  });
+
+  it("단일 트랜잭션이다", () => {
+    expect(executable.match(/^BEGIN;$/gm)).toHaveLength(1);
+    expect(executable.match(/^COMMIT;$/gm)).toHaveLength(1);
+  });
+
+  it("jsonb NOT NULL DEFAULT '[]' 컬럼을 IF NOT EXISTS 로 더한다", () => {
+    expect(executable).toMatch(
+      /ALTER TABLE public\.exams\s+ADD COLUMN IF NOT EXISTS student_materials jsonb NOT NULL DEFAULT '\[\]'::jsonb;/
+    );
+  });
+
+  it("배열 여부 CHECK 제약은 이름이 있고, 이미 있으면 더하지 않는다", () => {
+    expect(executable).toMatch(/ADD CONSTRAINT exams_student_materials_is_array\s+CHECK \(jsonb_typeof\(student_materials\) = 'array'\)/);
+    expect(executable).toMatch(/IF NOT EXISTS \(\s*SELECT 1\s+FROM pg_constraint\s+WHERE conrelid = 'public\.exams'::regclass\s+AND conname = 'exams_student_materials_is_array'/);
+    expect(executable.match(/ADD CONSTRAINT/g)).toHaveLength(1);
+  });
+
+  it("추가 전용이다 (지우거나 바꾸는 구문이 없다)", () => {
+    expect(executable).not.toMatch(/\b(DROP|TRUNCATE|DELETE|UPDATE|RENAME)\b/i);
+    expect(executable).not.toMatch(/ALTER COLUMN/i);
+  });
+
+  it("머리말에 선적용 규칙, 확인 쿼리, 롤백이 있다. 롤백은 주석이다", () => {
+    expect(header).toMatch(/코드보다 먼저 적용/);
+    expect(header).toContain("table_name = 'exams' and column_name = 'student_materials'");
+    expect(header).toContain("conname = 'exams_student_materials_is_array'");
+    expect(sql).toMatch(/롤백/);
+    expect(sql).toMatch(/^-- ALTER TABLE public\.exams DROP COLUMN IF EXISTS student_materials;$/m);
+    expect(sql).toMatch(/^-- ALTER TABLE public\.exams DROP CONSTRAINT IF EXISTS exams_student_materials_is_array;$/m);
+  });
+
+  it("prisma schema 의 exams 모델에 같은 컬럼이 있다 (NOT NULL, 기본값 [])", () => {
+    const schema = read("prisma/schema.prisma");
+    const model = schema.slice(schema.indexOf("model exams {"));
+    const body = model.slice(0, model.indexOf("\n}"));
+    expect(body).toMatch(/^\s+student_materials\s+Json\s+@default\("\[\]"\)/m);
+  });
+
+  it("스키마 매니페스트가 이 컬럼을 요구한다 (/api/health 가 DDL 누락을 드러낸다)", () => {
+    expect(read("lib/schema-manifest.ts")).toMatch(
+      /\{ table: "exams", columns: \[[^\]]*"student_materials"[^\]]*\] \}/
+    );
+  });
+
+  it("CI 테스트 DB 셋업이 prisma db push 뒤에 040 을 두 번 적용한다 (문법과 멱등성)", () => {
+    const action = read(".github/actions/test-setup/action.yml");
+    const pushAt = action.indexOf("npx prisma db push");
+    const applyAt = action.indexOf("-f database/040_exam_student_materials.sql");
+    expect(pushAt).toBeGreaterThan(-1);
+    expect(applyAt).toBeGreaterThan(pushAt);
+    expect(action.match(/-f database\/040_exam_student_materials\.sql/g)).toHaveLength(2);
+  });
+});

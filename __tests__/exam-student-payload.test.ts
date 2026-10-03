@@ -98,3 +98,76 @@ describe("sanitizeExamForStudent", () => {
     expect(out.questions).toBeNull();
   });
 });
+
+/**
+ * 학생 공개 자료 (#544). 교수자가 공개를 켠 파일만, 인증된 학생 입장 경로에서만 내려간다.
+ * materials(업로드 전체 목록)와 materials_text(추출 전문)는 어느 경로에서든 계속 비운다.
+ */
+describe("sanitizeExamForStudent: 학생 공개 자료", () => {
+  const XLSX = "https://example.test/storage/instructor-1/2026-10-03_data.xlsx";
+  const PDF = "https://example.test/storage/instructor-1/2026-10-03_slides.pdf";
+  const CSV = "https://example.test/storage/instructor-1/2026-10-03_extra.csv";
+  const examWith = (student_materials: unknown) => ({
+    ...baseExam(),
+    materials: [XLSX, PDF, CSV],
+    materials_text: [{ url: PDF, text: "강의 자료 전문", fileName: "slides.pdf" }],
+    student_materials,
+  });
+
+  it("공개 0개: student_materials 는 빈 배열이고 어떤 자료 URL 도 없다", () => {
+    const out = sanitizeExamForStudent(examWith([]), { includeStudentMaterials: true });
+    expect(out.student_materials).toEqual([]);
+    expect(out.materials).toEqual([]);
+    expect(JSON.stringify(out)).not.toContain("example.test/storage");
+  });
+
+  it("일부 공개: 공개한 파일만 { url, fileName, extension } 으로 남고 비공개 파일 URL 은 없다", () => {
+    const out = sanitizeExamForStudent(examWith([XLSX]), { includeStudentMaterials: true });
+    expect(out.student_materials).toEqual([{ url: XLSX, fileName: "2026-10-03_data.xlsx", extension: "xlsx" }]);
+    expect(out.materials).toEqual([]);
+    expect(out.materials_text).toEqual([]);
+    const json = JSON.stringify(out);
+    expect(json).not.toContain(PDF);
+    expect(json).not.toContain(CSV);
+    expect(json).not.toContain("강의 자료 전문");
+  });
+
+  it("전체 공개: 모든 파일이 materials 순서로 남는다", () => {
+    const out = sanitizeExamForStudent(examWith([CSV, XLSX, PDF]), { includeStudentMaterials: true });
+    expect((out.student_materials as Array<{ url: string }>).map((m) => m.url)).toEqual([XLSX, PDF, CSV]);
+    expect(out.materials).toEqual([]);
+    expect(out.materials_text).toEqual([]);
+  });
+
+  it("materials 에 없는 값은 student_materials 에 있어도 나가지 않는다 (불변식이 깨진 행)", () => {
+    const stale = "https://example.test/storage/instructor-1/deleted.xlsx";
+    const out = sanitizeExamForStudent(examWith([stale, XLSX]), { includeStudentMaterials: true });
+    expect((out.student_materials as Array<{ url: string }>).map((m) => m.url)).toEqual([XLSX]);
+    expect(JSON.stringify(out)).not.toContain("deleted.xlsx");
+  });
+
+  it("플래그 없이 부르면(공개 get_exam 등) 공개한 파일도 내려가지 않는다", () => {
+    const out = sanitizeExamForStudent(examWith([XLSX, PDF, CSV]));
+    expect(out.student_materials).toEqual([]);
+    expect(out.materials).toEqual([]);
+    expect(JSON.stringify(out)).not.toContain("example.test/storage");
+  });
+
+  it("materials 를 select 하지 않은 행은 아무것도 공개하지 않는다 (교집합이 비어 실패 쪽으로 닫힌다)", () => {
+    const { materials: _omit, ...withoutMaterials } = examWith([XLSX]);
+    const out = sanitizeExamForStudent(withoutMaterials, { includeStudentMaterials: true });
+    expect(out.student_materials).toEqual([]);
+  });
+
+  it("student_materials 키가 없으면 새로 만들지 않는다", () => {
+    const out = sanitizeExamForStudent(baseExam(), { includeStudentMaterials: true });
+    expect(out).not.toHaveProperty("student_materials");
+  });
+
+  it("입력 객체를 바꾸지 않는다", () => {
+    const input = examWith([XLSX]);
+    const snapshot = JSON.parse(JSON.stringify(input));
+    sanitizeExamForStudent(input, { includeStudentMaterials: true });
+    expect(input).toEqual(snapshot);
+  });
+});

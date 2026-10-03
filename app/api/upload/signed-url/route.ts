@@ -8,7 +8,12 @@ import { randomUUID } from "crypto";
 import { logError } from "@/lib/logger";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 
-import { UPLOAD_ALLOWED_EXTENSIONS, UPLOAD_ALLOWED_MIME_TYPES } from "@/lib/upload-allowlist";
+import {
+  UPLOAD_ALLOWED_EXTENSIONS,
+  UPLOAD_ALLOWED_MIME_TYPES,
+  UPLOAD_MAX_FILE_SIZE,
+} from "@/lib/upload-allowlist";
+import { makeMaterialObjectKey, materialStoragePath } from "@/lib/material-object-key";
 const supabase = getSupabaseServer();
 
 function errorJson(
@@ -24,15 +29,7 @@ function errorJson(
   );
 }
 
-function makeSafeObjectKey(originalName: string, extFallback = ".bin") {
-  const ts = new Date().toISOString().slice(0, 10);
-  const id = randomUUID();
-  const m = originalName.match(/\.([a-zA-Z0-9]{1,8})$/);
-  const ext = m ? `.${m[1].toLowerCase()}` : extFallback;
-  return `${ts}_${id}${ext}`;
-}
-
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_FILE_SIZE = UPLOAD_MAX_FILE_SIZE; // 50MB
 
 export async function POST(request: NextRequest) {
   try {
@@ -99,8 +96,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const objectKey = makeSafeObjectKey(fileName);
-    const storagePath = `instructor-${user.id}/${objectKey}`;
+    const objectKey = makeMaterialObjectKey(fileName);
+    const storagePath = materialStoragePath(user.id, objectKey);
 
     // Create signed upload URL using service role key
     const { data, error } = await supabase.storage

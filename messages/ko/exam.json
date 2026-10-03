@@ -51,6 +51,17 @@
     "description": "교수자가 공개한 기준입니다. 읽기 전용입니다.",
     "close": "닫기"
   },
+  "materials": {
+    "button": "자료",
+    "buttonAriaLabel": "시험 자료 {count}개 보기",
+    "title": "시험 자료",
+    "description": "교수자가 공개한 파일입니다. 내려받아 쓸 수 있습니다.",
+    "format": "형식: {format}",
+    "formatUnknown": "알 수 없음",
+    "download": "내려받기",
+    "downloadAriaLabel": "{name} 내려받기",
+    "close": "닫기"
+  },
   "timer": {
     "ariaLabel": "남은 시간 {time}",
     "expiredTitle": "시험 시간이 종료되었습니다",

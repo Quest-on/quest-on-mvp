@@ -4,8 +4,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 import { buildExamInsertPayload } from "../lib/exam-insert-payload";
 import {
+  UPLOAD_ALLOWED_EXTENSIONS,
+  UPLOAD_ALLOWED_MIME_TYPES,
+  UPLOAD_MAX_FILE_SIZE,
+} from "../lib/upload-allowlist";
+import {
+  CONTENT_TYPE_BY_EXTENSION,
   deriveProjectRef,
   isPlainTextWithLineBreaks,
+  loadMaterialFiles,
   main,
   parseArgs,
   resolveConnection,
@@ -1781,5 +1788,456 @@ describe("스크립트 소스 가드", () => {
 
   it("예시 스펙은 합성 데이터임을 스스로 밝힌다", () => {
     expect(JSON.stringify(FIXTURE)).toContain("합성");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 학생 공개 자료 업로드 (#544)
+// ─────────────────────────────────────────────────────────────────────────────
+type StorageOp =
+  | { op: "upload"; bucket: string; path: string; contentType?: string; upsert?: boolean; size: number }
+  | { op: "remove"; bucket: string; paths: string[] };
+
+/** 가짜 Storage. 업로드와 삭제를 기록하고, 훅으로 실패를 만든다. 네트워크에 나가지 않는다. */
+function createFakeStorage(
+  hooks: {
+    failUpload?: (path: string, n: number) => { message: string } | null;
+    failRemove?: () => { message: string } | null;
+  } = {}
+) {
+  const ops: StorageOp[] = [];
+  const objects = new Map<string, number>();
+  let uploads = 0;
+  const storage = {
+    from: (bucket: string) => ({
+      upload: async (path: string, bytes: Uint8Array, opts?: { contentType?: string; upsert?: boolean }) => {
+        uploads++;
+        ops.push({ op: "upload", bucket, path, contentType: opts?.contentType, upsert: opts?.upsert, size: bytes.byteLength });
+        const failure = hooks.failUpload?.(path, uploads);
+        if (failure) return { data: null, error: failure };
+        objects.set(`${bucket}/${path}`, bytes.byteLength);
+        return { data: { path }, error: null };
+      },
+      getPublicUrl: (path: string) => ({
+        data: { publicUrl: `https://${PROJECT_REF}.supabase.co/storage/v1/object/public/${bucket}/${path}` },
+      }),
+      remove: async (paths: string[]) => {
+        ops.push({ op: "remove", bucket, paths: [...paths] });
+        const failure = hooks.failRemove?.();
+        if (failure) return { data: null, error: failure };
+        for (const p of paths) objects.delete(`${bucket}/${p}`);
+        return { data: [], error: null };
+      },
+    }),
+  };
+  return { storage, ops, objects };
+}
+
+function withStorage(db: ReturnType<typeof createFakeDb>, fake: ReturnType<typeof createFakeStorage>) {
+  (db.client as unknown as { storage: unknown }).storage = fake.storage;
+  return db;
+}
+
+const MATERIAL_SOURCES = ["data/customers.xlsx", "guide.pdf"];
+const specWithFiles: MockExamSpec = { ...spec, student_material_files: MATERIAL_SOURCES };
+const SPEC_PATH = path.join("specs", "kim", "spec.json");
+const fakeBytes = (n: number) => new Uint8Array(n).fill(7);
+
+function loadedFiles(sources = MATERIAL_SOURCES) {
+  const r = loadMaterialFiles(sources, SPEC_PATH, () => fakeBytes(10));
+  if (!r.ok) throw new Error(r.errors.join("\n"));
+  return r.files;
+}
+
+const UUIDS = () => {
+  const list = ["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", "33333333-3333-4333-8333-333333333333"];
+  return () => list.shift() ?? "99999999-9999-4999-8999-999999999999";
+};
+
+const publicUrl = (p: string) => `https://${PROJECT_REF}.supabase.co/storage/v1/object/public/exam-materials/${p}`;
+const XLSX_PATH = `instructor-${INSTRUCTOR}/2026-10-03_11111111-1111-4111-8111-111111111111.xlsx`;
+const PDF_PATH = `instructor-${INSTRUCTOR}/2026-10-03_22222222-2222-4222-8222-222222222222.pdf`;
+
+describe("validateMockExamSpec: student_material_files (#544)", () => {
+  const good = () => structuredClone(FIXTURE) as Record<string, unknown>;
+  const errorsOf = (raw: unknown) => {
+    const r = validateMockExamSpec(raw);
+    return r.ok ? [] : r.errors;
+  };
+
+  it("생략하면 빈 배열이다 (자료 없이 만든다)", () => {
+    const r = validateMockExamSpec(FIXTURE);
+    expect(r.ok && r.spec.student_material_files).toEqual([]);
+  });
+
+  it("허용 목록 확장자의 경로 배열은 앞뒤 공백을 지워 그대로 받는다 (Windows 경로 포함)", () => {
+    const raw = good();
+    raw.student_material_files = [" data/customers.xlsx ", "C:\\exam\\guide.PDF", "raw.csv"];
+    const r = validateMockExamSpec(raw);
+    expect(r.ok && r.spec.student_material_files).toEqual(["data/customers.xlsx", "C:\\exam\\guide.PDF", "raw.csv"]);
+  });
+
+  it.each([
+    ["문자열", "data.xlsx"],
+    ["객체", { path: "data.xlsx" }],
+    ["null", null],
+  ])("배열이 아니면(%s) 거부한다", (_label, value) => {
+    const raw = good();
+    raw.student_material_files = value;
+    expect(errorsOf(raw).join("\n")).toContain("student_material_files 는 로컬 파일 경로 문자열의 배열");
+  });
+
+  it("빈 문자열이나 문자열이 아닌 원소는 위치와 함께 거부한다", () => {
+    const raw = good();
+    raw.student_material_files = ["ok.xlsx", " ", 3];
+    const errors = errorsOf(raw).join("\n");
+    expect(errors).toContain("student_material_files[1]");
+    expect(errors).toContain("student_material_files[2]");
+  });
+
+  it("같은 경로가 두 번이면 거부한다", () => {
+    const raw = good();
+    raw.student_material_files = ["a.xlsx", "a.xlsx"];
+    expect(errorsOf(raw).join("\n")).toMatch(/student_material_files\[1\].*중복/);
+  });
+
+  it.each(["run.exe", "macro.xlsm", "README", "archive.tar.gz", "data.xlsx.exe"])(
+    "앱 업로드 허용 목록에 없는 확장자(%s)는 거부한다",
+    (file) => {
+      const raw = good();
+      raw.student_material_files = [file];
+      expect(errorsOf(raw).join("\n")).toMatch(/허용 목록/);
+    }
+  );
+
+  it("학생 공개 상한(20개)을 넘으면 거부한다", () => {
+    const raw = good();
+    raw.student_material_files = Array.from({ length: 21 }, (_, i) => `f${i}.csv`);
+    expect(errorsOf(raw).join("\n")).toMatch(/20개까지/);
+    raw.student_material_files = Array.from({ length: 20 }, (_, i) => `f${i}.csv`);
+    expect(errorsOf(raw)).toEqual([]);
+  });
+});
+
+describe("CONTENT_TYPE_BY_EXTENSION: 앱 허용 목록과 맞물린다", () => {
+  it("허용 확장자마다 MIME 이 있고, 그 MIME 은 허용 MIME 목록 안에 있다", () => {
+    for (const ext of UPLOAD_ALLOWED_EXTENSIONS) {
+      const mime = CONTENT_TYPE_BY_EXTENSION[ext];
+      expect(mime, `${ext} 의 MIME 이 없다`).toBeTruthy();
+      expect(UPLOAD_ALLOWED_MIME_TYPES.has(mime), `${ext} → ${mime}`).toBe(true);
+    }
+  });
+
+  it("데이터 파일은 버킷(database/039)이 받는 MIME 으로 올린다", () => {
+    expect(CONTENT_TYPE_BY_EXTENSION[".xlsx"]).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    expect(CONTENT_TYPE_BY_EXTENSION[".xls"]).toBe("application/vnd.ms-excel");
+    expect(CONTENT_TYPE_BY_EXTENSION[".csv"]).toBe("text/csv");
+  });
+});
+
+describe("loadMaterialFiles (#544)", () => {
+  it("상대 경로는 스펙 파일 폴더 기준으로 읽고, 이름, 확장자, MIME, 크기를 채운다", () => {
+    const readBinary = vi.fn(() => fakeBytes(1234));
+    const r = loadMaterialFiles(["data/customers.xlsx"], SPEC_PATH, readBinary);
+
+    expect(readBinary).toHaveBeenCalledWith(path.resolve(path.dirname(SPEC_PATH), "data/customers.xlsx"));
+    expect(r.ok && r.files[0]).toMatchObject({
+      source: "data/customers.xlsx",
+      fileName: "customers.xlsx",
+      extension: ".xlsx",
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      size: 1234,
+    });
+  });
+
+  it("빈 파일, 상한을 넘는 파일, 읽을 수 없는 파일을 모두 모아 거부한다", () => {
+    const r = loadMaterialFiles(["empty.csv", "huge.xlsx", "missing.pdf"], SPEC_PATH, (p) => {
+      if (p.endsWith("empty.csv")) return fakeBytes(0);
+      if (p.endsWith("huge.xlsx")) return { byteLength: UPLOAD_MAX_FILE_SIZE + 1 } as Uint8Array;
+      throw new Error("ENOENT");
+    });
+
+    expect(r.ok).toBe(false);
+    const errors = r.ok ? "" : r.errors.join("\n");
+    expect(errors).toMatch(/empty\.csv.*빈 파일/);
+    expect(errors).toMatch(new RegExp(`huge\\.xlsx.*${UPLOAD_MAX_FILE_SIZE}`));
+    expect(errors).toMatch(/missing\.pdf.*읽을 수 없습니다.*ENOENT/);
+  });
+
+  it("상한과 같은 크기는 받는다", () => {
+    const r = loadMaterialFiles(["edge.csv"], SPEC_PATH, () => ({ byteLength: UPLOAD_MAX_FILE_SIZE }) as Uint8Array);
+    expect(r.ok).toBe(true);
+  });
+});
+
+describe("seedMockExam: 학생 공개 자료 dry-run (#544)", () => {
+  it("올리지 않고 무엇을 어디에 올릴지만 보여 준다", async () => {
+    const storage = createFakeStorage();
+    const db = withStorage(createFakeDb(verifiedWorld), storage);
+
+    const { report, output } = await run(db, { spec: specWithFiles, materialFiles: loadedFiles(), uuid: UUIDS() });
+
+    expect(report.status).toBe("dry-run");
+    expect(storage.ops).toEqual([]);
+    expect(db.writes).toEqual([]);
+    expect(report.uploads).toEqual([]);
+    expect(output).toContain("[올릴 파일] exam-materials 버킷, 모두 학생에게 공개 (2개)");
+    expect(output).toContain(`data/customers.xlsx (10 bytes, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet) → instructor-${INSTRUCTOR}/2026-10-03_<uuid>.xlsx`);
+    expect(output).toContain(`guide.pdf (10 bytes, application/pdf) → instructor-${INSTRUCTOR}/2026-10-03_<uuid>.pdf`);
+    expect(output).toMatch(/dry-run 이라 올리지 않습니다/);
+  });
+
+  it("만들 행의 materials 와 student_materials 는 같은 자리표시 목록이다", async () => {
+    const db = createFakeDb(verifiedWorld);
+
+    const { report } = await run(db, { spec: specWithFiles, materialFiles: loadedFiles() });
+
+    const row = report.planned?.exams as Record<string, unknown>;
+    expect(row.materials).toEqual([
+      "<업로드 후 정해지는 공개 URL: customers.xlsx>",
+      "<업로드 후 정해지는 공개 URL: guide.pdf>",
+    ]);
+    expect(row.student_materials).toEqual(row.materials);
+    expect(row.materials_text).toEqual([]);
+  });
+
+  it("공개 자료가 없는 스펙은 student_materials 키를 싣지 않는다 (DB 기본값 [])", async () => {
+    const { report } = await run(createFakeDb(verifiedWorld));
+    expect(report.planned?.exams).not.toHaveProperty("student_materials");
+  });
+
+  it("스펙의 파일 수와 읽은 파일 수가 다르면 막는다", async () => {
+    const db = createFakeDb(verifiedWorld);
+    const { report, output } = await run(db, { spec: specWithFiles, materialFiles: [] });
+    expect(report.status).toBe("blocked");
+    expect(output).toMatch(/읽은 파일이 0개/);
+  });
+});
+
+describe("seedMockExam: 학생 공개 자료 --apply (#544)", () => {
+  const apply = { apply: true, confirmProjectRef: PROJECT_REF } as const;
+  const LOST = { code: "", message: "TypeError: fetch failed" };
+
+  it("파일을 교수자 폴더에 먼저 올리고, 그 공개 URL 을 materials 와 student_materials 에 넣어 시험을 만든다", async () => {
+    const storage = createFakeStorage();
+    let uploadsAtExamInsert = -1;
+    const db = withStorage(
+      createFakeDb(verifiedWorld, {
+        failInsert: (table) => {
+          if (table === "exams") uploadsAtExamInsert = storage.ops.filter((o) => o.op === "upload").length;
+          return null;
+        },
+      }),
+      storage
+    );
+
+    const { report, output } = await run(db, { ...apply, spec: specWithFiles, materialFiles: loadedFiles(), uuid: UUIDS() });
+
+    expect(report.status).toBe("applied");
+    expect(uploadsAtExamInsert).toBe(2);
+    expect(storage.ops).toEqual([
+      {
+        op: "upload",
+        bucket: "exam-materials",
+        path: XLSX_PATH,
+        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        upsert: false,
+        size: 10,
+      },
+      { op: "upload", bucket: "exam-materials", path: PDF_PATH, contentType: "application/pdf", upsert: false, size: 10 },
+    ]);
+    const row = db.tables.exams[0];
+    expect(row.materials).toEqual([publicUrl(XLSX_PATH), publicUrl(PDF_PATH)]);
+    expect(row.student_materials).toEqual(row.materials);
+    expect(report.uploads.map((u) => u.path)).toEqual([XLSX_PATH, PDF_PATH]);
+    expect(report.uploadCleanup).toBe("not-needed");
+    expect(db.writes.map((w) => `${w.op}:${w.table}`)).toEqual(["insert:exams", "insert:exam_nodes"]);
+    expect(output).toContain("학생 공개 자료: 2개");
+  });
+
+  it("업로드 경로는 /api/upload 와 같은 규칙이다 (instructor-<id>/<날짜>_<uuid>.<확장자>)", async () => {
+    const storage = createFakeStorage();
+    const db = withStorage(createFakeDb(verifiedWorld), storage);
+
+    await run(db, { ...apply, spec: specWithFiles, materialFiles: loadedFiles() });
+
+    for (const op of storage.ops) {
+      if (op.op !== "upload") continue;
+      expect(op.path).toMatch(new RegExp(`^instructor-${INSTRUCTOR}/2026-10-03_[0-9a-f-]{36}\\.(xlsx|pdf)$`));
+    }
+  });
+
+  it("업로드가 실패하면 시험을 만들지 않고, 이미 올린 파일과 실패한 경로를 지운다", async () => {
+    const storage = createFakeStorage({ failUpload: (_p, n) => (n === 2 ? { message: "mime type not allowed" } : null) });
+    const db = withStorage(createFakeDb(verifiedWorld), storage);
+
+    const { report, output } = await run(db, { ...apply, spec: specWithFiles, materialFiles: loadedFiles(), uuid: UUIDS() });
+
+    expect(report.status).toBe("failed");
+    expect(report.exitCode).toBe(1);
+    expect(db.writes).toEqual([]);
+    expect(storage.ops.at(-1)).toEqual({ op: "remove", bucket: "exam-materials", paths: [XLSX_PATH, PDF_PATH] });
+    expect(storage.objects.size).toBe(0);
+    expect(report.uploadCleanup).toBe("removed");
+    expect(output).toMatch(/mime type not allowed/);
+  });
+
+  it("업로드가 던져도 같은 방식으로 정리한다", async () => {
+    const storage = createFakeStorage();
+    const throwing = {
+      from: (bucket: string) => ({
+        ...storage.storage.from(bucket),
+        upload: async () => {
+          throw new Error("socket hang up");
+        },
+      }),
+    };
+    const db = createFakeDb(verifiedWorld);
+    (db.client as unknown as { storage: unknown }).storage = throwing;
+
+    const { report } = await run(db, { ...apply, spec: specWithFiles, materialFiles: loadedFiles(), uuid: UUIDS() });
+
+    expect(report.status).toBe("failed");
+    expect(db.writes).toEqual([]);
+    expect(storage.ops).toEqual([{ op: "remove", bucket: "exam-materials", paths: [XLSX_PATH] }]);
+  });
+
+  it("exams INSERT 를 서버가 거부하면(PG 오류 코드) 올린 파일을 지운다", async () => {
+    const storage = createFakeStorage();
+    const db = withStorage(
+      createFakeDb(verifiedWorld, { failInsert: (t) => (t === "exams" ? { code: "42501", message: "denied" } : null) }),
+      storage
+    );
+
+    const { report } = await run(db, { ...apply, spec: specWithFiles, materialFiles: loadedFiles(), uuid: UUIDS() });
+
+    expect(report.status).toBe("failed");
+    expect(report.uploadCleanup).toBe("removed");
+    expect(storage.objects.size).toBe(0);
+  });
+
+  it("노드 실패로 시험 행을 보상 삭제하면 올린 파일도 지운다", async () => {
+    const storage = createFakeStorage();
+    const db = withStorage(
+      createFakeDb(verifiedWorld, { failInsert: (t) => (t === "exam_nodes" ? { code: "XX000", message: "node failed" } : null) }),
+      storage
+    );
+
+    const { report } = await run(db, { ...apply, spec: specWithFiles, materialFiles: loadedFiles(), uuid: UUIDS() });
+
+    expect(report.compensation).toBe("deleted");
+    expect(report.uploadCleanup).toBe("removed");
+  });
+
+  it("시험 행이 남았을 수 있으면(결과 불명, 보상 삭제 실패) 파일을 지우지 않고 경로를 알린다", async () => {
+    const unknownStorage = createFakeStorage();
+    const unknownDb = withStorage(
+      createFakeDb(verifiedWorld, {
+        commitThenFail: (table, _p, n) => (table === "exams" && n === 1 ? LOST : null),
+        failRead: (table, ctx) => (table === "exams" && ctx.writes.length > 0 ? LOST : null),
+      }),
+      unknownStorage
+    );
+    const unknown = await run(unknownDb, { ...apply, spec: specWithFiles, materialFiles: loadedFiles(), uuid: UUIDS() });
+    expect(unknown.report.ambiguousInsert).toBe("unknown");
+    expect(unknown.report.uploadCleanup).toBe("kept");
+    expect(unknownStorage.ops.some((o) => o.op === "remove")).toBe(false);
+    expect(unknown.output).toContain(XLSX_PATH);
+
+    const leftStorage = createFakeStorage();
+    const leftDb = withStorage(
+      createFakeDb(verifiedWorld, {
+        failInsert: (t) => (t === "exam_nodes" ? { code: "XX000", message: "node failed" } : null),
+        failDelete: () => ({ code: "XX001", message: "delete failed" }),
+      }),
+      leftStorage
+    );
+    const left = await run(leftDb, { ...apply, spec: specWithFiles, materialFiles: loadedFiles(), uuid: UUIDS() });
+    expect(left.report.compensation).toBe("failed");
+    expect(left.report.uploadCleanup).toBe("kept");
+    expect(leftStorage.ops.some((o) => o.op === "remove")).toBe(false);
+  });
+
+  it("파일 삭제가 실패하면 직접 지울 경로를 출력한다", async () => {
+    const storage = createFakeStorage({
+      failUpload: (_p, n) => (n === 2 ? { message: "boom" } : null),
+      failRemove: () => ({ message: "remove failed" }),
+    });
+    const db = withStorage(createFakeDb(verifiedWorld), storage);
+
+    const { report, output } = await run(db, { ...apply, spec: specWithFiles, materialFiles: loadedFiles(), uuid: UUIDS() });
+
+    expect(report.uploadCleanup).toBe("failed");
+    expect(output).toContain("직접 지우세요");
+    expect(output).toContain(XLSX_PATH);
+  });
+});
+
+describe("main: 학생 공개 자료 (#544)", () => {
+  const specText = JSON.stringify({ ...(FIXTURE as Record<string, unknown>), student_material_files: ["data/customers.xlsx"] });
+
+  function harnessWithFiles(readBinaryFile: (p: string) => Uint8Array, text = specText) {
+    const out: string[] = [];
+    const err: string[] = [];
+    const createClient = vi.fn(() => createFakeDb(verifiedWorld).client);
+    const code = main(["--spec", SPEC_PATH, "--instructor-id", INSTRUCTOR], {}, {
+      createClient: createClient as never,
+      readFile: () => text,
+      readBinaryFile,
+      out: (l) => out.push(l),
+      err: (l) => err.push(l),
+      now: () => NOW,
+      generateCode: () => "AAAAAA",
+    });
+    return { code, out, err, createClient };
+  }
+
+  it("오프라인 dry-run 은 스펙 폴더 기준으로 파일을 읽고 올릴 파일을 보여 준다", async () => {
+    const readBinaryFile = vi.fn(() => fakeBytes(42));
+    const h = harnessWithFiles(readBinaryFile);
+
+    expect(await h.code).toBe(0);
+    expect(readBinaryFile).toHaveBeenCalledWith(path.resolve(path.dirname(SPEC_PATH), "data/customers.xlsx"));
+    expect(h.out.join("\n")).toContain("data/customers.xlsx (42 bytes");
+    expect(h.createClient).not.toHaveBeenCalled();
+  });
+
+  it("파일을 읽을 수 없으면 2 로 끝나고 접속하지 않는다", async () => {
+    const h = harnessWithFiles(() => {
+      throw new Error("ENOENT: no such file");
+    });
+
+    expect(await h.code).toBe(2);
+    expect(h.err.join("\n")).toMatch(/student_material_files 를 쓸 수 없습니다/);
+    expect(h.err.join("\n")).toMatch(/ENOENT/);
+    expect(h.createClient).not.toHaveBeenCalled();
+  });
+
+  it("허용 목록에 없는 확장자는 파일을 읽기 전에 스펙 검증에서 2 로 끝난다", async () => {
+    const readBinaryFile = vi.fn(() => fakeBytes(1));
+    const bad = JSON.stringify({ ...(FIXTURE as Record<string, unknown>), student_material_files: ["tool.exe"] });
+    const h = harnessWithFiles(readBinaryFile, bad);
+
+    expect(await h.code).toBe(2);
+    expect(readBinaryFile).not.toHaveBeenCalled();
+    expect(h.err.join("\n")).toMatch(/허용 목록/);
+  });
+});
+
+describe("스크립트 소스 가드: 학생 공개 자료 (#544)", () => {
+  it("업로드 경로 규칙과 허용 목록은 앱과 같은 공용 모듈을 쓴다", () => {
+    expect(SCRIPT_SOURCE).toMatch(/from "\.\.\/lib\/material-object-key"/);
+    expect(SCRIPT_SOURCE).toMatch(/from "\.\.\/lib\/upload-allowlist"/);
+    expect(SCRIPT_SOURCE).toMatch(/from "\.\.\/lib\/student-materials"/);
+    expect(SCRIPT_SOURCE).not.toMatch(/`instructor-\$\{/);
+  });
+
+  it("두 업로드 라우트도 같은 경로 규칙 모듈을 쓰고 자체 규칙을 두지 않는다", () => {
+    for (const route of ["app/api/upload/route.ts", "app/api/upload/signed-url/route.ts"]) {
+      const source = readFileSync(path.join(ROOT, route), "utf8");
+      expect(source, route).toContain('from "@/lib/material-object-key"');
+      expect(source, route).toContain("materialStoragePath(user.id, objectKey)");
+      expect(source, route).not.toMatch(/function makeSafeObjectKey/);
+    }
   });
 });

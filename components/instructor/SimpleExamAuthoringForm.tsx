@@ -1,7 +1,7 @@
 "use client";
 
 import type { KeyboardEvent, ReactNode, Ref } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CourseSelectField } from "@/components/instructor/CourseSelectField";
 import { Input } from "@/components/ui/input";
@@ -47,10 +47,10 @@ import {
   Plus,
   Sparkles,
   Upload,
-  X,
 } from "lucide-react";
 import type { Question } from "@/components/instructor/QuestionEditor";
 import { QuestionEditor } from "@/components/instructor/QuestionEditor";
+import { MaterialFileRow } from "@/components/instructor/MaterialFileRow";
 import {
   perQuestionScore as computePerQuestionScore,
   scoreShare as computeScoreShare,
@@ -137,6 +137,13 @@ interface SimpleExamAuthoringFormProps {
   existingFiles?: Array<{ url: string; name: string; index: number }>;
   /** 기존 파일 삭제 핸들러. */
   onRemoveExistingFile?: (index: number) => void;
+  // ── 학생 공개 자료 (#544) ────────────────────────────────────────────────
+  /** 학생에게 공개로 표시한 자료 URL. */
+  sharedMaterialUrls?: ReadonlySet<string>;
+  /** 넘기면 파일 행마다 "학생에게 공개" 스위치가 생긴다. 기본은 꺼짐이다. */
+  onMaterialShareChange?: (url: string, shared: boolean) => void;
+  /** 새로 올린 파일의 업로드 URL (파일 이름 → URL). 업로드가 끝나기 전에는 없어 스위치가 비활성이다. */
+  uploadedUrlByName?: ReadonlyMap<string, string>;
 }
 
 type StatusTextKey = "simpleExamAuthoringForm.statusUploading" | "simpleExamAuthoringForm.statusExtracting" | "simpleExamAuthoringForm.statusDone" | "simpleExamAuthoringForm.statusFailed" | "simpleExamAuthoringForm.statusWaiting";
@@ -363,8 +370,12 @@ export function SimpleExamAuthoringForm({
   submitButtonText,
   existingFiles,
   onRemoveExistingFile,
+  sharedMaterialUrls,
+  onMaterialShareChange,
+  uploadedUrlByName,
 }: SimpleExamAuthoringFormProps) {
   const t = useTranslations("authoring");
+  const materialShareHelpId = useId();
   // "+" 문제 추가 — 문제 유형을 고르는 Dialog 의 열림 상태.
   const [isAddPickerOpen, setIsAddPickerOpen] = useState(false);
   // 추가 다이얼로그에서 선택 중인 문제 유형. 기본은 사례형이다.
@@ -945,76 +956,84 @@ export function SimpleExamAuthoringForm({
                 {t("simpleExamAuthoringForm.uploadSupportedFormats")}
               </span>
             </button>
-            {/* 기존 파일 chips (편집 모드에서 DB에서 로드한 파일) */}
-            {existingFiles && existingFiles.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {existingFiles.map(({ url, name, index }) => (
-                  <span
+            {/*
+              파일 목록. 편집 화면의 기존 파일(DB 의 URL)과 이번에 올린 파일이 같은 행을 쓴다.
+              파일마다 "학생에게 공개" 스위치가 있고 기본은 꺼짐이다 (#544). 공개할 URL 은 업로드가
+              끝나야 생기므로 그 전에는 스위치가 비활성이다.
+            */}
+            {((existingFiles?.length ?? 0) > 0 || files.length > 0) && (
+              <ul className="divide-y rounded-md border bg-background">
+                {existingFiles?.map(({ url, name, index }) => (
+                  <MaterialFileRow
                     key={url}
-                    className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-success-border bg-success-surface px-2 py-1 text-sm text-success-text"
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{name}</span>
-                    {onRemoveExistingFile && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-6 shrink-0"
-                        onClick={() => onRemoveExistingFile(index)}
-                        aria-label={t("simpleExamAuthoringForm.ariaDeleteExistingFile", { name })}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </span>
+                    name={name}
+                    icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                    tone="success"
+                    shared={sharedMaterialUrls?.has(url) ?? false}
+                    onShareChange={
+                      onMaterialShareChange
+                        ? (shared) => onMaterialShareChange(url, shared)
+                        : undefined
+                    }
+                    shareHelpId={materialShareHelpId}
+                    onRemove={
+                      onRemoveExistingFile ? () => onRemoveExistingFile(index) : undefined
+                    }
+                    removeAriaLabel={t("simpleExamAuthoringForm.ariaDeleteExistingFile", { name })}
+                  />
                 ))}
-              </div>
-            )}
-            {(files.length > 0 || !canAddMoreFiles) && (
-              <div className="flex flex-wrap gap-2">
                 {files.map((file, index) => {
                   const status = extractionStatus?.get(file.name);
                   const disabled = disabledFiles.has(index);
+                  const uploadedUrl = uploadedUrlByName?.get(file.name);
                   return (
-                    <span
+                    <MaterialFileRow
                       key={`${file.name}-${index}`}
-                      className={`inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-sm ${
+                      name={file.name}
+                      icon={
+                        status === "uploading" || status === "extracting" ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : status === "done" ? (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        ) : (
+                          getFileIcon(file.name)
+                        )
+                      }
+                      statusText={t(getStatusTextKey(status))}
+                      tone={
                         disabled || status === "failed"
-                          ? "border-destructive bg-destructive/10 text-destructive"
+                          ? "danger"
                           : status === "done"
-                            ? "border-success-border bg-success-surface text-success-text"
-                            : "bg-muted/40"
-                      }`}
-                    >
-                      {status === "uploading" || status === "extracting" ? (
-                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-                      ) : status === "done" ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                      ) : (
-                        getFileIcon(file.name)
-                      )}
-                      <span className="truncate">{file.name}</span>
-                      <span className="shrink-0 text-xs opacity-75">
-                        {t(getStatusTextKey(status))}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-6 shrink-0"
-                        onClick={() => onRemoveFile(index)}
-                        aria-label={t("simpleExamAuthoringForm.ariaDeleteFile", { name: file.name })}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </span>
+                            ? "success"
+                            : "neutral"
+                      }
+                      shared={uploadedUrl ? (sharedMaterialUrls?.has(uploadedUrl) ?? false) : false}
+                      canShare={Boolean(uploadedUrl) && !disabled && status !== "failed"}
+                      onShareChange={
+                        onMaterialShareChange
+                          ? (shared) => {
+                              if (uploadedUrl) onMaterialShareChange(uploadedUrl, shared);
+                            }
+                          : undefined
+                      }
+                      shareHelpId={materialShareHelpId}
+                      onRemove={() => onRemoveFile(index)}
+                      removeAriaLabel={t("simpleExamAuthoringForm.ariaDeleteFile", { name: file.name })}
+                    />
                   );
                 })}
-                <span className="inline-flex items-center rounded-md px-2 py-1 text-xs text-muted-foreground">
-                  {(totalSize / 1024 / 1024).toFixed(1)}MB / 50MB
-                </span>
-              </div>
+              </ul>
+            )}
+            {onMaterialShareChange &&
+              ((existingFiles?.length ?? 0) > 0 || files.length > 0) && (
+                <p id={materialShareHelpId} className="type-hint">
+                  {t("simpleExamAuthoringForm.materialShareHelp")}
+                </p>
+              )}
+            {(files.length > 0 || !canAddMoreFiles) && (
+              <p className="type-meta text-right">
+                {(totalSize / 1024 / 1024).toFixed(1)}MB / 50MB
+              </p>
             )}
           </div>
         </CardContent>
