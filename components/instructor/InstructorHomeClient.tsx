@@ -1074,8 +1074,16 @@ export default function InstructorHome() {
                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
              </svg>`;
 
+      // 아이콘은 위의 고정 문자열이라 HTML 로 넣어도 되지만, 이름은 교수자가 입력한 값이라
+      // 반드시 텍스트 노드로 넣는다. innerHTML 에 섞으면 `<img onerror=...` 같은 이름이 실행된다(#528).
       const ghost = document.createElement("div");
-      ghost.innerHTML = `${iconSvg}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${node.name}</span>`;
+      ghost.innerHTML = iconSvg;
+      const label = document.createElement("span");
+      label.style.overflow = "hidden";
+      label.style.textOverflow = "ellipsis";
+      label.style.whiteSpace = "nowrap";
+      label.textContent = node.name;
+      ghost.appendChild(label);
       Object.assign(ghost.style, {
         position: "absolute",
         top: "-1000px",
