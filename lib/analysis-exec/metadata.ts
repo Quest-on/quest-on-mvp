@@ -87,6 +87,8 @@ export type StoredAnalysisTurn = {
   notices: AnalysisNotice[];
   /** 만료 복구로 다시 실행하라고 넣은 이전 셀 수. */
   replayed_cells?: number;
+  /** 문항 간 연결로 알려 준 다른 문항의 셀 수(변수가 남아 있어 다시 실행하지 않는다). */
+  linked_cells?: number;
   elapsed_ms: number;
 };
 
@@ -215,6 +217,7 @@ export function readStoredAnalysisTurn(metadata: unknown): StoredAnalysisTurn | 
       ? raw.notices.filter((n): n is AnalysisNotice => (ANALYSIS_NOTICES as readonly unknown[]).includes(n))
       : [],
     ...(typeof raw.replayed_cells === "number" ? { replayed_cells: raw.replayed_cells } : {}),
+    ...(typeof raw.linked_cells === "number" ? { linked_cells: raw.linked_cells } : {}),
     elapsed_ms: typeof raw.elapsed_ms === "number" ? raw.elapsed_ms : 0,
   };
 }

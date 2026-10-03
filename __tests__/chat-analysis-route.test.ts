@@ -10,11 +10,14 @@
  *   4) 만료 복구: 새 컨테이너 + 이전 셀 코드 재실행 입력 + 화면 안내.
  *   5) 잔액 소진: 재시도 없음, 학생 안내 코드, 서버 로그 error.
  *   6) 셀 상한: 스트림 중단, 실패 턴으로 기록(response_id 없음).
+ *   7) 문항 간 연결: 대화는 문항마다 따로지만 컨테이너는 세션에 하나라, 새 문항의 첫 턴에 앞 문항의 성공 셀 코드를
+ *      developer 블록으로 알린다. 같은 문항의 이어지는 턴은 블록 없이 기존 대화를 잇고, 만료면 복구 문구가 우선한다.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SseParser } from "@/lib/analysis-exec/sse";
 import { STUDENT_CHAT_SPECS } from "@/lib/student-chat-spec";
 import { ANALYSIS_MAX_OUTPUT_TOKENS } from "@/lib/analysis-exec/limits";
+import { LINKED_CODE_HEADER, REPLAY_INSTRUCTION_HEADER } from "@/lib/analysis-exec/container";
 
 type Row = Record<string, unknown>;
 
@@ -32,10 +35,14 @@ const h = vi.hoisted(() => ({
     exam: null as Row | null,
     aiMessages: [] as Row[],
     prevResponseId: null as string | null,
+    /** 이전 응답이 속한 문항. null 이면 어느 문항을 물어도 돌려준다. 숫자면 그 문항(q_idx 조건)만. */
+    prevResponseQIdx: null as number | null,
   },
   openai: {
     calls: [] as Array<{ method: string; path: string; body: unknown }>,
     containerStatus: "running" as string,
+    /** 다음 컨테이너 생성 한 번을 404 로 실패시킨다(같은 파일 id 로 다시 만들 수 없는 경우). */
+    failNextContainerCreate: false,
     responses: [] as Array<() => Response>,
   },
 }));
@@ -79,9 +86,13 @@ function makeSupabase() {
       },
     },
     from(table: string) {
-      const state: { select?: string; insert?: Row[] } = {};
+      const state: { select?: string; insert?: Row[]; eq: Record<string, unknown> } = { eq: {} };
       const builder: Record<string, unknown> = {};
-      for (const m of ["eq", "neq", "is", "not", "in", "order", "limit"]) builder[m] = () => builder;
+      for (const m of ["neq", "is", "not", "in", "order", "limit"]) builder[m] = () => builder;
+      builder.eq = (column: string, value: unknown) => {
+        state.eq[column] = value;
+        return builder;
+      };
       builder.select = (cols?: string) => {
         state.select = cols ?? "*";
         return builder;
@@ -115,7 +126,10 @@ function makeSupabase() {
           return { data: h.db.exam, error: null };
         }
         if (table === "messages" && state.select === "response_id") {
-          return { data: h.db.prevResponseId ? { response_id: h.db.prevResponseId } : null, error: null };
+          // q_idx 조건 없이 물으면(문항을 가리지 않으면) 가장 최근 응답을 돌려준다.
+          const sameQuestion =
+            state.eq.q_idx === undefined || h.db.prevResponseQIdx === null || state.eq.q_idx === h.db.prevResponseQIdx;
+          return { data: h.db.prevResponseId && sameQuestion ? { response_id: h.db.prevResponseId } : null, error: null };
         }
         return { data: null, error: null };
       };
@@ -199,6 +213,10 @@ const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
   if (typeof init?.body === "string") body = JSON.parse(init.body);
   h.openai.calls.push({ method, path, body });
   if (method === "POST" && path === "/files") return jsonResponse(200, { id: "file-up1" });
+  if (method === "POST" && path === "/containers" && h.openai.failNextContainerCreate) {
+    h.openai.failNextContainerCreate = false;
+    return jsonResponse(404, { error: { message: "File not found", type: "invalid_request_error" } });
+  }
   if (method === "POST" && path === "/containers") return jsonResponse(200, { id: `cntr_${h.openai.calls.filter((c) => c.path === "/containers").length}`, status: "running" });
   if (method === "GET" && /^\/containers\/[^/]+\/files$/.test(path)) {
     return jsonResponse(200, { data: [{ id: "cfile_1", path: "/mnt/data/file-up1-a.xlsx" }] });
@@ -255,6 +273,7 @@ beforeEach(() => {
   h.openai.calls.length = 0;
   h.openai.responses.length = 0;
   h.openai.containerStatus = "running";
+  h.openai.failNextContainerCreate = false;
   h.currentUser.mockResolvedValue({ id: STUDENT, role: "student" });
   // 에픽 A 헬퍼의 fileName 은 URL 마지막 조각(날짜_uuid.확장자)이다.
   h.visible = [{ url: DATA_URL, fileName: "2026-10-03_0f8e.xlsx", extension: "xlsx" }];
@@ -269,6 +288,7 @@ beforeEach(() => {
   };
   h.db.aiMessages = [];
   h.db.prevResponseId = null;
+  h.db.prevResponseQIdx = null;
 });
 
 describe("켜지는 조건이 아니면 아무것도 저장하지 않고 409", () => {
@@ -531,6 +551,183 @@ describe("만료 복구", () => {
     expect(((responseCalls()[1].body as Row).input as Row[])[0]).toMatchObject({ role: "developer" });
     expect(events.some((e) => e.event === "done")).toBe(true);
     expect(userMessages()).toHaveLength(1);
+  });
+});
+
+describe("문항 간 연결", () => {
+  const cell = (index: number, code: string, status = "completed", extra: Row = {}) => ({
+    index,
+    status,
+    code,
+    logs: "",
+    figures: [],
+    ...extra,
+  });
+  function record(params: { n: number; qIdx: number; cells: Row[]; outcome?: string; container?: string }) {
+    return {
+      id: `00000000-0000-4000-8000-0000000001${String(params.n).padStart(2, "0")}`,
+      q_idx: params.qIdx,
+      created_at: `2026-10-03T04:${String(params.n).padStart(2, "0")}:00.000Z`,
+      metadata: {
+        analysis: {
+          v: 1,
+          container_id: params.container ?? "cntr_old",
+          files: [{ name: "a.xlsx", path: "/mnt/data/file-keep-a.xlsx", file_id: "file-keep", source: DATA_URL }],
+          cells: params.cells,
+          cited_figures: [],
+          outcome: params.outcome ?? "completed",
+          notices: [],
+          elapsed_ms: 1,
+        },
+      },
+    };
+  }
+  const READ = "df = pd.read_excel('/mnt/data/file-keep-a.xlsx')";
+  const CLEAN = "df_clean = df[(z.abs() < 3).all(axis=1)]";
+  const q1Record = record({
+    n: 1,
+    qIdx: 0,
+    cells: [cell(1, READ), cell(2, "boom()", "failed"), cell(3, "partial(", "completed", { code_truncated: true }), cell(4, CLEAN)],
+  });
+  const askQ2 = () => request({ questionIdx: 1, questionId: "q-2", currentQuestionText: "문제 2 본문", message: "K-means 로 군집을 나눠 주세요" });
+  const developerOf = (call: { body: unknown }) => {
+    const input = (call.body as Row).input;
+    return Array.isArray(input) ? (input as Row[]).filter((m) => m.role === "developer").map((m) => String(m.content)) : [];
+  };
+  const storedAnalysis = () => (aiMessages()[0].metadata as Row).analysis as Row;
+
+  beforeEach(() => {
+    h.db.exam!.questions = [
+      { id: "q-1", ai_context: "교수 메모", ai_role: "analysis_partner" },
+      { id: "q-2", ai_context: "교수 메모 2", ai_role: "analysis_partner" },
+    ];
+  });
+
+  it("첫 문항의 첫 턴에는 블록이 없다", async () => {
+    h.openai.responses.push(() => sseResponse(turnEvents(1)));
+    await readEvents(await POST(request()));
+    expect(responseCalls()[0].body).toMatchObject({ input: "데이터를 점검해 주세요" });
+    expect(storedAnalysis()).not.toHaveProperty("linked_cells");
+    expect(h.inserts.ai_events[0].metadata).toMatchObject({ linked_cells: 0, replayed_cells: 0 });
+  });
+
+  it("두 번째 문항의 첫 턴은 대화를 새로 시작하고, 앞 문항이 같은 컨테이너에서 실행한 성공 셀을 문항 번호와 함께 받는다", async () => {
+    h.db.aiMessages = [q1Record];
+    // 문제 1 의 대화가 있어도 문제 2 는 그 대화를 잇지 않는다(q_idx 별 대화).
+    h.db.prevResponseId = "resp_q1";
+    h.db.prevResponseQIdx = 0;
+    h.openai.responses.push(() => sseResponse(turnEvents(1)));
+    const events = await readEvents(await POST(askQ2()));
+
+    // 컨테이너는 그대로 쓴다(변수가 남아 있다).
+    expect(h.openai.calls.map((c) => `${c.method} ${c.path}`)).toEqual(["GET /containers/cntr_old", "POST /responses"]);
+    const body = responseCalls()[0].body as Row;
+    expect(body).not.toHaveProperty("previous_response_id");
+    expect(body).toMatchObject({ tools: [{ type: "code_interpreter", container: "cntr_old" }] });
+    expect(body.input).toEqual([
+      { role: "developer", content: expect.any(String) },
+      { role: "user", content: "K-means 로 군집을 나눠 주세요" },
+    ]);
+    const [block] = developerOf(responseCalls()[0]);
+    expect(block.startsWith(`${LINKED_CODE_HEADER}\n지금 풀고 있는 문제는 문제 2입니다.`)).toBe(true);
+    expect(block).toContain(`# 문제 1 셀 1\n${READ}\n\n# 문제 1 셀 2\n${CLEAN}`);
+    // 실패한 셀과 저장 상한에 잘린 셀은 넣지 않는다.
+    expect(block).not.toContain("boom()");
+    expect(block).not.toContain("partial(");
+    expect(block).not.toContain(REPLAY_INSTRUCTION_HEADER);
+    // 지시문(도구 있음 3절)에 앞 문항 처리를 이어 쓰기 전에 확인하는 규칙이 있다.
+    expect(body.instructions as string).toContain(
+      "앞 문항에서 실행한 분석 코드가 입력에 주어지면, 앞 문항의 처리(제외한 행, 변환과 표준화 방식 등)를 이 문항에 이어 쓰기 전에"
+    );
+
+    expect(userMessages()[0]).toMatchObject({ q_idx: 1 });
+    expect(aiMessages()[0]).toMatchObject({ q_idx: 1, response_id: "resp_1" });
+    expect(storedAnalysis()).toMatchObject({ container_id: "cntr_old", notices: [], linked_cells: 2 });
+    expect(storedAnalysis()).not.toHaveProperty("replayed_cells");
+    expect(h.inserts.ai_events[0].metadata).toMatchObject({ linked_cells: 2, replayed_cells: 0, container_restarted: false });
+    // 화면 안내는 없다(복구가 아니다).
+    expect(events.filter((e) => e.event === "status").map((e) => e.data.phase)).not.toContain("restarting");
+  });
+
+  it("같은 문항의 두 번째 턴은 기존 대화를 잇고 블록을 붙이지 않는다", async () => {
+    h.db.aiMessages = [q1Record, record({ n: 2, qIdx: 1, cells: [cell(1, "km = KMeans(4).fit(X)")] })];
+    h.db.prevResponseId = "resp_q2";
+    h.db.prevResponseQIdx = 1;
+    h.openai.responses.push(() => sseResponse(turnEvents(1)));
+    await readEvents(await POST(askQ2()));
+    expect(responseCalls()[0].body).toMatchObject({ previous_response_id: "resp_q2", input: "K-means 로 군집을 나눠 주세요" });
+    expect(storedAnalysis()).not.toHaveProperty("linked_cells");
+  });
+
+  it("다른 문항에 갔다가 돌아오면 그 사이 다른 문항에서 실행한 셀만 받는다", async () => {
+    h.db.aiMessages = [
+      q1Record,
+      record({ n: 2, qIdx: 1, cells: [cell(1, "km = KMeans(4).fit(X)")] }),
+      record({ n: 3, qIdx: 0, cells: [cell(1, "df_clean = df[mask_iqr]")] }),
+    ];
+    h.db.prevResponseId = "resp_q2";
+    h.db.prevResponseQIdx = 1;
+    h.openai.responses.push(() => sseResponse(turnEvents(1)));
+    await readEvents(await POST(askQ2()));
+    expect(responseCalls()[0].body).toMatchObject({ previous_response_id: "resp_q2" });
+    const [block] = developerOf(responseCalls()[0]);
+    expect(block).toContain("# 문제 1 셀 1\ndf_clean = df[mask_iqr]\n```");
+    expect(block).not.toContain(CLEAN);
+    expect(storedAnalysis()).toMatchObject({ linked_cells: 1 });
+  });
+
+  it("컨테이너가 만료됐는데 문항도 바뀌었으면 복구 문구가 우선하고 연결 블록은 붙이지 않는다", async () => {
+    h.db.aiMessages = [q1Record];
+    h.openai.containerStatus = "expired";
+    h.openai.responses.push(() => sseResponse(turnEvents(1)));
+    const events = await readEvents(await POST(askQ2()));
+    expect(h.openai.calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+      "GET /containers/cntr_old",
+      "POST /containers",
+      "POST /responses",
+    ]);
+    const blocks = developerOf(responseCalls()[0]);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].startsWith(REPLAY_INSTRUCTION_HEADER)).toBe(true);
+    expect(blocks[0]).not.toContain(LINKED_CODE_HEADER);
+    expect(blocks[0]).toContain("지금 풀고 있는 문제는 문제 2입니다. 다른 번호가 붙은 셀은 앞 문항에서 실행한 코드입니다.");
+    expect(blocks[0]).toContain(`# 문제 1 셀 1\n${READ}\n\n# 문제 1 셀 2\n${CLEAN}`);
+    expect(blocks[0]).not.toContain("boom()");
+    expect(storedAnalysis()).toMatchObject({ container_id: "cntr_1", notices: ["environment_restarted"], replayed_cells: 2 });
+    expect(storedAnalysis()).not.toHaveProperty("linked_cells");
+    expect(h.inserts.ai_events[0].metadata).toMatchObject({ linked_cells: 0, replayed_cells: 2, container_restarted: true });
+    expect(events.filter((e) => e.event === "status").map((e) => e.data.phase)).toContain("restarting");
+  });
+
+  it("만료 뒤 파일을 다시 올려 경로가 바뀌면 복구 코드 안의 앞 문항 경로도 새 경로로 바꿔 넣는다", async () => {
+    h.db.aiMessages = [q1Record];
+    h.openai.containerStatus = "expired";
+    h.openai.failNextContainerCreate = true;
+    h.openai.responses.push(() => sseResponse(turnEvents(1)));
+    await readEvents(await POST(askQ2()));
+    expect(h.openai.calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+      "GET /containers/cntr_old",
+      "POST /containers",
+      "POST /files",
+      "POST /containers",
+      "GET /containers/cntr_2/files",
+      "POST /responses",
+    ]);
+    const [block] = developerOf(responseCalls()[0]);
+    expect(block).toContain("# 문제 1 셀 1\ndf = pd.read_excel('/mnt/data/file-up1-a.xlsx')");
+    expect(block).not.toContain("file-keep");
+  });
+
+  it("앞 문항 코드가 4만 자를 넘으면 앞에서부터 넣고, 넣지 못한 셀 수를 알린다", async () => {
+    const big = (tag: string) => `# ${tag}\n${"x = 1\n".repeat(2_495)}`; // 셀 하나 약 1만 5천 자
+    h.db.aiMessages = [record({ n: 1, qIdx: 0, cells: [cell(1, big("A")), cell(2, big("B")), cell(3, big("C"))] })];
+    h.openai.responses.push(() => sseResponse(turnEvents(1)));
+    await readEvents(await POST(askQ2()));
+    const [block] = developerOf(responseCalls()[0]);
+    expect(block).toContain("# 문제 1 셀 2\n# B");
+    expect(block).not.toContain("# C");
+    expect(block).toContain("길이 제한으로 마지막 셀 1개의 코드는 넣지 못했습니다.");
+    expect(storedAnalysis()).toMatchObject({ linked_cells: 2 });
   });
 });
 

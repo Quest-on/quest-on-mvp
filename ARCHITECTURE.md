@@ -247,7 +247,7 @@ sequenceDiagram
 
 응시 중 `/api/chat` 은 `search-materials` 로 이 청크를 pgvector 검색해 컨텍스트로 넣는다.
 
-분석 파트너 문항(문항 `ai_role` 이 `analysis_partner`)이고 학생에게 공개된 데이터 파일(xlsx, xls, csv)이 있으면 화면은 `/api/chat/analysis` 로 보낸다(#545). 이 라우트는 OpenAI 호스팅 code_interpreter 를 foreground 스트림으로 부르고(SSE 로 진행을 화면에 전달, `maxDuration` 300), 세션마다 명시 컨테이너 하나에 공개 데이터 파일을 연결한다. 컨테이너 id, 파일 경로, 실행한 코드 셀(코드, 로그, 그림 경로)은 AI 메시지 `metadata.analysis` 에 남고(DDL 없음), 그림은 비공개 버킷 `analysis-outputs` 에 둔다. 학생과 교수는 `/api/session/[sessionId]/analysis`(기록)와 `/api/session/[sessionId]/analysis/figures/...`(서명 URL)로 본다. 대상이 아니면 409 를 받고 같은 메시지를 `/api/chat` 으로 보낸다.
+분석 파트너 문항(문항 `ai_role` 이 `analysis_partner`)이고 학생에게 공개된 데이터 파일(xlsx, xls, csv)이 있으면 화면은 `/api/chat/analysis` 로 보낸다(#545). 이 라우트는 OpenAI 호스팅 code_interpreter 를 foreground 스트림으로 부르고(SSE 로 진행을 화면에 전달, `maxDuration` 300), 세션마다 명시 컨테이너 하나에 공개 데이터 파일을 연결한다. 대화(`previous_response_id`)는 문항마다 따로이고 컨테이너는 세션에 하나라, 다른 문항에서 실행한 성공 셀 코드 중 이 문항의 대화가 아직 모르는 것을 developer 메시지로 알린다(새 문항의 첫 턴, 만료면 복구 지시가 대신한다). 컨테이너 id, 파일 경로, 실행한 코드 셀(코드, 로그, 그림 경로)은 AI 메시지 `metadata.analysis` 에 남고(DDL 없음), 그림은 비공개 버킷 `analysis-outputs` 에 둔다. 학생과 교수는 `/api/session/[sessionId]/analysis`(기록)와 `/api/session/[sessionId]/analysis/figures/...`(서명 URL)로 본다. 대상이 아니면 409 를 받고 같은 메시지를 `/api/chat` 으로 보낸다.
 
 ### 3-5. 에이전트 런 (출제 보조)
 

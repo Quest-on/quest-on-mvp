@@ -108,6 +108,8 @@ export function buildStoredTurn(params: {
   outcome: AnalysisOutcome;
   notices: AnalysisNotice[];
   replayedCells: number;
+  /** 문항 간 연결로 알려 준 다른 문항의 셀 수. 없으면 0. */
+  linkedCells?: number;
   elapsedMs: number;
 }): StoredAnalysisTurn {
   return {
@@ -120,6 +122,7 @@ export function buildStoredTurn(params: {
     outcome: params.outcome,
     notices: params.notices,
     ...(params.replayedCells > 0 ? { replayed_cells: params.replayedCells } : {}),
+    ...(params.linkedCells && params.linkedCells > 0 ? { linked_cells: params.linkedCells } : {}),
     elapsed_ms: Math.max(0, Math.round(params.elapsedMs)),
   };
 }

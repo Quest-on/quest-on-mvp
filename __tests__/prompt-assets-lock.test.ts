@@ -650,7 +650,7 @@ const V2_LOCK_DATA_FILES = [
 const V2_HOSTED = { kind: "hosted_python" as const, dataFiles: V2_LOCK_DATA_FILES };
 
 const PARTNER_V2_NONE_FULL_SHA256 = "46ad92761710c0cbb87eb3dffbb1b94ccb31c315e3a7ac98950b4434268c1846";
-const PARTNER_V2_HOSTED_FULL_SHA256 = "7f4debcfd0787782699ae1215c1fa17af4fba8d569e0de1cad621504b8427ec7";
+const PARTNER_V2_HOSTED_FULL_SHA256 = "b509acd704031188725130a41a7985c620333dacb2fa8daab6d99bb022fdc026";
 
 const PARTNER_V2_LOCKS: LockCase[] = [
   {
@@ -667,7 +667,7 @@ const PARTNER_V2_LOCKS: LockCase[] = [
   {
     name: "분석 파트너 v2 도구 있음 ko 최소",
     render: () => buildAnalysisPartnerV2SystemPrompt({ ...MINIMAL_INPUT, tools: V2_HOSTED }),
-    sha256: "f8d023c1651168fb2fb307003dc5a0c0dddf74de8fa6f44ad0a5bedb420b5f3d",
+    sha256: "098bb7d5fbfe23bb176894c6c30c8f24d0a24699d7da81b79f2c1b2f3b94bff6",
   },
   {
     name: "분석 파트너 v2 도구 있음 ko 전체",
@@ -747,7 +747,7 @@ describe("assembleAnalysisToolInstructions 해시 잠금 (코드 실행 경로�
     expect(result.instructions).not.toContain("분석에 쓰는 자료:");
     expect(result.instructions).not.toContain("[수업 자료 검색 결과 없음]");
     expect(sha256(result.instructions), CHANGE_NOTICE).toBe(
-      "d11957553034abe478e79868f496301aade0698884a76f2b31efdd4e321f15d8"
+      "8ec5d95a09f5f8344afe567a4db83801e3ded32d1c15b7fb96d3ebbd64c3c7d5"
     );
   });
 

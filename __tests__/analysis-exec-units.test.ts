@@ -1,6 +1,6 @@
 /**
  * 분석 실행 단위 모듈 (이슈 #545): 셀 수집과 상한, 오류 분류, 답변 텍스트 정리, 저장 기록 모양, 켜지는 조건,
- * 컨테이너 준비와 만료 복구 입력.
+ * 컨테이너 준비와 만료 복구 입력, 문항 간 연결 입력.
  *
  * OpenAI 는 부르지 않는다. 컨테이너 연산은 가짜 객체로 바꾼다.
  */
@@ -39,8 +39,12 @@ import {
 } from "@/lib/analysis-exec/eligibility";
 import {
   AnalysisSetupError,
+  LINKED_CODE_HEADER,
+  REPLAY_INSTRUCTION_HEADER,
   applyPathRewrites,
+  buildLinkedCodeInstruction,
   buildReplayInstruction,
+  collectLinkedCells,
   collectReplayCells,
   ensureAnalysisContainer,
   toAsciiUploadName,
@@ -602,24 +606,227 @@ describe("만료 복구 입력 구성", () => {
     cells: [{ index: 1, status: "completed", code: "OLD", logs: "", figures: [] }],
   });
 
-  it("만료된 컨테이너에서 성공한 셀만 시간 순서로 모은다(실패, 잘린 코드, 다른 컨테이너 제외)", () => {
-    expect(collectReplayCells([other, turnA, turnB], "cntr_old")).toEqual({
-      codes: ["df = load()", "scaled = scale(df)"],
+  it("만료된 컨테이너에서 성공한 셀만 문항과 관계없이 시간 순서로 모은다(실패, 잘린 코드, 다른 컨테이너 제외)", () => {
+    expect(
+      collectReplayCells(
+        [
+          { qIdx: 0, turn: other },
+          { qIdx: 0, turn: turnA },
+          { qIdx: 1, turn: turnB },
+        ],
+        "cntr_old"
+      )
+    ).toEqual({
+      cells: [
+        { qIdx: 0, code: "df = load()" },
+        { qIdx: 1, code: "scaled = scale(df)" },
+      ],
       omitted: 0,
     });
   });
 
   it("길이 상한을 넘으면 앞에서부터 넣고 나머지 수를 센다", () => {
-    expect(collectReplayCells([turnA, turnB], "cntr_old", 12)).toEqual({ codes: ["df = load()"], omitted: 1 });
+    expect(
+      collectReplayCells(
+        [
+          { qIdx: 0, turn: turnA },
+          { qIdx: 0, turn: turnB },
+        ],
+        "cntr_old",
+        12
+      )
+    ).toEqual({ cells: [{ qIdx: 0, code: "df = load()" }], omitted: 1 });
   });
 
-  it("복구 지시에는 표시 문구와 코드가 들어가고, 다시 실행할 코드가 없으면 null", () => {
-    const text = buildReplayInstruction({ codes: ["df = load()", "scaled = scale(df)"], omitted: 1 });
-    expect(text).toContain("[이전 분석 코드(환경이 초기화되어 다시 실행 필요)]");
+  it("복구 지시에는 표시 문구와 문제 번호가 붙은 코드가 들어가고, 다시 실행할 코드가 없으면 null", () => {
+    const text = buildReplayInstruction({
+      cells: [
+        { qIdx: 0, code: "df = load()" },
+        { qIdx: 0, code: "scaled = scale(df)" },
+      ],
+      omitted: 1,
+      currentQIdx: 0,
+    });
+    expect(text).toContain(REPLAY_INSTRUCTION_HEADER);
+    expect(REPLAY_INSTRUCTION_HEADER).toBe("[이전 분석 코드(환경이 초기화되어 다시 실행 필요)]");
     expect(text).toContain("```python");
-    expect(text).toContain("# 이전 셀 2\nscaled = scale(df)");
+    expect(text).toContain("# 문제 1 셀 1\ndf = load()\n\n# 문제 1 셀 2\nscaled = scale(df)");
     expect(text).toContain("마지막 셀 1개");
-    expect(buildReplayInstruction({ codes: [], omitted: 0 })).toBeNull();
+    // 같은 문항의 셀만 있으면 지금 문항 안내 줄이 없다.
+    expect(text).not.toContain("지금 풀고 있는 문제는");
+    expect(buildReplayInstruction({ cells: [], omitted: 0, currentQIdx: 0 })).toBeNull();
+  });
+
+  it("복구할 셀에 다른 문항의 셀이 섞여 있으면 지금 문항을 알리고, 셀마다 실행한 문항 번호를 붙인다", () => {
+    const text = buildReplayInstruction({
+      cells: [
+        { qIdx: 0, code: "df = load()" },
+        { qIdx: 1, code: "km = fit(df)" },
+      ],
+      omitted: 0,
+      currentQIdx: 1,
+    })!;
+    expect(text).toContain("지금 풀고 있는 문제는 문제 2입니다. 다른 번호가 붙은 셀은 앞 문항에서 실행한 코드입니다.");
+    expect(text).toContain("# 문제 1 셀 1\ndf = load()\n\n# 문제 2 셀 1\nkm = fit(df)");
+    expect(text).not.toContain(LINKED_CODE_HEADER);
+    expect(text).not.toContain("길이 제한");
+  });
+});
+
+describe("문항 간 연결 입력 구성", () => {
+  const cell = (index: number, code: string, status = "completed", extra: Record<string, unknown> = {}) => ({
+    index,
+    status,
+    code,
+    logs: "",
+    figures: [],
+    ...extra,
+  });
+  const q1First = storedTurn({
+    container_id: "cntr_live",
+    cells: [
+      cell(1, "df = pd.read_excel(p)"),
+      cell(2, "boom()", "failed"),
+      cell(3, "x" + "y".repeat(10), "completed", { code_truncated: true }),
+      cell(4, "df_clean = df[mask]"),
+    ],
+    outcome: "completed",
+  });
+  const q1Second = storedTurn({
+    container_id: "cntr_live",
+    cells: [cell(1, "X = scale(df_clean)")],
+    outcome: "completed",
+  });
+  const q2First = storedTurn({ container_id: "cntr_live", cells: [cell(1, "km = KMeans(4).fit(X)")], outcome: "completed" });
+  const q1Again = storedTurn({ container_id: "cntr_live", cells: [cell(1, "df_clean = df[mask2]")], outcome: "completed" });
+  const elsewhere = storedTurn({ container_id: "cntr_expired", cells: [cell(1, "OLD = 1")], outcome: "completed" });
+  const live = { containerId: "cntr_live" };
+
+  it("첫 문항의 첫 턴과 같은 문항에서 이어지는 턴은 알려 줄 코드가 없다(블록 없음)", () => {
+    expect(collectLinkedCells([], { ...live, qIdx: 0 })).toEqual({ cells: [], omitted: 0 });
+    expect(collectLinkedCells([{ qIdx: 0, turn: q1First }], { ...live, qIdx: 0 })).toEqual({ cells: [], omitted: 0 });
+    expect(
+      collectLinkedCells(
+        [
+          { qIdx: 0, turn: q1First },
+          { qIdx: 1, turn: q2First },
+        ],
+        { ...live, qIdx: 1 }
+      )
+    ).toEqual({ cells: [], omitted: 0 });
+    expect(buildLinkedCodeInstruction({ cells: [], omitted: 0, currentQIdx: 0 })).toBeNull();
+  });
+
+  it("새 문항의 첫 턴은 다른 문항이 지금 컨테이너에서 실행한 성공 셀을 시간 순서로 받는다(실패, 잘린 코드, 다른 컨테이너 제외)", () => {
+    expect(
+      collectLinkedCells(
+        [
+          { qIdx: 0, turn: elsewhere },
+          { qIdx: 0, turn: q1First },
+          { qIdx: 0, turn: q1Second },
+        ],
+        { ...live, qIdx: 1 }
+      )
+    ).toEqual({
+      cells: [
+        { qIdx: 0, code: "df = pd.read_excel(p)" },
+        { qIdx: 0, code: "df_clean = df[mask]" },
+        { qIdx: 0, code: "X = scale(df_clean)" },
+      ],
+      omitted: 0,
+    });
+  });
+
+  it("다른 문항에 갔다가 돌아오면 이 문항의 마지막 성공 턴 뒤에 다른 문항이 실행한 셀만 받는다", () => {
+    const records = [
+      { qIdx: 0, turn: q1First },
+      { qIdx: 1, turn: q2First },
+      { qIdx: 0, turn: q1Again },
+    ];
+    expect(collectLinkedCells(records, { ...live, qIdx: 1 }).cells).toEqual([{ qIdx: 0, code: "df_clean = df[mask2]" }]);
+    expect(collectLinkedCells(records.slice(0, 2), { ...live, qIdx: 0 }).cells).toEqual([
+      { qIdx: 1, code: "km = KMeans(4).fit(X)" },
+    ]);
+  });
+
+  it("이 문항의 실패한 턴은 대화에 이어지지 않으므로 본 것으로 치지 않는다", () => {
+    const failedQ2 = storedTurn({ container_id: "cntr_live", cells: [cell(1, "km = slow()")], outcome: "cell_limit" });
+    expect(
+      collectLinkedCells(
+        [
+          { qIdx: 0, turn: q1First },
+          { qIdx: 1, turn: failedQ2 },
+        ],
+        { ...live, qIdx: 1 }
+      ).cells.map((c) => c.code)
+    ).toEqual(["df = pd.read_excel(p)", "df_clean = df[mask]"]);
+  });
+
+  it("길이 상한(만료 복구와 같은 규칙)을 넘으면 앞에서부터 넣고 그 뒤 셀은 모두 빼고 센다", () => {
+    expect(
+      collectLinkedCells(
+        [
+          { qIdx: 0, turn: q1First },
+          { qIdx: 0, turn: q1Second },
+        ],
+        { ...live, qIdx: 1, maxChars: 25 }
+      )
+    ).toEqual({ cells: [{ qIdx: 0, code: "df = pd.read_excel(p)" }], omitted: 2 });
+  });
+
+  it("상한에 걸린 셀 뒤의 셀은 짧아도 넣지 않는다(실행 순서가 끊긴 코드를 주지 않는다)", () => {
+    const gap = storedTurn({
+      container_id: "cntr_live",
+      cells: [cell(1, "a = 1"), cell(2, "b = " + "9".repeat(30)), cell(3, "c = a")],
+      outcome: "completed",
+    });
+    expect(collectLinkedCells([{ qIdx: 0, turn: gap }], { ...live, qIdx: 1, maxChars: 25 })).toEqual({
+      cells: [{ qIdx: 0, code: "a = 1" }],
+      omitted: 2,
+    });
+  });
+
+  it("연결 지시는 정한 머리말, 지금 문항, 문제 번호가 붙은 코드를 담고 다시 실행하라고 하지 않는다", () => {
+    const text = buildLinkedCodeInstruction({
+      cells: [
+        { qIdx: 0, code: "df_clean = df[mask]" },
+        { qIdx: 0, code: "X = scale(df_clean)" },
+        { qIdx: 2, code: "profile = df_clean.groupby(km.labels_).mean()" },
+      ],
+      omitted: 0,
+      currentQIdx: 1,
+    })!;
+    expect(LINKED_CODE_HEADER).toBe("[앞 문항에서 실행한 분석 코드 — 변수는 분석 환경에 그대로 남아 있음]");
+    expect(text.startsWith(`${LINKED_CODE_HEADER}\n지금 풀고 있는 문제는 문제 2입니다.`)).toBe(true);
+    expect(text).toContain("다시 실행하지 않아도 됩니다");
+    expect(text).toContain(
+      "```python\n# 문제 1 셀 1\ndf_clean = df[mask]\n\n# 문제 1 셀 2\nX = scale(df_clean)\n\n# 문제 3 셀 1\nprofile = df_clean.groupby(km.labels_).mean()\n```"
+    );
+    expect(text).not.toContain(REPLAY_INSTRUCTION_HEADER);
+    expect(text).not.toContain("길이 제한");
+  });
+
+  it("넣지 못한 셀이 있으면 그 수와 변수는 남아 있다는 것을 알린다", () => {
+    const text = buildLinkedCodeInstruction({ cells: [{ qIdx: 0, code: "a = 1" }], omitted: 3, currentQIdx: 1 })!;
+    expect(text).toContain("길이 제한으로 마지막 셀 3개의 코드는 넣지 못했습니다. 그 셀이 만든 변수도 남아 있으니");
+  });
+
+  it("buildStoredTurn 은 연결한 셀이 있을 때만 linked_cells 를 두고, 읽을 때도 그대로다", () => {
+    const base = {
+      containerId: "c",
+      files: [],
+      cells: [],
+      citedFigures: [],
+      outcome: "completed" as const,
+      notices: [],
+      replayedCells: 0,
+      elapsedMs: 1,
+    };
+    expect(buildStoredTurn(base)).not.toHaveProperty("linked_cells");
+    expect(buildStoredTurn({ ...base, linkedCells: 0 })).not.toHaveProperty("linked_cells");
+    const linked = buildStoredTurn({ ...base, linkedCells: 3 });
+    expect(linked.linked_cells).toBe(3);
+    expect(readStoredAnalysisTurn({ analysis: linked })).toEqual(linked);
   });
 });
 

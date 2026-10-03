@@ -10,6 +10,9 @@
  *   - 턴마다 시작 전에 컨테이너를 조회한다. 조회가 마지막 사용 시각을 갱신한다. 상태가 expired 이거나 없으면
  *     같은 파일 id 로 새 컨테이너를 만든다. 파일 id 가 같으면 경로도 같아서 이전 코드가 그대로 돈다.
  *   - 새로 만든 경우 이전 컨테이너에서 성공한 셀 코드를 다시 실행하게 한다(`buildReplayInstruction`).
+ *   - 컨테이너는 세션 하나에 하나라 문항을 옮겨도 변수가 남는다. 대화(previous_response_id)는 문항마다 따로라
+ *     새 문항의 대화는 다른 문항에서 무엇을 실행했는지 모른다. 그래서 다른 문항에서 같은 컨테이너로 실행한
+ *     성공 셀 코드를 알려 준다(`buildLinkedCodeInstruction`). 복구가 필요한 턴은 복구 지시가 이를 대신한다.
  *
  * 저장(DB)은 하지 않는다. 결과는 호출부가 AI 메시지 metadata 에 넣는다.
  */
@@ -17,7 +20,7 @@
 import type { AnalysisDataSource } from "@/lib/analysis-exec/eligibility";
 import { OpenAIHttpError } from "@/lib/analysis-exec/errors";
 import { REPLAY_CODE_MAX_CHARS } from "@/lib/analysis-exec/limits";
-import type { StoredAnalysisFile, StoredAnalysisTurn } from "@/lib/analysis-exec/metadata";
+import { isSuccessfulOutcome, type StoredAnalysisFile, type StoredAnalysisTurn } from "@/lib/analysis-exec/metadata";
 import type { ContainerFileInfo, ContainerInfo } from "@/lib/analysis-exec/openai-http";
 
 /**
@@ -266,50 +269,132 @@ export function applyPathRewrites(code: string, rewrites: ReadonlyArray<{ from: 
   return out;
 }
 
+/** 세션의 분석 턴 기록 하나와 그 턴의 문항(0부터). `SessionAnalysisRecord` 에서 필요한 부분이다. */
+export type AnalysisTurnRecord = { qIdx: number; turn: StoredAnalysisTurn };
+
+/** 모델에게 다시 실행하게 하거나 알려 주는 셀 코드 하나. `qIdx` 는 그 셀을 실행한 문항(0부터)이다. */
+export type CarriedCell = { qIdx: number; code: string };
+
+export type CarriedCells = { cells: CarriedCell[]; omitted: number };
+
 /**
- * 만료 복구 때 다시 실행할 코드. 이전 컨테이너(`containerId`)에서 성공한(status completed) 셀을 시간 순서대로 모은다.
- * 이전에 복구하며 다시 실행한 코드도 그 컨테이너의 셀에 들어 있으므로 한 컨테이너의 셀만 모으면 된다.
- * 길이 상한을 넘으면 앞에서부터 들어가는 데까지 넣고 나머지 수를 센다.
+ * 기록들에서 성공한(status completed) 셀 코드를 시간 순서대로 모은다. 실패한 셀, 빈 코드, 저장 상한에 잘린 코드는
+ * 뺀다(잘린 코드는 실행할 수 없다). 길이 상한을 넘으면 앞에서부터 들어가는 데까지 넣고, 그 뒤 셀은 모두 빼고 수를 센다.
  */
-export function collectReplayCells(
-  turns: ReadonlyArray<StoredAnalysisTurn>,
-  containerId: string,
-  maxChars: number = REPLAY_CODE_MAX_CHARS
-): { codes: string[]; omitted: number } {
-  const codes: string[] = [];
+function collectCells(records: ReadonlyArray<AnalysisTurnRecord>, maxChars: number): CarriedCells {
+  const cells: CarriedCell[] = [];
   let used = 0;
   let omitted = 0;
-  for (const turn of turns) {
-    if (turn.container_id !== containerId) continue;
+  for (const { qIdx, turn } of records) {
     for (const cell of turn.cells) {
       if (cell.status !== "completed" || !cell.code.trim() || cell.code_truncated) continue;
       if (omitted > 0 || used + cell.code.length > maxChars) {
         omitted += 1;
         continue;
       }
-      codes.push(cell.code);
+      cells.push({ qIdx, code: cell.code });
       used += cell.code.length;
     }
   }
-  return { codes, omitted };
+  return { cells, omitted };
 }
+
+/**
+ * 만료 복구 때 다시 실행할 코드. 이전 컨테이너(`containerId`)에서 성공한 셀을 문항과 관계없이 시간 순서대로 모은다.
+ * 이전에 복구하며 다시 실행한 코드도 그 컨테이너의 셀에 들어 있으므로 한 컨테이너의 셀만 모으면 된다.
+ */
+export function collectReplayCells(
+  records: ReadonlyArray<AnalysisTurnRecord>,
+  containerId: string,
+  maxChars: number = REPLAY_CODE_MAX_CHARS
+): CarriedCells {
+  return collectCells(
+    records.filter((r) => r.turn.container_id === containerId),
+    maxChars
+  );
+}
+
+/**
+ * 문항 간 연결로 알려 줄 코드. 지금 컨테이너(`containerId`)에서 **다른 문항**이 실행한 성공 셀 중 이 문항의 대화가
+ * 아직 보지 못한 것이다. 이 문항의 대화는 마지막 성공 턴까지 이어지므로(실패한 턴은 이어 쓰지 않는다) 그 턴 뒤의
+ * 기록만 본다. 이 문항에 성공 턴이 없으면(새 문항의 첫 분석 턴) 다른 문항의 셀 전부다. 같은 문항에서 이어지는
+ * 턴은 사이에 다른 문항 기록이 없으므로 비어 있다(기존 대화 그대로).
+ */
+export function collectLinkedCells(
+  records: ReadonlyArray<AnalysisTurnRecord>,
+  params: { containerId: string; qIdx: number; maxChars?: number }
+): CarriedCells {
+  let lastSeen = -1;
+  records.forEach((record, i) => {
+    if (record.qIdx === params.qIdx && isSuccessfulOutcome(record.turn.outcome)) lastSeen = i;
+  });
+  return collectCells(
+    records
+      .slice(lastSeen + 1)
+      .filter((r) => r.qIdx !== params.qIdx && r.turn.container_id === params.containerId),
+    params.maxChars ?? REPLAY_CODE_MAX_CHARS
+  );
+}
+
+/** 코드 블록 본문. 셀마다 `# 문제 2 셀 1` 처럼 실행한 문항(화면 번호)과 그 문항 안의 순번을 붙인다. */
+function formatCarriedCells(cells: ReadonlyArray<CarriedCell>): string {
+  const perQuestion = new Map<number, number>();
+  return cells
+    .map(({ qIdx, code }) => {
+      const nth = (perQuestion.get(qIdx) ?? 0) + 1;
+      perQuestion.set(qIdx, nth);
+      return `# 문제 ${qIdx + 1} 셀 ${nth}\n${code.trimEnd()}`;
+    })
+    .join("\n\n");
+}
+
+/** 지금 문항을 알리는 줄. 셀 머리의 문제 번호와 견주라고 둔다(지시문 머리에는 문제 번호가 없다). */
+function currentQuestionLine(currentQIdx: number): string {
+  return `지금 풀고 있는 문제는 문제 ${currentQIdx + 1}입니다.`;
+}
+
+export const REPLAY_INSTRUCTION_HEADER = "[이전 분석 코드(환경이 초기화되어 다시 실행 필요)]";
+export const LINKED_CODE_HEADER = "[앞 문항에서 실행한 분석 코드 — 변수는 분석 환경에 그대로 남아 있음]";
 
 /**
  * 복구 지시. 다음 턴 입력의 developer 메시지로 넣는다. 다시 실행할 코드가 없으면 null.
  * 학생 화면의 안내는 화면이 따로 보여 주므로 모델에게는 답변에서 되풀이하지 말라고 한다.
+ * 다른 문항의 셀이 섞여 있으면 지금 문항을 함께 알린다(이 턴에는 문항 간 연결 지시를 이 지시가 대신한다).
  */
-export function buildReplayInstruction(replay: { codes: string[]; omitted: number }): string | null {
-  if (replay.codes.length === 0) return null;
-  const blocks = replay.codes.map((code, i) => `# 이전 셀 ${i + 1}\n${code.trimEnd()}`).join("\n\n");
+export function buildReplayInstruction(replay: CarriedCells & { currentQIdx: number }): string | null {
+  if (replay.cells.length === 0) return null;
   const lines = [
-    "[이전 분석 코드(환경이 초기화되어 다시 실행 필요)]",
+    REPLAY_INSTRUCTION_HEADER,
     "실행 환경이 초기화되어 이전 변수가 모두 사라졌습니다. 학생의 이번 요청을 처리하기 전에 아래 코드를 python 도구로 순서대로 다시 실행해 이전 상태를 복원하세요. 다시 실행한 코드의 출력은 답변에 옮기지 않고, 복원했다는 사실도 답변에서 되풀이하지 않습니다(화면이 따로 알립니다).",
   ];
+  if (replay.cells.some((cell) => cell.qIdx !== replay.currentQIdx)) {
+    lines.push(`${currentQuestionLine(replay.currentQIdx)} 다른 번호가 붙은 셀은 앞 문항에서 실행한 코드입니다.`);
+  }
   if (replay.omitted > 0) {
     lines.push(
       `길이 제한으로 마지막 셀 ${replay.omitted}개는 넣지 못했습니다. 그 단계가 필요하면 학생이 정한 기준을 대화에서 확인하고, 확인되지 않으면 학생에게 묻습니다.`
     );
   }
-  lines.push("", "```python", blocks, "```");
+  lines.push("", "```python", formatCarriedCells(replay.cells), "```");
+  return lines.join("\n");
+}
+
+/**
+ * 문항 간 연결 지시. 새 문항의 첫 분석 턴(그리고 이 문항의 마지막 성공 턴 뒤에 다른 문항에서 실행한 코드가 있는 턴)
+ * 입력의 developer 메시지로 넣는다. 알려 줄 코드가 없으면 null. 변수는 남아 있으므로 다시 실행하라고 하지 않는다.
+ * 앞 문항의 처리를 이어 쓸지 학생에게 확인하는 규칙은 지시문(`analysis-partner@2` 도구 있음 3절)에 있다.
+ */
+export function buildLinkedCodeInstruction(linked: CarriedCells & { currentQIdx: number }): string | null {
+  if (linked.cells.length === 0) return null;
+  const lines = [
+    LINKED_CODE_HEADER,
+    `${currentQuestionLine(linked.currentQIdx)} 아래는 같은 실행 환경에서 다른 문제를 풀며 실행한 코드입니다. 이 코드가 만든 변수는 지금도 실행 환경에 남아 있으므로 다시 실행하지 않아도 됩니다.`,
+  ];
+  if (linked.omitted > 0) {
+    lines.push(
+      `길이 제한으로 마지막 셀 ${linked.omitted}개의 코드는 넣지 못했습니다. 그 셀이 만든 변수도 남아 있으니 필요하면 실행 환경에서 확인합니다.`
+    );
+  }
+  lines.push("", "```python", formatCarriedCells(linked.cells), "```");
   return lines.join("\n");
 }

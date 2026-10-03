@@ -198,10 +198,10 @@ const ANALYSIS_PARTNER_V2: AnalysisPartnerV2StudentChatSpec = Object.freeze({
   }),
   toolRenderSha256: Object.freeze({
     hosted_python: Object.freeze({
-      ko: "7f4debcfd0787782699ae1215c1fa17af4fba8d569e0de1cad621504b8427ec7",
+      ko: "b509acd704031188725130a41a7985c620333dacb2fa8daab6d99bb022fdc026",
     }),
   }),
-  note: "분석 파트너 v2(2026-10-03, #545 #543). @1 에 도구 있음 상태(호스팅 python, 데이터 파일 경로, print, 설치 불가, NanumGothic)와 답 길이 상한(본문 8문장, 표 상위 행, 한 번에 한 단계)을 더했다. 도구 없음 상태의 3절은 @1 과 같다.",
+  note: "분석 파트너 v2(2026-10-03, #545 #543). @1 에 도구 있음 상태(호스팅 python, 데이터 파일 경로, print, 설치 불가, NanumGothic)와 답 길이 상한(본문 8문장, 표 상위 행, 한 번에 한 단계)을 더했다. 도구 없음 상태의 3절은 @1 과 같다. 배포 전 갱신(2026-10-03): 도구 있음 3절에 문항 간 연결 규칙(앞 문항에서 실행한 코드가 주어지면 그 처리를 이어 쓰기 전에 학생에게 확인)을 더했다. 도구 없음 렌더는 바뀌지 않았다.",
 });
 
 export type StudentChatSpecMap = {

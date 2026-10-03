@@ -6,8 +6,10 @@
  *   2. 컨테이너를 준비한다. 만료면 새로 만들고 이전 셀 코드를 다시 실행하게 한다(`environment_restarted`).
  *      준비가 실패하면 아무것도 저장하지 않고 끝낸다(학생이 다시 보내면 된다).
  *   3. 학생 메시지를 저장한다(`/api/chat` 과 같은 모양).
- *   4. 지시문(`analysis-partner@2` 도구 있음)과 입력을 만들고 Responses 스트림을 돌린다. 호출이
- *      `Container is expired` 로 실패하고 아직 셀이 없으면 한 번 복구해 다시 돌린다.
+ *   4. 지시문(`analysis-partner@2` 도구 있음)과 입력을 만들고 Responses 스트림을 돌린다. 입력 앞에는 developer
+ *      메시지를 하나까지 붙인다. 컨테이너를 새로 만들었으면 복구 지시(이전 코드 다시 실행), 아니면 문항 간 연결
+ *      (다른 문항에서 이 컨테이너로 실행했고 이 문항의 대화가 아직 모르는 코드)이다. 호출이 `Container is expired` 로
+ *      실패하고 아직 셀이 없으면 한 번 복구해 다시 돌린다.
  *   5. 그림을 비공개 버킷에 올리고, 답변의 sandbox 링크를 지우고, AI 메시지를 저장한다. 실패한 턴도 실행한 셀이
  *      있으면 기록한다("코드는 전부 기록").
  *   6. ai_events 에 정확히 한 번 기록한다(feature `student_chat_analysis`).
@@ -29,9 +31,12 @@ import {
 import type { AnalysisErrorCode, AnalysisStreamEvent } from "@/lib/analysis-exec/client-events";
 import {
   applyPathRewrites,
+  buildLinkedCodeInstruction,
   buildReplayInstruction,
+  collectLinkedCells,
   collectReplayCells,
   ensureAnalysisContainer,
+  type CarriedCells,
   type ContainerOps,
   type EnsuredContainer,
 } from "@/lib/analysis-exec/container";
@@ -224,19 +229,38 @@ function syntheticPrevious(ensured: EnsuredContainer): StoredAnalysisTurn {
   };
 }
 
-function replayFor(
+/**
+ * 이번 호출 입력 앞에 붙일 developer 메시지와 그 안의 셀 수.
+ *   - 컨테이너를 새로 만들었으면 복구 지시만 쓴다(이전 컨테이너의 셀 전부를 다시 실행). 다른 문항의 셀도 그 안에
+ *     들어 있으므로 문항 간 연결 지시는 붙이지 않는다(복구 문구 우선).
+ *   - 아니면 문항 간 연결 지시. 같은 문항에서 이어지는 턴은 비어 있어 아무것도 붙지 않는다.
+ */
+function carriedContextFor(
   records: ReadonlyArray<SessionAnalysisRecord>,
   ensured: EnsuredContainer,
-  pathRewrites: ReadonlyArray<{ from: string; to: string }>
-) {
-  if (!ensured.restarted || !ensured.previousContainerId) return { text: null as string | null, cells: 0 };
-  const replay = collectReplayCells(
-    records.map((r) => r.turn),
-    ensured.previousContainerId
-  );
+  pathRewrites: ReadonlyArray<{ from: string; to: string }>,
+  qIdx: number
+): { text: string | null; replayedCells: number; linkedCells: number } {
   // 파일을 다시 올려 경로가 바뀌었으면 이전 코드 안의 경로를 새 경로로 바꿔 넣는다.
-  const codes = replay.codes.map((code) => applyPathRewrites(code, pathRewrites));
-  return { text: buildReplayInstruction({ codes, omitted: replay.omitted }), cells: codes.length };
+  const rewrite = (carried: CarriedCells): CarriedCells => ({
+    cells: carried.cells.map((cell) => ({ ...cell, code: applyPathRewrites(cell.code, pathRewrites) })),
+    omitted: carried.omitted,
+  });
+  if (ensured.restarted) {
+    if (!ensured.previousContainerId) return { text: null, replayedCells: 0, linkedCells: 0 };
+    const replay = rewrite(collectReplayCells(records, ensured.previousContainerId));
+    return {
+      text: buildReplayInstruction({ ...replay, currentQIdx: qIdx }),
+      replayedCells: replay.cells.length,
+      linkedCells: 0,
+    };
+  }
+  const linked = rewrite(collectLinkedCells(records, { containerId: ensured.containerId, qIdx }));
+  return {
+    text: buildLinkedCodeInstruction({ ...linked, currentQIdx: qIdx }),
+    replayedCells: 0,
+    linkedCells: linked.cells.length,
+  };
 }
 
 /** 복구로 두 번 호출했으면 두 호출의 사용량을 더한다(비용 기록이 빠지지 않게). */
@@ -369,6 +393,7 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
 
     let restartedAny = ensured.restarted;
     let replayedCells = 0;
+    let linkedCells = 0;
     let attempts = 0;
     let result: StreamTurnResult;
     let pathRewrites = [...ensured.pathRewrites];
@@ -386,11 +411,12 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
       const instructions = assembled.instructions;
       specId = assembled.specId;
       instructionsForLog = instructions;
-      const replay = replayFor(records, ensured, pathRewrites);
-      replayedCells = replay.cells;
-      const input = replay.text
+      const carried = carriedContextFor(records, ensured, pathRewrites, ctx.qIdx);
+      replayedCells = carried.replayedCells;
+      linkedCells = carried.linkedCells;
+      const input = carried.text
         ? [
-            { role: "developer", content: replay.text },
+            { role: "developer", content: carried.text },
             { role: "user", content: ctx.message },
           ]
         : ctx.message;
@@ -511,6 +537,7 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
       outcome,
       notices,
       replayedCells,
+      linkedCells,
       elapsedMs: now() - ctx.startedAtMs,
     });
 
@@ -571,6 +598,7 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
         figures: storedCells.reduce((n, c) => n + c.figures.length, 0) + citedFigures.length,
         container_restarted: restartedAny,
         replayed_cells: replayedCells,
+        linked_cells: linkedCells,
         rate_limit_retries: result.retries,
         ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
         message_saved: saved,
