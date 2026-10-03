@@ -137,8 +137,9 @@ describe("답안 칸 붙여넣기 표식 제거 (#555)", () => {
     legacy.setData("application/x-queston-internal", "true");
     await pasteAtEnd(legacy);
 
+    // 이 테스트는 지우기만 본다. 옛 형식을 내부로 볼지는 표식 판정의 몫이다(#560 은 세션 범위가 없는 옛 형식을 외부로 본다).
     expect(textarea().value).toBe("답: 옛 화면에서 복사한 글");
-    expect(pastes[0]).toMatchObject({ pastedText: "옛 화면에서 복사한 글", isInternal: true });
+    expect(pastes[0].pastedText).toBe("옛 화면에서 복사한 글");
   });
 
   it("답안 칸에서 복사한 글을 붙여도 표식 문자가 남지 않는다", async () => {
