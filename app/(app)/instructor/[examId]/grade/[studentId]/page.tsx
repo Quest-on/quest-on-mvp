@@ -30,6 +30,7 @@ import {
   type SummaryData,
 } from "@/components/instructor/AIOverallSummary";
 import { hasAnalysisPartnerQuestions, isGradingOpen, isObjectiveQuestion, resolveByQIdx } from "@/lib/grading-helpers";
+import { isScoringGrade } from "@/lib/grade-utils";
 import { resolveGradingStatusBanner } from "@/lib/grading-status-banner";
 import {
   buildTypedQuestionEntries,
@@ -427,8 +428,11 @@ export default function GradeStudentPage({
     currentQuestion?.id,
   );
 
+  // 평가 요약 행(ai_summary)·채점 실패 행(ai_failed)의 score 0 은 점수가 아니다(#577). 그대로 넘기면 점수 칸에
+  // "0"이 미리 채워져, 교수가 코멘트만 쓰고 저장해도 0점이 확정될 수 있었다. 점수 행일 때만 초기값으로 쓴다.
   const caseGradeInitialScore =
-    currentGrade?.stage_grading?.answer?.score ?? currentGrade?.score;
+    currentGrade?.stage_grading?.answer?.score ??
+    (isScoringGrade(currentGrade) ? currentGrade.score : undefined);
   const caseGradeInitialComment =
     currentGrade?.stage_grading?.answer?.comment ?? currentGrade?.comment ?? "";
 

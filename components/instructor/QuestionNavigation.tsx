@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useTranslations } from "next-intl";
+import { isScoringGrade } from "@/lib/grade-utils";
 
 interface Question {
   id: string;
@@ -17,6 +18,8 @@ interface Grade {
   q_idx: number;
   score: number;
   comment?: string;
+  /** "ai_summary"(평가 요약, 점수 아님)·"ai_failed" 는 점수 배지를 그리지 않는다(#577). */
+  grade_type?: string | null;
 }
 
 type FilterType = "all" | "multiple-choice" | "true-false" | "case";
@@ -173,12 +176,14 @@ export function QuestionNavigation({
               data-testid={`question-nav-${arrIdx}`}
             >
               {label}
-              {grade && !hideScores && (
+              {/* 점수 행일 때만 점수를 보인다. 배경 채점이 서술형 문항마다 남기는 평가 요약 행(ai_summary)은
+                  score 가 0 이라, 그대로 그리면 교수가 채점하기 전인데 모든 문항에 "0점"이 떴다(#577). */}
+              {isScoringGrade(grade) && !hideScores && (
                 <Badge
                   variant="secondary"
                   className="ml-2 bg-success-subtle text-success-text"
                 >
-                  {t("questionNavigation.scorePoints", { score: grade.score || 0 })}
+                  {t("questionNavigation.scorePoints", { score: grade.score })}
                 </Badge>
               )}
             </Button>

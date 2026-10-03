@@ -40,7 +40,7 @@ import {
   normalizeAssignmentGradeScore,
   scoreToAssignmentLabel,
 } from "@/lib/grading-utils";
-import { isSuccessfulGradeType } from "@/lib/grade-utils";
+import { isScoringGrade, isSuccessfulGradeType } from "@/lib/grade-utils";
 import type {
   StageGrading,
   SummaryData,
@@ -474,7 +474,7 @@ async function gradeSingleQuestion(params: {
 async function generateQuestionSummary(params: {
   /** 진입점이 한 번 읽어 내려주는 설정 버전 (이슈 #118). */
   aiVersion?: AiConfigVersionSnapshot;
-  question: { idx: number; prompt?: string; ai_context?: string };
+  question: { idx: number; prompt?: string; ai_context?: string; type?: string };
   submission: { answer: string } | undefined;
   questionMessages: Array<{ role: string; content: string }>;
   grade: GradeResult;
@@ -576,7 +576,13 @@ ${rubricText}
 ${submission?.answer || "답안 없음"}
 ${chatHistoryText}
 
-점수: ${grade.score}점
+점수: ${formatSummaryScoreLabel({
+  score: grade.score,
+  ungraded: grade.ungraded,
+  hasSubmission: !!submission,
+  questionType: question.type,
+  isAssignment: false,
+})}
 ${stageInfoText}
 ${aiDependencyText}
 
@@ -1141,6 +1147,9 @@ export async function generateOneQuestionSummary(
     score: typedGrade?.score ?? 0,
     comment: typedGrade?.comment || "",
     stage_grading: typedGrade?.stage_grading || undefined,
+    // 점수 행이 아니면(행 없음, ai_summary 자리 표시 행) 교수가 아직 채점하지 않은 것이다(#577). 문항 요약
+    // 프롬프트가 이 0 을 "점수: 0점"으로 받으면 평가가 0점을 전제로 쓰일 수 있었다. 세션 종합 요약과 같이 "미채점"으로 넘긴다.
+    ungraded: !isScoringGrade(typedGrade),
   };
 
   const summary = await generateQuestionSummary({
