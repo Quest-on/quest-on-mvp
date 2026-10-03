@@ -179,6 +179,12 @@ export const qk = {
     grade: (sessionId: string) => ["session-grade", sessionId] as const,
 
     /**
+     * 세션의 분석 턴 실행 기록(코드 셀, 결과, 그림 주소). 교수 채점 화면이 읽는다(#545).
+     * @param sessionId - 세션 ID
+     */
+    analysis: (sessionId: string) => ["session-analysis", sessionId] as const,
+
+    /**
      * 세션별 AI 요약 데이터
      * @param sessionId - 세션 ID (optional)
      */

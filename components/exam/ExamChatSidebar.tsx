@@ -24,6 +24,9 @@ import { ChatLoadingIndicator } from "@/components/exam/ExamLoading";
 import { MessageCircle, ArrowUp, X } from "lucide-react";
 import { CopyMessageButton } from "@/components/chat/CopyMessageButton";
 import { FloatingChatButton } from "./FloatingChatButton";
+import { AnalysisProgressIndicator } from "./AnalysisProgressIndicator";
+import { AnalysisErrorNotice, AnalysisTurnBlock } from "@/components/chat/AnalysisTurnBlock";
+import type { AnalysisProgress, ChatMessage } from "@/hooks/useExamChat";
 
 const AIMessageRenderer = dynamic(
   () => import("@/components/chat/AIMessageRenderer"),
@@ -43,12 +46,7 @@ const AIMessageRenderer = dynamic(
 );
 
 interface ExamChatSidebarProps {
-  chatHistory: Array<{
-    type: "user" | "assistant";
-    message: string;
-    timestamp: string;
-    qIdx: number;
-  }>;
+  chatHistory: ChatMessage[];
   chatMessage: string;
   setChatMessage: (value: string) => void;
   sendChatMessage: () => void;
@@ -64,6 +62,8 @@ interface ExamChatSidebarProps {
    * 실제 학생 응시에 예시 질문이 뜨면 평가가 오염된다.
    */
   isDemoPreview?: boolean;
+  /** 분석 턴(코드 실행) 진행 상황(#545). 있으면 일반 로딩 표시 대신 보인다. */
+  analysisProgress?: AnalysisProgress | null;
 }
 
 export function ExamChatSidebar({
@@ -78,6 +78,7 @@ export function ExamChatSidebar({
   chatEndRef,
   currentQuestion,
   isDemoPreview = false,
+  analysisProgress = null,
 }: ExamChatSidebarProps) {
   const t = useTranslations("exam");
   const { setOpen, isMobile, setOpenMobile } = useSidebar();
@@ -189,14 +190,25 @@ export function ExamChatSidebar({
                         <AIMessageRenderer
                           content={msg.message}
                           timestamp={msg.timestamp}
+                          attachment={
+                            msg.analysis ? (
+                              <AnalysisTurnBlock analysis={msg.analysis} errorNotice={msg.analysisError} />
+                            ) : msg.analysisError ? (
+                              <AnalysisErrorNotice code={msg.analysisError} />
+                            ) : undefined
+                          }
                         />
                       )}
                     </div>
                   ))}
 
-                  {/* Typing Indicator */}
+                  {/* Typing Indicator. 분석 턴이면 단계와 경과 시간을 보인다(#545). */}
                   <div className="flex justify-start">
-                    <ChatLoadingIndicator isTyping={isTyping} />
+                    {analysisProgress ? (
+                      <AnalysisProgressIndicator progress={analysisProgress} />
+                    ) : (
+                      <ChatLoadingIndicator isTyping={isTyping} />
+                    )}
                   </div>
                 </>
               )}

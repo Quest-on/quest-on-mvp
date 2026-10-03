@@ -119,7 +119,9 @@
   "aiConversations": {
     "title": "AI와의 대화 기록",
     "description": "학생이 AI와 나눈 대화 내용입니다",
-    "empty": "AI와의 대화 기록이 없습니다."
+    "empty": "AI와의 대화 기록이 없습니다.",
+    "analysisLoadFailed": "실행 기록을 불러오지 못했습니다.",
+    "analysisRetry": "다시 시도"
   },
   "aiOverallSummary": {
     "emptyTitle": "CASE 종합 평가",

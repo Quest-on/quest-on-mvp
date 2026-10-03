@@ -593,6 +593,7 @@ export default function ExamPage() {
           chatEndRef={chatEndRef}
           currentQuestion={currentQuestion}
           isDemoPreview={session.demoPreview === true}
+          analysisProgress={examChat.analysisProgress}
         />
       )}
 

@@ -53,6 +53,14 @@ const REGISTRY: Record<string, { kind: Classification; why: string }> = {
   "app/api/analytics/exam/[examId]/overview/route.ts": { kind: "single-exam", why: "단건 분석" },
   "app/api/assignment-chat/route.ts": { kind: "single-exam", why: "세션의 exam 로드" },
   "app/api/chat/route.ts": { kind: "single-exam", why: "세션의 exam 로드" },
+  "app/api/chat/analysis/route.ts": {
+    kind: "single-exam",
+    why: "세션의 exam 한 건과 그 시험의 학생 공개 자료를 읽는 코드 실행 턴(#545)",
+  },
+  "lib/analysis-exec/session-records.ts": {
+    kind: "single-exam",
+    why: "분석 기록 열람 권한 확인. 세션의 exam 한 건의 instructor_id 만 본다(#545)",
+  },
   "app/api/exam/[examId]/end/route.ts": { kind: "single-exam", why: "단건 상태 전이" },
   "app/api/exam/[examId]/export/csv/route.ts": { kind: "single-exam", why: "단건 결과 내보내기" },
   "app/api/exam/[examId]/export/excel/route.ts": { kind: "single-exam", why: "단건 결과 내보내기" },

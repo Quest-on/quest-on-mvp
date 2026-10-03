@@ -20,6 +20,7 @@ const ROOT = path.resolve(__dirname, "..");
 /** proxy 가 게이팅하지 않고 route 에 맡기는 연속성 경로. */
 const CONTINUITY_ROUTES = [
   "app/api/chat/route.ts",
+  "app/api/chat/analysis/route.ts",
   "app/api/assignment-chat/route.ts",
   "app/api/log/paste/route.ts",
   "app/api/feedback/route.ts",

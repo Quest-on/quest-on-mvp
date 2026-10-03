@@ -9,6 +9,9 @@
     "app/api/chat/route.ts": {
       "maxDuration": 60
     },
+    "app/api/chat/analysis/route.ts": {
+      "maxDuration": 300
+    },
     "app/api/feedback/route.ts": {
       "maxDuration": 300
     },

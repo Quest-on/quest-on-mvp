@@ -35,12 +35,17 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildStudentChatSystemPrompt } from "@/lib/prompts";
 import {
+  assembleAnalysisToolInstructions,
   assembleStudentChatInstructions,
   buildRagNotice,
   classifyRagState,
 } from "@/lib/chat-instructions";
 import { STUDENT_CHAT_SPECS } from "@/lib/student-chat-spec";
 import { buildAnalysisPartnerV1SystemPrompt } from "@/lib/prompts-analysis-partner";
+import {
+  buildAnalysisPartnerV2SystemPrompt,
+  resolveAnalysisPartnerV2ToolKind,
+} from "@/lib/prompts-analysis-partner-v2";
 import { resolveExamAiProfile } from "@/lib/exam-ai-profile";
 
 /** 출력 문자열을 있는 그대로 해시한다 (줄바꿈 정규화 없음). */
@@ -623,6 +628,136 @@ describe("assembleStudentChatInstructions 분석 파트너 세 상태 해시 잠
 describe("analysis-partner@1 스냅샷 (사람이 diff 로 읽는 용도)", () => {
   // 해시 테스트가 먼저 실패해 이유를 알려 준다. 이 스냅샷은 PR diff 로 무엇이 바뀌었는지 보여 주기 위한 것이다.
   it.each(PARTNER_BUILDER_LOCKS)("$name 렌더가 스냅샷과 같다", async ({ render, snapshot }) => {
+    await expect(render()).toMatchFileSnapshot(snapshot as string);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 분석 파트너 analysis-partner@2 (이슈 #545, #543)
+//
+// 한 버전 안에 도구 상태 두 개가 있다. 둘 다 잠근다.
+//   - 도구 없음: `/api/chat` 의 도구 없는 분석 파트너. 레지스트리 `renderSha256.ko`.
+//   - 도구 있음(호스팅 python): `/api/chat/analysis`. 레지스트리 `toolRenderSha256.hosted_python.ko`.
+// 도구 있음 렌더의 11절(데이터 파일 경로)은 학생마다 다르므로 아래 고정 목록으로 렌더한다.
+// @1 의 잠금(위 PARTNER_BUILDER_LOCKS)은 그대로다 — @2 를 더해도 @1 의 출력은 한 글자도 바뀌지 않는다.
+// ---------------------------------------------------------------------------
+
+/** 도구 있음 상태의 고정 데이터 파일 목록. 한글 원래 이름과 csv 를 함께 둔다. */
+const V2_LOCK_DATA_FILES = [
+  { path: "/mnt/data/file-LOCK0000000000000000000001-dataset.xlsx", name: "고객 데이터.xlsx" },
+  { path: "/mnt/data/file-LOCK0000000000000000000002-extra.csv", name: "extra.csv" },
+];
+const V2_HOSTED = { kind: "hosted_python" as const, dataFiles: V2_LOCK_DATA_FILES };
+
+const PARTNER_V2_NONE_FULL_SHA256 = "44c05390a867be03a8048bc15153233afcb3cb7c0a3e08210f26b3101c8714c1";
+const PARTNER_V2_HOSTED_FULL_SHA256 = "f42f29e5d19f6bf2ba0611dbdfc81076b920861f9f29a40e014642e9a6914d85";
+
+const PARTNER_V2_LOCKS: LockCase[] = [
+  {
+    name: "분석 파트너 v2 도구 없음 ko 최소",
+    render: () => buildAnalysisPartnerV2SystemPrompt(MINIMAL_INPUT),
+    sha256: "f47c1f815fdce347f427d3b74bc9bf71700cba5b55daeb92f8e73a4b6d55a267",
+  },
+  {
+    name: "분석 파트너 v2 도구 없음 ko 전체",
+    render: () => buildAnalysisPartnerV2SystemPrompt(FULL_INPUT),
+    sha256: PARTNER_V2_NONE_FULL_SHA256,
+    snapshot: "./__snapshots__/prompt-assets-lock/analysis-partner-v2.none.ko.full.txt",
+  },
+  {
+    name: "분석 파트너 v2 도구 있음 ko 최소",
+    render: () => buildAnalysisPartnerV2SystemPrompt({ ...MINIMAL_INPUT, tools: V2_HOSTED }),
+    sha256: "01bd520ec0113eed991c8fafffbc267d00710416cfc8de3708843b0e86854019",
+  },
+  {
+    name: "분석 파트너 v2 도구 있음 ko 전체",
+    render: () => buildAnalysisPartnerV2SystemPrompt({ ...FULL_INPUT, tools: V2_HOSTED }),
+    sha256: PARTNER_V2_HOSTED_FULL_SHA256,
+    snapshot: "./__snapshots__/prompt-assets-lock/analysis-partner-v2.hosted.ko.full.txt",
+  },
+];
+
+describe("analysis-partner@2 빌더 해시 잠금 (도구 없음, 도구 있음)", () => {
+  it.each(PARTNER_V2_LOCKS)("$name 입력의 렌더 SHA-256 이 기준값과 같다", ({ name, render, sha256: expected }) => {
+    const actual = sha256(render());
+    expect(
+      actual,
+      `${CHANGE_NOTICE}\n  대상: buildAnalysisPartnerV2SystemPrompt (${name})\n  기준값: ${expected}\n  현재값: ${actual}`
+    ).toBe(expected);
+  });
+
+  it("같은 입력을 두 번 렌더하면 같고 CR 이 섞이지 않는다", () => {
+    for (const { render } of PARTNER_V2_LOCKS) {
+      expect(render()).toBe(render());
+      expect(render()).not.toContain("\r");
+    }
+  });
+
+  it("도구 있음인데 데이터 파일이 하나도 없으면 도구 없음 지시문이다 (경로 모르는 도구 상태를 만들지 않는다)", () => {
+    const none = buildAnalysisPartnerV2SystemPrompt(FULL_INPUT);
+    expect(buildAnalysisPartnerV2SystemPrompt({ ...FULL_INPUT, tools: { kind: "hosted_python", dataFiles: [] } })).toBe(none);
+    expect(
+      buildAnalysisPartnerV2SystemPrompt({ ...FULL_INPUT, tools: { kind: "hosted_python", dataFiles: [{ path: "  ", name: "x" }] } })
+    ).toBe(none);
+    expect(resolveAnalysisPartnerV2ToolKind({ kind: "hosted_python", dataFiles: [] })).toBe("none");
+    expect(resolveAnalysisPartnerV2ToolKind(V2_HOSTED)).toBe("hosted_python");
+    expect(resolveAnalysisPartnerV2ToolKind(undefined)).toBe("none");
+  });
+
+  it("@1 의 출력은 @2 와 관계없이 그대로다 (@1 전체 입력 해시)", () => {
+    expect(sha256(buildAnalysisPartnerV1SystemPrompt(FULL_INPUT))).toBe(PARTNER_KO_FULL_SHA256);
+  });
+});
+
+describe("스펙 레지스트리: analysis-partner@2", () => {
+  const spec = STUDENT_CHAT_SPECS["analysis-partner@2"];
+
+  it("도구 없음 렌더 해시는 renderSha256.ko, 도구 있음 렌더 해시는 toolRenderSha256.hosted_python.ko 와 같다", () => {
+    expect(spec.renderSha256.ko, CHANGE_NOTICE).toBe(PARTNER_V2_NONE_FULL_SHA256);
+    expect(spec.toolRenderSha256.hosted_python.ko, CHANGE_NOTICE).toBe(PARTNER_V2_HOSTED_FULL_SHA256);
+    expect(sha256(spec.build({ ...FULL_INPUT, tools: V2_HOSTED })), CHANGE_NOTICE).toBe(
+      spec.toolRenderSha256.hosted_python.ko
+    );
+    expect("en" in spec.renderSha256).toBe(false);
+  });
+
+  it("빌더는 v2 전용 함수이고 두 상태의 해시는 서로 다르다", () => {
+    expect(spec.build).toBe(buildAnalysisPartnerV2SystemPrompt);
+    expect(spec.mode).toBe("analysis-partner");
+    expect(spec.renderSha256.ko).not.toBe(spec.toolRenderSha256.hosted_python.ko);
+    expect(spec.note.length).toBeGreaterThan(0);
+  });
+});
+
+describe("assembleAnalysisToolInstructions 해시 잠금 (코드 실행 경로가 모델에 보내는 지시문)", () => {
+  const ROUTE_LIKE_INPUT = {
+    examTitle: "시험 제목",
+    examCode: "TST001",
+    questionId: "q-1",
+    currentQuestionText: "문제 본문입니다",
+    currentQuestionAiContext: "채점 맥락",
+  };
+
+  it("도구 있음 포인터의 스펙을 도구 있음 상태로 렌더하고, 자료 발췌와 자료 검색 경고 문장이 없다", () => {
+    const result = assembleAnalysisToolInstructions({ ...ROUTE_LIKE_INPUT, dataFiles: V2_LOCK_DATA_FILES });
+    expect(result).toMatchObject({ specId: "analysis-partner@2", language: "ko", tools: "hosted_python" });
+    expect(result.instructions).toBe(
+      buildAnalysisPartnerV2SystemPrompt({ ...ROUTE_LIKE_INPUT, tools: V2_HOSTED })
+    );
+    expect(result.instructions).not.toContain("분석에 쓰는 자료:");
+    expect(result.instructions).not.toContain("[수업 자료 검색 결과 없음]");
+    expect(sha256(result.instructions), CHANGE_NOTICE).toBe(
+      "ba343349c576af888f10cb8616b5f45caea188779f7d496576946b6dcf5f6c50"
+    );
+  });
+
+  it("데이터 파일이 없으면 던진다 (도구가 붙었는데 경로를 모르는 지시문을 만들지 않는다)", () => {
+    expect(() => assembleAnalysisToolInstructions({ ...ROUTE_LIKE_INPUT, dataFiles: [] })).toThrow();
+  });
+});
+
+describe("analysis-partner@2 스냅샷 (사람이 diff 로 읽는 용도)", () => {
+  it.each(PARTNER_V2_LOCKS.filter((lock) => lock.snapshot))("$name 렌더가 스냅샷과 같다", async ({ render, snapshot }) => {
     await expect(render()).toMatchFileSnapshot(snapshot as string);
   });
 });

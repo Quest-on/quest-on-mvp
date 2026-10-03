@@ -26,14 +26,24 @@
  *   - 분석 파트너이면 전용 빌더(`analysis-partner@1`)를 부르고 위의 "자료 없음/관련성 낮음" 문장 두 가지를
  *     붙이지 않는다. 그 문장은 "자료에 없으면 모른다고 답하라" 는 사례형 충돌의 한쪽이고, 분석 파트너
  *     본문은 이미 자료에 없는 사실을 만들지 않고 없다고 말하도록 쓰여 있다.
+ *
+ * 코드 실행 (이슈 #545)
+ *   - 도구 없는 분석 파트너(`/api/chat`)는 도구 없음 포인터의 스펙으로 조립한다. 그 스펙이 도구 상태를 아는
+ *     버전(@2 이후)이면 도구 없음 상태로 렌더하고 `tools: "none"` 을 돌려준다.
+ *   - 코드 실행이 붙은 분석 파트너(`/api/chat/analysis`)는 `assembleAnalysisToolInstructions` 로 조립한다.
+ *     도구 있음 포인터의 스펙을 도구 있음 상태(데이터 파일 경로 포함)로 렌더한다.
+ *   - 사례형 경로는 이 변경과 관계없다(위 코드를 그대로 부른다).
  */
 
 import type { PromptLanguage, RubricItem } from "@/lib/prompts";
 import type { ResolvedExamAiProfile } from "@/lib/exam-ai-profile";
+import { resolveAnalysisPartnerV2ToolKind, type AnalysisDataFile } from "@/lib/prompts-analysis-partner-v2";
 import {
   getCurrentAnalysisPartnerSpec,
+  getCurrentAnalysisPartnerToolsSpec,
   getCurrentStudentChatSpec,
   type StudentChatSpecId,
+  type StudentChatToolKind,
 } from "@/lib/student-chat-spec";
 
 /** 이 값 미만이면 "관련성 낮음". route.ts 에 인라인으로 있던 숫자 그대로다. */
@@ -104,6 +114,11 @@ export type StudentChatInstructions = {
   specId: StudentChatSpecId;
   /** 실제로 쓴 템플릿 언어(en 이 아니면 ko). 응답 기록(`template_sha`)에 쓴다. */
   language: PromptLanguage;
+  /**
+   * 도구 상태. 도구 상태를 아는 스펙(`analysis-partner@2` 이후)으로 만들었을 때만 있다. 응답 기록의
+   * `tools` 와 `template_sha` 를 고르는 데 쓴다. 사례형과 `analysis-partner@1` 에는 없다.
+   */
+  tools?: StudentChatToolKind;
 };
 
 /**
@@ -118,18 +133,28 @@ export function assembleStudentChatInstructions(
   const { rag } = input;
 
   if (input.profile?.role === "analysis_partner") {
-    // 분석 파트너는 한국어 본문 하나뿐이고(v1) 자료 검색 경고 문장을 붙이지 않는다.
+    // 분석 파트너는 한국어 본문 하나뿐이고 자료 검색 경고 문장을 붙이지 않는다. 이 경로는 코드를 실행하지 않는다.
     const partnerSpec = getCurrentAnalysisPartnerSpec();
+    const base = {
+      examTitle: input.examTitle,
+      examCode: input.examCode,
+      questionId: input.questionId,
+      currentQuestionText: input.currentQuestionText,
+      currentQuestionAiContext: input.currentQuestionAiContext,
+      relevantMaterialsText: rag.relevantMaterialsText,
+      rubric: input.publicRubric,
+    };
+    if (partnerSpec.toolRenderSha256) {
+      // 도구 상태를 아는 버전: 도구 없음 상태로 렌더한다.
+      return {
+        instructions: partnerSpec.build({ ...base, tools: { kind: "none" } }),
+        specId: partnerSpec.id,
+        language: "ko",
+        tools: "none",
+      };
+    }
     return {
-      instructions: partnerSpec.build({
-        examTitle: input.examTitle,
-        examCode: input.examCode,
-        questionId: input.questionId,
-        currentQuestionText: input.currentQuestionText,
-        currentQuestionAiContext: input.currentQuestionAiContext,
-        relevantMaterialsText: rag.relevantMaterialsText,
-        rubric: input.publicRubric,
-      }),
+      instructions: partnerSpec.build(base),
       specId: partnerSpec.id,
       language: "ko",
     };
@@ -154,4 +179,43 @@ export function assembleStudentChatInstructions(
     specId: spec.id,
     language: input.language === "en" ? "en" : "ko",
   };
+}
+
+export type AnalysisToolInstructionsInput = {
+  examTitle?: string;
+  examCode?: string;
+  questionId?: string;
+  currentQuestionText?: string;
+  currentQuestionAiContext?: string;
+  /** 학생에게 공개된 평가 기준. 라우트는 아직 넘기지 않는다(루브릭 공개 연동은 별도). */
+  publicRubric?: RubricItem[];
+  /** 컨테이너 안 데이터 파일 경로와 원래 이름. 하나 이상이어야 한다. */
+  dataFiles: ReadonlyArray<AnalysisDataFile>;
+};
+
+/**
+ * 코드 실행이 붙은 분석 파트너(`/api/chat/analysis`)의 지시문. 도구 있음 포인터의 스펙을 도구 있음 상태로
+ * 렌더한다. 자료 발췌(RAG)는 넣지 않는다 — 데이터는 컨테이너의 파일을 직접 읽는다. 자료 검색 경고 문장도 없다.
+ *
+ * 데이터 파일이 하나도 없으면 빌더가 도구 없음 지시문을 내므로, 그런 입력은 던져서 막는다(라우트는 데이터 파일이
+ * 있을 때만 이 함수를 부른다).
+ */
+export function assembleAnalysisToolInstructions(
+  input: AnalysisToolInstructionsInput
+): StudentChatInstructions & { tools: "hosted_python" } {
+  const spec = getCurrentAnalysisPartnerToolsSpec();
+  const tools = { kind: "hosted_python" as const, dataFiles: input.dataFiles };
+  if (resolveAnalysisPartnerV2ToolKind(tools) !== "hosted_python") {
+    throw new Error("analysis tool instructions require at least one data file");
+  }
+  const instructions = spec.build({
+    examTitle: input.examTitle,
+    examCode: input.examCode,
+    questionId: input.questionId,
+    currentQuestionText: input.currentQuestionText,
+    currentQuestionAiContext: input.currentQuestionAiContext,
+    rubric: input.publicRubric,
+    tools,
+  });
+  return { instructions, specId: spec.id, language: "ko", tools: "hosted_python" };
 }

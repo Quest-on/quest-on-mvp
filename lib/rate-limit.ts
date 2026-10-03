@@ -268,6 +268,13 @@ export const RATE_LIMITS = {
   /** AI 일괄 문제 생성용 (유형별 병렬 3콜 × 최대 제한): 5 requests per minute per user */
   bulkGenerate: { limit: 5, windowSec: 60 } satisfies RateLimitConfig,
   /**
+   * 분석 턴(코드 실행) 그림 열기 (#545): 120 requests per minute per user.
+   *
+   * 학생 채팅과 채점 화면이 대화를 열 때 그림을 한꺼번에 불러온다(턴당 여러 장, 대화 수십 턴). 그림 하나가 요청
+   * 하나라서 `sessionRead`(30회)로는 대화 하나를 다 못 연다. 라우트는 서명 URL 로 보내기만 하므로 가볍다.
+   */
+  analysisFigure: { limit: 120, windowSec: 60 } satisfies RateLimitConfig,
+  /**
    * 비밀번호 재설정 메일 발송 (IP 기준): 5분에 3회.
    *
    * 다른 버킷보다 창이 훨씬 길다. 이건 사용자가 연타할 동작이 아니라 **남의
