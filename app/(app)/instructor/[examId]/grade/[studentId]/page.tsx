@@ -29,7 +29,7 @@ import {
   AIOverallSummary,
   type SummaryData,
 } from "@/components/instructor/AIOverallSummary";
-import { isObjectiveQuestion, resolveByQIdx } from "@/lib/grading-helpers";
+import { hasAnalysisPartnerQuestions, isObjectiveQuestion, resolveByQIdx } from "@/lib/grading-helpers";
 import {
   buildTypedQuestionEntries,
   getSubmissionForQuestion,
@@ -74,6 +74,8 @@ interface Question {
   ai_context?: string;
   options?: string[];
   correctOptionIndex?: number;
+  /** 문항의 AI 역할(#519). 분석 파트너 문항이 있는 시험에서만 실행 기록을 부른다(#564). */
+  ai_role?: string;
 }
 
 interface Submission {
@@ -240,6 +242,9 @@ export default function GradeStudentPage({
   // 학생 대화의 분석 턴 실행 기록(#545). 코드 실행이 붙은 문항에서만 내용이 있다. 실패해도 대화는 그대로 보인다.
   // 실패(속도 제한 429, 네트워크)는 빈 기록으로 캐시하지 않는다. 빈 기록으로 보이면 학생이 코드를 실행하지 않은 것으로
   // 읽히므로, 오류로 두고 카드에 "다시 시도"를 보인다.
+  // 분석 파트너 문항이 있는 시험만 부른다(#564). 일반 시험은 기록이 없는데도 부르면 학생을 빠르게 넘길 때 분당 한도에
+  // 걸려 실행 기록 배너가 떴다. 그래서 채점 데이터(문항의 ai_role)를 받은 뒤에 정한다.
+  const hasAnalysisQuestions = hasAnalysisPartnerQuestions(sessionData?.exam?.questions);
   const analysisQuery = useQuery({
     queryKey: qk.session.analysis(resolvedParams.studentId),
     queryFn: async ({ signal }) => {
@@ -258,7 +263,7 @@ export default function GradeStudentPage({
       }
       return byMessageId;
     },
-    enabled: !!(isLoaded && isSignedIn && (profile?.role as string) === "instructor"),
+    enabled: !!(isLoaded && isSignedIn && (profile?.role as string) === "instructor" && hasAnalysisQuestions),
     staleTime: 60_000,
     retry: false,
   });

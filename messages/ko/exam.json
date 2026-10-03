@@ -135,6 +135,13 @@
     },
     "figureDialogDescription": "AI가 실행한 코드로 만든 그림을 크게 보여 줍니다.",
     "replayCellLabel": "이전 단계 다시 실행",
+    "replayCellDone": "앞에서 실행한 코드 {count}개를 다시 실행했습니다.",
+    "replayCellPartial": "앞에서 실행한 코드 {total}개를 다시 실행했고, 그중 {failed}개는 오류로 끝났습니다.",
+    "replayCellIncomplete": "앞에서 실행한 코드를 끝까지 다시 실행하지 못했습니다.",
+    "chatAnswer": {
+      "truncated": "답변이 길어 뒷부분이 잘렸습니다. 궁금한 부분을 좁혀서 다시 질문해 주세요.",
+      "empty": "답변을 끝까지 만들지 못했습니다. 질문을 더 좁혀서 다시 보내 주세요."
+    },
     "instructorNotices": {
       "environmentRestarted": "분석 환경이 다시 시작되어 이전 코드를 다시 실행한 턴입니다.",
       "limitExceeded": "셀 수나 시간 상한에 걸려 중단된 턴입니다.",

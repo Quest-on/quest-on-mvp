@@ -103,6 +103,8 @@ export async function GET(
           Number.isInteger(q.correctOptionIndex)
             ? q.correctOptionIndex
             : undefined,
+        // 문항의 AI 역할(#519). 채점 화면은 분석 파트너 문항이 있는 시험에서만 실행 기록을 부른다(#564).
+        ai_role: typeof q.ai_role === "string" ? q.ai_role : undefined,
       }));
     }
 
