@@ -5,7 +5,8 @@
  * (.github/actions/test-setup/action.yml)이 prisma db push 뒤에 이 파일을 두 번 적용해 문법과 멱등성을
  * 확인한다. 여기서는 (1) 추가 전용이고 멱등인지, (2) 배열 CHECK 제약이 이름을 갖고 중복 없이 붙는지,
  * (3) 머리말에 선적용 규칙, 확인 쿼리, 주석 처리된 롤백이 있는지, (4) prisma schema, 스키마 매니페스트,
- * CI 셋업이 같은 컬럼을 알고 있는지를 잠근다.
+ * CI 셋업이 같은 컬럼을 알고 있는지, (5) 주석 줄이 SQL 로 새지 않는지를 잠근다. (5)는 CI 의 DB 셋업까지
+ * 가지 않아도 단위 테스트에서 바로 드러나게 하려는 것이다.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -16,11 +17,12 @@ const FILE = "041_exam_student_materials.sql";
 const read = (rel: string) => readFileSync(path.join(root, rel), "utf8").replace(/\r\n/g, "\n");
 
 const sql = read(`database/${FILE}`);
-const header = sql.slice(0, sql.indexOf("BEGIN;"));
-const executable = sql
-  .split("\n")
-  .filter((line) => !line.trimStart().startsWith("--"))
-  .join("\n");
+const lines = sql.split("\n");
+const beginLine = lines.indexOf("BEGIN;");
+const commitLine = lines.indexOf("COMMIT;");
+const header = lines.slice(0, beginLine).join("\n");
+const executable = lines.filter((line) => !line.trimStart().startsWith("--")).join("\n");
+const isBlank = (line: string) => line.trim() === "";
 
 describe("041 exams.student_materials, exams.material_names 마이그레이션", () => {
   it("041 이 database 디렉터리에서 유일한 순번이다", () => {
@@ -32,6 +34,33 @@ describe("041 exams.student_materials, exams.material_names 마이그레이션",
   it("단일 트랜잭션이다", () => {
     expect(executable.match(/^BEGIN;$/gm)).toHaveLength(1);
     expect(executable.match(/^COMMIT;$/gm)).toHaveLength(1);
+    expect(beginLine).toBeGreaterThan(0);
+    expect(commitLine).toBeGreaterThan(beginLine);
+  });
+
+  // 아래 세 단언은 주석 줄에서 -- 가 빠진 실수를 잡는다(#546 재검토 B2). 머리말 한 줄이 SQL 로 새면
+  // 파일 전체가 `syntax error at or near ...` 로 실패한다. psql 에 ON_ERROR_STOP 이 없으면 BEGIN 이
+  // 실패한 첫 문장에 삼켜져 ALTER 들이 트랜잭션과 lock_timeout 없이 적용된다.
+  it("BEGIN 앞의 비어 있지 않은 줄은 모두 -- 로 시작한다", () => {
+    const offenders = lines
+      .slice(0, beginLine)
+      .map((line, index) => `${index + 1}: ${line}`)
+      .filter((_, index) => !isBlank(lines[index]) && !lines[index].startsWith("--"));
+    expect(offenders).toEqual([]);
+  });
+
+  it("COMMIT 뒤에는 NOTIFY 한 문장과 주석뿐이다", () => {
+    const statements = lines
+      .slice(commitLine + 1)
+      .filter((line) => !isBlank(line) && !line.startsWith("--"));
+    expect(statements).toEqual(["NOTIFY pgrst, 'reload schema';"]);
+  });
+
+  it("실행되는 줄에 한글이 없다 (트랜잭션 안의 주석도 -- 를 잃지 않았다)", () => {
+    const offenders = lines
+      .map((line, index) => `${index + 1}: ${line}`)
+      .filter((_, index) => !lines[index].trimStart().startsWith("--") && /[가-힣]/.test(lines[index]));
+    expect(offenders).toEqual([]);
   });
 
   it("트랜잭션 안에서 잠금 대기를 5초로 제한하고 커밋 뒤 PostgREST 캐시를 갱신한다 (#546 리뷰 5)", () => {

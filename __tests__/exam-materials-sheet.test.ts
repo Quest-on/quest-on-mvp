@@ -4,11 +4,12 @@
  *  - 학생: 응시 화면 도구 막대의 "자료" 버튼과 읽기 전용 시트(MaterialsSheet). 공개 파일이 없으면 버튼이 없다.
  *  - 교수자: 수업 자료 목록의 파일 행(MaterialFileRow)마다 "학생에게 공개" 스위치. 기본은 꺼짐이다.
  *
- * 렌더 방식은 평가 기준 시트 테스트(exam-rubric-sheet.test.ts)와 같다. jsdom 이 없어서 react-dom/server
- * 로 렌더하고, Radix Portal 을 "자식을 그 자리에 그린다" 로 바꿔 열린 시트의 안쪽을 본다. 여는 동작,
- * 실제 내려받기, 좁은 화면 배치는 브라우저의 몫이라 스테이징 QA 에서 본다.
+ * 렌더 방식은 평가 기준 시트 테스트(exam-rubric-sheet.test.ts)와 같다. 기본 환경이 node 라 react-dom/server
+ * 로 렌더하고, Radix Portal 을 "자식을 그 자리에 그린다" 로 바꿔 열린 시트의 안쪽을 본다. 내려받기
+ * 클릭과 실패 감지는 exam-materials-download.test.ts 가 jsdom 으로 본다. 실제 내려받기와 좁은 화면
+ * 배치는 브라우저의 몫이라 스테이징 QA 에서 본다.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement, type ReactElement, type ReactNode } from "react";
@@ -27,6 +28,15 @@ vi.mock("@radix-ui/react-dialog", async (importOriginal) => {
     ...actual,
     Portal: ({ children }: { children?: ReactNode }) => h(Fragment, null, children),
   };
+});
+
+// 내려받기 주소(materialDownloadHref)는 프로젝트 호스트를 본다. 테스트 결과가 실행 환경의 값에
+// 따라 바뀌지 않게 고정한다(CI 의 단위 테스트에는 이 값이 없다).
+beforeEach(() => {
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://proj.supabase.co");
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 function read(rel: string): string {
@@ -115,22 +125,26 @@ describe("열린 시트 - 파일마다 이름, 형식, 내려받기 링크", () 
     expect(buttons[0]).toContain(`aria-label="` + ORIGINAL + ` 내려받기"`);
   });
 
-  it("내려받기는 최상위 탐색이 아니다 - 숨긴 iframe 이 있고 <a href> 로 걸지 않는다 (beforeunload 가 돌지 않게, #546 리뷰 B1)", async () => {
-    const html = await renderSheet("ko", ITEMS, true);
-    const iframe = html.match(/<iframe[^>]*>/)?.[0] ?? "";
-    expect(iframe).toContain('aria-hidden="true"');
-    expect(iframe).toContain('tabindex="-1"');
-    expect(iframe).toMatch(/\bsr-only\b/);
-    expect(iframe).not.toContain("src=");
-    expect(html).not.toMatch(/<a[^>]*href="https?:\/\/[\w.-]*supabase/);
+  it("내려받기는 최상위 탐색이 아니다 - 숨긴 iframe 이 시트 밖에 있고 <a href> 로 걸지 않는다 (#546 리뷰 B1, 재검토)", async () => {
+    // 클릭, load 감지, 실패 알림은 jsdom 으로 실제 동작을 본다(exam-materials-download.test.ts).
+    for (const open of [false, true]) {
+      const html = await renderSheet("ko", ITEMS, open);
+      // 시트가 닫혀 있어도(시트 내용이 없어도) 파일마다 iframe 이 있다.
+      expect(html.includes('role="dialog"'), String(open)).toBe(open);
+      const iframes = html.match(/<iframe[^>]*>/g) ?? [];
+      expect(iframes, String(open)).toHaveLength(2);
+      for (const iframe of iframes) {
+        expect(iframe).toContain('aria-hidden="true"');
+        expect(iframe).toContain('tabindex="-1"');
+        expect(iframe).toMatch(/\bsr-only\b/);
+        expect(iframe).not.toContain("src=");
+      }
+      expect(html).not.toMatch(/<a[^>]*href="https?:\/\/[\w.-]*supabase/);
+      // 실패하기 전에는 알림이 없다.
+      expect(html).not.toContain('role="alert"');
+    }
   });
 
-  it("내려받기 버튼은 Supabase 공개 객체를 iframe src 로, 그 밖의 주소를 window.open 으로 연다", async () => {
-    const src = read("components/exam/MaterialsSheet.tsx");
-    expect(src).toMatch(/if \(downloadHref\) download\(downloadHref\);/);
-    expect(src).toMatch(/window\.open\(item\.url, "_blank", "noopener,noreferrer"\)/);
-    expect(src).toMatch(/setAttribute\("src", `/);
-  });
   it("확장자가 없으면 형식은 '알 수 없음' 이다", async () => {
     const html = await renderSheet("ko", [{ url: "https://x.test/README", fileName: "README", extension: "" }], true);
     expect(html).toContain("형식: 알 수 없음");

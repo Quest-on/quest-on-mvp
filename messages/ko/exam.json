@@ -60,7 +60,10 @@
     "formatUnknown": "알 수 없음",
     "download": "내려받기",
     "downloadAriaLabel": "{name} 내려받기",
-    "close": "닫기"
+    "close": "닫기",
+    "downloadFailed": "파일을 내려받지 못했습니다. 다시 시도하거나 새 탭에서 여세요.",
+    "openInNewTab": "새 탭에서 열기",
+    "openInNewTabAriaLabel": "{name} 새 탭에서 열기"
   },
   "timer": {
     "ariaLabel": "남은 시간 {time}",

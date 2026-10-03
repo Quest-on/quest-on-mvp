@@ -375,7 +375,7 @@ describe("원래 파일 이름 (material_names, #544 추가 반영)", () => {
   });
 });
 
-describe("materialDownloadHref (같은 탭에서 원래 이름으로 내려받기, #544 추가 반영)", () => {
+describe("materialDownloadHref (숨긴 iframe 으로 원래 이름 내려받기, #544)", () => {
   it("Supabase 공개 객체 URL 에 download=<인코딩한 원래 이름> 을 붙인다 (공백은 %20)", () => {
     const href = materialDownloadHref(XLSX, "하냥센스_시험용 dataset.xlsx");
     expect(href).toBe(`${XLSX}?download=${encodeURIComponent("하냥센스_시험용 dataset.xlsx")}`);
@@ -409,7 +409,7 @@ describe("materialDownloadHref (같은 탭에서 원래 이름으로 내려받�
     expect(materialDownloadHref("javascript:alert(1)//storage/v1/object/public/a.xlsx", "a.xlsx")).toBeNull();
   });
 
-  it("커스텀 도메인 스토리지를 쓰는 배포에서는 프로젝트 호스트와 정확히 같을 때만 같은 탭 취급을 한다 (#546 리뷰 2)", () => {
+  it("커스텀 도메인 스토리지를 쓰는 배포에서는 프로젝트 호스트와 정확히 같을 때만 iframe 으로 연다 (#546 리뷰 2)", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://storage.quest-on.app");
     const mine = materialDownloadHref("https://storage.quest-on.app/storage/v1/object/public/exam-materials/i/a.xlsx", "a.xlsx");
     expect(mine).toContain("download=a.xlsx");
@@ -426,7 +426,7 @@ describe("materialDownloadHref (같은 탭에서 원래 이름으로 내려받�
     expect(materialDownloadHref(XLSX, "a.xlsx")).toContain("download=a.xlsx");
   });
 
-  it("호스트가 Supabase 스토리지가 아니면 같은 탭 취급을 하지 않는다 (#546 리뷰 2)", () => {
+  it("호스트가 Supabase 스토리지가 아니면 iframe 으로 열지 않는다 (#546 리뷰 2)", () => {
     // 경로만 같고 호스트가 다른 경우
     expect(materialDownloadHref("https://evil.example/storage/v1/object/public/x.html", "x.html")).toBeNull();
     // 서픽스를 흉내 낸 타 도메인(점 경계 아님)
@@ -440,5 +440,35 @@ describe("materialDownloadHref (같은 탭에서 원래 이름으로 내려받�
     // 대문자 호스트는 정규화 뒤 허용된다
     const upper = materialDownloadHref("https://PROJ.SUPABASE.CO/storage/v1/object/public/b/a.xlsx", "a.xlsx");
     expect(upper).toContain("download=a.xlsx");
+  });
+
+  it.each([
+    ["설정 없음", ""],
+    ["*.supabase.co 프로젝트", "https://proj.supabase.co"],
+  ])("점 경계가 없는 서픽스, supabase.co 자체, 빈 라벨은 거부한다 (%s, #546 재검토)", (_label, projectUrl) => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", projectUrl);
+    for (const host of ["evil-supabase.co", "evilsupabase.co", "supabase.co", ".supabase.co", "a..supabase.co"]) {
+      expect(materialDownloadHref(`https://${host}/storage/v1/object/public/a.xlsx`, "a.xlsx"), host).toBeNull();
+    }
+    expect(materialDownloadHref(XLSX, "a.xlsx")).toContain("download=a.xlsx");
+    // 여러 단계 하위 도메인도 *.supabase.co 다.
+    expect(materialDownloadHref("https://x.y.supabase.co/storage/v1/object/public/a.xlsx", "a.xlsx")).toContain(
+      "download=a.xlsx"
+    );
+  });
+
+  it("로컬 스택은 프로젝트 주소와 정확히 같을 때만 통과한다 (CSP frame-src 도 그 출처를 연다)", () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321");
+    const local = "http://127.0.0.1:54321/storage/v1/object/public/exam-materials/i/a.xlsx";
+    expect(materialDownloadHref(local, "a.xlsx")).toBe(`${local}?download=a.xlsx`);
+    expect(materialDownloadHref(XLSX, "a.xlsx")).toBeNull();
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://proj.supabase.co");
+    expect(materialDownloadHref(local, "a.xlsx")).toBeNull();
+  });
+
+  it("조각(#...)을 지운다 - 같은 주소를 iframe 에 다시 넣으면 언제나 새로 요청한다 (#546 재검토)", () => {
+    const href = materialDownloadHref(`${XLSX}#d123`, "a.xlsx")!;
+    expect(href).not.toContain("#");
+    expect(href).toBe(`${XLSX}?download=a.xlsx`);
   });
 });

@@ -276,12 +276,26 @@ const SUPABASE_PUBLIC_OBJECT_PATH = "/storage/v1/object/public/";
 const SUPABASE_STORAGE_HOST_SUFFIX = ".supabase.co";
 
 /**
+ * `*.supabase.co` 의 하위 도메인인가. 점 경계로만 맞추고(`evil-supabase.co` 제외), 서픽스 앞에 빈 라벨이
+ * 있는 이름(`.supabase.co`, `a..supabase.co`)도 제외한다. `supabase.co` 자체는 서픽스로 끝나지 않아 빠진다.
+ */
+function isSupabaseCoSubdomain(host: string): boolean {
+  if (!host.endsWith(SUPABASE_STORAGE_HOST_SUFFIX)) return false;
+  return host
+    .slice(0, -SUPABASE_STORAGE_HOST_SUFFIX.length)
+    .split(".")
+    .every((label) => label.length > 0);
+}
+
+/**
  * Storage 공개 객체를 내놓는 Supabase 호스트인가.
  *
- * 같은 탭 링크는 페이지 이동으로 처리될 수 있어 잘못 걸면 응시 화면을 떠나게 한다. 그래서 경로뿐 아니라
- * 호스트를 명시적으로 검사한다. 통과하는 경우는 두 가지다:
+ * 응시 화면은 이 주소를 숨긴 iframe 으로 연다. 아무 주소나 iframe 에 넣지 않도록 경로뿐 아니라 호스트를
+ * 명시적으로 검사한다. 통과하는 경우는 두 가지다:
  *   1. URL 의 호스트가 프로젝트 스토리지 호스트(`NEXT_PUBLIC_SUPABASE_URL` 의 hostname)와 정확히 같다.
- *      커스텀 도메인 스토리지 배포는 이 경로로 통과한다.
+ *      로컬 스택(127.0.0.1, localhost)은 이 경로로 통과하고, CSP frame-src 도 그 출처를 허용한다.
+ *      커스텀 도메인도 여기서는 통과하지만 CSP(connect-src, frame-src)가 `*.supabase.co` 와 로컬만
+ *      허용하므로 그런 배포는 CSP 도 함께 넓혀야 한다. 막히면 응시 화면이 실패 알림과 새 탭 링크를 보인다.
  *   2. 프로젝트 호스트가 `*.supabase.co` 이고 URL 의 호스트도 점 경계로 `*.supabase.co` 서픽스를 가진다.
  * `evil.example`, `abc.supabase.co.evil.com`, `abc.supabase.co@evil.com`(URL 파서가 호스트를 evil.com
  * 으로 읽는다)은 모두 제외된다. 프로젝트가 커스텀 도메인이면 남의 *.supabase.co 주소도 제외된다.
@@ -302,18 +316,16 @@ function isSupabaseStorageHost(parsed: URL): boolean {
       if (host === projectHost) return true;
       // *.supabase.co 프로젝트라면 같은 서픽스의 다른 프로젝트도 통과. 프로젝트가 커스텀
       // 도메인이면 위 정확 일치만 통과하므로 남의 *.supabase.co 주소는 제외된다.
-      if (projectHost.endsWith(SUPABASE_STORAGE_HOST_SUFFIX)) {
-        return host.endsWith(SUPABASE_STORAGE_HOST_SUFFIX) && host !== SUPABASE_STORAGE_HOST_SUFFIX.slice(1);
-      }
+      if (projectHost.endsWith(SUPABASE_STORAGE_HOST_SUFFIX)) return isSupabaseCoSubdomain(host);
       return false;
     }
   }
-  // NEXT_PUBLIC_SUPABASE_URL 이 없으면 서픽스 규칙만 따른다. "supabase.co" 자체(빈 라벨)는 제외.
-  return host.endsWith(SUPABASE_STORAGE_HOST_SUFFIX) && host !== SUPABASE_STORAGE_HOST_SUFFIX.slice(1);
+  // NEXT_PUBLIC_SUPABASE_URL 이 없으면 서픽스 규칙만 따른다.
+  return isSupabaseCoSubdomain(host);
 }
 
 /**
- * 같은 탭에서 파일로 내려받게 하는 링크 주소. 쓸 수 없으면 null.
+ * 숨긴 iframe 으로 파일을 내려받을 주소. 쓸 수 없으면 null.
  *
  * `exam-materials` 는 Supabase 공개 버킷이다. 공개 URL 에 `?download=<이름>` 을 붙이면 Storage 가
  * `Content-Disposition: attachment; filename=...; filename*=UTF-8''...` 로 응답해 브라우저가 페이지를
@@ -321,8 +333,8 @@ function isSupabaseStorageHost(parsed: URL): boolean {
  * supabase/storage 의 src/storage/renderer/renderer.ts handleDownload). 다른 출처 링크라 `<a download>`
  * 이름은 브라우저가 무시하므로 이 파라미터가 핵심이다.
  *
- * Supabase 공개 객체 경로가 아닌 URL 은 이 파라미터를 모르는 서버라 null 을 돌려준다. 그런 링크를 같은
- * 탭으로 열면 시험 화면을 떠나게 되므로, 호출자는 null 이면 새 탭으로 연다.
+ * Supabase 공개 객체 경로가 아닌 URL 은 이 파라미터를 모르는 서버라 null 을 돌려준다. 호출자는 null 이면
+ * 새 탭으로 연다(시험 화면을 떠나지 않게).
  */
 export function materialDownloadHref(url: string, fileName: string): string | null {
   const parsed = parseHttpUrl(url);
@@ -330,6 +342,9 @@ export function materialDownloadHref(url: string, fileName: string): string | nu
   if (!isSupabaseStorageHost(parsed)) return null;
   const name = normalizeMaterialName(fileName) ?? normalizeMaterialName(lastPathSegment(parsed));
   if (name === null) return null;
+  // 조각(#...)은 서버로 가지 않는다. 남겨 두면 같은 주소를 iframe src 에 다시 넣을 때 문서 안 이동으로
+  // 처리돼 다시 요청하지 않는다(#546 재검토). 조각을 지워 다시 누르면 언제나 새로 요청하게 한다.
+  parsed.hash = "";
   parsed.searchParams.delete("download");
   try {
     // URLSearchParams 는 공백을 + 로 쓴다. 이름은 encodeURIComponent 로 직접 붙여 %20 으로 보낸다.

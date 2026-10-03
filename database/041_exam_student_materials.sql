@@ -31,11 +31,10 @@
 --     않는다(메타데이터만 바뀐다). 기존 행은 모두 [] 와 {} 로 읽힌다.
 --   - CHECK 제약 두 개는 이름(exams_student_materials_is_array, exams_material_names_is_object)으로
 --     존재를 확인하고 없을 때만 더한다. 더할 때 기존 행을 한 번 검사한다. 모든 행이 기본값이라 실패하지 않는다.
---   - 멱등: 여러 번 실행해도 결과가 같다.
+--   - 멱등: 여러 번 실행해도 결과가 같다. CI 의 테스트 DB 처럼 prisma db push 가 컬럼을 먼저
+--     만든 DB 에서도 컬럼 추가는 건너뛰고 제약만 더한다.
 --   - SET LOCAL lock_timeout = 5s: 잠금을 5초 안에 못 얻으면 실패한다(트랜잭션 안에서만).
 --   - COMMIT 뒤 NOTIFY pgrst 로 PostgREST 스키마 캐시를 바로 갱신한다.
- CI 의 테스트 DB 처럼 prisma db push 가 컬럼을 먼저
---     만든 DB 에서도 컬럼 추가는 건너뛰고 제약만 더한다.
 --
 -- 확인 쿼리 (적용 후):
 --   select column_name, data_type, is_nullable, column_default
