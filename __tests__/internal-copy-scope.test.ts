@@ -111,6 +111,34 @@ function textClipboard(text: string) {
   return clip;
 }
 
+function inputEvent(type: "beforeinput" | "input", inputType: string, data: string | null = null) {
+  return new InputEvent(type, { bubbles: true, cancelable: type === "beforeinput", inputType, data });
+}
+
+/** React 가 감시하는 value setter 를 건너뛰어야 input 이벤트에서 onChange 가 불린다(브라우저가 값을 바꾼 것처럼). */
+function setNativeValue(el: HTMLTextAreaElement, value: string) {
+  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(el, value);
+}
+
+/**
+ * 끌어 온 데이터를 답안 칸 끝에 놓는다. 브라우저는 text/plain 을 그대로(표식 문자까지) 넣는다.
+ * 순서는 #561 테스트와 같다: drop → beforeinput/input insertFromDrop.
+ */
+async function dropInto(id: string, data: FakeClipboard) {
+  const ta = textareaIn(id);
+  const text = data.getData("text/plain");
+  const drop = new Event("drop", { bubbles: true, cancelable: true });
+  Object.defineProperty(drop, "dataTransfer", { value: data });
+  await act(async () => {
+    ta.dispatchEvent(drop);
+    ta.dispatchEvent(inputEvent("beforeinput", "insertFromDrop", text));
+    setNativeValue(ta, ta.value + text);
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    ta.dispatchEvent(inputEvent("input", "insertFromDrop"));
+  });
+  return pastes[id]?.[pastes[id].length - 1];
+}
+
 /** 답안 칸에서 [start, end) 를 복사한다. */
 async function copyFromAnswer(id: string, start: number, end: number) {
   const ta = textareaIn(id);
@@ -286,6 +314,40 @@ describe("답안 칸·문제 본문 복사의 세션 범위 (#560)", () => {
     const legacyTrue = textClipboard("다른 글");
     legacyTrue.setData(INTERNAL_COPY_MIME_TYPE, "true");
     expect((await pasteInto("answer-b", legacyTrue))?.isInternal).toBe(false);
+  });
+});
+
+describe("끌어다 놓기의 표식 판정도 세션 범위를 본다 (#560, #561)", () => {
+  function markedData(text: string, scope: string) {
+    const data = new FakeClipboard();
+    data.setData("text/plain", wrapInternalCopy(text, scope));
+    data.setData(INTERNAL_COPY_MIME_TYPE, internalCopyMimeValue(scope));
+    return data;
+  }
+
+  beforeEach(async () => {
+    await render(createElement(Exam, { sessionId: "session-a" }, createElement(Answer, { id: "drop-a" })));
+  });
+
+  it("같은 세션 범위의 형식·표식이 실린 끌기는 내부다", async () => {
+    expect((await dropInto("drop-a", markedData("같은 세션 글", internalCopyScope("session-a"))))?.isInternal).toBe(true);
+  });
+
+  it("다른 세션 범위의 형식·표식이 실린 끌기는 외부다", async () => {
+    expect((await dropInto("drop-a", markedData("다른 세션 글", internalCopyScope("session-b"))))?.isInternal).toBe(false);
+  });
+
+  it("범위 없는 표식(시험 밖·#560 이전 형식)이 실린 끌기는 외부다", async () => {
+    expect((await dropInto("drop-a", markedData("범위 없는 글", "")))?.isInternal).toBe(false);
+
+    const legacy = new FakeClipboard();
+    legacy.setData("text/plain", "\u200B\u{E0001}\u200B옛 표식 글\u200B\u{E0002}\u200B");
+    legacy.setData(INTERNAL_COPY_MIME_TYPE, "1");
+    expect((await dropInto("drop-a", legacy))?.isInternal).toBe(false);
+  });
+
+  it("끝 표식만 있는 글은 범위와 상관없이 내부가 되지 않는다", async () => {
+    expect((await dropInto("drop-a", textClipboard("끝 표식만 있는 글\u200B\u{E0002}\u200B")))?.isInternal).toBe(false);
   });
 });
 

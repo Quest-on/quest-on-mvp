@@ -22,10 +22,11 @@ export type PasteLogKind = "tab_switch" | "external_paste" | "internal_copy" | "
 /**
  * 로그 한 건의 종류. 검사 순서가 곧 우선순위다.
  *
- * - 내부 복사: `is_internal === true` (시험 화면 안에서 복사해 붙인 것 — AI 대화, 문제 본문,
- *   평가 기준, 학생 본인 답안. 표식은 `CopyProtector`, 채팅 메시지 복사 버튼(`CopyMessageButton`),
+ * - 내부 복사: `is_internal === true` (시험 화면 안에서 복사해 붙이거나 끌어다 놓은 것 — AI 대화,
+ *   문제 본문, 평가 기준, 학생 본인 답안. 표식은 `CopyProtector`, 채팅 메시지 복사 버튼(`CopyMessageButton`),
  *   답안 칸 copy·cut 핸들러가 붙인다. 표식에는 시험 세션 범위가 담겨 같은 세션에서 복사한 것만
- *   내부로 기록된다 — `lib/internal-copy.ts`, #560).
+ *   내부로 기록된다 — `lib/internal-copy.ts`, #560. 끌어다 놓기는 표식을 실을 수 없어서, 같은 화면의
+ *   `CopyProtector`·답안 칸에서 시작한 끌기를 메모리에 적어 내부로 본다 — `lib/answer-drop.ts`, #561).
  *   **가장 먼저** 본다. 내부 복사 표시가 있는 행을 다른 종류로 분류하면 채점 정보
  *   (시험 화면 안의 내용을 얼마나 가져다 썼는지)가 조용히 사라진다.
  * - 탭 전환: `pasted_text` 가 마커와 **정확히** 같다. 본문에 마커가 섞인 진짜

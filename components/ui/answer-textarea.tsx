@@ -4,6 +4,7 @@ import { useRef, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import {
+  cancelInternalDragFrom,
   endInternalDrag,
   isInternalDrag,
   locateInsertedText,
@@ -183,7 +184,7 @@ export function AnswerTextarea({
   const handleDragStart = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    startInternalDrag(textarea.value.substring(textarea.selectionStart, textarea.selectionEnd));
+    startInternalDrag(textarea.value.substring(textarea.selectionStart, textarea.selectionEnd), textarea);
   }, []);
 
   const handleDrop = useCallback((e: DragEvent) => {
@@ -282,6 +283,12 @@ export function AnswerTextarea({
       textarea.removeEventListener("input", handleInput);
     };
   }, [handleDragStart, handleDrop, handleBeforeInput, handleInput]);
+
+  // 답안 칸에서 시작한 끌기 도중 답안 칸이 사라지면(문항 전환 등) 남긴 표시를 지운다.
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    return () => cancelInternalDragFrom(textarea);
+  }, []);
 
   return (
     <textarea
