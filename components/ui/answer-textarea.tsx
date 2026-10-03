@@ -36,6 +36,15 @@ interface AnswerTextareaProps {
   }) => void;
 }
 
+/**
+ * input 이벤트 처리 중에 textarea 값을 바꾼다. React 가 값 변화를 감시하는 setter 를 거치지 않으므로, 이어서 도는
+ * React 의 onChange 가 바뀐 값을 받는다. `textarea.value = ...` 로 바꾸면 React 가 변화를 못 봐서 onChange 가
+ * 불리지 않고, 다음 렌더에서 상태에 있던 값으로 돌아간다.
+ */
+function setValueForReact(textarea: HTMLTextAreaElement, value: string): void {
+  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(textarea, value);
+}
+
 export function AnswerTextarea({
   value,
   onChange,
@@ -226,12 +235,26 @@ export function AnswerTextarea({
 
       const after = textarea.value;
       const range = locateInsertedText(pending.valueBefore, after, textarea.selectionEnd, pending.hint);
-      if (!range || !onPaste) return;
+      if (!range) return;
+
+      // 놓인 글에 표식 문자가 섞여 있으면(표식이 든 채팅 글을 끌어온 경우 등) 붙여넣기처럼 지운다(#555).
+      // 들어온 구간만 고치고 그 밖의 답안 글은 건드리지 않는다.
+      //
+      // 이 리스너는 같은 input 이벤트에서 React 의 onChange 보다 먼저 돈다. 여기서 값을 바로 고치면 React 가
+      // 고친 값을 onChange 로 받는다. 타이머로 미루면 그 사이 학생이 친 글자를 놓을 때의 값으로 덮어쓸 수 있다.
+      const inserted = after.substring(range.start, range.end);
+      const cleaned = stripInternalCopyMarkers(inserted);
+      if (cleaned !== inserted) {
+        setValueForReact(textarea, after.substring(0, range.start) + cleaned + after.substring(range.end));
+        const caret = range.start + cleaned.length;
+        textarea.setSelectionRange(caret, caret);
+      }
+      if (!onPaste) return;
 
       onPaste({
-        pastedText: after.substring(range.start, range.end),
+        pastedText: cleaned,
         pasteStart: range.start,
-        pasteEnd: range.end,
+        pasteEnd: range.start + cleaned.length,
         answerLengthBefore: pending.valueBefore.length,
         answerTextBefore: pending.valueBefore,
         isInternal: pending.isInternal,
@@ -284,7 +307,9 @@ export function AnswerTextarea({
     };
   }, [handleDragStart, handleDrop, handleBeforeInput, handleInput]);
 
-  // 답안 칸에서 시작한 끌기 도중 답안 칸이 사라지면(문항 전환 등) 남긴 표시를 지운다.
+  // 답안 칸에서 시작한 끌기 도중 답안 칸이 다시 그려지거나 화면에서 빠지면(시간이 끝나 제출 화면으로 바뀔 때,
+  // 문제 패널을 접거나 펼 때 등) 남긴 표시를 지운다. 문제 패널을 접은 채 다른 문항으로 옮기면 패널이 다시
+  // 펼쳐지면서(setCurrentQuestionWithReveal) 답안 칸도 다시 그려진다.
   useEffect(() => {
     const textarea = textareaRef.current;
     return () => cancelInternalDragFrom(textarea);

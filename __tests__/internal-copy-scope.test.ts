@@ -150,6 +150,17 @@ async function copyFromAnswer(id: string, start: number, end: number) {
   return clip;
 }
 
+/** 답안 칸에서 [start, end) 를 잘라낸다. */
+async function cutFromAnswer(id: string, start: number, end: number) {
+  const ta = textareaIn(id);
+  ta.setSelectionRange(start, end);
+  const clip = new FakeClipboard();
+  await act(async () => {
+    ta.dispatchEvent(clipboardEvent("cut", clip));
+  });
+  return clip;
+}
+
 /** 문제 본문(CopyProtector) 안의 글을 선택해 복사한다. */
 async function copyFromProtected(id: string) {
   const node = container.querySelector(`#${id}`) as HTMLElement;
@@ -294,6 +305,16 @@ describe("답안 칸·문제 본문 복사의 세션 범위 (#560)", () => {
     expect(await pasteInto("answer-a", clip)).toEqual({ pastedText: "세션 A", isInternal: true });
   });
 
+  it("답안 칸에서 잘라낸 글도 같은 세션에서만 내부 복사다", async () => {
+    // answer-textarea-cut.test.ts 는 범위 Provider 없이 렌더해서, 잘라내기가 세션 범위를 싣는지는 여기서 본다.
+    await renderTwoSessions();
+    const clip = await cutFromAnswer("answer-a", 0, 4); // "세션 A"
+    expect(textareaIn("answer-a").value).toBe(" 답안");
+
+    expect(await pasteInto("answer-a", clip)).toEqual({ pastedText: "세션 A", isInternal: true });
+    expect(await pasteInto("answer-b", clip)).toEqual({ pastedText: "세션 A", isInternal: false });
+  });
+
   it("문제 본문(CopyProtector)에서 복사한 글은 같은 세션에서만 내부 복사다", async () => {
     await renderTwoSessions();
     const clip = await copyFromProtected("question-a");
@@ -331,6 +352,11 @@ describe("끌어다 놓기의 표식 판정도 세션 범위를 본다 (#560, #5
 
   it("같은 세션 범위의 형식·표식이 실린 끌기는 내부다", async () => {
     expect((await dropInto("drop-a", markedData("같은 세션 글", internalCopyScope("session-a"))))?.isInternal).toBe(true);
+  });
+
+  it("형식 없이 같은 세션 범위 표식 문자만 실린 끌기도 내부다", async () => {
+    const data = textClipboard(wrapInternalCopy("표식만 있는 글", internalCopyScope("session-a")));
+    expect((await dropInto("drop-a", data))?.isInternal).toBe(true);
   });
 
   it("다른 세션 범위의 형식·표식이 실린 끌기는 외부다", async () => {
