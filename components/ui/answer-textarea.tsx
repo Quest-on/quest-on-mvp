@@ -3,6 +3,12 @@
 import { useRef, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
+import {
+  endInternalDrag,
+  isInternalDrag,
+  locateInsertedText,
+  startInternalDrag,
+} from "@/lib/answer-drop";
 import { useInternalCopyScope } from "@/components/providers/InternalCopyScopeProvider";
 import {
   INTERNAL_COPY_MIME_TYPE,
@@ -160,6 +166,79 @@ export function AnswerTextarea({
     [onChange, onPaste, scope]
   );
 
+  // 끌어다 놓기(drop)도 붙여넣기와 같은 onPaste 로 기록한다(#561). paste 만 기록하면 다른 창의 글을
+  // 끌어다 놓는 경로가 기록 없이 열려 있다.
+  //
+  // 놓는 위치를 스크립트로 알 수 없어서 넣기는 브라우저에 맡기고(기본 동작을 막지 않으므로 답안 안에서
+  // 끌어 옮기기도 그대로 동작한다), 넣은 직후의 input(insertFromDrop)에서 넣기 직전 값과 비교해 들어온
+  // 구간을 찾는다. 답안 안에서 옮기면 브라우저가 지우기(deleteByDrag) 뒤에 넣기를 하므로, 기준값은
+  // drop 시점이 아니라 넣기 직전(beforeinput insertFromDrop)의 값이다.
+  const pendingDropRef = useRef<{
+    isInternal: boolean;
+    valueBefore: string;
+    hint: string;
+  } | null>(null);
+
+  // 답안 칸에서 시작한 끌기 — 자기 글을 옮기는 것이므로 내부로 본다(잘라내 붙이기와 같은 기준, #554).
+  const handleDragStart = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    startInternalDrag(textarea.value.substring(textarea.selectionStart, textarea.selectionEnd));
+  }, []);
+
+  const handleDrop = useCallback((e: DragEvent) => {
+    const textarea = textareaRef.current;
+    if (!textarea || !e.dataTransfer) return;
+
+    const droppedText = e.dataTransfer.getData("text/plain");
+    const pending = {
+      isInternal: isInternalDrag(droppedText) || isInternalCopyFor(e.dataTransfer, scope),
+      valueBefore: textarea.value,
+      hint: droppedText,
+    };
+    pendingDropRef.current = pending;
+    endInternalDrag();
+
+    // 브라우저가 놓기를 거절해 input 이 오지 않으면 비운다. 놓기의 input 은 이 타이머보다 먼저 온다
+    // (Chromium·Firefox·WebKit 확인).
+    setTimeout(() => {
+      if (pendingDropRef.current === pending) pendingDropRef.current = null;
+    }, 0);
+  }, [scope]);
+
+  const handleBeforeInput = useCallback((e: Event) => {
+    const textarea = textareaRef.current;
+    const pending = pendingDropRef.current;
+    if (!textarea || !pending || (e as InputEvent).inputType !== "insertFromDrop") return;
+
+    pending.valueBefore = textarea.value;
+    const data = (e as InputEvent).data;
+    if (data) pending.hint = data;
+  }, []);
+
+  const handleInput = useCallback(
+    (e: Event) => {
+      const textarea = textareaRef.current;
+      const pending = pendingDropRef.current;
+      if (!textarea || !pending || (e as InputEvent).inputType !== "insertFromDrop") return;
+      pendingDropRef.current = null;
+
+      const after = textarea.value;
+      const range = locateInsertedText(pending.valueBefore, after, textarea.selectionEnd, pending.hint);
+      if (!range || !onPaste) return;
+
+      onPaste({
+        pastedText: after.substring(range.start, range.end),
+        pasteStart: range.start,
+        pasteEnd: range.end,
+        answerLengthBefore: pending.valueBefore.length,
+        answerTextBefore: pending.valueBefore,
+        isInternal: pending.isInternal,
+      });
+    },
+    [onPaste]
+  );
+
   // Copy 이벤트 리스너 등록
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -184,6 +263,25 @@ export function AnswerTextarea({
       textarea.removeEventListener("paste", handlePaste);
     };
   }, [handlePaste]);
+
+  // 끌어다 놓기 이벤트 리스너 등록
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.addEventListener("dragstart", handleDragStart);
+    textarea.addEventListener("dragend", endInternalDrag);
+    textarea.addEventListener("drop", handleDrop);
+    textarea.addEventListener("beforeinput", handleBeforeInput);
+    textarea.addEventListener("input", handleInput);
+    return () => {
+      textarea.removeEventListener("dragstart", handleDragStart);
+      textarea.removeEventListener("dragend", endInternalDrag);
+      textarea.removeEventListener("drop", handleDrop);
+      textarea.removeEventListener("beforeinput", handleBeforeInput);
+      textarea.removeEventListener("input", handleInput);
+    };
+  }, [handleDragStart, handleDrop, handleBeforeInput, handleInput]);
 
   return (
     <textarea
