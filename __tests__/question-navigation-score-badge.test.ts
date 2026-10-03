@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "fs";
+import path from "path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
@@ -72,5 +74,21 @@ describe("문항 탭 점수 배지 (#577)", () => {
 
   it("hideScores 면 점수 배지를 숨긴다", () => {
     expect(scoreBadges(render({ 0: { score: 85, grade_type: "manual" } }, true))).toEqual([]);
+  });
+});
+
+describe("채점 입력 점수 칸 초기값 (#577)", () => {
+  // 평가 요약 행의 score 0 을 초기값으로 넘기면 점수 칸에 "0"이 미리 채워져, 교수가 코멘트만 쓰고 저장해도
+  // 0점이 확정될 수 있었다. 점수 행일 때만 넘기고, 아니면 빈 칸(undefined)이다.
+  const page = readFileSync(
+    path.resolve(__dirname, "..", "app/(app)/instructor/[examId]/grade/[studentId]/page.tsx"),
+    "utf8"
+  ).replace(/\r\n/g, "\n");
+
+  it("시험 채점 화면은 점수 행일 때만 점수 칸 초기값을 넘긴다", () => {
+    expect(page).toMatch(
+      /caseGradeInitialScore =\s*currentGrade\?\.stage_grading\?\.answer\?\.score \?\?\s*\(isScoringGrade\(currentGrade\) \? currentGrade\.score : undefined\);/
+    );
+    expect(page).not.toMatch(/caseGradeInitialScore =\s*currentGrade\?\.stage_grading\?\.answer\?\.score \?\? currentGrade\?\.score;/);
   });
 });
