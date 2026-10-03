@@ -67,6 +67,37 @@ export function AnswerTextarea({
     []
   );
 
+  // Cut 이벤트 핸들러 - 복사와 같은 내부 표식을 붙이고 선택 영역을 직접 지운다.
+  // 표식이 없으면 자기 답안 안에서 잘라내 옮긴 글이 외부 붙여넣기로 기록된다(#554).
+  const handleCut = useCallback(
+    (e: ClipboardEvent) => {
+      const textarea = textareaRef.current;
+      if (!textarea || !e.clipboardData) return;
+
+      const selectionStart = textarea.selectionStart;
+      const selectionEnd = textarea.selectionEnd;
+      if (selectionStart === selectionEnd) return;
+
+      const selectedText = textarea.value.substring(selectionStart, selectionEnd);
+      if (!selectedText) return;
+
+      // 기본 잘라내기를 막았으므로 선택 영역 삭제도 여기서 한다.
+      e.preventDefault();
+      e.clipboardData.setData(
+        "text/plain",
+        INTERNAL_COPY_MARKER_START + selectedText + INTERNAL_COPY_MARKER_END
+      );
+      e.clipboardData.setData(INTERNAL_COPY_MIME_TYPE, "1");
+
+      const currentValue = textarea.value;
+      onChange(currentValue.substring(0, selectionStart) + currentValue.substring(selectionEnd));
+      setTimeout(() => {
+        textarea.setSelectionRange(selectionStart, selectionStart);
+      }, 0);
+    },
+    [onChange]
+  );
+
   // Paste 이벤트 핸들러
   const handlePaste = useCallback(
     (e: ClipboardEvent) => {
@@ -142,10 +173,12 @@ export function AnswerTextarea({
 
     // textarea에서 복사 이벤트 감지
     textarea.addEventListener("copy", handleCopy);
+    textarea.addEventListener("cut", handleCut);
     return () => {
       textarea.removeEventListener("copy", handleCopy);
+      textarea.removeEventListener("cut", handleCut);
     };
-  }, [handleCopy]);
+  }, [handleCopy, handleCut]);
 
   // Paste 이벤트 리스너 등록
   useEffect(() => {
