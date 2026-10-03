@@ -20,6 +20,13 @@
  *   5. `analysis-partner@1` 은 처음부터 위 규칙을 지킨다. `V1` 이름이 붙은 전용 빌더
  *      (`lib/prompts-analysis-partner.ts`)를 가리키고, 그 모듈의 본문과 도구 문단은 이 버전 전용이다.
  *      도구 있음 변형은 `analysis-partner@2` 와 새 빌더로 추가한다.
+ *   6. `analysis-partner@2`(이슈 #545, #543)는 한 버전 안에 도구 상태 두 개(도구 없음, 호스팅 python)를 둔다.
+ *      `renderSha256` 은 도구 없음 렌더, `toolRenderSha256.hosted_python` 은 도구 있음 렌더의 해시다. 둘 다
+ *      잠금 테스트가 지킨다. 응답 기록에는 어느 상태였는지(`tools`)와 그 상태의 `template_sha` 가 남는다.
+ *      빌더는 고정 사본 모듈(`lib/prompts-analysis-partner-v2.ts`)이다.
+ *   7. 분석 파트너 포인터는 두 개다. 도구 없음 경로(`/api/chat`)는 `CURRENT_ANALYSIS_PARTNER_SPEC_ID`, 도구 있음
+ *      경로(`/api/chat/analysis`)는 `CURRENT_ANALYSIS_PARTNER_TOOLS_SPEC_ID` 를 쓴다. 도구 있음 포인터는 도구
+ *      상태를 아는 버전(@2 이후)만 가리킬 수 있다(타입이 막는다). 한쪽을 되돌려도 다른 쪽은 그대로다.
  *
  * 알려진 한계: 자료 검색 결과에 따라 지시문 끝에 붙는 문장(`lib/chat-instructions.ts` 의 상수)은 아직
  * 스펙 필드가 아니다. 그 문장을 바꿔도 이 레지스트리의 `renderSha256` 과 `template_sha` 는 달라지지
@@ -38,10 +45,20 @@
 
 import { buildStudentChatSystemPrompt, type PromptLanguage } from "@/lib/prompts";
 import { buildAnalysisPartnerV1SystemPrompt } from "@/lib/prompts-analysis-partner";
+import {
+  buildAnalysisPartnerV2SystemPrompt,
+  type AnalysisPartnerV2ToolKind,
+} from "@/lib/prompts-analysis-partner-v2";
 
 export type CaseStudentChatSpecId = "case@1";
-export type AnalysisPartnerStudentChatSpecId = "analysis-partner@1";
+export type AnalysisPartnerV1SpecId = "analysis-partner@1";
+/** 도구 상태(없음, 호스팅 python)를 아는 분석 파트너 버전. 도구 있음 포인터는 이 타입만 받는다. */
+export type ToolCapableAnalysisPartnerSpecId = "analysis-partner@2";
+export type AnalysisPartnerStudentChatSpecId = AnalysisPartnerV1SpecId | ToolCapableAnalysisPartnerSpecId;
 export type StudentChatSpecId = CaseStudentChatSpecId | AnalysisPartnerStudentChatSpecId;
+
+/** 응답 기록의 `tools` 값. 도구 상태를 아는 스펙(@2 이후)에서만 남긴다. */
+export type StudentChatToolKind = AnalysisPartnerV2ToolKind;
 
 /** 추론 강도를 요청에 넘기지 않는다 = 공급사 기본값. */
 export type StudentChatEffort = "unspecified";
@@ -82,8 +99,8 @@ export interface CaseStudentChatSpec extends StudentChatSpecBase {
   };
 }
 
-export interface AnalysisPartnerStudentChatSpec extends StudentChatSpecBase {
-  readonly id: AnalysisPartnerStudentChatSpecId;
+export interface AnalysisPartnerV1StudentChatSpec extends StudentChatSpecBase {
+  readonly id: AnalysisPartnerV1SpecId;
   readonly mode: "analysis-partner";
   /**
    * `analysis-partner@1` 전용으로 고정된 빌더(`lib/prompts-analysis-partner.ts`). 도구 상태로 문단을 고르는
@@ -98,7 +115,32 @@ export interface AnalysisPartnerStudentChatSpec extends StudentChatSpecBase {
     readonly ko: string;
     readonly en?: undefined;
   };
+  /** v1 은 도구 상태가 하나(없음)뿐이다. */
+  readonly toolRenderSha256?: undefined;
 }
+
+export interface AnalysisPartnerV2StudentChatSpec extends StudentChatSpecBase {
+  readonly id: ToolCapableAnalysisPartnerSpecId;
+  readonly mode: "analysis-partner";
+  /** `analysis-partner@2` 전용 고정 빌더(`lib/prompts-analysis-partner-v2.ts`). 입력의 `tools` 로 상태를 고른다. */
+  readonly build: typeof buildAnalysisPartnerV2SystemPrompt;
+  /** 도구 없음 상태의 렌더 SHA-256. 입력은 사례형과 같은 전체 입력(FULL_INPUT)이다. 한국어만 있다. */
+  readonly renderSha256: {
+    readonly ko: string;
+    readonly en?: undefined;
+  };
+  /**
+   * 도구 있음 상태의 렌더 SHA-256. 입력은 전체 입력에 잠금 테스트의 고정 데이터 파일 목록을 더한 것이다.
+   * 실제 지시문의 11절(데이터 파일 경로)은 학생마다 다르므로 이 해시는 템플릿을 가리킨다.
+   */
+  readonly toolRenderSha256: {
+    readonly hosted_python: {
+      readonly ko: string;
+    };
+  };
+}
+
+export type AnalysisPartnerStudentChatSpec = AnalysisPartnerV1StudentChatSpec | AnalysisPartnerV2StudentChatSpec;
 
 export type StudentChatSpec = CaseStudentChatSpec | AnalysisPartnerStudentChatSpec;
 
@@ -121,7 +163,7 @@ const CASE_V1: CaseStudentChatSpec = Object.freeze({
   note: "현행 사례형 출제자 프롬프트(staging 15106bba, 2026-10-03 기준)를 바이트 단위로 보존한다.",
 });
 
-const ANALYSIS_PARTNER_V1: AnalysisPartnerStudentChatSpec = Object.freeze({
+const ANALYSIS_PARTNER_V1: AnalysisPartnerV1StudentChatSpec = Object.freeze({
   id: "analysis-partner@1",
   mode: "analysis-partner",
   model: Object.freeze({
@@ -139,21 +181,55 @@ const ANALYSIS_PARTNER_V1: AnalysisPartnerStudentChatSpec = Object.freeze({
   note: "분석 파트너 v1(2026-10-03). 한국어만, 도구 없음 문단. 자료 검색 경고 문장은 붙지 않는다. 문항 ai_role 이 analysis_partner 일 때만 쓴다.",
 });
 
+const ANALYSIS_PARTNER_V2: AnalysisPartnerV2StudentChatSpec = Object.freeze({
+  id: "analysis-partner@2",
+  mode: "analysis-partner",
+  model: Object.freeze({
+    selection: "env-with-default",
+    envVar: "AI_MODEL",
+    defaultModel: "gpt-5.6-luna",
+    source: "lib/ai-models.ts",
+  }),
+  effort: "unspecified",
+  effortLabel: "미지정(공급사 기본값)",
+  build: buildAnalysisPartnerV2SystemPrompt,
+  renderSha256: Object.freeze({
+    ko: "46ad92761710c0cbb87eb3dffbb1b94ccb31c315e3a7ac98950b4434268c1846",
+  }),
+  toolRenderSha256: Object.freeze({
+    hosted_python: Object.freeze({
+      ko: "7f4debcfd0787782699ae1215c1fa17af4fba8d569e0de1cad621504b8427ec7",
+    }),
+  }),
+  note: "분석 파트너 v2(2026-10-03, #545 #543). @1 에 도구 있음 상태(호스팅 python, 데이터 파일 경로, print, 설치 불가, NanumGothic)와 답 길이 상한(본문 8문장, 표 상위 행, 한 번에 한 단계)을 더했다. 도구 없음 상태의 3절은 @1 과 같다.",
+});
+
 export type StudentChatSpecMap = {
   readonly "case@1": CaseStudentChatSpec;
-  readonly "analysis-partner@1": AnalysisPartnerStudentChatSpec;
+  readonly "analysis-partner@1": AnalysisPartnerV1StudentChatSpec;
+  readonly "analysis-partner@2": AnalysisPartnerV2StudentChatSpec;
 };
 
 export const STUDENT_CHAT_SPECS: Readonly<StudentChatSpecMap> = Object.freeze({
   "case@1": CASE_V1,
   "analysis-partner@1": ANALYSIS_PARTNER_V1,
+  "analysis-partner@2": ANALYSIS_PARTNER_V2,
 });
 
 /** 지금 사례형 학생에게 적용되는 스펙. 동작이 바뀌는 곳은 여기 한 줄이다. */
 export const CURRENT_STUDENT_CHAT_SPEC_ID: CaseStudentChatSpecId = "case@1";
 
-/** 지금 분석 파트너 학생에게 적용되는 스펙. 사례형 포인터와 따로 움직인다. */
+/**
+ * 지금 도구 없는 분석 파트너(`/api/chat`)에게 적용되는 스펙. 사례형 포인터와 따로 움직인다.
+ * 학생 공개 데이터 파일이 없는 분석 파트너 문항과 temp 세션이 여기로 온다.
+ */
 export const CURRENT_ANALYSIS_PARTNER_SPEC_ID: AnalysisPartnerStudentChatSpecId = "analysis-partner@1";
+
+/**
+ * 지금 코드 실행이 붙은 분석 파트너(`/api/chat/analysis`)에게 적용되는 스펙. 도구 상태를 아는 버전만 가리킬 수
+ * 있다. 위 포인터와 따로 움직인다.
+ */
+export const CURRENT_ANALYSIS_PARTNER_TOOLS_SPEC_ID: ToolCapableAnalysisPartnerSpecId = "analysis-partner@2";
 
 export function getStudentChatSpec<Id extends StudentChatSpecId>(id: Id): StudentChatSpecMap[Id] {
   const spec = STUDENT_CHAT_SPECS[id];
@@ -171,6 +247,10 @@ export function getCurrentAnalysisPartnerSpec(): AnalysisPartnerStudentChatSpec 
   return getStudentChatSpec(CURRENT_ANALYSIS_PARTNER_SPEC_ID);
 }
 
+export function getCurrentAnalysisPartnerToolsSpec(): AnalysisPartnerV2StudentChatSpec {
+  return getStudentChatSpec(CURRENT_ANALYSIS_PARTNER_TOOLS_SPEC_ID);
+}
+
 // ---------------------------------------------------------------------------
 // 응답 기록(스탬프)
 //
@@ -185,9 +265,14 @@ export const TEMPLATE_SHA_LENGTH = 16;
 export type StudentChatSpecStamp = {
   /** 예: `case@1` */
   spec: StudentChatSpecId;
-  /** 렌더 해시 앞 16자. 응답에 쓴 언어의 템플릿이다. */
+  /** 렌더 해시 앞 16자. 응답에 쓴 언어(와 도구 상태)의 템플릿이다. */
   template_sha: string;
   effort: StudentChatEffort;
+  /**
+   * 도구 상태. 도구 상태를 아는 스펙(`analysis-partner@2` 이후)에서만 있다. 그 밖의 스펙은 이 키가 없어서
+   * 기존 응답 기록의 모양이 그대로다.
+   */
+  tools?: StudentChatToolKind;
 };
 
 export type ResponseModelStamp = {
@@ -204,9 +289,22 @@ export type ResponseModelStamp = {
 export function buildStudentChatSpecStamp(params: {
   specId: StudentChatSpecId;
   language: PromptLanguage;
+  /** 도구 상태. 도구 상태를 아는 스펙에서만 읽는다. 안 주면 도구 없음이다. */
+  tools?: StudentChatToolKind;
 }): StudentChatSpecStamp | Record<string, never> {
   try {
-    const spec = getStudentChatSpec(params.specId);
+    const spec: StudentChatSpec = getStudentChatSpec(params.specId);
+    if ("toolRenderSha256" in spec && spec.toolRenderSha256) {
+      // 도구 상태를 아는 스펙(@2 이후). 한국어 템플릿 하나뿐이고 상태별 해시가 따로 있다.
+      const tools: StudentChatToolKind = params.tools === "hosted_python" ? "hosted_python" : "none";
+      const renderSha256 = tools === "hosted_python" ? spec.toolRenderSha256.hosted_python.ko : spec.renderSha256.ko;
+      return {
+        spec: spec.id,
+        template_sha: renderSha256.slice(0, TEMPLATE_SHA_LENGTH),
+        effort: spec.effort,
+        tools,
+      };
+    }
     // 빌더와 같은 규칙: en 이 아니면 ko. 영어 템플릿이 없는 스펙(분석 파트너)은 ko 하나뿐이다.
     const renderSha256 =
       params.language === "en" ? (spec.renderSha256.en ?? spec.renderSha256.ko) : spec.renderSha256.ko;
