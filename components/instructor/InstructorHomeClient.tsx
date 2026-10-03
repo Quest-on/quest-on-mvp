@@ -14,6 +14,11 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import { qk } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
 import {
+  resolveDriveCardStatus,
+  type DriveStatusFilter,
+  type DriveStatusTone,
+} from "@/lib/drive-card-status";
+import {
   Plus,
   FileText,
   Clock,
@@ -129,15 +134,18 @@ interface ExamNode {
   } | null;
 }
 
-type ExamFilterType =
-  | "all"
-  | "exam"
-  | "assignment"
-  | "deadline"
-  | "in-progress";
+// "마감"(deadline)·"진행 중"(in-progress) 칩의 값은 resolveDriveCardStatus 가 내는 filter 값 그대로다(#567).
+type ExamFilterType = "all" | "exam" | "assignment" | DriveStatusFilter;
 
 // Labels are resolved inside the component using t()
 const EXAM_FILTER_OPTION_VALUES: ExamFilterType[] = ["all", "exam", "assignment", "deadline", "in-progress"];
+
+/** 카드 상태 배지 색. 어떤 상태가 어떤 색인지는 lib/drive-card-status 가 정한다. */
+const DRIVE_STATUS_TONE_CLASS: Record<DriveStatusTone, string> = {
+  success: "bg-success-subtle text-success-text dark:text-success-solid",
+  warning: "bg-warning-subtle text-warning-text dark:text-warning-solid",
+  neutral: "bg-secondary text-secondary-foreground",
+};
 
 const FOLDER_CARD_STEP_PX = 226; // folder card width (210) + gap (16)
 
@@ -346,16 +354,6 @@ export default function InstructorHome() {
 
     return examNodes.filter((node) => {
       const examType = node.exams?.type;
-      const status = node.exams?.status;
-      const hasDeadline = Boolean(node.exams?.deadline);
-      const deadlineTime = node.exams?.deadline
-        ? new Date(node.exams.deadline).getTime()
-        : Number.NaN;
-      const isDeadlinePassed = hasDeadline && !Number.isNaN(deadlineTime) && deadlineTime < now;
-      const isInProgress =
-        status === "active" ||
-        (hasDeadline && !Number.isNaN(deadlineTime) && deadlineTime >= now);
-
       const isNonExamType = examType && examType !== "exam";
 
       switch (examFilter) {
@@ -364,9 +362,9 @@ export default function InstructorHome() {
         case "assignment":
           return !!isNonExamType;
         case "deadline":
-          return status === "completed" || isDeadlinePassed;
         case "in-progress":
-          return isInProgress;
+          // 카드 배지와 같은 판정이다. "진행 중" 배지가 붙은 카드는 여기에도 나온다.
+          return resolveDriveCardStatus(node.exams, now).filter === examFilter;
         default:
           return true;
       }
@@ -375,7 +373,11 @@ export default function InstructorHome() {
 
   const isFiltering = searchQuery.trim().length > 0;
   const isExamFilterActive = examFilter !== "all";
-  const hasResults = folderNodes.length > 0 || filteredExamNodes.length > 0;
+  // 첫 사용 빈 화면("아직 만든 시험이 없습니다")은 칩 필터를 걸기 전 목록으로 고른다(#567).
+  // 칩 필터 결과로 고르면 폴더 없는 교수가 "진행 중"을 눌러 0건일 때 시험이 사라진 것처럼
+  // 보이고, 칩 줄까지 함께 사라져 "전체"로 돌아갈 수 없었다. 0건이면 섹션 안의
+  // "선택한 조건에 맞는 시험/과제가 없습니다"가 대신 뜬다. 검색은 examNodes 에 이미 반영돼 있다.
+  const hasResults = folderNodes.length > 0 || examNodes.length > 0;
 
   // Intersection Observer sentinel for infinite scroll
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -567,58 +569,20 @@ export default function InstructorHome() {
       return null;
     }
 
-    const examType = node.exams.type;
-    const isNonExamType = examType && examType !== "exam";
-
-    // For non-exam types (assignments), derive status from time window
-    if (isNonExamType) {
-      const now = new Date();
-      const deadline = node.exams.deadline ? new Date(node.exams.deadline) : null;
-      const openAt = node.exams.open_at ? new Date(node.exams.open_at) : null;
-
-      if (deadline && now > deadline) {
-        return (
-          <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-secondary text-secondary-foreground">
-            {t("drive.statusDeadlinePassed")}
-          </span>
-        );
-      }
-      if (!openAt || now >= openAt) {
-        return (
-          <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-success-subtle text-success-text dark:text-success-solid">
-            {t("drive.statusActive")}
-          </span>
-        );
-      }
-      return (
-        <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-warning-subtle text-warning-text dark:text-warning-solid">
-          {t("drive.statusScheduled")}
-        </span>
-      );
-    }
-
-    // Existing exam logic
-    const statusLabel =
-      node.exams.status === "active"
-        ? t("drive.statusActive")
-        : node.exams.status === "draft"
-        ? t("drive.statusDraft")
-        : t("drive.statusCompleted");
-
-    if (node.exams.status === "draft") {
+    // 시험은 status, 과제는 기간으로 판정한다. "진행 중"·"마감" 필터도 같은 판정을 쓴다.
+    const { badge } = resolveDriveCardStatus(node.exams);
+    if (!badge) {
       return null;
     }
 
-    const badgeClasses =
-      node.exams.status === "active"
-        ? "bg-success-subtle text-success-text dark:text-success-solid"
-        : "bg-secondary text-secondary-foreground";
-
     return (
       <span
-        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${badgeClasses}`}
+        className={cn(
+          "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
+          DRIVE_STATUS_TONE_CLASS[badge.tone]
+        )}
       >
-        {statusLabel}
+        {t(badge.labelKey)}
       </span>
     );
   };
