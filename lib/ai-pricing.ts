@@ -4,6 +4,9 @@ export type AiEndpoint = "chat.completions" | "responses" | "embeddings";
 
 export type AiFeature =
   | "student_chat"
+  // 학생 시험 채팅 중 코드 실행(code_interpreter)이 붙은 분석 턴(#545). 컨테이너 실행 비용과 긴 지연이 따로
+  // 보이도록 일반 채팅과 나눈다.
+  | "student_chat_analysis"
   | "instructor_chat"
   | "feedback_chat"
   | "auto_grading_question"
@@ -28,6 +31,7 @@ export type AiFeature =
 
 export const AI_FEATURES: AiFeature[] = [
   "student_chat",
+  "student_chat_analysis",
   "instructor_chat",
   "feedback_chat",
   "auto_grading_question",

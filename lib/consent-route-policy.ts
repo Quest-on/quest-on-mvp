@@ -65,9 +65,12 @@ export function classifyRoute(pathname: string, method: string, action?: unknown
   if (INTERNAL_PREFIXES.some((prefix) => pathname === prefix.slice(0, -1) || pathname.startsWith(prefix))) return "public";
   if (method.toUpperCase() === "GET" && (/^\/exam\/[^/]+$/.test(pathname) || /^\/assignment\/[^/]+$/.test(pathname))) return "exam_continuity";
   if (method.toUpperCase() === "POST" && pathname === "/api/supa" && typeof action === "string" && SUPA_CONTINUITY_ACTIONS.has(action)) return "exam_continuity";
-  if (method.toUpperCase() === "POST" && ["/api/chat", "/api/assignment-chat", "/api/log/paste", "/api/feedback"].includes(pathname)) return "exam_continuity";
+  if (method.toUpperCase() === "POST" && ["/api/chat", "/api/chat/analysis", "/api/assignment-chat", "/api/log/paste", "/api/feedback"].includes(pathname)) return "exam_continuity";
   if (method.toUpperCase() === "POST" && /^\/api\/student\/session\/[^/]+\/deadline-auto-submit$/.test(pathname)) return "exam_continuity";
   if (method.toUpperCase() === "GET" && /^\/api\/session\/[^/]+$/.test(pathname)) return "exam_continuity";
+  // 분석 턴 기록과 그림(#545). 시험 중인 학생이 자기 대화의 그림을 연다. 소유권과 교수 접근은 라우트가 확인하고,
+  // 라우트가 이 분류로 동의 판정(`assertConsentOrRespond`)을 다시 한다.
+  if (method.toUpperCase() === "GET" && /^\/api\/session\/[^/]+\/analysis(?:\/figures\/[^/]+\/[^/]+)?$/.test(pathname)) return "exam_continuity";
   return "protected";
 }
 

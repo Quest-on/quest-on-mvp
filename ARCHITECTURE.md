@@ -247,6 +247,8 @@ sequenceDiagram
 
 응시 중 `/api/chat` 은 `search-materials` 로 이 청크를 pgvector 검색해 컨텍스트로 넣는다.
 
+분석 파트너 문항(문항 `ai_role` 이 `analysis_partner`)이고 학생에게 공개된 데이터 파일(xlsx, xls, csv)이 있으면 화면은 `/api/chat/analysis` 로 보낸다(#545). 이 라우트는 OpenAI 호스팅 code_interpreter 를 foreground 스트림으로 부르고(SSE 로 진행을 화면에 전달, `maxDuration` 300), 세션마다 명시 컨테이너 하나에 공개 데이터 파일을 연결한다. 컨테이너 id, 파일 경로, 실행한 코드 셀(코드, 로그, 그림 경로)은 AI 메시지 `metadata.analysis` 에 남고(DDL 없음), 그림은 비공개 버킷 `analysis-outputs` 에 둔다. 학생과 교수는 `/api/session/[sessionId]/analysis`(기록)와 `/api/session/[sessionId]/analysis/figures/...`(서명 URL)로 본다. 대상이 아니면 409 를 받고 같은 메시지를 `/api/chat` 으로 보낸다.
+
 ### 3-5. 에이전트 런 (출제 보조)
 
 ```mermaid
@@ -400,7 +402,7 @@ flowchart LR
 | 액션 멀티핸들러 | `/api/supa` | `currentUser()` |
 | 시험 운영 | `/api/exam/[examId]/*` | `currentUser()` + 소유권 |
 | 세션·응시 | `/api/session/*`, `/api/student/*` | `currentUser()` + 소유권 |
-| AI 생성·대화 | `/api/ai/*`, `/api/chat`, `/api/feedback*`, `/api/assignment-chat` | `currentUser()` + 레이트리밋 |
+| AI 생성·대화 | `/api/ai/*`, `/api/chat`, `/api/chat/analysis`, `/api/feedback*`, `/api/assignment-chat` | `currentUser()` + 레이트리밋 |
 | 에이전트 런 | `/api/agent/runs/*` | `currentUser()` |
 | 관리자 | `/api/admin/*` | `requireAdmin()` |
 | 내부 위임 | `/api/internal/*` | `INTERNAL_API_SECRET` |
