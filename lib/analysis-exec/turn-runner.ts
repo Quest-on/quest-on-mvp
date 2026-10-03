@@ -269,6 +269,8 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
     result?: StreamTurnResult | null;
     metadata?: Record<string, unknown>;
     outputText?: string | null;
+    /** 결과가 없을 때(준비 실패) 기록할 사용량. */
+    usage?: AiUsageSnapshot | null;
   }) => {
     if (eventRecorded) return;
     eventRecorded = true;
@@ -294,7 +296,7 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
       },
       status: params.status,
       latencyMs: now() - ctx.startedAtMs,
-      usage: params.result?.usage ?? null,
+      usage: params.result?.usage ?? params.usage ?? null,
       responseId: params.result?.responseId ?? null,
       error: params.error,
     });
@@ -312,6 +314,9 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
     }
     const previous = records.length > 0 ? records[records.length - 1].turn : null;
     const ops = bindContainerOps(ctx);
+
+    // 만료 복구 전 호출의 사용량(비용). 복구 중 실패해도 기록에 넣는다.
+    let earlierUsage: AiUsageSnapshot | null = null;
 
     const setupFailed = async (error: unknown) => {
       const quota = error instanceof OpenAIHttpError && error.kind === "quota_exhausted";
@@ -332,13 +337,18 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
                 : "setup_failed",
         }),
         metadata: { analysis_outcome: quota ? "quota_exhausted" : "setup_failed" },
+        usage: earlierUsage,
       });
       send({ event: "error", data: { code: quota ? "quota_exhausted" : "tool_unavailable" } });
     };
 
     const cancelledDuringSetup = async () => {
       // 준비 중에 학생이 연결을 끊었다. 컨테이너와 파일 API 는 이미 불렀으므로 이벤트는 남긴다.
-      await recordEvent({ status: "client_cancelled", metadata: { analysis_outcome: "client_cancelled_setup" } });
+      await recordEvent({
+        status: "client_cancelled",
+        metadata: { analysis_outcome: "client_cancelled_setup" },
+        usage: earlierUsage,
+      });
     };
 
     let ensured: EnsuredContainer;
@@ -362,8 +372,6 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
     let attempts = 0;
     let result: StreamTurnResult;
     let pathRewrites = [...ensured.pathRewrites];
-    // 만료 복구 전 호출의 사용량(비용). 마지막 결과에 더한다.
-    let earlierUsage: AiUsageSnapshot | null = null;
 
     while (true) {
       attempts += 1;

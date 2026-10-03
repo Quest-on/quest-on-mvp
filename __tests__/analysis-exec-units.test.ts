@@ -465,7 +465,7 @@ function fakeOps(overrides: Partial<ContainerOps> = {}) {
       ops.calls.push(`upload:${filename}`);
       return { id: `file-up${++fileSeq}` };
     }),
-    downloadDataSource: vi.fn(async () => new Uint8Array([1, 2, 3])),
+    downloadDataSource: vi.fn(async () => ({ ok: true as const, bytes: new Uint8Array([1, 2, 3]) })),
     ...overrides,
   };
   return ops;
@@ -560,7 +560,7 @@ describe("컨테이너 준비와 만료 복구", () => {
   });
 
   it("데이터 파일을 하나도 읽지 못하면 준비 실패다", async () => {
-    const ops = fakeOps({ downloadDataSource: vi.fn(async () => null) });
+    const ops = fakeOps({ downloadDataSource: vi.fn(async () => ({ ok: false as const, permanent: false })) });
     await expect(ensureAnalysisContainer(ops, { sessionId: SID, previous: null, dataSources: SOURCES })).rejects.toBeInstanceOf(
       AnalysisSetupError
     );
@@ -638,9 +638,11 @@ describe("검토 반영: 자료 경로, 일부만 받은 파일, 경로 바뀜, 
     { url: "https://s/exam-materials/big.csv", fileName: "big.csv", extension: "csv" as const },
   ];
 
-  it("한 파일을 못 받아도 본 공개 자료 목록을 남겨, 다음 턴에 같은 자료면 컨테이너를 그대로 쓴다", async () => {
+  it("다시 해도 못 받는 파일(용량 초과 등)은 본 공개 자료에 남겨, 다음 턴에 같은 자료면 컨테이너를 그대로 쓴다", async () => {
     const ops = fakeOps({
-      downloadDataSource: vi.fn(async (s) => (s.url.endsWith("big.csv") ? null : new Uint8Array([1]))),
+      downloadDataSource: vi.fn(async (s) =>
+        s.url.endsWith("big.csv") ? { ok: false as const, permanent: true } : { ok: true as const, bytes: new Uint8Array([1]) }
+      ),
     });
     const first = await ensureAnalysisContainer(ops, { sessionId: SID, previous: null, dataSources: twoSources });
     expect(first.files).toHaveLength(1);
@@ -662,6 +664,34 @@ describe("검토 반영: 자료 경로, 일부만 받은 파일, 경로 바뀜, 
     const second = await ensureAnalysisContainer(ops2, { sessionId: SID, previous: roundTrip, dataSources: twoSources });
     expect(second).toMatchObject({ containerId: first.containerId, restarted: false });
     expect(ops2.calls).toEqual([`get:${first.containerId}`]);
+  });
+
+  it("일시 오류로 못 받은 파일은 본 공개 자료에 넣지 않아, 다음 턴에 자료가 바뀐 것으로 보고 다시 받는다", async () => {
+    const flaky = fakeOps({
+      downloadDataSource: vi.fn(async (s) =>
+        s.url.endsWith("big.csv") ? { ok: false as const, permanent: false } : { ok: true as const, bytes: new Uint8Array([1]) }
+      ),
+    });
+    const first = await ensureAnalysisContainer(flaky, { sessionId: SID, previous: null, dataSources: twoSources });
+    expect(first.sources).toEqual([twoSources[0].url]);
+    const recorded = readStoredAnalysisTurn({
+      analysis: buildStoredTurn({
+        containerId: first.containerId,
+        files: first.files,
+        sources: first.sources,
+        cells: [],
+        citedFigures: [],
+        outcome: "completed",
+        notices: [],
+        replayedCells: 0,
+        elapsedMs: 1,
+      }),
+    });
+    const healthy = fakeOps();
+    const second = await ensureAnalysisContainer(healthy, { sessionId: SID, previous: recorded, dataSources: twoSources });
+    expect(second.restarted).toBe(true);
+    expect(healthy.calls.filter((c) => c.startsWith("upload:"))).toHaveLength(2);
+    expect(second.sources.sort()).toEqual(twoSources.map((s) => s.url).sort());
   });
 
   it("파일을 다시 올려 경로가 바뀌면 옛 경로와 새 경로를 짝지어 돌려주고, 이전 코드의 경로를 바꿔 넣는다", async () => {

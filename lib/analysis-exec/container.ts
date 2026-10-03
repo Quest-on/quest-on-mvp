@@ -20,13 +20,22 @@ import { REPLAY_CODE_MAX_CHARS } from "@/lib/analysis-exec/limits";
 import type { StoredAnalysisFile, StoredAnalysisTurn } from "@/lib/analysis-exec/metadata";
 import type { ContainerFileInfo, ContainerInfo } from "@/lib/analysis-exec/openai-http";
 
+/**
+ * 공개 데이터 파일 내려받기 결과. 실패는 두 가지다.
+ *   - permanent: 다시 해도 같다(교수 자료 키 모양이 아님, 빈 파일, 용량 초과). 이 URL 은 "본 공개 자료"에 넣어
+ *     다음 턴에 같은 자료로 본다(턴마다 컨테이너를 새로 만들지 않는다).
+ *   - transient: 일시 오류(Storage 응답 실패). 본 공개 자료에 넣지 않는다. 그래서 다음 턴에 자료가 바뀐 것으로 보고
+ *     다시 내려받아 본다(한 번의 일시 오류가 세션 내내 파일을 빠뜨리지 않는다).
+ */
+export type DataSourceDownload = { ok: true; bytes: Uint8Array } | { ok: false; permanent: boolean };
+
 export type ContainerOps = {
   createContainer(params: { name: string; fileIds: string[] }): Promise<ContainerInfo>;
   retrieveContainer(params: { containerId: string }): Promise<ContainerInfo>;
   listContainerFiles(params: { containerId: string }): Promise<ContainerFileInfo[]>;
   uploadFile(params: { filename: string; bytes: Uint8Array; mime: string }): Promise<{ id: string }>;
-  /** 공개 데이터 파일의 바이트. 읽지 못하면 null. */
-  downloadDataSource(source: AnalysisDataSource): Promise<Uint8Array | null>;
+  /** 공개 데이터 파일의 바이트. 실패하면 다시 해도 같은 실패인지 함께 알려 준다. */
+  downloadDataSource(source: AnalysisDataSource): Promise<DataSourceDownload>;
 };
 
 export type EnsuredContainer = {
@@ -108,15 +117,26 @@ function rewritesBetween(before: ReadonlyArray<StoredAnalysisFile>, after: Reado
 
 async function uploadAll(ops: ContainerOps, sources: ReadonlyArray<AnalysisDataSource>) {
   const uploaded: Array<{ source: AnalysisDataSource; fileId: string; uploadName: string }> = [];
+  // 다시 해도 못 받는 파일. 본 공개 자료에는 넣는다(아래 `seenSources`).
+  const permanentlySkipped: string[] = [];
   for (const [index, source] of sources.entries()) {
-    const bytes = await ops.downloadDataSource(source);
-    if (!bytes || bytes.byteLength === 0) continue;
+    const download = await ops.downloadDataSource(source);
+    if (!download.ok || download.bytes.byteLength === 0) {
+      if (!download.ok && download.permanent) permanentlySkipped.push(source.url);
+      continue;
+    }
     const uploadName = toAsciiUploadName(source.fileName, source.extension, index);
-    const { id } = await ops.uploadFile({ filename: uploadName, bytes, mime: MIME_BY_EXTENSION[source.extension] });
+    const { id } = await ops.uploadFile({
+      filename: uploadName,
+      bytes: download.bytes,
+      mime: MIME_BY_EXTENSION[source.extension],
+    });
     uploaded.push({ source, fileId: id, uploadName });
   }
   if (uploaded.length === 0) throw new AnalysisSetupError("no data file could be uploaded");
-  return uploaded;
+  // 올린 파일과 다시 해도 못 받는 파일. 일시 오류로 못 받은 파일은 빠져서 다음 턴에 다시 시도된다.
+  const seenSources = [...uploaded.map((u) => u.source.url), ...permanentlySkipped];
+  return { uploaded, seenSources };
 }
 
 /** 컨테이너 파일 목록에서 각 파일 id 의 경로를 찾는다. 못 찾으면 컨테이너의 경로 규칙으로 짐작한다. */
@@ -150,10 +170,10 @@ async function createFresh(
   ops: ContainerOps,
   sessionId: string,
   sources: ReadonlyArray<AnalysisDataSource>
-): Promise<{ containerId: string; files: StoredAnalysisFile[] }> {
-  const uploaded = await uploadAll(ops, sources);
+): Promise<{ containerId: string; files: StoredAnalysisFile[]; sources: string[] }> {
+  const { uploaded, seenSources } = await uploadAll(ops, sources);
   const container = await ops.createContainer({ name: containerName(sessionId), fileIds: uploaded.map((u) => u.fileId) });
-  return { containerId: container.id, files: await resolveFiles(ops, container.id, uploaded) };
+  return { containerId: container.id, files: await resolveFiles(ops, container.id, uploaded), sources: seenSources };
 }
 
 /**
@@ -177,17 +197,17 @@ export async function ensureAnalysisContainer(
 ): Promise<EnsuredContainer> {
   const { sessionId, previous, dataSources } = params;
 
-  const sources = dataSources.map((s) => s.url);
-
   if (!previous) {
     const fresh = await createFresh(ops, sessionId, dataSources);
-    return { ...fresh, sources, restarted: false, previousContainerId: null, pathRewrites: [] };
+    return { ...fresh, restarted: false, previousContainerId: null, pathRewrites: [] };
   }
 
+  // 공개 자료가 같으면(재사용 경로) 이전 기록의 "본 공개 자료"를 그대로 이어 간다.
+  const keptSources = previousSources(previous);
   const reuse = (): EnsuredContainer => ({
     containerId: previous.container_id,
     files: previous.files,
-    sources,
+    sources: keptSources,
     restarted: false,
     previousContainerId: null,
     pathRewrites: [],
@@ -217,7 +237,7 @@ export async function ensureAnalysisContainer(
       return {
         containerId: container.id,
         files: previous.files,
-        sources,
+        sources: keptSources,
         restarted: true,
         previousContainerId: previous.container_id,
         pathRewrites: [],
@@ -231,7 +251,6 @@ export async function ensureAnalysisContainer(
   const fresh = await createFresh(ops, sessionId, dataSources);
   return {
     ...fresh,
-    sources,
     restarted: true,
     previousContainerId: previous.container_id,
     pathRewrites: rewritesBetween(previous.files, fresh.files),

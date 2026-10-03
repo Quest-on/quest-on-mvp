@@ -10,6 +10,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DataSourceDownload } from "@/lib/analysis-exec/container";
 import type { AnalysisDataSource } from "@/lib/analysis-exec/eligibility";
 import { MAX_DATA_FILE_BYTES } from "@/lib/analysis-exec/limits";
 import {
@@ -136,18 +137,25 @@ export function materialObjectPath(url: string, supabaseUrl: string | undefined)
   return MATERIAL_OBJECT_KEY_RE.test(key) ? key : null;
 }
 
-/** 공개 데이터 파일을 교수 자료 버킷에서 내려받는다. 못 읽거나 상한을 넘으면 null. */
+/**
+ * 공개 데이터 파일을 교수 자료 버킷에서 내려받는다. 키 모양이 아니거나 빈 파일이거나 상한을 넘으면 다시 해도 같은
+ * 실패(permanent), Storage 응답 실패는 일시 실패다.
+ */
 export async function downloadDataSource(
   supabase: SupabaseClient,
   source: AnalysisDataSource
-): Promise<Uint8Array | null> {
+): Promise<DataSourceDownload> {
   const key = materialObjectPath(source.url, process.env.NEXT_PUBLIC_SUPABASE_URL);
-  if (!key) return null;
-  const { data, error } = await supabase.storage.from(EXAM_MATERIALS_BUCKET).download(key);
-  if (error || !data) return null;
-  const bytes = new Uint8Array(await data.arrayBuffer());
-  if (bytes.byteLength === 0 || bytes.byteLength > MAX_DATA_FILE_BYTES) return null;
-  return bytes;
+  if (!key) return { ok: false, permanent: true };
+  try {
+    const { data, error } = await supabase.storage.from(EXAM_MATERIALS_BUCKET).download(key);
+    if (error || !data) return { ok: false, permanent: false };
+    const bytes = new Uint8Array(await data.arrayBuffer());
+    if (bytes.byteLength === 0 || bytes.byteLength > MAX_DATA_FILE_BYTES) return { ok: false, permanent: true };
+    return { ok: true, bytes };
+  } catch {
+    return { ok: false, permanent: false };
+  }
 }
 
 /** 그림 업로드 하나를 기다리는 최대 시간. */
