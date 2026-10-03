@@ -6,7 +6,7 @@
  *  1. **실행 검증** — 컨트롤러의 판정을 `decideNavigate` seam 으로 빼서, 위험한
  *     route 에서 push 가 **0회** 호출되고 실패 결과가 나오는지 실제로 돌린다.
  *  2. **배선 검증** — 컨트롤러 소스가 그 seam 을 쓰는지. 이 저장소에는 React 렌더
- *     테스트 인프라가 없어서(`@testing-library/*`·`jsdom` 미설치) 컴포넌트를 띄우는
+ *     테스트 인프라가 없어서(`@testing-library/*` 미설치. `jsdom` 은 #541 부터 devDependency) 컴포넌트를 띄우는
  *     대신 `router.push(action.route)` 형태로 되돌아가는 회귀를 막는다.
  */
 import { describe, it, expect, vi } from "vitest";

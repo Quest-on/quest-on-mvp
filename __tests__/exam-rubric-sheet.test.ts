@@ -4,7 +4,7 @@
  * 2026-05-20 루브릭 기능을 걷어낼 때 학생 화면의 표시도 함께 사라졌다. 교수자가
  * `rubric_public` 을 켜도 학생은 무엇으로 평가받는지 시험 중에 볼 곳이 없었다.
  *
- * 렌더 방식: 이 저장소에는 `@testing-library/*`·`jsdom` 이 없다. 그래서 기존
+ * 렌더 방식: 이 저장소에는 `@testing-library/*` 가 없다. 그래서 기존
  * 렌더 테스트(`password-reset-recovery-page.test.ts`)처럼 `react-dom/server` 로
  * 렌더한다. next-intl 훅이 있으므로 실제 ko/en 메시지를 넣은 Provider 로 감싼다.
  *

@@ -2,7 +2,7 @@
  * `PreflightModal` 의 AI 고지 게이팅 배선 회귀 (PR #90 리뷰 P2).
  *
  * 왜 소스 검사인가: 이 저장소에는 React 렌더 테스트 인프라가 없다
- * (`@testing-library/*`, `jsdom` 미설치). 모달은 next-intl 훅과 Radix Dialog 에
+ * (`@testing-library/*` 미설치). 모달은 next-intl 훅과 Radix Dialog 에
  * 묶여 있어 `react-dom/server` 만으로도 프로바이더 없이는 렌더되지 않는다.
  * 그래서 렌더 결과 대신 **게이팅이 붙어 있는지**를 고정한다 — 리뷰가 지적한
  * 회귀(고지 블록이 무조건 렌더되는 상태)는 이 검사로 잡힌다.
