@@ -87,9 +87,33 @@ function blockOpener(body: string): { char: string; size: number } | null {
   return math ? { char: "$", size: math[1].length } : null;
 }
 
-/** 문단을 끊고 새 블록을 시작하는 줄인가(그렇지 않은 줄은 덜 들여써도 앞 문단에 이어진다). */
-function startsBlock(body: string): boolean {
-  return blockOpener(body) !== null || LIST_MARKER.test(body) || THEMATIC_BREAK.test(body) || ATX_HEADING.test(body);
+// GFM 표의 구분 줄(| --- | :-: |). 끝의 공백 반복이 맞붙지 않게 쓴다(맞지 않는 긴 줄에서 길이의 제곱으로 돌지 않게).
+const TABLE_DELIMITER = /^\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*(?:\|[ \t]*)?$/;
+
+/** GFM 표 줄의 칸 수. 맨 앞뒤의 | 는 칸을 나누지 않고 \| 는 글이다. */
+function tableCells(row: string): number {
+  return row
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/(?<!\\)\|$/, "")
+    .split(/(?<!\\)\|/).length;
+}
+
+/** 문단 글(머리 줄) 바로 다음의 이 줄이 표를 여는 구분 줄인가. | 가 있고 머리 줄과 칸 수가 같아야 한다(GFM). */
+function isTableDelimiter(body: string, header: string): boolean {
+  return body.includes("|") && TABLE_DELIMITER.test(body) && tableCells(body) === tableCells(header);
+}
+
+/** 열린 목록 항목 하나. 내용 열과 목록 종류(글머리 기호는 그 문자, 번호 목록은 번호 뒤의 `.` 이나 `)`). */
+type ListItem = { col: number; kind: string };
+
+/**
+ * 문단 바로 다음 줄의 목록 표시가 새 목록을 시작해 문단을 끊을 수 있는가(CommonMark). 비어 있지 않은 항목이어야 하고,
+ * 번호 목록이면 1 로 시작해야 한다. 그렇지 않은 줄(예: "3. ```", 빈 "-")은 앞 문단에 이어지는 글이다.
+ */
+function interruptsParagraph(marker: RegExpExecArray, body: string): boolean {
+  if (body.slice(marker[0].length).trim() === "") return false;
+  return /^\d/.test(marker[1]) ? /^1[.)]$/.test(marker[1]) : true;
 }
 
 /** 열린 블록을 닫는 줄인가. 같은 문자가 여는 표시 길이 이상 이어지고 그 뒤에 공백만 있다. */
@@ -106,13 +130,19 @@ function isCloser(body: string, block: OpenBlock): boolean {
  *   - 블록 안의 줄: 같은 문자, 같거나 긴 표시로만 닫는다(코드 블록 안의 $$, 수식 블록 안의 ``` 는 세지 않는다). 담은
  *     목록 항목보다 덜 들여쓴 줄이나 인용 표시가 모자란 줄이 오면 그 항목, 인용과 함께 블록도 끝난다.
  *   - 글 속 수식($$x$$, `$$`)과 줄 가운데의 $$ 는 블록을 열지 않는다(블록은 줄 머리에서만 열린다).
- * HTML 블록과 표 안의 세부 규칙은 보지 않는다.
+ *   - 문단 바로 다음 줄의 목록 표시는 같은 목록의 다음 항목이거나 문단을 끊을 수 있는 새 목록(`interruptsParagraph`)일
+ *     때만 목록이다. 아니면 문단에 이어지는 글이라 그 뒤 블록도 목록 밖에서 연 것으로 본다.
+ *   - GFM 표의 줄은 문단이 아니다. 표 바로 다음 줄의 목록 표시는 번호와 관계없이 목록을 연다.
+ * HTML 블록과 setext 제목 밑줄의 세부 규칙은 보지 않는다.
  */
 function findOpenBlock(text: string): OpenBlock | null {
-  const lists: number[] = [];
-  let listQuotes = 0;
+  const lists: ListItem[] = [];
+  let quoteDepth = 0;
   let open: OpenBlock | null = null;
   let paragraph = false;
+  // 바로 앞 줄이 같은 자리의 문단 글이면 그 글(표의 머리 줄 후보). 표 안에 있는가.
+  let header: string | null = null;
+  let table = false;
   for (const raw of text.split("\n")) {
     const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
     if (open) {
@@ -128,20 +158,48 @@ function findOpenBlock(text: string): OpenBlock | null {
     }
 
     const quoted = stripQuotes(line, Number.POSITIVE_INFINITY);
-    if (quoted.quotes !== listQuotes) {
+    if (quoted.quotes !== quoteDepth) {
       lists.length = 0;
-      listQuotes = quoted.quotes;
+      table = false;
+      // 새 인용이 열리면 그 안에는 아직 문단이 없다(인용 표시는 앞 문단을 끊는다).
+      if (quoted.quotes > quoteDepth) {
+        paragraph = false;
+        header = null;
+      }
+      quoteDepth = quoted.quotes;
     }
     const { width, body } = splitIndent(quoted.rest);
     if (body === "") {
       paragraph = false;
+      header = null;
+      table = false;
       continue;
     }
-    // 문단의 게으른 이어짐(덜 들여써도 앞 문단에 이어지는 글)은 목록 항목을 끝내지 않는다.
-    if (paragraph && !startsBlock(body)) continue;
-    while (lists.length > 0 && width < lists[lists.length - 1]) lists.pop();
+    const lead = THEMATIC_BREAK.test(body) ? null : LIST_MARKER.exec(body);
+    // 바깥부터 보아 처음으로 이어지지 않는 항목(이 줄이 그 내용 열보다 덜 들여씀)의 목록이 같은 종류의 다음 항목을 받는다.
+    const sibling = lead !== null && lists.find((item) => width < item.col)?.kind === lead[1].slice(-1);
+    const listStart = lead !== null && (!paragraph || sibling || interruptsParagraph(lead, body));
+    const blockStart = listStart || blockOpener(body) !== null || THEMATIC_BREAK.test(body) || ATX_HEADING.test(body);
+    if (table) {
+      // 표의 줄(빈 줄이나 블록을 여는 줄 전까지).
+      if (!blockStart) continue;
+      table = false;
+    }
+    if (paragraph && !blockStart) {
+      // 문단에 이어지는 글. 덜 들여써도 이어지는 게으른 이어짐은 목록 항목을 끝내지 않고, 표의 머리 줄이 되지 못한다.
+      const lazy = lists.length > 0 && width < lists[lists.length - 1].col;
+      if (!lazy && header !== null && isTableDelimiter(body, header)) {
+        table = true;
+        paragraph = false;
+        header = null;
+      } else {
+        header = lazy ? null : body;
+      }
+      continue;
+    }
+    while (lists.length > 0 && width < lists[lists.length - 1].col) lists.pop();
 
-    let col = lists.length > 0 ? lists[lists.length - 1] : 0;
+    let col = lists.length > 0 ? lists[lists.length - 1].col : 0;
     let column = width;
     let rest = body;
     while (column - col <= 3 && !THEMATIC_BREAK.test(rest)) {
@@ -152,7 +210,7 @@ function findOpenBlock(text: string): OpenBlock | null {
       // 표시 뒤가 비었거나(빈 항목) 5칸 이상 띄었으면(들여쓴 코드) 내용 열은 표시 다음 칸이고 이 줄에서 블록이 열리지 않는다.
       const plain = marker[2] !== "" && after - markerEnd <= 4;
       col = plain ? after : markerEnd + 1;
-      lists.push(col);
+      lists.push({ col, kind: marker[1].slice(-1) });
       if (!plain) {
         rest = "";
         break;
@@ -165,9 +223,11 @@ function findOpenBlock(text: string): OpenBlock | null {
     if (opener) {
       open = { ...opener, quotes: quoted.quotes, col, prefix: quoted.prefix + " ".repeat(column) };
       paragraph = false;
+      header = null;
       continue;
     }
     paragraph = rest !== "" && !THEMATIC_BREAK.test(rest) && !ATX_HEADING.test(rest);
+    header = paragraph ? rest : null;
   }
   return open;
 }

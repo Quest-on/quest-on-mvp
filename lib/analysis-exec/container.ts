@@ -32,7 +32,7 @@ import {
   type StoredAnalysisTurn,
 } from "@/lib/analysis-exec/metadata";
 import type { ContainerFileInfo, ContainerInfo } from "@/lib/analysis-exec/openai-http";
-import { REPLAY_MARKER, replayCellRemainder } from "@/lib/analysis-exec/replay-file";
+import { REPLAY_MARKER } from "@/lib/analysis-exec/replay-file";
 
 /**
  * 공개 데이터 파일 내려받기 결과. 실패는 두 가지다.
@@ -301,15 +301,9 @@ export type CarriedCells = { cells: CarriedCell[]; omitted: number };
 /** 원래 셀 하나와 그 출처. 복원 파일과 다음 복원의 이력에 쓴다. */
 export type HistoryCell = CarriedCell & { ref: AnalysisCellRef };
 
-/**
- * 다시 실행할 원래 셀의 코드. 실패한 셀, 빈 코드, 저장 상한에 잘린 코드는 null 이다.
- * 복원 셀(복원 파일을 실행한 셀)은 복원 실행 줄을 뺀 나머지 코드다(#564). 실행 줄이 다시 실행한 이전 셀은 그 컨테이너의
- * 복원 출처가 원래 셀로 이미 넣으므로 빼고, 모델이 같은 셀에 덧붙인 분석 코드는 넣는다(그 코드가 만든 변수도 다음 복원에
- * 있어야 한다). 실행 줄만 있거나 떼어 낼 수 없는 복원 셀은 예전처럼 통째로 뺀다(`replayCellRemainder`).
- */
-function replayableCode(cell: StoredAnalysisCell): string | null {
-  if (cell.status !== "completed" || cell.code.trim() === "" || cell.code_truncated) return null;
-  return cell.replay === true ? replayCellRemainder(cell.code) : cell.code;
+/** 다시 실행할 수 있는 원래 셀인가. 실패한 셀, 빈 코드, 저장 상한에 잘린 코드, 복원 셀은 아니다. */
+function isReplayable(cell: StoredAnalysisCell): boolean {
+  return cell.status === "completed" && cell.code.trim() !== "" && !cell.code_truncated && cell.replay !== true;
 }
 
 /**
@@ -349,9 +343,8 @@ type StateCell = HistoryCell & { position: number };
  *   - 이 컨테이너가 복원으로 시작했으면 그 복원의 출처(`restore.refs`)를 원래 기록 위치로 펼쳐 먼저 둔다. 복원 셀(파일을
  *     여는 한 줄)이나 모델이 다시 쓴 코드가 아니라 원래 셀이므로, 복원 셀이 저장 상한에 잘려도 이력이 빠지지 않고, 복원
  *     전에 실행된 셀도 원래 문항과 위치로 다른 문항에 알릴 수 있다.
- *   - 그 뒤에 이 컨테이너에서 실행한 다시 실행할 수 있는 셀을 둔다(복원 셀은 실행 줄을 뺀 나머지, `replayableCode`).
- *     파일을 못 올려 모델이 코드를 다시 쓴 복원 턴(inline)은 어느 셀이 다시 쓴 코드인지 알 수 없으므로 통째로 뺀다
- *     (같은 처리가 두 번 적용되지 않게).
+ *   - 그 뒤에 이 컨테이너에서 실행한 다시 실행할 수 있는 셀을 둔다. 파일을 못 올려 모델이 코드를 다시 쓴 복원 턴(inline)은
+ *     어느 셀이 다시 쓴 코드인지 알 수 없으므로 통째로 뺀다(같은 처리가 두 번 적용되지 않게).
  */
 function containerStateCells(records: ReadonlyArray<AnalysisTurnRecord>, containerId: string): StateCell[] {
   const positionOf = new Map<string, number>();
@@ -366,17 +359,15 @@ function containerStateCells(records: ReadonlyArray<AnalysisTurnRecord>, contain
     if (position === undefined) continue;
     const source = records[position];
     const cell = source.turn.cells.find((c) => c.index === ref.i);
-    const code = cell ? replayableCode(cell) : null;
-    if (code === null) continue;
-    cells.push({ qIdx: source.qIdx, code, ref: { m: ref.m, i: ref.i }, position });
+    if (!cell || !isReplayable(cell)) continue;
+    cells.push({ qIdx: source.qIdx, code: cell.code, ref: { m: ref.m, i: ref.i }, position });
   }
 
   records.forEach((record, position) => {
     if (record.turn.container_id !== containerId || record.turn.restore?.mode === "inline") return;
     for (const cell of record.turn.cells) {
-      const code = replayableCode(cell);
-      if (code === null) continue;
-      cells.push({ qIdx: record.qIdx, code, ref: { m: record.messageId ?? "", i: cell.index }, position });
+      if (!isReplayable(cell)) continue;
+      cells.push({ qIdx: record.qIdx, code: cell.code, ref: { m: record.messageId ?? "", i: cell.index }, position });
     }
   });
   return cells;

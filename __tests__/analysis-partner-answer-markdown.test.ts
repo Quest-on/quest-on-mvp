@@ -5,8 +5,9 @@
  * remark-math 를 붙여 읽는다. 여기서는 같은 길로 읽은 트리(mdast)를 받아, 잘렸다는 안내가 맨 바깥의 마지막 문단(바로
  * 앞은 구분선)으로 남는지 본다. 안내가 코드 블록, 수식 블록, 목록 안으로 들어가면 실패한다.
  *
- * 리뷰에서 찾은 경우(목록 안에 들여 연 코드 블록과 수식 블록, ~~~ 코드 블록, 글 속 코드의 $$ 와 줄 가운데의 $$)를
- * 하나씩 보고, 흔한 답 모양을 무작위로 짜 여러 자리에서 자른 글도 같은 기준으로 본다.
+ * 리뷰에서 찾은 경우(목록 안에 들여 연 코드 블록과 수식 블록, ~~~ 코드 블록, 글 속 코드의 $$ 와 줄 가운데의 $$, 문단
+ * 바로 다음 줄의 1 이 아닌 번호와 빈 항목, 표 바로 다음 줄의 번호)를 하나씩 보고, 흔한 답 모양을 무작위로 짜(블록 사이
+ * 빈 줄이 없는 답 포함) 여러 자리에서 자른 글도 같은 기준으로 본다.
  */
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
@@ -162,6 +163,34 @@ describe("잘린 답의 코드 블록과 수식 블록 닫기 (#564 후속)", ()
     expectNoticeOnTop(content);
   });
 
+  it("문단 바로 다음 줄의 1 이 아닌 번호나 빈 항목은 문단에 이어지는 글이라 목록을 열지 않는다(리뷰 재현)", () => {
+    // "3. ```" 는 문단을 끊지 못해 글이다. 목록 안 블록으로 보고 "   ```" 를 붙이면 화면에서는 새 코드 블록이 열린다.
+    expectClosedWith("지역별 평균을 봅니다.\n3. ```", "");
+    expectClosedWith("지역별 평균을 봅니다.\n3. ```python\n   x = 1", "");
+    // 빈 항목도 문단을 끊지 못한다. 그 뒤 들여 연 블록은 맨 바깥 블록이라 0열 코드 줄로 끝나지 않는다.
+    expectClosedWith("지역별 평균을 봅니다.\n1.\n   ```python\nx = 1", "   ```");
+    // 종류가 다른 목록의 다음 항목도 아니다(글머리 목록 뒤의 "2.").
+    expectClosedWith("- 첫째\n2. ```python\n   x = 1", "");
+  });
+
+  it("1 로 시작하는 번호, 비어 있지 않은 글머리, 같은 목록의 다음 항목은 문단 바로 다음 줄에서도 목록이다", () => {
+    const one = expectClosedWith("지역별 평균을 봅니다.\n1. ```python\n   x = 1", "   ```");
+    expect(findAll(one, "code")[0].ancestors.map((n) => n.type)).toContain("listItem");
+    expectClosedWith("지역별 평균을 봅니다.\n- ```python\n  x = 1", "  ```");
+    const next = expectClosedWith("1. 첫째\n3. ```python\n   x = 1", "   ```");
+    expect(findAll(next, "listItem")).toHaveLength(2);
+  });
+
+  it("GFM 표의 줄은 문단이 아니어서 표 바로 다음 줄의 번호는 1 이 아니어도 목록을 연다", () => {
+    // 표 → "2." 항목의 수식 블록 → 다음 항목 → 0열 ```` 블록. 표를 문단으로 보면 "   $$" 를 새 수식 블록의 시작으로 잘못 읽는다.
+    const table = "| 지역 | 매출 |\n| --- | --- |\n| 서울 | 120 |";
+    const tree = expectClosedWith(`${table}\n2. $$\n   \\sigma^2\n   $$\n3. 다음 단계\n\`\`\`\`text\n결과`, "````");
+    expect(findAll(tree, "table")).toHaveLength(1);
+    expect(findAll(tree, "listItem")).toHaveLength(2);
+    // 칸 수가 다르면 표가 아니라 문단이고, 그 뒤 "2." 는 문단에 이어지는 글이다.
+    expectClosedWith("| 지역 | 매출 |\n| --- |\n2. ```python\n   x = 1", "");
+  });
+
   it("목록 항목보다 덜 들여쓴 줄이 오면 항목과 블록이 함께 끝난 것으로 본다(화면 해석과 같게)", () => {
     // 코드 줄을 들여쓰지 않으면 화면은 거기서 목록과 코드 블록을 끝내고, 그 뒤 들여쓴 ``` 를 새 블록의 시작으로 읽는다.
     expectClosedWith("1. 코드:\n   ```python\nimport pandas as pd\n   ```\n\n결과를 보면", "   ```");
@@ -215,13 +244,18 @@ function sampleAnswer(next: () => number): string {
   const blockAt = (indent: string): string[] => (next() < 0.65 ? fence(indent) : math(indent));
   const list = (): string[] => {
     const ordered = next() < 0.5;
+    // 번호는 1 이 아닌 수로도 시작한다(코드 블록 뒤에 번호를 이어 쓰는 답).
+    const first = pick([1, 1, 2, 3]);
     const lines: string[] = [];
     const items = 1 + Math.floor(next() * 3);
-    for (let n = 1; n <= items; n++) {
+    for (let n = first; n < first + items; n++) {
       const marker = ordered ? `${n}. ` : "- ";
       const content = " ".repeat(marker.length);
       const roll = next();
-      if (roll < 0.2) {
+      if (roll < 0.08) {
+        // 빈 항목: 표시만 있고 내용은 다음 줄부터.
+        lines.push(marker.trimEnd(), ...blockAt(content));
+      } else if (roll < 0.25) {
         // 목록 표시 바로 뒤에서 블록을 연다.
         const [open, ...rest] = blockAt(content);
         lines.push(marker + open.trimStart(), ...rest);
@@ -243,9 +277,10 @@ function sampleAnswer(next: () => number): string {
     () => ["| 지역 | 매출 |", "| --- | --- |", "| 서울 | 120 |"],
     () => ["## 결과"],
   ];
+  // 블록 사이에 빈 줄을 두지 않기도 한다(문단 바로 다음 줄의 목록, 코드 블록, 수식 블록, 인용).
   return some(blocks, 2, 5)
     .map((block) => block().join("\n"))
-    .join("\n\n");
+    .reduce((answer, block) => `${answer}${next() < 0.35 ? "\n" : "\n\n"}${block}`);
 }
 
 describe("흔한 답 모양을 여러 자리에서 잘라도 안내는 맨 바깥에 온다 (#564 후속)", () => {
