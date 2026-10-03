@@ -116,6 +116,12 @@ describe("화면 이벤트 파서", () => {
     expect(noticeMessageKey("quotaExhausted", "instructor")).toBe("analysis.instructorNotices.quotaExhausted");
     expect(noticeMessageKey("environmentRestarted", "student")).toBe("analysis.environmentRestarted");
     expect(noticeMessageKey("environmentRestarted", "instructor")).toBe("analysis.instructorNotices.environmentRestarted");
+    expect(noticeMessageKey("restoreAbandoned", "student")).toBe("analysis.restoreAbandoned");
+    // 셀 블록이 그 안내를 실제로 그리고, 그때는 "다시 실행했습니다" 안내를 함께 보이지 않는다.
+    const block = read("components/chat/AnalysisTurnBlock.tsx");
+    expect(block).toContain('{abandoned && <Notice tone="warning">{t(noticeMessageKey("restoreAbandoned", viewer))}</Notice>}');
+    expect(block).toContain('analysis.notices.includes("environment_restarted") && !abandoned');
+    expect(noticeMessageKey("restoreAbandoned", "instructor")).toBe("analysis.instructorNotices.restoreAbandoned");
   });
 });
 
@@ -151,6 +157,9 @@ describe("문구", () => {
       expect(keys.has(`instructorNotices.${key}`), key).toBe(true);
     }
     expect(keys.has("instructorNotices.environmentRestarted")).toBe(true);
+    expect(keys.has("instructorNotices.restoreAbandoned")).toBe(true);
+    const map = Object.fromEntries(flatten(ko));
+    expect(map.restoreAbandoned).toBe("이전 분석을 다시 실행하지 못했습니다. 필요한 단계를 다시 요청해 주세요.");
   });
 
   it("가운뎃점과 낫표를 쓰지 않는다", () => {

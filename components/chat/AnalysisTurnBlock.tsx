@@ -39,10 +39,13 @@ type NoticeKey =
 /** 누가 보는 화면인가. 학생 응시 화면과 교수 채점 화면은 같은 턴에 다른 말을 쓴다. */
 export type AnalysisViewer = "student" | "instructor";
 
-/** 안내 문구의 메시지 키. 학생은 `analysis.errors.*`, 교수는 `analysis.instructorNotices.*`. */
-export function noticeMessageKey(key: NoticeKey | "environmentRestarted", viewer: AnalysisViewer): string {
+/** 턴 안내(결과와 별도). 환경 재시작과, 다시 복원까지 실패해 더는 복원하지 않음. */
+type TurnNoticeKey = "environmentRestarted" | "restoreAbandoned";
+
+/** 안내 문구의 메시지 키. 학생은 `analysis.errors.*`(턴 안내는 `analysis.*`), 교수는 `analysis.instructorNotices.*`. */
+export function noticeMessageKey(key: NoticeKey | TurnNoticeKey, viewer: AnalysisViewer): string {
   if (viewer === "instructor") return `analysis.instructorNotices.${key}`;
-  return key === "environmentRestarted" ? "analysis.environmentRestarted" : `analysis.errors.${key}`;
+  return key === "environmentRestarted" || key === "restoreAbandoned" ? `analysis.${key}` : `analysis.errors.${key}`;
 }
 
 /** 턴 결과를 안내 문구 키로 바꾼다. 정상 완료는 안내가 없다. */
@@ -251,7 +254,9 @@ export interface AnalysisTurnBlockProps {
 
 export function AnalysisTurnBlock({ analysis, errorNotice, viewer = "student" }: AnalysisTurnBlockProps) {
   const t = useTranslations("exam");
-  const restarted = analysis.notices.includes("environment_restarted");
+  // 다시 복원까지 실패했으면 "이전 단계를 다시 실행했습니다" 대신 다시 실행하지 못했다는 안내만 보인다.
+  const abandoned = analysis.notices.includes("restore_abandoned");
+  const restarted = analysis.notices.includes("environment_restarted") && !abandoned;
   const outcomeKey = outcomeNoticeKey(analysis.outcome);
   const errorKey = errorNotice ? errorCodeNoticeKey(errorNotice) : null;
   const warningKey = errorKey ?? outcomeKey;
@@ -259,6 +264,7 @@ export function AnalysisTurnBlock({ analysis, errorNotice, viewer = "student" }:
   return (
     <div className="not-prose mt-3 space-y-2" data-testid="analysis-turn-block">
       {restarted && <Notice tone="info">{t(noticeMessageKey("environmentRestarted", viewer))}</Notice>}
+      {abandoned && <Notice tone="warning">{t(noticeMessageKey("restoreAbandoned", viewer))}</Notice>}
       {warningKey && <Notice tone="warning">{t(noticeMessageKey(warningKey, viewer))}</Notice>}
       {analysis.cells.length > 0 && (
         <section aria-label={t("analysis.recordTitle")} className="space-y-2">

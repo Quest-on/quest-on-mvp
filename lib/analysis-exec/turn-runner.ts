@@ -41,10 +41,12 @@ import {
   capCells,
   collectContainerHistory,
   collectUnseenCells,
+  MAX_RESTORE_ATTEMPTS,
   ensureAnalysisContainer,
   historyPathRewrites,
   isReplayCellCode,
   parseReplayResult,
+  restoreAttemptOf,
   restoreNeedsRetry,
   type CarriedCells,
   type ContainerOps,
@@ -261,6 +263,8 @@ type RestorePlan = {
   text: string | null;
   /** 복원 파일(file)이나 지시문(inline)에 넣은 셀 수. */
   cells: number;
+  /** 같은 이력의 몇 번째 복원인가(처음 1, 다시 복원 2). */
+  attempt: number;
 };
 
 /**
@@ -274,6 +278,7 @@ async function prepareRestore(params: {
   ensured: EnsuredContainer;
   qIdx: number;
   clientSignal: AbortSignal;
+  attempt: number;
 }): Promise<RestorePlan | null> {
   const { ops, records, ensured } = params;
   if (!ensured.previousContainerId) return null;
@@ -309,6 +314,7 @@ async function prepareRestore(params: {
         currentQIdx: params.qIdx,
       }),
       cells: inFile.cells.length,
+      attempt: params.attempt,
     };
   } catch (error) {
     if (params.clientSignal.aborted) throw error;
@@ -321,6 +327,7 @@ async function prepareRestore(params: {
       refs,
       text: buildReplayInstruction({ ...inline, currentQIdx: params.qIdx }),
       cells: inline.cells.length,
+      attempt: params.attempt,
     };
   }
 }
@@ -334,7 +341,7 @@ function restoreOutcome(
   cells: ReadonlyArray<{ code: string; status: string; logs: string }>,
   outcome: AnalysisOutcome
 ): StoredAnalysisRestore {
-  const base = { refs: plan.refs, mode: plan.mode };
+  const base = { refs: plan.refs, mode: plan.mode, ...(plan.attempt > 1 ? { attempt: plan.attempt } : {}) };
   if (plan.mode === "file") {
     const replayCell = cells.find((cell) => isReplayCellCode(cell.code));
     const parsed = replayCell && replayCell.status === "completed" ? parseReplayResult(replayCell.logs) : null;
@@ -446,6 +453,8 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
     const previous = records.length > 0 ? records[records.length - 1].turn : null;
     // 지난 턴이 이 컨테이너로 복원을 시작했는데 덜 끝났으면(복원 셀이 끝까지 돌지 못함) 새 컨테이너로 다시 복원한다.
     const retryRestore = previous ? restoreNeedsRetry(records, previous.container_id) : false;
+    // 이번 복원이 같은 이력의 몇 번째 시도인가. 다시 복원은 한 번뿐이다(`MAX_RESTORE_ATTEMPTS`).
+    const restoreAttempt = retryRestore && previous ? restoreAttemptOf(records, previous.container_id) + 1 : 1;
     const ops = bindContainerOps(ctx);
 
     // 만료 복구 전 호출의 사용량(비용). 복구 중 실패해도 기록에 넣는다.
@@ -497,7 +506,14 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
       });
       if (ensured.restarted) {
         send({ event: "status", data: { phase: "restarting" } });
-        plan = await prepareRestore({ ops, records, ensured, qIdx: ctx.qIdx, clientSignal: ctx.clientSignal });
+        plan = await prepareRestore({
+          ops,
+          records,
+          ensured,
+          qIdx: ctx.qIdx,
+          clientSignal: ctx.clientSignal,
+          attempt: restoreAttempt,
+        });
         planFor = ensured.containerId;
       }
     } catch (error) {
@@ -594,7 +610,14 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
         });
         send({ event: "status", data: { phase: "restarting" } });
         if (planFor !== ensured.containerId) {
-          plan = await prepareRestore({ ops, records, ensured, qIdx: ctx.qIdx, clientSignal: ctx.clientSignal });
+          plan = await prepareRestore({
+            ops,
+            records,
+            ensured,
+            qIdx: ctx.qIdx,
+            clientSignal: ctx.clientSignal,
+            attempt: restoreAttempt,
+          });
           planFor = ensured.containerId;
         }
       } catch (error) {
@@ -671,7 +694,12 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
 
     const rawText = result.finalOutput ? collectOutputText(result.finalOutput) : result.streamedText;
     const content = stripSandboxLinks(rawText);
-    const notices: AnalysisNotice[] = restartedAny ? ["environment_restarted"] : [];
+    // 다시 복원까지 끝내지 못했으면 더는 복원하지 않는다. 학생에게 필요한 단계를 다시 요청하라고 알린다.
+    const restoreAbandoned = restore?.status === "incomplete" && (restore.attempt ?? 1) >= MAX_RESTORE_ATTEMPTS;
+    const notices: AnalysisNotice[] = [
+      ...(restartedAny ? (["environment_restarted"] as const) : []),
+      ...(restoreAbandoned ? (["restore_abandoned"] as const) : []),
+    ];
     const storedTurn = buildStoredTurn({
       containerId: ensured.containerId,
       files: ensured.files,
@@ -748,6 +776,8 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
         interrupted_cells: interruptedCells,
         ...(restore ? { restore_mode: restore.mode, restore_status: restore.status } : {}),
         restore_retry: retryRestore,
+        ...(restore ? { restore_attempt: restore.attempt ?? 1 } : {}),
+        ...(restoreAbandoned ? { restore_abandoned: true } : {}),
         rate_limit_retries: result.retries,
         ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
         message_saved: saved,

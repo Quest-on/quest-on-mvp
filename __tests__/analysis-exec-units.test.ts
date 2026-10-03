@@ -59,6 +59,8 @@ import {
   isReplayCellCode,
   parseReplayResult,
   replayExecLine,
+  MAX_RESTORE_ATTEMPTS,
+  restoreAttemptOf,
   restoreNeedsRetry,
   toAsciiUploadName,
   type ContainerOps,
@@ -747,6 +749,19 @@ describe("만료 복구 입력 구성", () => {
     expect(restoreNeedsRetry([rec("m1", 0, storedTurn({ container_id: "cntr_b" }))], "cntr_b")).toBe(false);
   });
 
+  it("다시 복원은 한 번뿐이다(같은 이력의 두 번째 복원도 덜 끝났으면 더 하지 않는다)", () => {
+    const second = [
+      rec("m1", 0, storedTurn({ container_id: "cntr_c", restore: { refs: [], mode: "file", status: "incomplete", attempt: 2 } })),
+    ];
+    expect(MAX_RESTORE_ATTEMPTS).toBe(2);
+    expect(restoreNeedsRetry(second, "cntr_c")).toBe(false);
+    expect(restoreAttemptOf(second, "cntr_c")).toBe(2);
+    // 시도 횟수가 없는 기록은 첫 복원이다.
+    const first = [rec("m1", 0, storedTurn({ container_id: "cntr_b", restore: { refs: [], mode: "file", status: "incomplete" } }))];
+    expect(restoreAttemptOf(first, "cntr_b")).toBe(1);
+    expect(restoreAttemptOf(first, "cntr_x")).toBe(0);
+  });
+
   it("옛 데이터 파일 경로는 여러 세대 전 것까지 지금 경로로 바꾼다", () => {
     const file = (path: string) => ({ name: "a.xlsx", path, file_id: path, source: "https://s/a.xlsx" });
     const records = [
@@ -773,6 +788,9 @@ describe("만료 복구 입력 구성", () => {
     // 다시 실행하는 동안의 출력과 그림은 내보내지 않고, 끝나면 plt.show 를 되돌린다.
     expect(script).toContain("redirect_stdout");
     expect(script).toContain("_qo_plt.show = _qo_show");
+    // sys.exit() 같은 SystemExit 도 실패로 모아 결과 줄이 빠지지 않게 한다. 실행 중단만 그대로 올린다.
+    expect(script).toContain("        except KeyboardInterrupt:\n            raise\n        except BaseException as _qo_e:");
+    expect(script).not.toContain("except Exception as _qo_e");
     expect(script).toContain(`print("${REPLAY_MARKER} ok=%d failed=%d"`);
   });
 
@@ -938,6 +956,62 @@ describe("중단된 요청과 문항 간 연결의 입력 구성", () => {
     expect(text).toContain("같은 처리를 다시 하기 전에 지금 상태(행 수 등)를 먼저 확인합니다.");
     expect(text).toContain("```python\n# 문제 1 셀 1\ndf = df[~mask]\n```");
     expect(buildInterruptedCodeInstruction({ cells: [], omitted: 0, currentQIdx: 0 })).toBeNull();
+  });
+
+  // 재검토 5.1 재현: 만료 복원 뒤 다른 문항으로 가면, 복원 전 컨테이너에서 실행된 셀을 원래 문항과 위치로 알려야 한다.
+  const restoredRecords = () => {
+    const read = { messageId: "m1", qIdx: 0, turn: storedTurn({ container_id: "cntr_c1", cells: [cell(1, "df = pd.read_excel(p)")], outcome: "completed" }) };
+    const filter = { messageId: "m2", qIdx: 1, turn: storedTurn({ container_id: "cntr_c1", cells: [cell(1, "df = df[~iqr_mask]")], outcome: "completed" }) };
+    const restoredQ2 = {
+      messageId: "m3",
+      qIdx: 1,
+      turn: storedTurn({
+        container_id: "cntr_c2",
+        cells: [cell(1, replayExecLine("/mnt/data/x.py"), "completed", { replay: true }), cell(2, "km = KMeans(4).fit(X)")],
+        outcome: "completed",
+        restore: { refs: [{ m: "m1", i: 1 }, { m: "m2", i: 1 }], mode: "file", status: "ok" },
+      }),
+    };
+    return [read, filter, restoredQ2];
+  };
+
+  it("만료 복원 뒤 새 문항의 첫 턴은 복원 전 셀도 원래 문항 번호로 받는다(만료가 없었을 때와 같다)", () => {
+    const records = restoredRecords();
+    expect(collectUnseenCells(records, { containerId: "cntr_c2", qIdx: 2 }).linked.cells).toEqual([
+      { qIdx: 0, code: "df = pd.read_excel(p)" },
+      { qIdx: 1, code: "df = df[~iqr_mask]" },
+      { qIdx: 1, code: "km = KMeans(4).fit(X)" },
+    ]);
+    // 문제 1 로 돌아오면 문제 1 의 마지막 성공 턴 뒤의 셀만(복원 전 문제 2 의 정제와 복원 뒤 km).
+    expect(collectUnseenCells(records, { containerId: "cntr_c2", qIdx: 0 }).linked.cells.map((c) => c.code)).toEqual([
+      "df = df[~iqr_mask]",
+      "km = KMeans(4).fit(X)",
+    ]);
+    // 만료가 없었으면(모두 cntr_c1) 같은 결과다.
+    const noExpiry = records.map((r) => ({ ...r, turn: { ...r.turn, container_id: "cntr_c1", restore: undefined } }));
+    noExpiry[2].turn.cells = [cell(2, "km = KMeans(4).fit(X)")];
+    expect(collectUnseenCells(noExpiry, { containerId: "cntr_c1", qIdx: 0 }).linked.cells.map((c) => c.code)).toEqual([
+      "df = df[~iqr_mask]",
+      "km = KMeans(4).fit(X)",
+    ]);
+  });
+
+  it("만료 복원 뒤에도 같은 문항에서 중단된 요청의 셀(복원 전 실행)을 다음 턴에 중단 블록으로 받는다", () => {
+    const t1 = { messageId: "m1", qIdx: 0, turn: storedTurn({ container_id: "cntr_c1", cells: [cell(1, "df = pd.read_excel(p)")], outcome: "completed" }) };
+    const t2 = { messageId: "m2", qIdx: 0, turn: storedTurn({ container_id: "cntr_c1", cells: [cell(1, "df = df[~iqr_mask]")], outcome: "time_limit" }) };
+    const otherRestored = {
+      messageId: "m3",
+      qIdx: 1,
+      turn: storedTurn({
+        container_id: "cntr_c2",
+        cells: [cell(1, replayExecLine("/mnt/data/x.py"), "completed", { replay: true })],
+        outcome: "completed",
+        restore: { refs: [{ m: "m1", i: 1 }, { m: "m2", i: 1 }], mode: "file", status: "ok" },
+      }),
+    };
+    const unseen = collectUnseenCells([t1, t2, otherRestored], { containerId: "cntr_c2", qIdx: 0 });
+    expect(unseen.interrupted.cells).toEqual([{ qIdx: 0, code: "df = df[~iqr_mask]" }]);
+    expect(unseen.linked.cells).toEqual([]);
   });
 
   it("문항 간 연결은 복원 셀을 빼고 원래 셀만 알린다", () => {

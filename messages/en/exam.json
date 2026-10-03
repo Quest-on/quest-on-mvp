@@ -144,8 +144,10 @@
       "failed": "This turn ended with an error during the analysis.",
       "timeout": "This turn timed out.",
       "clientCancelled": "The student's connection dropped, so this turn stopped partway. The code that ran is kept.",
-      "incomplete": "The answer in this turn was cut off by the output limit."
-    }
+      "incomplete": "The answer in this turn was cut off by the output limit.",
+      "restoreAbandoned": "The analysis environment restarted, but the earlier analysis could not be rerun even after a retry."
+    },
+    "restoreAbandoned": "The earlier analysis could not be rerun. Please ask again for the steps you need."
   },
   "submissionOverlay": {
     "saving": "Securely saving your answers...",

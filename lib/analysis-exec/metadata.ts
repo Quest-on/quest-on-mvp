@@ -71,6 +71,8 @@ export type StoredAnalysisRestore = {
   /** 파일 방식에서 복원 셀이 출력한 성공, 실패 셀 수. */
   ok_cells?: number;
   failed_cells?: number;
+  /** 같은 이력의 몇 번째 복원인가(처음 1, 다시 복원 2). 없으면 1. */
+  attempt?: number;
 };
 
 export type StoredAnalysisFile = {
@@ -101,7 +103,12 @@ export function isSuccessfulOutcome(outcome: AnalysisOutcome): boolean {
   return outcome === "completed" || outcome === "incomplete";
 }
 
-export const ANALYSIS_NOTICES = ["environment_restarted"] as const;
+/**
+ * 턴 안내.
+ *   - environment_restarted: 실행 환경이 다시 시작되어 이전 단계를 다시 실행했다.
+ *   - restore_abandoned: 다시 복원까지 끝내지 못해 더는 복원하지 않는다(학생에게 필요한 단계를 다시 요청하라고 안내).
+ */
+export const ANALYSIS_NOTICES = ["environment_restarted", "restore_abandoned"] as const;
 export type AnalysisNotice = (typeof ANALYSIS_NOTICES)[number];
 
 export type StoredAnalysisTurn = {
@@ -229,6 +236,7 @@ function readRestore(value: unknown): StoredAnalysisRestore | null {
     status,
     ...(typeof value.ok_cells === "number" ? { ok_cells: value.ok_cells } : {}),
     ...(typeof value.failed_cells === "number" ? { failed_cells: value.failed_cells } : {}),
+    ...(typeof value.attempt === "number" ? { attempt: value.attempt } : {}),
   };
 }
 

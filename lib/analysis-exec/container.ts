@@ -333,8 +333,48 @@ function lastSuccessfulTurnIndex(records: ReadonlyArray<AnalysisTurnRecord>, qId
   return lastSeen;
 }
 
+/** 컨테이너 상태를 이루는 셀 하나와, 그 셀이 처음 실행된 기록의 위치(기록 순서). */
+type StateCell = HistoryCell & { position: number };
+
 /**
- * 이 문항의 대화가 아직 모르는, 지금 컨테이너(`containerId`)에서 실행된 셀. 이 문항의 마지막 성공 턴 뒤의 기록만 본다.
+ * 컨테이너의 상태를 이루는 원래 셀들(시간 순서)과 각 셀이 처음 실행된 기록의 위치. 다음 복원의 이력과 "이 문항의 대화가
+ * 아직 모르는 셀"이 같은 목록을 쓴다.
+ *   - 이 컨테이너가 복원으로 시작했으면 그 복원의 출처(`restore.refs`)를 원래 기록 위치로 펼쳐 먼저 둔다. 복원 셀(파일을
+ *     여는 한 줄)이나 모델이 다시 쓴 코드가 아니라 원래 셀이므로, 복원 셀이 저장 상한에 잘려도 이력이 빠지지 않고, 복원
+ *     전에 실행된 셀도 원래 문항과 위치로 다른 문항에 알릴 수 있다.
+ *   - 그 뒤에 이 컨테이너에서 실행한 다시 실행할 수 있는 셀을 둔다. 파일을 못 올려 모델이 코드를 다시 쓴 복원 턴(inline)은
+ *     어느 셀이 다시 쓴 코드인지 알 수 없으므로 통째로 뺀다(같은 처리가 두 번 적용되지 않게).
+ */
+function containerStateCells(records: ReadonlyArray<AnalysisTurnRecord>, containerId: string): StateCell[] {
+  const positionOf = new Map<string, number>();
+  records.forEach((record, i) => {
+    if (record.messageId) positionOf.set(record.messageId, i);
+  });
+  const cells: StateCell[] = [];
+
+  const restoreRecord = records.find((r) => r.turn.container_id === containerId && r.turn.restore);
+  for (const ref of restoreRecord?.turn.restore?.refs ?? []) {
+    const position = positionOf.get(ref.m);
+    if (position === undefined) continue;
+    const source = records[position];
+    const cell = source.turn.cells.find((c) => c.index === ref.i);
+    if (!cell || !isReplayable(cell)) continue;
+    cells.push({ qIdx: source.qIdx, code: cell.code, ref: { m: ref.m, i: ref.i }, position });
+  }
+
+  records.forEach((record, position) => {
+    if (record.turn.container_id !== containerId || record.turn.restore?.mode === "inline") return;
+    for (const cell of record.turn.cells) {
+      if (!isReplayable(cell)) continue;
+      cells.push({ qIdx: record.qIdx, code: cell.code, ref: { m: record.messageId ?? "", i: cell.index }, position });
+    }
+  });
+  return cells;
+}
+
+/**
+ * 이 문항의 대화가 아직 모르는, 지금 컨테이너(`containerId`)의 상태를 이루는 셀. 이 문항의 마지막 성공 턴 뒤에 처음
+ * 실행된 셀만 본다(복원으로 이 컨테이너에 옮겨 온 셀은 원래 실행된 위치로 따진다).
  *   - linked: 다른 문항이 실행한 셀(문항 간 연결). 새 문항의 첫 턴이면 다른 문항의 셀 전부다.
  *   - interrupted: 같은 문항에서 중단된 요청(시간이나 셀 상한, 연결 끊김, 오류)이 끝나기 전에 실행한 셀. 그 요청은
  *     대화에 이어지지 않으므로 다음 턴의 모델은 이 셀이 실행된 것을 모른다.
@@ -345,14 +385,9 @@ export function collectUnseenCells(
   params: { containerId: string; qIdx: number; maxChars?: number }
 ): { linked: CarriedCells; interrupted: CarriedCells } {
   const lastSeen = lastSuccessfulTurnIndex(records, params.qIdx);
-  const unseen: Array<CarriedCell & { own: boolean }> = [];
-  for (const record of records.slice(lastSeen + 1)) {
-    if (record.turn.container_id !== params.containerId) continue;
-    for (const cell of record.turn.cells) {
-      if (!isReplayable(cell)) continue;
-      unseen.push({ qIdx: record.qIdx, code: cell.code, own: record.qIdx === params.qIdx });
-    }
-  }
+  const unseen = containerStateCells(records, params.containerId)
+    .filter((cell) => cell.position > lastSeen)
+    .map(({ qIdx, code }) => ({ qIdx, code, own: qIdx === params.qIdx }));
   const capped = capCells(unseen, params.maxChars ?? REPLAY_CODE_MAX_CHARS);
   const omitted = unseen.slice(capped.cells.length);
   const pick = (own: boolean): CarriedCells => ({
@@ -370,43 +405,34 @@ export function collectLinkedCells(
   return collectUnseenCells(records, params).linked;
 }
 
-/**
- * 컨테이너의 상태를 처음부터 다시 만들 원래 셀들(시간 순서). 만료 뒤 새 컨테이너에 복원할 때 쓴다.
- *   - 이 컨테이너가 복원으로 시작했으면 그 복원의 출처(`restore.refs`, 원래 셀)를 먼저 둔다. 복원 셀(파일을 여는 한 줄)이나
- *     모델이 다시 쓴 코드가 아니라 원래 셀이므로, 복원 셀이 저장 상한에 잘려도 다음 복원에서 이력이 빠지지 않는다.
- *   - 그 뒤에 이 컨테이너에서 실행한 다시 실행할 수 있는 셀을 시간 순서로 둔다. 파일을 못 올려 모델이 코드를 다시 쓴
- *     복원 턴(inline)은 어느 셀이 다시 쓴 코드인지 알 수 없으므로 통째로 뺀다(같은 처리가 두 번 적용되지 않게).
- */
+/** 컨테이너의 상태를 처음부터 다시 만들 원래 셀들(시간 순서). 만료 뒤 새 컨테이너에 복원할 때 쓴다. */
 export function collectContainerHistory(records: ReadonlyArray<HistoryRecord>, containerId: string): HistoryCell[] {
-  const byMessage = new Map(records.map((r) => [r.messageId, r] as const));
-  const inContainer = records.filter((r) => r.turn.container_id === containerId);
-  const history: HistoryCell[] = [];
+  return containerStateCells(records, containerId).map(({ qIdx, code, ref }) => ({ qIdx, code, ref }));
+}
 
-  const restoreRecord = inContainer.find((r) => r.turn.restore);
-  for (const ref of restoreRecord?.turn.restore?.refs ?? []) {
-    const source = byMessage.get(ref.m);
-    const cell = source?.turn.cells.find((c) => c.index === ref.i);
-    if (!source || !cell || !isReplayable(cell)) continue;
-    history.push({ qIdx: source.qIdx, code: cell.code, ref: { m: ref.m, i: ref.i } });
-  }
+/** 같은 이력의 복원을 몇 번까지 해 보는가. 처음 복원과 다시 복원 한 번. */
+export const MAX_RESTORE_ATTEMPTS = 2;
 
-  for (const record of inContainer) {
-    if (record.turn.restore?.mode === "inline") continue;
-    for (const cell of record.turn.cells) {
-      if (!isReplayable(cell)) continue;
-      history.push({ qIdx: record.qIdx, code: cell.code, ref: { m: record.messageId, i: cell.index } });
-    }
-  }
-  return history;
+/** 이 컨테이너를 시작한 복원 기록. 없으면 null. */
+function restoreOf(records: ReadonlyArray<AnalysisTurnRecord>, containerId: string) {
+  return records.find((r) => r.turn.container_id === containerId && r.turn.restore)?.turn.restore ?? null;
+}
+
+/** 이 컨테이너를 시작한 복원이 몇 번째 시도였는가. 복원으로 시작하지 않았으면 0. */
+export function restoreAttemptOf(records: ReadonlyArray<AnalysisTurnRecord>, containerId: string): number {
+  const restore = restoreOf(records, containerId);
+  return restore ? (restore.attempt ?? 1) : 0;
 }
 
 /**
  * 이 컨테이너를 시작한 복원이 덜 끝났는가(복원 셀이 끝까지 돌지 못함). 그러면 다음 턴은 새 컨테이너를 만들어 다시
- * 복원한다. 복원은 끝났지만 실패한 셀이 있는 경우(partial)는 다시 해도 같으므로 다시 하지 않는다.
+ * 복원한다. 다시 복원은 한 번뿐이다(`MAX_RESTORE_ATTEMPTS`). 같은 이유로 늘 실패하면(무거운 셀이 시간 예산을 넘는 등)
+ * 매 턴 컨테이너를 새로 만들며 되풀이하지 않게 한다. 복원은 끝났지만 실패한 셀이 있는 경우(partial)는 다시 해도
+ * 같으므로 다시 하지 않는다.
  */
 export function restoreNeedsRetry(records: ReadonlyArray<AnalysisTurnRecord>, containerId: string): boolean {
-  const restoreRecord = records.find((r) => r.turn.container_id === containerId && r.turn.restore);
-  return restoreRecord?.turn.restore?.status === "incomplete";
+  const restore = restoreOf(records, containerId);
+  return restore?.status === "incomplete" && (restore.attempt ?? 1) < MAX_RESTORE_ATTEMPTS;
 }
 
 /**
@@ -582,6 +608,8 @@ function toBase64(text: string): string {
  * 복원 파일(파이썬). 원래 셀들을 순서대로 다시 실행해 변수를 되살린다. ASCII 만 쓴다(파일을 여는 쪽의 기본 인코딩과
  * 관계없게). 셀 코드는 base64 로 넣어 따옴표나 줄바꿈 때문에 깨지지 않게 한다.
  *   - 셀마다 따로 실행한다. 한 셀이 실패해도 다음 셀로 간다(원래도 셀마다 따로 실행됐다). 실패한 셀은 이름과 오류를 모은다.
+ *     `sys.exit()` 같은 SystemExit 도 실패로 모아 결과 줄이 빠지지 않게 한다. 실행 중단(KeyboardInterrupt)만 그대로 올린다
+ *     (실행 환경이 멈추라고 한 것을 삼키지 않는다).
  *   - 다시 실행하는 동안의 출력은 버리고, 그래프는 화면에 내보내지 않고 닫는다(plt.show 를 잠시 바꾼다). 복원 셀의
  *     기록과 그림이 이전 출력으로 넘치지 않게 한다. 끝나면 plt.show 를 되돌린다.
  *   - 마지막에 `QUEST_ON_REPLAY ok=<성공 수> failed=<실패 수>` 와 실패한 셀마다 한 줄을 출력한다.
@@ -611,7 +639,9 @@ export function buildReplayScript(cells: ReadonlyArray<CarriedCell>): string {
     "        try:",
     "            with _qo_ctx.redirect_stdout(_qo_io.StringIO()), _qo_ctx.redirect_stderr(_qo_io.StringIO()):",
     '                exec(compile(_qo_b64.b64decode(_qo_src).decode("utf-8"), _qo_label, "exec"), globals())',
-    "        except Exception as _qo_e:",
+    "        except KeyboardInterrupt:",
+    "            raise",
+    "        except BaseException as _qo_e:",
     '            _qo_failed.append("%s %s: %s" % (_qo_label, type(_qo_e).__name__, str(_qo_e)[:200]))',
     "finally:",
     "    if _qo_plt is not None:",
