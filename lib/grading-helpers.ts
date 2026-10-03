@@ -219,6 +219,21 @@ export function hasAiChatQuestions(
   return questions.some((q) => !!q && !isObjectiveQuestion(q.type));
 }
 
+/**
+ * 분석 파트너 문항(`ai_role === "analysis_partner"`)이 하나라도 있는 시험인가 (#564).
+ *
+ * 분석 턴 실행 기록(`/api/session/<id>/analysis`)은 이런 시험에만 있다. 교수 채점 화면은 이 판정이 참일 때만
+ * 기록을 부른다. 일반 시험에서도 부르면 분당 한도(30)에 걸려 429 배너가 뜬다.
+ * 값은 정확히 일치할 때만 인정한다(`lib/exam-ai-profile.ts` 와 학생 화면 `useExamChat` 과 같은 규칙).
+ * 문항 목록을 아직 못 받았으면 false.
+ */
+export function hasAnalysisPartnerQuestions(
+  questions: ReadonlyArray<{ ai_role?: unknown } | null | undefined> | null | undefined
+): boolean {
+  if (!Array.isArray(questions)) return false;
+  return questions.some((q) => !!q && q.ai_role === "analysis_partner");
+}
+
 /** True when a question belongs to the instructor/AI case-grading surface. */
 export function isCaseQuestion(type?: string): boolean {
   return type === "case" || type === "essay" || type === "short-answer";

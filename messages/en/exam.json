@@ -135,6 +135,13 @@
     },
     "figureDialogDescription": "A larger view of a chart made by code the AI ran.",
     "replayCellLabel": "Rerun of earlier steps",
+    "replayCellDone": "Ran {count} earlier code cell(s) again.",
+    "replayCellPartial": "Ran {total} earlier code cell(s) again; {failed} ended with an error.",
+    "replayCellIncomplete": "Could not finish running the earlier code again.",
+    "chatAnswer": {
+      "truncated": "The answer was long, so the end was cut off. Please ask again about a narrower part.",
+      "empty": "The answer could not be completed. Please narrow down your question and send it again."
+    },
     "instructorNotices": {
       "environmentRestarted": "The analysis environment restarted in this turn, so earlier code was run again.",
       "limitExceeded": "This turn was stopped by the cell or time limit.",
