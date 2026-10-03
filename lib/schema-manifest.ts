@@ -18,7 +18,7 @@ const REQUIRED_TABLES = [
 
 const REQUIRED_COLUMNS = [
   { table: "ai_events", columns: ["config_version"] },
-  { table: "exams", columns: ["is_demo", "first_published_at", "student_materials"] },
+  { table: "exams", columns: ["is_demo", "first_published_at", "student_materials", "material_names"] },
   { table: "profiles", columns: ["plan"] },
 ] as const;
 

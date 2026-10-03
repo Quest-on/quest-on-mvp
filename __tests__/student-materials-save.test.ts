@@ -129,6 +129,29 @@ function mockCreateTables() {
   return { exams, nodes };
 }
 
+describe("1-2) 요청 스키마: material_names", () => {
+  it("생성과 수정 모두 문자열 → 문자열 객체를 통과시킨다", () => {
+    const names = { [XLSX]: "하냥센스_시험용_dataset.xlsx" };
+    const created = createExamSchema.safeParse(createInput({ materials: [XLSX], material_names: names }));
+    expect(created.success && created.data.material_names).toEqual(names);
+    const updated = updateExamSchema.safeParse({ id: EXAM_ID, update: { material_names: names } });
+    expect(updated.success && updated.data.update.material_names).toEqual(names);
+  });
+
+  it("객체가 아니거나 값이 문자열이 아니거나 너무 길거나 항목이 너무 많으면 거부한다", () => {
+    const bad = [
+      [XLSX],
+      "x",
+      { [XLSX]: 3 },
+      { [XLSX]: "가".repeat(1001) },
+      Object.fromEntries(Array.from({ length: 201 }, (_, i) => [`${BASE}/f${i}.csv`, "a.csv"])),
+    ];
+    for (const value of bad) {
+      expect(updateExamSchema.safeParse({ id: EXAM_ID, update: { material_names: value } }).success).toBe(false);
+    }
+  });
+});
+
 describe("2) createExam", () => {
   it("공개 목록을 materials 순서로 정렬하고 중복을 빼서 저장한다", async () => {
     const { exams } = mockCreateTables();
@@ -162,6 +185,24 @@ describe("2) createExam", () => {
     expect(res.status).toBe(400);
   });
 
+  it("material_names 는 materials 에 있는 URL 키만 남기고 이름을 정규화해 저장한다", async () => {
+    const { exams } = mockCreateTables();
+
+    const res = await createExam(
+      createInput({
+        materials: [XLSX, PDF],
+        material_names: {
+          [XLSX]: "C:\\tmp\\하냥센스_시험용\u0000_dataset.xlsx",
+          "https://x.test/other.csv": "다른 시험.csv",
+          [PDF]: "   ",
+        },
+      }) as never
+    );
+
+    expect(res.status).toBe(200);
+    expect(exams.inserted[0].material_names).toEqual({ [XLSX]: "하냥센스_시험용_dataset.xlsx" });
+  });
+
   it("student_materials 를 보내지 않으면 키를 싣지 않는다 (DB 기본값 [], 기존 호출 그대로)", async () => {
     const { exams } = mockCreateTables();
 
@@ -169,6 +210,7 @@ describe("2) createExam", () => {
 
     expect(res.status).toBe(200);
     expect(exams.inserted[0]).not.toHaveProperty("student_materials");
+    expect(exams.inserted[0]).not.toHaveProperty("material_names");
   });
 
   it("공용 빌더도 값이 있을 때만 싣는다", () => {
@@ -277,13 +319,50 @@ describe("3) updateExam", () => {
     expect(selects.join(" | ")).not.toMatch(/materials/);
   });
 
+  it("보낸 이름 맵은 저장될 materials 키만 남기고 정규화한다", async () => {
+    const { exams } = mockUpdateTables({ materials: [XLSX], student_materials: [], material_names: {} });
+
+    const res = await updateExam({
+      id: EXAM_ID,
+      update: {
+        materials: [XLSX, PDF],
+        material_names: { [XLSX]: "하냥센스_시험용_dataset.xlsx", [PDF]: "a/b/강의안.pdf", [CSV]: "지운 파일.csv" },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(exams.updated[0].material_names).toEqual({ [XLSX]: "하냥센스_시험용_dataset.xlsx", [PDF]: "강의안.pdf" });
+  });
+
+  it("materials 만 바뀌면 지운 자료의 이름을 맵에서도 뺀다", async () => {
+    const { exams } = mockUpdateTables({
+      materials: [XLSX, PDF],
+      student_materials: [],
+      material_names: { [XLSX]: "데이터.xlsx", [PDF]: "강의안.pdf" },
+    });
+
+    const res = await updateExam({ id: EXAM_ID, update: { materials: [PDF] } });
+
+    expect(res.status).toBe(200);
+    expect(exams.updated[0].material_names).toEqual({ [PDF]: "강의안.pdf" });
+  });
+
+  it("이름이 그대로면 이름 맵을 쓰지 않는다", async () => {
+    const { exams } = mockUpdateTables({ materials: [XLSX], student_materials: [], material_names: { [XLSX]: "데이터.xlsx" } });
+
+    const res = await updateExam({ id: EXAM_ID, update: { student_materials: [XLSX] } });
+
+    expect(res.status).toBe(200);
+    expect(exams.updated[0]).toEqual({ student_materials: [XLSX] });
+  });
+
   it("자료를 바꾸는 저장은 지금 값 조회에 두 컬럼을 함께 읽는다", async () => {
     const { exams } = mockUpdateTables({ materials: [XLSX], student_materials: [] });
 
     await updateExam({ id: EXAM_ID, update: { student_materials: [XLSX] } });
 
     const columns = String(exams.select.mock.calls[0][0]).split(",").map((c) => c.trim());
-    expect(columns).toEqual(expect.arrayContaining(["materials", "student_materials"]));
+    expect(columns).toEqual(expect.arrayContaining(["materials", "student_materials", "material_names"]));
   });
 });
 
@@ -304,6 +383,15 @@ describe("4) 시험 복사", () => {
   it("원본에 공개 설정이 없으면 빈 배열이다", () => {
     expect(copy({ materials: [XLSX] }).student_materials).toEqual([]);
   });
+
+  it("원래 파일 이름도 materials 키만 남겨 옮긴다. 원본에 없으면 빈 객체다", () => {
+    const payload = copy({
+      materials: [XLSX, PDF],
+      material_names: { [XLSX]: "데이터.xlsx", "https://x.test/gone.pdf": "지운 파일.pdf" },
+    });
+    expect(payload.material_names).toEqual({ [XLSX]: "데이터.xlsx" });
+    expect(copy({ materials: [XLSX] }).material_names).toEqual({});
+  });
 });
 
 describe("5) 교수자 화면(new, edit 거울 쌍)", () => {
@@ -314,8 +402,21 @@ describe("5) 교수자 화면(new, edit 거울 쌍)", () => {
   ] as const;
 
   it.each(pages)("%s: 공용 헬퍼로 student_materials 를 materials 와의 교집합으로 싣는다", (_name, source) => {
-    expect(source).toContain('import { pickStudentMaterials } from "@/lib/student-materials";');
+    expect(source).toContain('import { normalizeMaterialNames, pickStudentMaterials } from "@/lib/student-materials";');
     expect(source).toMatch(/student_materials: pickStudentMaterials\(materialUrls, sharedMaterialUrls\)/);
+  });
+
+  it.each(pages)("%s: 올린 파일의 원래 이름을 material_names 로 함께 싣는다 (materials 키만 남는 공용 헬퍼)", (_name, source) => {
+    expect(source).toMatch(/material_names: normalizeMaterialNames\(\s*materialUrls,/);
+    expect(source).toMatch(/fileUpload\.uploadedFiles\.values\(\)\)\.map\(\(file\) => \[file\.url, file\.fileName\]\)/);
+  });
+
+  it("edit: 불러온 material_names 와 추출 때 남긴 이름으로 기존 파일 이름을 보이고, 저장할 때 다시 싣는다", () => {
+    const edit = read("app/(app)/instructor/[examId]/edit/page.tsx");
+    expect(edit).toMatch(/setMaterialNames\(\s*normalizeMaterialNames\(exam\.materials, \{/);
+    expect(edit).toContain("exam.material_names");
+    expect(edit).toContain("const getExistingFileName = (url: string) => materialNames[url] || getFileNameFromUrl(url);");
+    expect(edit).toMatch(/material_names: normalizeMaterialNames\(materialUrls, \{\s*\.\.\.materialNames,/);
   });
 
   it.each(pages)("%s: 공개 상태는 빈 Set 으로 시작한다 (기본은 비공개)", (_name, source) => {

@@ -1,5 +1,5 @@
 /**
- * database/040 — exams.student_materials (#544)
+ * database/040 — exams.student_materials, exams.material_names (#544)
  *
  * SQL 을 실제로 실행하지는 않는다(AGENTS.md 의 DB 안전 규칙). CI 의 테스트 DB 셋업
  * (.github/actions/test-setup/action.yml)이 prisma db push 뒤에 이 파일을 두 번 적용해 문법과 멱등성을
@@ -22,7 +22,7 @@ const executable = sql
   .filter((line) => !line.trimStart().startsWith("--"))
   .join("\n");
 
-describe("040 exams.student_materials 마이그레이션", () => {
+describe("040 exams.student_materials, exams.material_names 마이그레이션", () => {
   it("040 이 database 디렉터리에서 유일한 순번이다", () => {
     const files = readdirSync(path.join(root, "database"));
     expect(files).toContain(FILE);
@@ -40,10 +40,28 @@ describe("040 exams.student_materials 마이그레이션", () => {
     );
   });
 
-  it("배열 여부 CHECK 제약은 이름이 있고, 이미 있으면 더하지 않는다", () => {
-    expect(executable).toMatch(/ADD CONSTRAINT exams_student_materials_is_array\s+CHECK \(jsonb_typeof\(student_materials\) = 'array'\)/);
-    expect(executable).toMatch(/IF NOT EXISTS \(\s*SELECT 1\s+FROM pg_constraint\s+WHERE conrelid = 'public\.exams'::regclass\s+AND conname = 'exams_student_materials_is_array'/);
-    expect(executable.match(/ADD CONSTRAINT/g)).toHaveLength(1);
+  it("원래 이름 맵은 jsonb NOT NULL DEFAULT '{}' 컬럼을 IF NOT EXISTS 로 더한다", () => {
+    expect(executable).toMatch(
+      /ALTER TABLE public\.exams\s+ADD COLUMN IF NOT EXISTS material_names jsonb NOT NULL DEFAULT '\{\}'::jsonb;/
+    );
+  });
+
+  it.each([
+    ["exams_student_materials_is_array", "student_materials", "array"],
+    ["exams_material_names_is_object", "material_names", "object"],
+  ])("CHECK 제약 %s 는 이름이 있고, 이미 있으면 더하지 않는다", (name, column, type) => {
+    expect(executable).toMatch(
+      new RegExp(`ADD CONSTRAINT ${name}\\s+CHECK \\(jsonb_typeof\\(${column}\\) = '${type}'\\)`)
+    );
+    expect(executable).toMatch(
+      new RegExp(
+        `IF NOT EXISTS \\(\\s*SELECT 1\\s+FROM pg_constraint\\s+WHERE conrelid = 'public\\.exams'::regclass\\s+AND conname = '${name}'\\s*\\)\\s+THEN\\s+ALTER TABLE public\\.exams\\s+ADD CONSTRAINT ${name}\\b`
+      )
+    );
+  });
+
+  it("제약은 정확히 두 개다", () => {
+    expect(executable.match(/ADD CONSTRAINT/g)).toHaveLength(2);
   });
 
   it("추가 전용이다 (지우거나 바꾸는 구문이 없다)", () => {
@@ -53,11 +71,18 @@ describe("040 exams.student_materials 마이그레이션", () => {
 
   it("머리말에 선적용 규칙, 확인 쿼리, 롤백이 있다. 롤백은 주석이다", () => {
     expect(header).toMatch(/코드보다 먼저 적용/);
-    expect(header).toContain("table_name = 'exams' and column_name = 'student_materials'");
-    expect(header).toContain("conname = 'exams_student_materials_is_array'");
+    expect(header).toContain("column_name in ('student_materials', 'material_names')");
+    expect(header).toContain("conname in ('exams_student_materials_is_array', 'exams_material_names_is_object')");
+    expect(header).toContain("material_names <> '{}'::jsonb");
     expect(sql).toMatch(/롤백/);
-    expect(sql).toMatch(/^-- ALTER TABLE public\.exams DROP COLUMN IF EXISTS student_materials;$/m);
-    expect(sql).toMatch(/^-- ALTER TABLE public\.exams DROP CONSTRAINT IF EXISTS exams_student_materials_is_array;$/m);
+    for (const line of [
+      "-- ALTER TABLE public.exams DROP CONSTRAINT IF EXISTS exams_material_names_is_object;",
+      "-- ALTER TABLE public.exams DROP CONSTRAINT IF EXISTS exams_student_materials_is_array;",
+      "-- ALTER TABLE public.exams DROP COLUMN IF EXISTS material_names;",
+      "-- ALTER TABLE public.exams DROP COLUMN IF EXISTS student_materials;",
+    ]) {
+      expect(sql.split("\n")).toContain(line);
+    }
   });
 
   it("prisma schema 의 exams 모델에 같은 컬럼이 있다 (NOT NULL, 기본값 [])", () => {
@@ -65,11 +90,15 @@ describe("040 exams.student_materials 마이그레이션", () => {
     const model = schema.slice(schema.indexOf("model exams {"));
     const body = model.slice(0, model.indexOf("\n}"));
     expect(body).toMatch(/^\s+student_materials\s+Json\s+@default\("\[\]"\)/m);
+    expect(body).toMatch(/^\s+material_names\s+Json\s+@default\("\{\}"\)/m);
   });
 
   it("스키마 매니페스트가 이 컬럼을 요구한다 (/api/health 가 DDL 누락을 드러낸다)", () => {
     expect(read("lib/schema-manifest.ts")).toMatch(
       /\{ table: "exams", columns: \[[^\]]*"student_materials"[^\]]*\] \}/
+    );
+    expect(read("lib/schema-manifest.ts")).toMatch(
+      /\{ table: "exams", columns: \[[^\]]*"material_names"[^\]]*\] \}/
     );
   });
 

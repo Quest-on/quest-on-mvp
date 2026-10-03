@@ -8,8 +8,12 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  MAX_MATERIAL_NAME_LENGTH,
   MAX_STUDENT_MATERIALS,
   getStudentVisibleMaterials,
+  materialDownloadHref,
+  normalizeMaterialName,
+  normalizeMaterialNames,
   pickStudentMaterials,
   readStudentMaterialItems,
   validateStudentMaterials,
@@ -220,5 +224,162 @@ describe("교수 자료 객체 키 규칙 (lib/material-object-key.ts)", () => {
 
   it("교수자 폴더 아래 경로다", () => {
     expect(materialStoragePath("inst-1", `2026-10-03_${uuid}.csv`)).toBe(`instructor-inst-1/2026-10-03_${uuid}.csv`);
+  });
+});
+
+describe("원래 파일 이름 (material_names, #544 추가 반영)", () => {
+  const ORIGINAL = "하냥센스_시험용_dataset.xlsx";
+
+  it("material_names[url] 이 있으면 fileName 은 원래 이름이고, 반환 모양은 그대로다", () => {
+    const [item] = getStudentVisibleMaterials({
+      materials: [XLSX],
+      student_materials: [XLSX],
+      material_names: { [XLSX]: ORIGINAL },
+    });
+    expect(item).toEqual({ url: XLSX, fileName: ORIGINAL, extension: "xlsx" });
+    expect(Object.keys(item).sort()).toEqual(["extension", "fileName", "url"]);
+  });
+
+  it("이름이 없는 자료(기존 시험)는 지금처럼 URL 조각을 쓴다", () => {
+    const out = getStudentVisibleMaterials({
+      materials: [XLSX, PDF],
+      student_materials: [XLSX, PDF],
+      material_names: { [XLSX]: ORIGINAL },
+    });
+    expect(out.map((m) => m.fileName)).toEqual([ORIGINAL, "2026-10-03_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.pdf"]);
+    for (const names of [undefined, null, "x", [ORIGINAL], { [XLSX]: 3 }, { [XLSX]: "  " }]) {
+      const [only] = getStudentVisibleMaterials({ materials: [XLSX], student_materials: [XLSX], material_names: names });
+      expect(only.fileName, JSON.stringify(names)).toBe("2026-10-03_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.xlsx");
+    }
+  });
+
+  it("확장자는 저장된 객체 이름에서 정한다(원래 이름에 확장자가 없어도 데이터 파일로 고를 수 있다)", () => {
+    const [item] = getStudentVisibleMaterials({
+      materials: [CSV],
+      student_materials: [CSV],
+      material_names: { [CSV]: "고객 데이터" },
+    });
+    expect(item).toMatchObject({ fileName: "고객 데이터", extension: "csv" });
+  });
+
+  it("이름 맵에 있어도 공개하지 않은 파일은 나가지 않는다", () => {
+    const out = getStudentVisibleMaterials({
+      materials: [XLSX, PDF],
+      student_materials: [XLSX],
+      material_names: { [XLSX]: ORIGINAL, [PDF]: "비공개 강의안.pdf" },
+    });
+    expect(JSON.stringify(out)).not.toContain("비공개 강의안");
+  });
+
+  it("__proto__ 같은 키가 이름을 끌어오지 않는다", () => {
+    const names = JSON.parse('{"__proto__": "x.xlsx"}');
+    const [item] = getStudentVisibleMaterials({ materials: [XLSX], student_materials: [XLSX], material_names: names });
+    expect(item.fileName).toBe("2026-10-03_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.xlsx");
+  });
+
+  describe("normalizeMaterialName", () => {
+    it("제어문자와 글자 방향 제어문자를 지운다", () => {
+      expect(normalizeMaterialName("하냥\u0000센스\n\t.xlsx")).toBe("하냥센스.xlsx");
+      expect(normalizeMaterialName("보고서\u202Exslx.exe")).toBe("보고서xslx.exe");
+      expect(normalizeMaterialName("a\u0085b\u007f.csv")).toBe("ab.csv");
+    });
+
+    it("경로 구분자가 있으면 마지막 조각만 남긴다", () => {
+      expect(normalizeMaterialName("C:\\Users\\kim\\하냥센스.xlsx")).toBe("하냥센스.xlsx");
+      expect(normalizeMaterialName("../../etc/passwd")).toBe("passwd");
+      expect(normalizeMaterialName("dir/")).toBeNull();
+    });
+
+    it("앞뒤 공백을 지우고, 비거나 . .. 이면 null 이다. 문자열이 아니면 null 이다", () => {
+      expect(normalizeMaterialName("  데이터.csv  ")).toBe("데이터.csv");
+      for (const bad of ["", "   ", ".", "..", "\u0000", null, undefined, 3, {}, []]) {
+        expect(normalizeMaterialName(bad), JSON.stringify(bad)).toBeNull();
+      }
+    });
+
+    it(`${MAX_MATERIAL_NAME_LENGTH}자를 넘으면 확장자를 살리고 앞을 자른다 (코드 포인트 기준)`, () => {
+      const long = `${"가".repeat(300)}.xlsx`;
+      const out = normalizeMaterialName(long)!;
+      expect(Array.from(out)).toHaveLength(MAX_MATERIAL_NAME_LENGTH);
+      expect(out.endsWith(".xlsx")).toBe(true);
+      const exact = `${"나".repeat(MAX_MATERIAL_NAME_LENGTH - 4)}.csv`;
+      expect(normalizeMaterialName(exact)).toBe(exact);
+      const emoji = "😀".repeat(250);
+      expect(Array.from(normalizeMaterialName(emoji)!)).toHaveLength(MAX_MATERIAL_NAME_LENGTH);
+    });
+  });
+
+  describe("normalizeMaterialNames (서버 저장, 교수자 페이로드, 시드)", () => {
+    it("materials 안의 URL 키만 남기고 materials 순서로 정리한다. 지운 자료의 이름은 빠진다", () => {
+      const out = normalizeMaterialNames([XLSX, PDF], {
+        [PDF]: "강의안.pdf",
+        "https://x.test/deleted.csv": "지운 파일.csv",
+        [XLSX]: ORIGINAL,
+      });
+      expect(out).toEqual({ [XLSX]: ORIGINAL, [PDF]: "강의안.pdf" });
+      expect(Object.keys(out)).toEqual([XLSX, PDF]);
+    });
+
+    it("값을 정규화하고 쓸 수 없는 값은 뺀다", () => {
+      const out = normalizeMaterialNames([XLSX, PDF, CSV], {
+        [XLSX]: "C:\\tmp\\하냥\u0000센스.xlsx",
+        [PDF]: 42,
+        [CSV]: "   ",
+      });
+      expect(out).toEqual({ [XLSX]: "하냥센스.xlsx" });
+    });
+
+    it("객체가 아니면 빈 객체다", () => {
+      for (const names of [undefined, null, "x", [XLSX], 3]) {
+        expect(normalizeMaterialNames([XLSX], names)).toEqual({});
+      }
+    });
+
+    it("__proto__ 키도 일반 속성으로 다룬다 (프로토타입 오염 없음)", () => {
+      const out = normalizeMaterialNames(["__proto__"], JSON.parse('{"__proto__": "x.csv"}'));
+      expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+      expect(Object.prototype.hasOwnProperty.call(out, "__proto__")).toBe(true);
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    });
+  });
+
+  it("학생 화면도 서버가 준 원래 이름을 같은 규칙으로 읽는다", () => {
+    const items = readStudentMaterialItems([{ url: XLSX, fileName: `\u202E${ORIGINAL}`, extension: "xlsx" }]);
+    expect(items).toEqual([{ url: XLSX, fileName: ORIGINAL, extension: "xlsx" }]);
+  });
+});
+
+describe("materialDownloadHref (같은 탭에서 원래 이름으로 내려받기, #544 추가 반영)", () => {
+  it("Supabase 공개 객체 URL 에 download=<인코딩한 원래 이름> 을 붙인다 (공백은 %20)", () => {
+    const href = materialDownloadHref(XLSX, "하냥센스_시험용 dataset.xlsx");
+    expect(href).toBe(`${XLSX}?download=${encodeURIComponent("하냥센스_시험용 dataset.xlsx")}`);
+    expect(href).toContain("%20");
+    expect(href).not.toContain("+");
+    expect(new URL(href!).searchParams.get("download")).toBe("하냥센스_시험용 dataset.xlsx");
+  });
+
+  it("& # ? 같은 글자가 있어도 다른 파라미터로 새지 않는다", () => {
+    const href = materialDownloadHref(XLSX, "R&D #1?.csv")!;
+    const params = new URL(href).searchParams;
+    expect([...params.keys()]).toEqual(["download"]);
+    expect(params.get("download")).toBe("R&D #1?.csv");
+  });
+
+  it("이미 있는 download 파라미터는 바꾸고 다른 파라미터는 남긴다", () => {
+    const href = materialDownloadHref(`${XLSX}?v=2&download=old.xlsx`, "새 이름.xlsx")!;
+    const params = new URL(href).searchParams;
+    expect(params.getAll("download")).toEqual(["새 이름.xlsx"]);
+    expect(params.get("v")).toBe("2");
+  });
+
+  it("이름을 쓸 수 없으면 URL 조각을 이름으로 쓴다", () => {
+    const href = materialDownloadHref(XLSX, "  ")!;
+    expect(new URL(href).searchParams.get("download")).toBe("2026-10-03_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.xlsx");
+  });
+
+  it("Supabase 공개 객체 경로가 아니거나 http(s) 가 아니면 null 이다 (호출자가 새 탭으로 연다)", () => {
+    expect(materialDownloadHref("https://example.test/files/a.xlsx", "a.xlsx")).toBeNull();
+    expect(materialDownloadHref("https://proj.supabase.co/storage/v1/object/sign/exam-materials/a.xlsx", "a.xlsx")).toBeNull();
+    expect(materialDownloadHref("javascript:alert(1)//storage/v1/object/public/a.xlsx", "a.xlsx")).toBeNull();
   });
 });

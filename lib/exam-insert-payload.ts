@@ -68,6 +68,11 @@ export type ExamInsertInput<Q extends { type?: string | null } = ExamInsertQuest
    * `[]` 이다 - 이 키를 넘기지 않는 기존 호출의 페이로드는 바뀌지 않는다.
    */
   student_materials?: string[];
+  /**
+   * 자료 URL → 원래 파일 이름 (#544). 호출자가 `normalizeMaterialNames` 로 정리해서 넘긴다.
+   * 값이 있을 때만 싣고, 없으면 DB 기본값 `{}` 이다.
+   */
+  material_names?: Record<string, string>;
   /** null 은 "교수자가 안 건드림". 숫자로 접지 않고 그대로 저장한다. */
   chat_weight?: number | null;
   score_weights?: ScoreWeights | null;
@@ -142,6 +147,7 @@ export function buildExamInsertPayload<Q extends { type?: string | null }>(
     materials: data.materials || [],
     materials_text: data.materials_text || [], // 추출된 텍스트 저장
     ...(data.student_materials !== undefined ? { student_materials: data.student_materials } : {}),
+    ...(data.material_names !== undefined ? { material_names: data.material_names } : {}),
     // null 은 "교수자가 안 건드림" 을 뜻한다. 여기서 50 으로 접으면 그 사실이
     // 사라져, 편집으로 다시 들어왔을 때 손대지 않은 시험도 사용자 지정으로
     // 보인다. 컬럼은 Int? 이고 DB 기본값이 50 이며, 채점은 lib/grading.ts:789

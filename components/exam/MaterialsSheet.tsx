@@ -15,7 +15,11 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { FileTypeIcon } from "@/components/instructor/FileTypeIcon";
-import { readStudentMaterialItems, type StudentVisibleMaterial } from "@/lib/student-materials";
+import {
+  materialDownloadHref,
+  readStudentMaterialItems,
+  type StudentVisibleMaterial,
+} from "@/lib/student-materials";
 import { cn } from "@/lib/utils";
 
 interface MaterialsListProps {
@@ -29,6 +33,9 @@ export function MaterialsList({ items }: MaterialsListProps) {
     <ul className="space-y-3">
       {items.map((item) => {
         const format = item.extension ? item.extension.toUpperCase() : t("materials.formatUnknown");
+        // Supabase 공개 객체면 ?download=<원래 이름> 으로 같은 탭에서 파일로 내려받는다(시험 화면을 떠나지
+        // 않아 탭 전환 기록이 생기지 않는다). 그 밖의 주소는 그 파라미터를 모르는 서버라 새 탭으로 연다.
+        const downloadHref = materialDownloadHref(item.url, item.fileName);
         return (
           <li
             key={item.url}
@@ -40,16 +47,15 @@ export function MaterialsList({ items }: MaterialsListProps) {
               <p className="type-meta mt-1">{t("materials.format", { format })}</p>
             </div>
             {/*
-              공개 버킷의 URL 이라 다른 출처다. 브라우저는 다른 출처 링크의 download 이름을 무시하고 새 탭에서
-              연다. 표 파일은 그 탭에서 바로 내려받아지고, PDF 처럼 볼 수 있는 파일은 새 탭에 열린다.
-              어느 쪽이든 시험 화면은 그대로 남는다.
+              다른 출처 링크라 브라우저는 download 속성의 이름을 무시한다. 그래서 이름과 내려받기 여부는
+              Storage 의 download 쿼리 파라미터(Content-Disposition: attachment)가 정한다.
+              download 속성은 같은 출처일 때를 위해 남긴다.
             */}
             <Button asChild variant="outline" size="sm" className="min-h-[40px] shrink-0 gap-1.5">
               <a
-                href={item.url}
+                href={downloadHref ?? item.url}
                 download={item.fileName}
-                target="_blank"
-                rel="noopener noreferrer"
+                {...(downloadHref ? {} : { target: "_blank", rel: "noopener noreferrer" })}
                 aria-label={t("materials.downloadAriaLabel", { name: item.fileName })}
               >
                 <Download className="size-4 shrink-0" aria-hidden="true" />

@@ -45,10 +45,17 @@ function withIntl(locale: Locale, node: ReactElement): string {
 
 const XLSX = "https://proj.supabase.co/storage/v1/object/public/exam-materials/instructor-1/2026-10-03_a.xlsx";
 const PDF = "https://proj.supabase.co/storage/v1/object/public/exam-materials/instructor-1/2026-10-03_b.pdf";
+const ORIGINAL = "하냥센스_시험용_dataset.xlsx";
 const ITEMS = [
-  { url: XLSX, fileName: "2026-10-03_a.xlsx", extension: "xlsx" },
+  { url: XLSX, fileName: ORIGINAL, extension: "xlsx" },
   { url: PDF, fileName: "2026-10-03_b.pdf", extension: "pdf" },
 ];
+
+/** 마크업에서 href 가 주어진 값으로 시작하는 a 태그 하나. & 는 마크업에서 &amp; 로 나온다. */
+function anchorFor(html: string, hrefPrefix: string): string {
+  const escaped = hrefPrefix.replace(/&/g, "&amp;").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return html.match(new RegExp(`<a[^>]*href="${escaped}[^"]*"[^>]*>`))?.[0] ?? "";
+}
 
 async function renderSheet(locale: Locale, materials: unknown, defaultOpen = false) {
   const { MaterialsSheet } = await import("@/components/exam/MaterialsSheet");
@@ -97,17 +104,37 @@ describe("열린 시트 - 파일마다 이름, 형식, 내려받기 링크", () 
     expect(html).toContain(`id="${labelledBy}"`);
   });
 
-  it("파일마다 이름, 형식, 새 탭으로 여는 내려받기 링크(download 속성)가 있다", async () => {
+  it("파일마다 원래 이름, 형식, 내려받기 링크가 있다", async () => {
     const html = await renderSheet("ko", ITEMS, true);
     expect((html.match(/<li\b/g) ?? []).length).toBe(2);
-    expect(html).toContain("2026-10-03_a.xlsx");
+    expect(html).toContain(`>${ORIGINAL}</p>`);
+    // 저장 경로 이름은 링크 주소에만 있고 화면 글자로는 보이지 않는다.
+    expect(html).not.toContain(">2026-10-03_a.xlsx<");
     expect(html).toContain("형식: XLSX");
     expect(html).toContain("형식: PDF");
-    const link = html.match(new RegExp(`<a[^>]*href="${XLSX.replace(/[.?]/g, "\\$&")}"[^>]*>`))?.[0] ?? "";
-    expect(link).toContain('download="2026-10-03_a.xlsx"');
+    const link = anchorFor(html, XLSX);
+    expect(link).toContain(`aria-label="${ORIGINAL} 내려받기"`);
+    expect(link).toContain(`download="${ORIGINAL}"`);
+  });
+
+  it("Supabase 공개 객체는 같은 탭에서 ?download=<인코딩한 원래 이름> 으로 내려받는다 (새 탭 없음, 탭 전환 기록 없음)", async () => {
+    const html = await renderSheet("ko", ITEMS, true);
+    const link = anchorFor(html, XLSX);
+    expect(link).toContain(`href="${XLSX}?download=${encodeURIComponent(ORIGINAL)}"`);
+    expect(link).not.toContain("target=");
+    expect(link).not.toContain("noopener");
+    const pdf = anchorFor(html, PDF);
+    expect(pdf).toContain(`href="${PDF}?download=${encodeURIComponent("2026-10-03_b.pdf")}"`);
+    expect(pdf).not.toContain("target=");
+  });
+
+  it("Supabase 공개 객체가 아닌 주소는 download 파라미터를 붙이지 않고 새 탭으로 연다 (시험 화면을 떠나지 않게)", async () => {
+    const other = "https://files.example.test/guide.pdf";
+    const html = await renderSheet("ko", [{ url: other, fileName: "안내.pdf", extension: "pdf" }], true);
+    const link = anchorFor(html, other);
+    expect(link).toContain(`href="${other}"`);
     expect(link).toContain('target="_blank"');
     expect(link).toContain('rel="noopener noreferrer"');
-    expect(link).toContain('aria-label="2026-10-03_a.xlsx 내려받기"');
   });
 
   it("http(s) 가 아닌 링크는 그리지 않는다", async () => {

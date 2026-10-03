@@ -5,15 +5,16 @@
  *   - `exams.materials`         업로드한 자료의 공개 URL 문자열 배열 (교수자 전용)
  *   - `exams.student_materials` 그중 학생에게 공개한 URL 문자열 배열. 항상 `materials` 의 부분집합이고
  *                               순서는 `materials` 순서를 따른다.
+ *   - `exams.material_names`    자료 URL → 원래 파일 이름 객체. 키는 항상 `materials` 안의 URL 이다.
  *
  * 이 모듈은 순수 함수만 둔다(DB, 인증, 시계 없음). 서버 저장 검증, 학생 응답 정리, 교수자 화면의
  * 저장 페이로드, 학생 화면이 같은 규칙을 쓴다. 다른 기능(AI 코드 실행)도 데이터 파일을 고를 때
- * `getStudentVisibleMaterials` 를 쓴다 - 이 함수의 입출력 모양은 다른 담당과 맞춘 계약이라 바꾸지 않는다.
+ * `getStudentVisibleMaterials` 를 쓴다 - 이 함수의 반환 모양은 다른 담당과 맞춘 계약이라 바꾸지 않는다.
  *
  * 파일 이름: 업로드 경로(`/api/upload`, `/api/upload/signed-url`)는 객체 키를
  * `instructor-<교수자 id>/<YYYY-MM-DD>_<uuid>.<확장자>` 로 만들고 원래 이름은 응답 메타데이터로만
- * 돌려준다(`lib/material-object-key.ts`). URL 에 원래 이름이 없으므로 되살릴 수 없고, 경로의 마지막
- * 조각을 디코드한 값이 곧 파일 이름이다.
+ * 돌려준다(`lib/material-object-key.ts`). 그래서 원래 이름은 업로드한 화면이 `material_names` 에 담아
+ * 저장한다. 이름이 없는 자료(이 컬럼 전에 올린 자료)는 경로의 마지막 조각을 디코드한 값을 이름으로 쓴다.
  */
 
 /** 한 시험에서 학생에게 공개할 수 있는 파일 수 상한. 서버 검증과 입력 스키마가 같은 값을 쓴다. */
@@ -22,10 +23,16 @@ export const MAX_STUDENT_MATERIALS = 20;
 /** URL 하나의 길이 상한. 저장 경로 규칙상 실제 URL 은 200자 안쪽이다. */
 export const MAX_STUDENT_MATERIAL_URL_LENGTH = 2048;
 
+/** 원래 파일 이름의 길이 상한(코드 포인트). 넘으면 확장자를 살리고 앞부분을 자른다. */
+export const MAX_MATERIAL_NAME_LENGTH = 200;
+
+/** `material_names` 입력의 항목 수 상한. 저장할 때는 materials 에 있는 키만 남는다. */
+export const MAX_MATERIAL_NAMES = 200;
+
 export type StudentVisibleMaterial = {
   /** `materials` 에 저장된 URL 그대로. */
   url: string;
-  /** URL 경로의 마지막 조각을 디코드한 값. */
+  /** `material_names[url]` 의 원래 이름. 없으면 URL 경로의 마지막 조각을 디코드한 값. */
   fileName: string;
   /** 소문자 확장자, 점 없이 (`xlsx`). 없으면 빈 문자열. */
   extension: string;
@@ -58,17 +65,74 @@ function extensionOf(fileName: string): string {
   return match ? match[1].toLowerCase() : "";
 }
 
-/** URL 문자열을 학생에게 보여 줄 항목으로 바꾼다. http(s) URL 이 아니거나 파일 이름이 없으면 null. */
-function toVisibleMaterial(url: string): StudentVisibleMaterial | null {
-  const parsed = parseHttpUrl(url);
-  if (!parsed) return null;
-  const fileName = lastPathSegment(parsed);
-  if (fileName.trim() === "") return null;
-  return { url, fileName, extension: extensionOf(fileName) };
-}
-
 function stringsOf(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** 객체의 자기 속성만 읽는다. `__proto__` 같은 키가 프로토타입을 끌어오지 않게 한다. */
+function ownValue(record: Record<string, unknown>, key: string): unknown {
+  return Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined;
+}
+
+// C0, DEL, C1 제어문자.
+const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/g;
+// 글자 방향 제어문자. RLO(U+202E) 를 끼워 "보고서xslx.exe" 가 다른 확장자처럼 보이게 하는 데 쓰인다.
+const BIDI_CONTROLS = /[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
+
+/**
+ * 원래 파일 이름을 저장, 표시할 수 있게 정규화한다. 쓸 수 없으면 null.
+ *
+ * - 문자열만 받는다.
+ * - 제어문자와 글자 방향 제어문자를 지운다.
+ * - 경로 구분자(`/`, `\`)가 있으면 마지막 조각만 남긴다(구분자와 앞 경로를 지운다).
+ *   브라우저의 `File.name` 에는 구분자가 없으므로 손으로 만든 입력에서만 일어난다.
+ * - 앞뒤 공백을 지운다. 비거나 `.`, `..` 이면 null.
+ * - `MAX_MATERIAL_NAME_LENGTH` 를 넘으면 확장자를 살리고 앞부분을 자른다.
+ */
+export function normalizeMaterialName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const cleaned = value.replace(CONTROL_CHARS, "").replace(BIDI_CONTROLS, "");
+  const name = (cleaned.split(/[\\/]/).pop() ?? "").trim();
+  if (name === "" || name === "." || name === "..") return null;
+  const chars = Array.from(name);
+  if (chars.length <= MAX_MATERIAL_NAME_LENGTH) return name;
+  const ext = /\.[a-zA-Z0-9]{1,8}$/.exec(name)?.[0] ?? "";
+  const base = Array.from(name.slice(0, name.length - ext.length));
+  return base.slice(0, MAX_MATERIAL_NAME_LENGTH - ext.length).join("").trimEnd() + ext;
+}
+
+/**
+ * 저장할 `material_names`. 키가 `materials` 안의 URL 인 항목만 남기고 값은 `normalizeMaterialName` 으로
+ * 정규화한다. 쓸 수 없는 값은 뺀다. 순서는 `materials` 순서다. 자료를 지우면 그 키도 여기서 빠진다.
+ * 서버 저장(생성, 수정, 복사), 교수자 화면의 페이로드, 시드 스크립트가 같은 함수를 쓴다.
+ */
+export function normalizeMaterialNames(materials: unknown, names: unknown): Record<string, string> {
+  if (!isPlainObject(names)) return {};
+  const entries: Array<[string, string]> = [];
+  const seen = new Set<string>();
+  for (const url of stringsOf(materials)) {
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const name = normalizeMaterialName(ownValue(names, url));
+    if (name !== null) entries.push([url, name]);
+  }
+  // Object.fromEntries 는 `__proto__` 키도 자기 속성으로 만든다(프로토타입을 바꾸지 않는다).
+  return Object.fromEntries(entries);
+}
+
+/** URL 문자열을 학생에게 보여 줄 항목으로 바꾼다. http(s) URL 이 아니거나 이름을 정할 수 없으면 null. */
+function toVisibleMaterial(url: string, originalName?: unknown): StudentVisibleMaterial | null {
+  const parsed = parseHttpUrl(url);
+  if (!parsed) return null;
+  const segment = lastPathSegment(parsed);
+  if (segment.trim() === "") return null;
+  const fileName = normalizeMaterialName(originalName) ?? segment;
+  // 확장자는 저장된 객체 이름(업로드 때 원래 이름에서 정한 값)이 먼저다. 없으면 원래 이름에서 본다.
+  return { url, fileName, extension: extensionOf(segment) || extensionOf(fileName) };
 }
 
 /**
@@ -78,20 +142,25 @@ function stringsOf(value: unknown): string[] {
  * `student_materials` 에만 있고 `materials` 에 없는 값(지운 파일)도 뺀다. 그래서 저장 불변식이
  * 어떤 이유로 깨져도 지금 시험 자료가 아닌 파일은 나가지 않는다. 두 키 중 하나라도 없거나 배열이
  * 아니면 빈 배열이다 - 호출자는 두 컬럼을 함께 읽어야 한다.
+ *
+ * `fileName` 은 `material_names[url]` 이 있으면 그 원래 이름(정규화), 없으면 URL 경로의 마지막 조각이다.
+ * `material_names` 를 넘기지 않아도 동작한다(이름만 조각이 된다).
  */
 export function getStudentVisibleMaterials(exam: {
   materials?: unknown;
   student_materials?: unknown;
+  material_names?: unknown;
 }): StudentVisibleMaterial[] {
   const shared = new Set(stringsOf(exam.student_materials));
   if (shared.size === 0) return [];
+  const names = isPlainObject(exam.material_names) ? exam.material_names : {};
 
   const seen = new Set<string>();
   const out: StudentVisibleMaterial[] = [];
   for (const url of stringsOf(exam.materials)) {
     if (!shared.has(url) || seen.has(url)) continue;
     seen.add(url);
-    const item = toVisibleMaterial(url);
+    const item = toVisibleMaterial(url, ownValue(names, url));
     if (item) out.push(item);
   }
   return out;
@@ -177,12 +246,37 @@ export function readStudentMaterialItems(value: unknown): StudentVisibleMaterial
     if (!entry || typeof entry !== "object") continue;
     const { url, fileName } = entry as Record<string, unknown>;
     if (typeof url !== "string" || seen.has(url)) continue;
-    const item = toVisibleMaterial(url);
+    // 서버가 정한 이름(원래 이름)을 쓴다. 화면에서도 같은 정규화를 한 번 더 거친다.
+    const item = toVisibleMaterial(url, fileName);
     if (!item) continue;
     seen.add(url);
-    // 서버가 정한 이름이 있으면 그것을 쓴다(지금은 URL 에서 뽑은 값과 같다).
-    const name = typeof fileName === "string" && fileName.trim() !== "" ? fileName : item.fileName;
-    out.push({ url, fileName: name, extension: extensionOf(name) || item.extension });
+    out.push(item);
   }
   return out;
+}
+
+/** Supabase Storage 공개 객체 경로. 이 경로만 `download` 쿼리 파라미터를 알아듣는다. */
+const SUPABASE_PUBLIC_OBJECT_PATH = "/storage/v1/object/public/";
+
+/**
+ * 같은 탭에서 파일로 내려받게 하는 링크 주소. 쓸 수 없으면 null.
+ *
+ * `exam-materials` 는 Supabase 공개 버킷이다. 공개 URL 에 `?download=<이름>` 을 붙이면 Storage 가
+ * `Content-Disposition: attachment; filename=...; filename*=UTF-8''...` 로 응답해 브라우저가 페이지를
+ * 바꾸지 않고 그 이름으로 저장한다(https://supabase.com/docs/guides/storage/serving/downloads,
+ * supabase/storage 의 src/storage/renderer/renderer.ts handleDownload). 다른 출처 링크라 `<a download>`
+ * 이름은 브라우저가 무시하므로 이 파라미터가 핵심이다.
+ *
+ * Supabase 공개 객체 경로가 아닌 URL 은 이 파라미터를 모르는 서버라 null 을 돌려준다. 그런 링크를 같은
+ * 탭으로 열면 시험 화면을 떠나게 되므로, 호출자는 null 이면 새 탭으로 연다.
+ */
+export function materialDownloadHref(url: string, fileName: string): string | null {
+  const parsed = parseHttpUrl(url);
+  if (!parsed || !parsed.pathname.includes(SUPABASE_PUBLIC_OBJECT_PATH)) return null;
+  const name = normalizeMaterialName(fileName) ?? lastPathSegment(parsed);
+  parsed.searchParams.delete("download");
+  // URLSearchParams 는 공백을 + 로 쓴다. 이름은 encodeURIComponent 로 직접 붙여 %20 으로 보낸다.
+  const rest = parsed.searchParams.toString();
+  parsed.search = `${rest ? `${rest}&` : ""}download=${encodeURIComponent(name)}`;
+  return parsed.toString();
 }

@@ -21,7 +21,7 @@ import { SimpleExamAuthoringForm } from "@/components/instructor/SimpleExamAutho
 import { useTranslations } from "next-intl";
 import type { Question } from "@/components/instructor/QuestionEditor";
 import { useFileUpload } from "@/hooks/useFileUpload";
-import { pickStudentMaterials } from "@/lib/student-materials";
+import { normalizeMaterialNames, pickStudentMaterials } from "@/lib/student-materials";
 import {
   buildDefaultScoreWeightsForQuestionTypes,
   validateScoreWeightsForQuestions,
@@ -75,6 +75,9 @@ export default function EditExam({
       return next;
     });
   }, []);
+  // 기존 자료의 원래 파일 이름 (#544). 불러온 material_names 가 먼저이고, 그 전에 올린 자료는 텍스트를
+  // 추출할 때 남긴 이름(pdf, docx, pptx)으로 채운다. 저장하면 이 이름들이 material_names 로 남는다.
+  const [materialNames, setMaterialNames] = useState<Record<string, string>>({});
   const uploadedUrlByName = useMemo(
     () =>
       new Map(
@@ -123,6 +126,20 @@ export default function EditExam({
         setScoreWeights(loadedScoreWeights);
         setHasSessions(Boolean(exam.has_sessions));
         fileUpload.initExistingData(exam.materials || [], exam.materials_text);
+        setMaterialNames(
+          normalizeMaterialNames(exam.materials, {
+            ...Object.fromEntries(
+              (Array.isArray(exam.materials_text) ? exam.materials_text : [])
+                .filter(
+                  (m: unknown): m is { url: string; fileName: string } =>
+                    typeof (m as { url?: unknown })?.url === "string" &&
+                    typeof (m as { fileName?: unknown })?.fileName === "string"
+                )
+                .map((m: { url: string; fileName: string }) => [m.url, m.fileName])
+            ),
+            ...(exam.material_names && typeof exam.material_names === "object" ? exam.material_names : {}),
+          })
+        );
         setSharedMaterialUrls(
           new Set(
             Array.isArray(exam.student_materials)
@@ -267,10 +284,9 @@ export default function EditExam({
     try { return decodeURIComponent(new URL(url).pathname.split("/").pop() || t("editExam.filenameFallback")); }
     catch { return t("editExam.filenameFallback"); }
   };
-  // 저장 경로에는 원래 이름이 없다. 텍스트를 추출한 파일(pdf, docx, pptx)은 추출 때 남긴 원래 이름을 쓴다.
+  // 저장 경로에는 원래 이름이 없다. 원래 이름을 알면(material_names, 추출 때 남긴 이름) 그것을 보여 준다.
   // 공개 스위치를 켤 때 어떤 파일인지 알아볼 수 있게 한다.
-  const getExistingFileName = (url: string) =>
-    fileUpload.extractedTexts.get(url)?.fileName || getFileNameFromUrl(url);
+  const getExistingFileName = (url: string) => materialNames[url] || getFileNameFromUrl(url);
 
   // ── 문제 CRUD ──────────────────────────────────────────────────────────────
   const addQuestion = useCallback((type?: Question["type"], count?: number) => {
@@ -338,6 +354,7 @@ export default function EditExam({
         materials: string[];
         materials_text: Array<{ url: string; text: string; fileName: string }>;
         student_materials: string[];
+        material_names: Record<string, string>;
         language: "ko" | "en";
         updated_at: string;
       } = {
@@ -350,6 +367,13 @@ export default function EditExam({
         materials_text: fileUpload.getMaterialsText(),
         // 학생에게 공개할 자료 (#544). materials 의 부분집합, materials 순서. 서버가 다시 검증한다.
         student_materials: pickStudentMaterials(materialUrls, sharedMaterialUrls),
+        // 원래 파일 이름 (#544): 기존 자료의 이름과 이번에 올린 파일의 이름. 지운 자료의 이름은 빠진다.
+        material_names: normalizeMaterialNames(materialUrls, {
+          ...materialNames,
+          ...Object.fromEntries(
+            Array.from(fileUpload.uploadedFiles.values()).map((file) => [file.url, file.fileName])
+          ),
+        }),
         language: examData.language,
         updated_at: new Date().toISOString(),
       };
@@ -378,7 +402,7 @@ export default function EditExam({
       setIsLoading(false);
       isSubmittingRef.current = false;
     }
-  }, [examData, questions, chatWeight, scoreWeights, courseId, hasSessions, fileUpload, sharedMaterialUrls, resolvedParams.examId, t]);
+  }, [examData, questions, chatWeight, scoreWeights, courseId, hasSessions, fileUpload, sharedMaterialUrls, materialNames, resolvedParams.examId, t]);
 
   // ── 제출 사유 ─────────────────────────────────────────────────────────────
   const submitReasons = useMemo(() => {

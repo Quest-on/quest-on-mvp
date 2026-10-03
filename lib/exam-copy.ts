@@ -1,5 +1,5 @@
 import { normalizeScoreWeights } from "@/lib/grade-utils";
-import { getStudentVisibleMaterials } from "@/lib/student-materials";
+import { getStudentVisibleMaterials, normalizeMaterialNames } from "@/lib/student-materials";
 
 /** 복사 대상(원본) 시험/과제에서 페이로드 생성에 필요한 필드들. */
 export interface CopyableExamSource {
@@ -11,6 +11,8 @@ export interface CopyableExamSource {
   materials_text?: unknown;
   /** 학생에게 공개한 자료 URL (#544). 복사본도 같은 파일을 공개한다. */
   student_materials?: unknown;
+  /** 자료 URL → 원래 파일 이름 (#544). 복사본도 같은 이름을 보인다. */
+  material_names?: unknown;
   rubric?: unknown;
   rubric_public?: boolean | null;
   chat_weight?: number | null;
@@ -61,6 +63,7 @@ export function buildCopiedExamPayload(
     materials_text: source.materials_text ?? [],
     // 원본과 같은 파일을 공개한다. 원본의 불변식이 깨져 있어도 복사본에는 materials 의 부분집합만 싣는다.
     student_materials: getStudentVisibleMaterials(source).map((m) => m.url),
+    material_names: normalizeMaterialNames(source.materials, source.material_names),
     rubric: source.rubric ?? [],
     rubric_public: source.rubric_public ?? false,
     chat_weight: source.chat_weight ?? null,

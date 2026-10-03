@@ -252,6 +252,7 @@ describe("initExamSession 응답은 교수 전용 필드를 싣지 않는다", (
     const columns = String(chains.exams[0].select.mock.calls[0][0]).split(",").map((c) => c.trim());
     expect(columns).toContain("materials");
     expect(columns).toContain("student_materials");
+    expect(columns).toContain("material_names");
     expect(columns).not.toContain("materials_text");
   });
 });
@@ -301,6 +302,21 @@ describe("initExamSession 은 교수자가 공개한 자료만 내려준다 (#54
     expect(result.body.exam.materials).toEqual([]);
   });
 
+  it("원래 파일 이름이 있으면 그 이름으로 오고, 이름 맵은 비어서 온다 (비공개 파일 이름이 새지 않는다)", async () => {
+    const result = await initWith({
+      materials: [SECRETS.url, SHARED],
+      student_materials: [SHARED],
+      material_names: { [SHARED]: "하냥센스_시험용_dataset.xlsx", [SECRETS.url]: "SECRET_ORIGINAL_NAME.pdf" },
+    });
+
+    expect(result.body.exam.student_materials).toEqual([
+      { url: SHARED, fileName: "하냥센스_시험용_dataset.xlsx", extension: "xlsx" },
+    ]);
+    expect(result.body.exam.material_names).toEqual({});
+    expect(JSON.stringify(result.body.exam)).not.toContain("SECRET_ORIGINAL_NAME");
+    expectNoLeak(result.body.exam);
+  });
+
   it("지운 파일(materials 에 없는 값)은 student_materials 에 남아 있어도 오지 않는다", async () => {
     const result = await initWith({ materials: [SHARED], student_materials: [SECRETS.url, SHARED] });
 
@@ -346,7 +362,16 @@ describe("공개 getExam 은 학생과 같은 규칙을 쓴다", () => {
     // 응답 정리가 막는지 본다.
     const SHARED = "https://example.test/storage/instructor-1/2026-10-03_customers.xlsx";
     queue({
-      exams: [{ data: leakyExam({ materials: [SHARED], student_materials: [SHARED] }), error: null }],
+      exams: [
+        {
+          data: leakyExam({
+            materials: [SHARED],
+            student_materials: [SHARED],
+            material_names: { [SHARED]: "SHARED_ORIGINAL_NAME.xlsx" },
+          }),
+          error: null,
+        },
+      ],
     });
 
     const response = await getExam({ code: "ABC123" });
@@ -356,5 +381,6 @@ describe("공개 getExam 은 학생과 같은 규칙을 쓴다", () => {
     expect(JSON.stringify(body.exam)).not.toContain(SHARED);
     expect(body.exam.student_materials).toEqual([]);
     expect(body.exam.materials).toEqual([]);
+    expect(JSON.stringify(body.exam)).not.toContain("SHARED_ORIGINAL_NAME");
   });
 });

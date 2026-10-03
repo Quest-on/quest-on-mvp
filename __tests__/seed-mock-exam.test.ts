@@ -1999,11 +1999,16 @@ describe("seedMockExam: 학생 공개 자료 dry-run (#544)", () => {
     ]);
     expect(row.student_materials).toEqual(row.materials);
     expect(row.materials_text).toEqual([]);
+    expect(row.material_names).toEqual({
+      "<업로드 후 정해지는 공개 URL: customers.xlsx>": "customers.xlsx",
+      "<업로드 후 정해지는 공개 URL: guide.pdf>": "guide.pdf",
+    });
   });
 
-  it("공개 자료가 없는 스펙은 student_materials 키를 싣지 않는다 (DB 기본값 [])", async () => {
+  it("공개 자료가 없는 스펙은 student_materials, material_names 키를 싣지 않는다 (DB 기본값 [], {})", async () => {
     const { report } = await run(createFakeDb(verifiedWorld));
     expect(report.planned?.exams).not.toHaveProperty("student_materials");
+    expect(report.planned?.exams).not.toHaveProperty("material_names");
   });
 
   it("스펙의 파일 수와 읽은 파일 수가 다르면 막는다", async () => {
@@ -2049,10 +2054,31 @@ describe("seedMockExam: 학생 공개 자료 --apply (#544)", () => {
     const row = db.tables.exams[0];
     expect(row.materials).toEqual([publicUrl(XLSX_PATH), publicUrl(PDF_PATH)]);
     expect(row.student_materials).toEqual(row.materials);
+    expect(row.material_names).toEqual({
+      [publicUrl(XLSX_PATH)]: "customers.xlsx",
+      [publicUrl(PDF_PATH)]: "guide.pdf",
+    });
     expect(report.uploads.map((u) => u.path)).toEqual([XLSX_PATH, PDF_PATH]);
     expect(report.uploadCleanup).toBe("not-needed");
     expect(db.writes.map((w) => `${w.op}:${w.table}`)).toEqual(["insert:exams", "insert:exam_nodes"]);
     expect(output).toContain("학생 공개 자료: 2개");
+  });
+
+  it("한글 로컬 파일 이름이 그대로 원래 이름이 되고, 저장 경로에는 이름이 들어가지 않는다", async () => {
+    const storage = createFakeStorage();
+    const db = withStorage(createFakeDb(verifiedWorld), storage);
+    const source = "data/하냥센스_시험용_dataset.xlsx";
+
+    const { report } = await run(db, {
+      ...apply,
+      spec: { ...spec, student_material_files: [source] },
+      materialFiles: loadedFiles([source]),
+      uuid: UUIDS(),
+    });
+
+    expect(report.status).toBe("applied");
+    expect(db.tables.exams[0].material_names).toEqual({ [publicUrl(XLSX_PATH)]: "하냥센스_시험용_dataset.xlsx" });
+    expect(XLSX_PATH).not.toMatch(/하냥센스/);
   });
 
   it("업로드 경로는 /api/upload 와 같은 규칙이다 (instructor-<id>/<날짜>_<uuid>.<확장자>)", async () => {

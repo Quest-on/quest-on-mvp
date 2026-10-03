@@ -171,3 +171,35 @@ describe("sanitizeExamForStudent: 학생 공개 자료", () => {
     expect(input).toEqual(snapshot);
   });
 });
+
+describe("sanitizeExamForStudent: 원래 파일 이름 (#544 추가 반영)", () => {
+  const XLSX = "https://example.test/storage/instructor-1/2026-10-03_data.xlsx";
+  const PDF = "https://example.test/storage/instructor-1/2026-10-03_slides.pdf";
+  const exam = () => ({
+    ...baseExam(),
+    materials: [XLSX, PDF],
+    student_materials: [XLSX],
+    material_names: { [XLSX]: "하냥센스_시험용_dataset.xlsx", [PDF]: "비공개_강의안.pdf" },
+  });
+
+  it("공개한 파일 항목은 원래 이름을 쓰고, 이름 맵 자체는 빈 객체로 비운다 (비공개 파일의 URL 과 이름이 들어 있다)", () => {
+    const out = sanitizeExamForStudent(exam(), { includeStudentMaterials: true });
+    expect(out.student_materials).toEqual([{ url: XLSX, fileName: "하냥센스_시험용_dataset.xlsx", extension: "xlsx" }]);
+    expect(out.material_names).toEqual({});
+    const json = JSON.stringify(out);
+    expect(json).not.toContain("비공개_강의안");
+    expect(json).not.toContain(PDF);
+  });
+
+  it("플래그 없이(공개 get_exam) 부르면 이름도 어떤 것도 나가지 않는다", () => {
+    const out = sanitizeExamForStudent(exam());
+    expect(out.material_names).toEqual({});
+    expect(out.student_materials).toEqual([]);
+    expect(JSON.stringify(out)).not.toContain("하냥센스");
+  });
+
+  it("material_names 키가 없으면 새로 만들지 않는다", () => {
+    const { material_names: _omit, ...rest } = exam();
+    expect(sanitizeExamForStudent(rest, { includeStudentMaterials: true })).not.toHaveProperty("material_names");
+  });
+});

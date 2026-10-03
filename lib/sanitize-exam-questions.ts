@@ -50,7 +50,9 @@ export function stripSensitiveQuestionFields<T>(
  *    student entry path (`init_exam_session`) passes. Everyone else, including the public
  *    `get_exam`, gets [] (fail closed: a new caller that forgets the flag shares nothing).
  *    Callers that pass the flag must select both `materials` and `student_materials`;
- *    without `materials` the intersection is empty and nothing is shared.
+ *    without `materials` the intersection is empty and nothing is shared. Select
+ *    `material_names` too so the items carry the original file names.
+ *  - material_names: emptied to {}. Its keys are the URLs of every upload, private ones included.
  *  - rubric: kept only when `rubric_public === true`.
  *
  * Pure function: does not mutate its input. Keys that are absent stay absent, so a
@@ -69,6 +71,8 @@ export function sanitizeExamForStudent<T extends Record<string, unknown>>(
     out.student_materials = opts.includeStudentMaterials ? getStudentVisibleMaterials(exam) : [];
   }
   if ("materials" in out) out.materials = [];
+  // 이름 맵의 키는 모든 자료(비공개 포함)의 URL 이다. 공개한 파일의 이름은 student_materials 항목에 들어 있다.
+  if ("material_names" in out) out.material_names = {};
   if ("materials_text" in out) out.materials_text = [];
   if ("rubric" in out && !rubricPublic) out.rubric = null;
   return out as T;

@@ -49,7 +49,7 @@ import {
 } from "@/components/animate-ui/primitives/animate/scroll-progress";
 import { useExamDraftAutoSave } from "@/hooks/useExamDraftAutoSave";
 import { useFileUpload } from "@/hooks/useFileUpload";
-import { pickStudentMaterials } from "@/lib/student-materials";
+import { normalizeMaterialNames, pickStudentMaterials } from "@/lib/student-materials";
 import type { ChatMessage } from "@/hooks/useQuestionGeneration";
 import {
   buildDefaultScoreWeightsForQuestionTypes,
@@ -559,6 +559,7 @@ export default function CreateExam() {
       score_weights: ScoreWeights | null;
       materials: string[];
       student_materials: string[];
+      material_names: Record<string, string>;
       status: string;
       created_at: string;
       updated_at: string;
@@ -706,6 +707,13 @@ export default function CreateExam() {
         materials_text: materialsText, // 추출된 텍스트 배열
         // 학생에게 공개할 자료 (#544). materials 의 부분집합, materials 순서. 서버가 다시 검증한다.
         student_materials: pickStudentMaterials(materialUrls, sharedMaterialUrls),
+        // 원래 파일 이름 (#544). 저장 경로에는 이름이 없어서 올린 화면이 알고 있는 이름을 함께 보낸다.
+        material_names: normalizeMaterialNames(
+          materialUrls,
+          Object.fromEntries(
+            Array.from(fileUpload.uploadedFiles.values()).map((file) => [file.url, file.fileName])
+          )
+        ),
         language: examData.language, // AI 시스템 프롬프트 언어 (ko | en)
         status: "draft", // Start as draft
         created_at: new Date().toISOString(),

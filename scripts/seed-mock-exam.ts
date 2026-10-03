@@ -30,7 +30,8 @@
  * `<ul>` 등, 목록은 `BLOCK_HTML_TAG_RE`)가 없으면 스펙 검증이 막는다(줄바꿈 없는 평문 한 줄은 통과).
  *
  * 학생 공개 자료 (#544): 스펙의 `student_material_files`(로컬 파일 경로 배열)를 `exam-materials` 버킷에
- * 올리고, 그 공개 URL 을 `materials` 와 `student_materials` 에 함께 넣는다(모두 학생에게 공개). 경로 규칙은
+ * 올리고, 그 공개 URL 을 `materials` 와 `student_materials` 에 함께 넣는다(모두 학생에게 공개). 로컬 파일
+ * 이름은 `material_names` 에 URL 키로 넣는다(학생이 내려받는 파일 이름). 경로 규칙은
  * `/api/upload` 와 같은 `lib/material-object-key.ts` 이고 교수자 폴더 아래다. 확장자와 크기는 앱 허용 목록
  * (`lib/upload-allowlist.ts`)으로 검사한다. 상대 경로는 스펙 파일이 있는 폴더 기준이다. dry-run 은 파일을
  * 읽어 크기만 확인하고 올리지 않는다. 텍스트 추출(`materials_text`)은 하지 않는다 - 표 파일은 앱도 추출하지
@@ -57,7 +58,11 @@ import {
   type ExamRubricItem,
 } from "../lib/exam-insert-payload";
 import { makeMaterialObjectKey, materialStoragePath } from "../lib/material-object-key";
-import { MAX_STUDENT_MATERIALS, validateStudentMaterials } from "../lib/student-materials";
+import {
+  MAX_STUDENT_MATERIALS,
+  normalizeMaterialNames,
+  validateStudentMaterials,
+} from "../lib/student-materials";
 import {
   UPLOAD_ALLOWED_EXTENSIONS,
   UPLOAD_ALLOWED_MIME_TYPES,
@@ -456,6 +461,7 @@ export const USAGE = `사용법:
 
 student_material_files 는 학생에게 공개할 로컬 파일 경로 배열입니다(상대 경로는 스펙 파일 폴더 기준).
 --apply 에서 exam-materials 버킷의 교수자 폴더에 올리고 materials 와 student_materials 에 넣습니다.
+로컬 파일 이름은 material_names 에 넣어 학생이 그 이름으로 내려받습니다.
 dry-run 은 파일 크기만 확인하고 올리지 않습니다. 확장자와 크기는 앱 업로드 허용 목록을 따릅니다.
 
 옵션:
@@ -972,7 +978,10 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
     );
   }
 
-  /** exams 행. 공개 자료가 있으면 materials 와 student_materials 에 같은 URL 목록을 넣는다. */
+  /**
+   * exams 행. 공개 자료가 있으면 materials 와 student_materials 에 같은 URL 목록을 넣고, material_names 에
+   * URL → 로컬 파일 이름을 넣는다(학생이 받는 파일 이름). materialUrls 는 materialFiles 와 같은 순서다.
+   */
   const buildRow = (materialUrls: string[] | null) =>
     buildExamInsertPayload({
       title: spec.title,
@@ -981,7 +990,15 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
       questions: spec.questions,
       materials: materialUrls ?? [],
       materials_text: [],
-      ...(materialUrls ? { student_materials: materialUrls } : {}),
+      ...(materialUrls
+        ? {
+            student_materials: materialUrls,
+            material_names: normalizeMaterialNames(
+              materialUrls,
+              Object.fromEntries(materialUrls.map((url, i) => [url, materialFiles[i]?.fileName]))
+            ),
+          }
+        : {}),
       chat_weight: null,
       status: "draft",
       instructor_id: instructorId,
