@@ -15,7 +15,9 @@ import {
   buildResponseModelStamp,
   buildStudentChatSpecStamp,
   type StudentChatSpecId,
+  type StudentChatToolKind,
 } from "@/lib/student-chat-spec";
+import { ANALYSIS_PARTNER_CHAT_MAX_OUTPUT_TOKENS } from "@/lib/analysis-exec/limits";
 import { handleCorsPreFlight } from "@/lib/cors";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { validateRequest, chatRequestSchema } from "@/lib/validations";
@@ -181,7 +183,8 @@ async function getAIResponse(
     qIdx?: number;
   },
   // 이 지시문을 어느 스펙·언어로 만들었는지. 응답 기록(spec, template_sha, effort)에 쓴다.
-  promptSpec?: { specId: StudentChatSpecId; language: PromptLanguage }
+  // tools 는 도구 상태를 아는 스펙(analysis-partner@2 이후)에서만 온다.
+  promptSpec?: { specId: StudentChatSpecId; language: PromptLanguage; tools?: StudentChatToolKind }
 ): Promise<{
   response: string;
   responseId: string;
@@ -201,6 +204,9 @@ async function getAIResponse(
   const specStamp: Record<string, string> = promptSpec
     ? buildStudentChatSpecStamp(promptSpec)
     : {};
+  // 분석 파트너만 답 길이 상한을 둔다(#543). 시간 예산(60초)에서 역산한 값이다(`lib/analysis-exec/limits.ts`).
+  // 사례형은 이 키를 넣지 않는다 — 사례형 요청 모양은 바뀌지 않는다.
+  const isAnalysisPartnerSpec = promptSpec?.specId.startsWith("analysis-partner@") === true;
   try {
     const tracked = await callTrackedResponse(
       () =>
@@ -210,6 +216,7 @@ async function getAIResponse(
           input: userMessage,
           previous_response_id: previousResponseId || undefined,
           store: true,
+          ...(isAnalysisPartnerSpec ? { max_output_tokens: ANALYSIS_PARTNER_CHAT_MAX_OUTPUT_TOKENS } : {}),
         }),
       {
         feature: "student_chat",
@@ -519,6 +526,7 @@ async function handleChatLogic(params: {
     instructions: systemPrompt,
     specId,
     language: promptLanguage,
+    tools: promptTools,
   } = assembleStudentChatInstructions({
     examTitle,
     examCode,
@@ -540,7 +548,7 @@ async function handleChatLogic(params: {
       sessionId,
       qIdx,
     },
-    { specId, language: promptLanguage }
+    { specId, language: promptLanguage, ...(promptTools ? { tools: promptTools } : {}) }
   );
 
   // AI 응답/세션 업데이트는 반드시 응답 전에 await (fetch failed 방지)
@@ -751,6 +759,7 @@ export async function POST(request: NextRequest) {
           instructions: prompt,
           specId: tempSpecId,
           language: tempPromptLanguage,
+          tools: tempPromptTools,
         } = assembleStudentChatInstructions({
           examTitle: requestExamTitle,
           examCode: requestExamCode || "TEMP",
@@ -773,7 +782,7 @@ export async function POST(request: NextRequest) {
             sessionId,
             qIdx: safeQIdx,
           },
-          { specId: tempSpecId, language: tempPromptLanguage }
+          { specId: tempSpecId, language: tempPromptLanguage, ...(tempPromptTools ? { tools: tempPromptTools } : {}) }
         );
 
         return successJson({

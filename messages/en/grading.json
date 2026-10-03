@@ -119,7 +119,9 @@
   "aiConversations": {
     "title": "AI Conversation History",
     "description": "Conversation the student had with the AI",
-    "empty": "No AI conversation history."
+    "empty": "No AI conversation history.",
+    "analysisLoadFailed": "Could not load the execution records.",
+    "analysisRetry": "Try again"
   },
   "aiOverallSummary": {
     "emptyTitle": "CASE Overall Assessment",

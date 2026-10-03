@@ -59,6 +59,8 @@ model exams {
   score_weights          Json? // 최종 점수 유형별 비중 정책 (MCQ/OX/Case)
   rubric_public          Boolean?               @default(false) // 루브릭 공개 여부
   materials_text         Json?                  @default("[]") // 추출된 텍스트 저장
+  student_materials      Json                   @default("[]") // 학생에게 공개한 자료 URL. materials 의 부분집합 (database/041, #544)
+  material_names         Json                   @default("{}") // 자료 URL → 원래 파일 이름. 키는 materials 안의 URL (database/041, #544)
   rag_status             String?                @default("none") // 'none' | 'pending' | 'processing' | 'completed' | 'failed'
   type                   String?                @default("exam") // 'exam' | 'report' | 'code' | 'erd' | 'mindmap'
   deadline               DateTime?              @db.Timestamptz(6) // 과제 제출 기한

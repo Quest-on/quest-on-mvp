@@ -11,6 +11,13 @@
  * 출처 표시다.
  */
 
+/**
+ * 파일 하나의 최대 크기. 큰 파일은 서명 URL(/api/upload/signed-url)로 직접 올리므로 그 상한이 곧
+ * 앱의 상한이다. /api/upload 는 Vercel 본문 제한(4.5MB) 때문에 4MB 까지만 받고 넘으면 클라이언트가
+ * 서명 URL 로 바꾼다. 시드 스크립트도 이 값으로 검사한다.
+ */
+export const UPLOAD_MAX_FILE_SIZE = 50 * 1024 * 1024;
+
 export const UPLOAD_ALLOWED_EXTENSIONS: ReadonlySet<string> = new Set([
   ".pdf", ".ppt", ".pptx", ".doc", ".docx",
   ".xls", ".xlsx", ".csv",

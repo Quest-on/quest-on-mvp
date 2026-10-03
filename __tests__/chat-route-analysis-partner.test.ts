@@ -17,6 +17,7 @@
 import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { STUDENT_CHAT_SPECS } from "@/lib/student-chat-spec";
+import { ANALYSIS_PARTNER_CHAT_MAX_OUTPUT_TOKENS } from "@/lib/analysis-exec/limits";
 
 type Row = Record<string, unknown>;
 
@@ -282,7 +283,7 @@ describe("ai_role === analysis_partner 이고 시험 언어가 ko 이면 분석 
     expect(h.inserts.messages).toEqual([]);
   });
 
-  it("모델 호출 모양은 사례형과 같다 (모델, 입력, 추론 강도 미지정)", async () => {
+  it("모델 호출 모양은 사례형에 출력 상한(#543)만 더한 것이다 (모델, 입력, 추론 강도 미지정)", async () => {
     setup({ lang: "ko", state: "normal", questions: PARTNER_QUESTIONS });
     await POST(chatRequest("regular"));
 
@@ -293,7 +294,16 @@ describe("ai_role === analysis_partner 이고 시험 언어가 ko 이면 분석 
       input: "질문이요",
       previous_response_id: undefined,
       store: true,
+      // 60초 함수 시간에서 역산한 상한(lib/analysis-exec/limits.ts). 사례형에는 붙지 않는다.
+      max_output_tokens: ANALYSIS_PARTNER_CHAT_MAX_OUTPUT_TOKENS,
     });
+    expect(ANALYSIS_PARTNER_CHAT_MAX_OUTPUT_TOKENS).toBe(2475);
+  });
+
+  it("사례형 문항의 호출에는 출력 상한이 없다 (사례형 요청 모양은 그대로다)", async () => {
+    setup({ lang: "ko", state: "normal", questions: [{ ai_context: "채점 맥락" }] });
+    await POST(chatRequest("regular"));
+    expect(h.responsesCreate.mock.calls[0][0]).not.toHaveProperty("max_output_tokens");
   });
 });
 

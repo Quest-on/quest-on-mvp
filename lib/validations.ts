@@ -1,5 +1,10 @@
 import { z } from "zod";
 import { sanitizeChatMessage, sanitizeUserInput } from "@/lib/sanitize";
+import {
+  MAX_MATERIAL_NAMES,
+  MAX_STUDENT_MATERIALS,
+  MAX_STUDENT_MATERIAL_URL_LENGTH,
+} from "@/lib/student-materials";
 
 // AI 문항 생성 상한. 스트림 라우트가 문항당 병렬 OpenAI 호출을 발사하므로
 // (비용·rate-limit 폭주 방지) 보수적으로 유지한다.
@@ -282,6 +287,24 @@ export const supaActionSchema = z.object({
 
 // ========== Supa Route Action Schemas ==========
 
+/**
+ * 학생에게 공개할 자료 URL 배열 (#544). 원소 수 상한은 중복을 빼기 전 기준이라 조금 더 엄격하다.
+ * 부분집합 검사와 순서 정렬은 핸들러의 validateStudentMaterials 가 한다.
+ */
+const studentMaterialsSchema = z
+  .array(z.string().max(MAX_STUDENT_MATERIAL_URL_LENGTH))
+  .max(MAX_STUDENT_MATERIALS);
+
+/**
+ * 자료 URL → 원래 파일 이름 (#544). 모양과 크기만 여기서 막는다. 키를 materials 안의 URL 로 좁히고
+ * 이름을 정규화(제어문자, 경로 구분자 제거, 200자)하는 일은 핸들러의 normalizeMaterialNames 가 한다.
+ */
+const materialNamesSchema = z
+  .record(z.string().max(MAX_STUDENT_MATERIAL_URL_LENGTH), z.string().max(1000))
+  .refine((names) => Object.keys(names).length <= MAX_MATERIAL_NAMES, {
+    message: `material_names 는 ${MAX_MATERIAL_NAMES}개까지입니다.`,
+  });
+
 // Exam creation/update
 export const createExamSchema = z.object({
   title: sanitizedString(z.string().min(1, "Title is required").max(500)),
@@ -348,6 +371,10 @@ export const createExamSchema = z.object({
     text: z.string(),
     fileName: z.string(),
   })).optional(),
+  // 학생에게 공개할 자료 URL (#544). 모양과 개수는 여기서, materials 의 부분집합인지는
+  // 핸들러가 lib/student-materials.ts 의 validateStudentMaterials 로 확인한다.
+  student_materials: studentMaterialsSchema.optional(),
+  material_names: materialNamesSchema.optional(),
   status: z.string().min(1),
   created_at: z.string(),
   updated_at: z.string(),
@@ -368,6 +395,8 @@ export const updateExamSchema = z.object({
       text: z.string(),
       fileName: z.string(),
     })).optional(),
+    student_materials: studentMaterialsSchema.optional(),
+    material_names: materialNamesSchema.optional(),
     status: z.string().optional(),
     code: z.string().min(1).max(20).optional(),
     chat_weight: z.number().int().min(0).max(100).nullable().optional(),

@@ -12,6 +12,11 @@ import {
 import { buildCopiedExamPayload, type CopyableExamSource } from "@/lib/exam-copy";
 import { buildExamInsertPayload, generateExamCode } from "@/lib/exam-insert-payload";
 import { sanitizeExamForStudent } from "@/lib/sanitize-exam-questions";
+import {
+  normalizeMaterialNames,
+  pickStudentMaterials,
+  validateStudentMaterials,
+} from "@/lib/student-materials";
 
 // Lazy Supabase client getter — creates a fresh client per invocation
 // to avoid stale connections in serverless environments
@@ -87,6 +92,10 @@ export async function createExam(data: {
     text: string;
     fileName: string;
   }>;
+  /** 학생에게 공개할 자료 URL (#544). materials 의 부분집합이어야 한다(아래에서 검증). */
+  student_materials?: string[];
+  /** 자료 URL → 원래 파일 이름 (#544). materials 안의 키만 남기고 이름을 정규화해 저장한다. */
+  material_names?: Record<string, string>;
   chat_weight?: number | null;
   score_weights?: ScoreWeights | null;
   course_id?: string | null;
@@ -120,6 +129,17 @@ export async function createExam(data: {
 
     if (userRole !== "instructor") {
       return errorJson("INSTRUCTOR_REQUIRED", "Instructor access required", 403);
+    }
+
+    // 학생 공개 자료는 이 시험에 올린 자료의 부분집합이어야 한다 (#544). 클라이언트를 믿지 않는다.
+    // 통과하면 materials 순서로 정렬하고 중복을 뺀 값을 저장한다.
+    let studentMaterials: string[] | undefined;
+    if (data.student_materials !== undefined) {
+      const checked = validateStudentMaterials(data.materials ?? [], data.student_materials);
+      if (!checked.ok) {
+        return errorJson("INVALID_STUDENT_MATERIALS", checked.message, 400, { reason: checked.reason });
+      }
+      studentMaterials = checked.value;
     }
 
     // 시험 코드 중복 검증 및 자동 재생성
@@ -164,6 +184,12 @@ export async function createExam(data: {
       questions: data.questions,
       materials: data.materials,
       materials_text: data.materials_text,
+      student_materials: studentMaterials,
+      // 원래 파일 이름: materials 에 있는 URL 키만 남기고 이름을 정규화한다 (#544).
+      material_names:
+        data.material_names !== undefined
+          ? normalizeMaterialNames(data.materials ?? [], data.material_names)
+          : undefined,
       chat_weight: data.chat_weight,
       score_weights: data.score_weights,
       course_id: data.course_id,
@@ -309,23 +335,38 @@ export async function updateExam(data: {
       return errorJson("INSTRUCTOR_REQUIRED", "Instructor access required", 403);
     }
 
+    // 자료 목록이나 학생 공개 목록을 바꾸는 저장은 두 목록을 함께 맞춰야 한다 (#544).
+    // 시작, 종료처럼 자료를 건드리지 않는 저장은 student_materials 컬럼을 읽지 않는다.
+    const touchesMaterials =
+      "materials" in data.update ||
+      "student_materials" in data.update ||
+      "material_names" in data.update;
     const needsCurrentExam =
       data.update.code !== undefined ||
       "score_weights" in data.update ||
       "chat_weight" in data.update ||
-      "questions" in data.update;
-    let currentExam: {
+      "questions" in data.update ||
+      touchesMaterials;
+    type CurrentExam = {
       id: string;
       questions: unknown;
       score_weights: unknown;
       ai_draft_questions: unknown;
       chat_weight: number | null;
-    } | null = null;
+      materials?: unknown;
+      student_materials?: unknown;
+      material_names?: unknown;
+    };
+    let currentExam: CurrentExam | null = null;
 
     if (needsCurrentExam) {
       const { data: foundExam, error: findError } = await getSupabase()
         .from("exams")
-        .select("id, questions, score_weights, ai_draft_questions, chat_weight")
+        .select(
+          touchesMaterials
+            ? "id, questions, score_weights, ai_draft_questions, chat_weight, materials, student_materials, material_names"
+            : "id, questions, score_weights, ai_draft_questions, chat_weight"
+        )
         .eq("id", data.id)
         .eq("instructor_id", user.id)
         .maybeSingle();
@@ -334,13 +375,7 @@ export async function updateExam(data: {
       if (!foundExam) {
         return errorJson("EXAM_NOT_FOUND", "Exam not found or access denied", 404);
       }
-      currentExam = foundExam as {
-        id: string;
-        questions: unknown;
-        score_weights: unknown;
-        ai_draft_questions: unknown;
-        chat_weight: number | null;
-      };
+      currentExam = foundExam as unknown as CurrentExam;
     }
 
     // If exam code is being changed, verify no sessions exist
@@ -363,6 +398,49 @@ export async function updateExam(data: {
     const updateWithoutRubric = { ...data.update };
     delete updateWithoutRubric.rubric;
     delete updateWithoutRubric.rubric_public;
+
+    // 학생 공개 자료 (#544): 항상 materials 의 부분집합, materials 순서.
+    //  - student_materials 를 보내면 저장될 materials(이번에 보낸 값, 없으면 지금 값) 기준으로 검증한다.
+    //    부분집합이 아니면 거부한다. 이번 저장의 materials 목록에 없는 URL 은 공개로 남지 않는다.
+    //    (materials 자체를 임의 URL 로 채워 보내면 통과한다 - 검사의 한계는 lib/student-materials.ts 참고.)
+    //  - materials 만 보내면 빠진 파일을 공개 목록에서도 지운다.
+    // 학생이 이미 입장한 시험도 바꿀 수 있다(시험 중에 파일을 더 공개하는 경우). 학생 화면에는 다시 입장할 때 반영된다.
+    if (touchesMaterials && currentExam) {
+      const nextMaterials =
+        "materials" in updateWithoutRubric ? updateWithoutRubric.materials : currentExam.materials;
+      if ("student_materials" in updateWithoutRubric) {
+        const checked = validateStudentMaterials(nextMaterials, updateWithoutRubric.student_materials);
+        if (!checked.ok) {
+          return errorJson("INVALID_STUDENT_MATERIALS", checked.message, 400, { reason: checked.reason });
+        }
+        updateWithoutRubric.student_materials = checked.value;
+      } else {
+        const currentShared = Array.isArray(currentExam.student_materials)
+          ? currentExam.student_materials.filter((v): v is string => typeof v === "string")
+          : [];
+        const nextList = Array.isArray(nextMaterials)
+          ? nextMaterials.filter((v): v is string => typeof v === "string")
+          : [];
+        const pruned = pickStudentMaterials(nextList, currentShared);
+        if (JSON.stringify(pruned) !== JSON.stringify(currentShared)) {
+          updateWithoutRubric.student_materials = pruned;
+        }
+      }
+
+      // 원래 파일 이름: 보낸 맵(없으면 지금 맵)에서 저장될 materials 에 있는 URL 키만 남긴다.
+      // 자료를 지우면 그 이름도 빠진다. 바뀐 것이 없으면 쓰지 않는다.
+      const nameSource =
+        "material_names" in updateWithoutRubric
+          ? updateWithoutRubric.material_names
+          : currentExam.material_names;
+      const nextNames = normalizeMaterialNames(nextMaterials, nameSource);
+      if (
+        "material_names" in updateWithoutRubric ||
+        JSON.stringify(nextNames) !== JSON.stringify(currentExam.material_names ?? {})
+      ) {
+        updateWithoutRubric.material_names = nextNames;
+      }
+    }
 
     if ("questions" in updateWithoutRubric) {
       const currentQuestions = Array.isArray(currentExam?.questions)
@@ -651,7 +729,7 @@ export async function getExamById(data: { id: string }) {
     const { data: exam, error } = await getSupabase()
       .from("exams")
       .select(
-        "id, title, code, description, duration, questions, materials, materials_text, rubric, rubric_public, chat_weight, score_weights, course_id, status, instructor_id, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, type, deadline, assignment_prompt, grades_released, language, is_demo, first_published_at"
+        "id, title, code, description, duration, questions, materials, materials_text, student_materials, material_names, rubric, rubric_public, chat_weight, score_weights, course_id, status, instructor_id, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, type, deadline, assignment_prompt, grades_released, language, is_demo, first_published_at"
       )
       .eq("id", data.id)
       .eq("instructor_id", user.id) // Only allow instructors to view their own exams
@@ -768,7 +846,7 @@ export async function copyExam(data: { exam_id: string }) {
     // Get the original exam
     const { data: originalExam, error: examError } = await getSupabase()
       .from("exams")
-      .select("id, title, code, description, duration, questions, materials, materials_text, rubric, rubric_public, chat_weight, score_weights, status, instructor_id, created_at, updated_at, language, type, assignment_prompt, initial_state, canvas_config")
+      .select("id, title, code, description, duration, questions, materials, materials_text, student_materials, material_names, rubric, rubric_public, chat_weight, score_weights, status, instructor_id, created_at, updated_at, language, type, assignment_prompt, initial_state, canvas_config")
       .eq("id", data.exam_id)
       .eq("instructor_id", user.id)
       .single();

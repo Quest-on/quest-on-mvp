@@ -9,19 +9,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildStudentChatSystemPrompt } from "@/lib/prompts";
 import {
   CURRENT_ANALYSIS_PARTNER_SPEC_ID,
+  CURRENT_ANALYSIS_PARTNER_TOOLS_SPEC_ID,
   CURRENT_STUDENT_CHAT_SPEC_ID,
   STUDENT_CHAT_SPECS,
   TEMPLATE_SHA_LENGTH,
   buildResponseModelStamp,
   buildStudentChatSpecStamp,
   getCurrentAnalysisPartnerSpec,
+  getCurrentAnalysisPartnerToolsSpec,
   getCurrentStudentChatSpec,
   getStudentChatSpec,
 } from "@/lib/student-chat-spec";
 
 describe("스펙 레지스트리", () => {
-  it("현재는 case@1 과 analysis-partner@1 두 개다 (#519 가 분석 파트너를 더했다)", () => {
-    expect(Object.keys(STUDENT_CHAT_SPECS)).toEqual(["case@1", "analysis-partner@1"]);
+  it("현재는 case@1, analysis-partner@1, analysis-partner@2 세 개다 (#519 가 분석 파트너를, #545 가 도구 있음 @2 를 더했다)", () => {
+    expect(Object.keys(STUDENT_CHAT_SPECS)).toEqual(["case@1", "analysis-partner@1", "analysis-partner@2"]);
     expect(CURRENT_STUDENT_CHAT_SPEC_ID).toBe("case@1");
     expect(getCurrentStudentChatSpec()).toBe(STUDENT_CHAT_SPECS["case@1"]);
     expect(getStudentChatSpec("case@1")).toBe(STUDENT_CHAT_SPECS["case@1"]);
@@ -204,5 +206,51 @@ describe("analysis-partner@1 스펙 (이슈 #519)", () => {
     expect(buildStudentChatSpecStamp({ specId: "analysis-partner@1", language: "en" })).toMatchObject({
       template_sha: spec.renderSha256.ko.slice(0, 16),
     });
+  });
+});
+
+describe("analysis-partner@2 스펙 (이슈 #545, #543)", () => {
+  const spec = STUDENT_CHAT_SPECS["analysis-partner@2"];
+
+  it("도구 있음 포인터는 @2 를 가리키고 도구 없음 포인터와 따로 움직인다", () => {
+    expect(CURRENT_ANALYSIS_PARTNER_TOOLS_SPEC_ID).toBe("analysis-partner@2");
+    expect(getCurrentAnalysisPartnerToolsSpec()).toBe(spec);
+    expect(CURRENT_STUDENT_CHAT_SPEC_ID).toBe("case@1");
+  });
+
+  it("모델 선택 방식과 추론 강도 기록은 다른 스펙과 같다 (모델을 바꾸지 않는다)", () => {
+    expect(spec.model).toEqual(STUDENT_CHAT_SPECS["case@1"].model);
+    expect(spec.effort).toBe("unspecified");
+  });
+
+  it("두 상태의 렌더 해시가 있고 불변이다", () => {
+    expect(spec.renderSha256.ko).toMatch(/^[0-9a-f]{64}$/);
+    expect(spec.toolRenderSha256.hosted_python.ko).toMatch(/^[0-9a-f]{64}$/);
+    expect(Object.isFrozen(spec.toolRenderSha256)).toBe(true);
+    expect(Object.isFrozen(spec.toolRenderSha256.hosted_python)).toBe(true);
+  });
+
+  it("스탬프: 도구 있음이면 tools 와 도구 있음 템플릿 해시, 도구 없음이면 도구 없음 해시", () => {
+    expect(buildStudentChatSpecStamp({ specId: "analysis-partner@2", language: "ko", tools: "hosted_python" })).toEqual({
+      spec: "analysis-partner@2",
+      template_sha: spec.toolRenderSha256.hosted_python.ko.slice(0, 16),
+      effort: "unspecified",
+      tools: "hosted_python",
+    });
+    expect(buildStudentChatSpecStamp({ specId: "analysis-partner@2", language: "ko", tools: "none" })).toEqual({
+      spec: "analysis-partner@2",
+      template_sha: spec.renderSha256.ko.slice(0, 16),
+      effort: "unspecified",
+      tools: "none",
+    });
+    // tools 를 안 주면 도구 없음이다.
+    expect(buildStudentChatSpecStamp({ specId: "analysis-partner@2", language: "ko" })).toMatchObject({ tools: "none" });
+  });
+
+  it("도구 상태를 모르는 스펙의 스탬프에는 tools 키가 없다 (기존 기록 모양이 그대로다)", () => {
+    expect(buildStudentChatSpecStamp({ specId: "case@1", language: "ko", tools: "hosted_python" })).not.toHaveProperty("tools");
+    expect(buildStudentChatSpecStamp({ specId: "analysis-partner@1", language: "ko", tools: "hosted_python" })).not.toHaveProperty(
+      "tools"
+    );
   });
 });

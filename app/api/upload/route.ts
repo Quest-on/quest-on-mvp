@@ -10,6 +10,7 @@ import { logError } from "@/lib/logger";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 
 import { UPLOAD_ALLOWED_EXTENSIONS, UPLOAD_ALLOWED_MIME_TYPES } from "@/lib/upload-allowlist";
+import { makeMaterialObjectKey, materialStoragePath } from "@/lib/material-object-key";
 // Initialize Supabase client with service role key for server-side operations
 const supabase = getSupabaseServer();
 
@@ -25,17 +26,6 @@ function errorJson(
     { ok: false, code, message, details, traceId },
     { status }
   );
-}
-
-// 안전한 저장용 key 생성 (원본명은 메타데이터로만 저장)
-function makeSafeObjectKey(originalName: string, extFallback = ".bin") {
-  const ts = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  const id = randomUUID();
-  // 확장자 추출 (마지막 점 기준, 너무 긴/이상한 건 버림)
-  const m = originalName.match(/\.([a-zA-Z0-9]{1,8})$/);
-  const ext = m ? `.${m[1].toLowerCase()}` : extFallback;
-  // 슬래시를 언더스코어로 변경 (일부 storage는 중첩 폴더 미지원)
-  return `${ts}_${id}${ext}`;
 }
 
 // OPTIONS 요청 처리 (CORS preflight)
@@ -134,11 +124,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 안전한 저장용 키 생성 (원본명은 메타데이터로만)
-    objectKey = makeSafeObjectKey(originalName);
+    objectKey = makeMaterialObjectKey(originalName);
 
     // Supabase Storage 경로: instructor-{userId}/{objectKey}
-    // objectKey는 이미 날짜/uuid.ext 형식이므로 그대로 사용
-    const storagePath = `instructor-${user.id}/${objectKey}`;
+    // objectKey는 이미 날짜/uuid.ext 형식이므로 그대로 사용 (규칙은 lib/material-object-key.ts)
+    const storagePath = materialStoragePath(user.id, objectKey);
 
     // Convert file to buffer (no compression - direct upload)
     const arrayBuffer = await file.arrayBuffer();

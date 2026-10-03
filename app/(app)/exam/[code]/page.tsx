@@ -82,6 +82,8 @@ interface Exam {
   /** 교수자가 공개한 평가 기준. 서버는 rubric_public 일 때만 내려 주고, 배열이 아닐 수 있어 unknown 으로 둔다. */
   rubric?: unknown;
   rubric_public?: boolean;
+  /** 교수자가 학생에게 공개한 자료 ({ url, fileName, extension }[]). 서버가 공개한 것만 내려 준다 (#544). */
+  student_materials?: unknown;
   allow_draft_in_waiting?: boolean;
   allow_chat_in_waiting?: boolean;
 }
@@ -591,6 +593,7 @@ export default function ExamPage() {
           chatEndRef={chatEndRef}
           currentQuestion={currentQuestion}
           isDemoPreview={session.demoPreview === true}
+          analysisProgress={examChat.analysisProgress}
         />
       )}
 
@@ -622,6 +625,7 @@ export default function ExamPage() {
               }}
               rubric={exam.rubric}
               rubricPublic={exam.rubric_public}
+              studentMaterials={exam.student_materials}
             />
 
             <MainContentWrapper>
