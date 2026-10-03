@@ -9,9 +9,14 @@
 
 `posthog-js` and `posthog-node` are pinned stable official SDKs. Existing Vercel Analytics does not provide the selected PostHog project's shared anonymous/authenticated identity or ingestion contract. Use these SDKs instead of implementing a tracker, proxy, queue or retry framework. The prerelease `@posthog/next` is not used. Record the dependency audit in PR #358; do not run unrelated force upgrades.
 
-## `npm audit` 잔여 5건 — 도달 가능성 분석 (#187, 2026-09-23)
+## `npm audit` 잔여 11건 — 도달 가능성 분석 (#187, 2026-09-23 / #556, 2026-10-04 갱신)
 
-`npm audit` 은 5건(moderate 2 / high 3 / **critical 0**)을 보고한다. PR #440 이 49건 → 5건, critical 5 → 0 으로 줄인 뒤 남은 것들이다. **다섯 모두 게시된 상위 수정 버전이 없고, 도달 불가이거나 dev 전용이다.** 아래를 읽지 않고 `npm audit fix --force` 를 돌리면 다운그레이드가 적용된다.
+`npm audit` 은 11건(low 1 / moderate 2 / high 8 / **critical 0**)을 보고한다. PR #440 이 49건 → 5건, critical 5 → 0 으로 줄인 뒤(2026-09-23 기록) 아래가 바뀌었다.
+
+- **해결 — `next` critical 1건 (#556)**: advisory [GHSA-vcvr-r3jv-pc5j](https://github.com/advisories/GHSA-vcvr-r3jv-pc5j)(`next/og` 의 `ImageResponse` 원격 코드 실행, 범위 `>=16.2.0 <16.3.6`)가 `next 16.3.5` 에 걸렸다. `next` 를 비메이저 수정 버전 `16.3.8` 로 올려 없앴다. 앱은 원래도 `next/og` 와 `ImageResponse` 를 import 하지 않고 `opengraph-image` 같은 생성 이미지 파일도 없어 도달 경로가 없었다.
+- **새로 보고됨 — 사슬 3(high 5건, dev 전용), 사슬 4(low 1건, 도달 불가)**: 아래.
+
+사슬 1~3 은 게시된 상위 수정 버전이 없고(npm 제안은 모두 메이저 다운그레이드다), 도달 불가이거나 dev 전용이다. 사슬 4 는 비메이저 수정이 있지만 도달 불가라 #556(`next` 만 올림)에 섞지 않았다. 아래를 읽지 않고 `npm audit fix --force` 를 돌리면 다운그레이드가 적용된다.
 
 ### 사슬 1 — `exceljs` → `uuid` (moderate, 런타임 의존)
 
@@ -44,15 +49,44 @@ const { deepmerge } = await import("deepmerge-ts");
 
 즉 빌드·마이그레이션 시점에 저장소 소유 파일을 병합하는 경로다.
 
-수정 버전이 없다 — 취약 범위가 `prisma 6.13.0-dev.1 - 8.1.0-dev.4` 이고, 그걸 벗어나는 건 아직 게시되지 않았다(현재 최신은 `8.0.0-rc.15`, 여전히 범위 안이며 RC 다). 설치본은 `6.19.3` 이고 npm 제안 `6.12.0` 은 다운그레이드다.
+수정 버전이 없다 — 취약 범위가 `prisma 6.13.0-dev.1 - 8.1.0-dev.4` 이고, 그걸 벗어나는 건 아직 게시되지 않았다(2026-10-04 최신은 `8.0.0-rc.19`, 여전히 범위 안이며 RC 다). 설치본은 `6.19.3` 이고 npm 제안 `6.12.0` 은 다운그레이드다.
+
+### 사슬 3 — `eslint-config-next` → `@next/eslint-plugin-next` → `fast-glob` → `micromatch` → `braces` (high 5건, **devDependency**)
+
+advisory [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm): `braces <= 3.0.3` 이 깊게 중첩된 패턴을 펼칠 때 스택을 소진한다(서비스 거부). 사슬의 다섯 패키지가 각각 한 건으로 잡힌다.
+
+**런타임에 없다.** `eslint-config-next` 는 `devDependencies` 이고 이 사슬은 린트 때만 돈다. 린트 안에서도 `fast-glob` 을 부르는 곳은 ESLint 설정의 `settings.next.rootDir` glob 을 펼치는 한 곳뿐인데, 이 저장소 설정(`eslint.config.mjs`)에는 그 값이 없다:
+
+```js
+// node_modules/@next/eslint-plugin-next/dist/utils/get-root-dirs.js
+var processRootDir = function(rootDir) {
+    return (0, _fastglob.globSync)(rootDir.replace(/\\/g, '/'), { onlyDirectories: true });
+};
+var rootDir = nextSettings.rootDir;   // 문자열이나 배열일 때만 processRootDir 를 부른다
+```
+
+앱 코드는 `braces`, `micromatch`, `fast-glob` 을 import 하지 않는다.
+
+수정 버전이 없다 — `braces` 최신 게시 버전이 설치본과 같은 `3.0.3` 이고, `@next/eslint-plugin-next` 는 최신 `16.3.8` 도 `fast-glob 3.3.1` 을 그대로 문다. npm 제안 `eslint-config-next@14.2.35` 는 메이저 다운그레이드다.
+
+### 사슬 4 — `dompurify` (low, 런타임 의존, 도달 불가)
+
+advisory [GHSA-p98j-92pf-mc4p](https://github.com/advisories/GHSA-p98j-92pf-mc4p): `dompurify 3.4.13 - 3.4.15` 에서 `IN_PLACE` 모드로 정화할 때 노드를 지우는 `afterSanitize` 훅이 있으면 떨어져 나간 하위 트리의 이벤트 핸들러가 남는다.
+
+**도달 불가다.** 저장소는 `components/ui/rich-text-viewer.tsx` 한 곳에서 `DOMPurify.sanitize(content, { ALLOWED_TAGS, ALLOWED_ATTR, ALLOW_DATA_ATTR: false })` 로 문자열을 정화하고, `IN_PLACE` 와 `addHook` 을 쓰지 않는다.
+
+비메이저 수정(`3.4.16`)이 있다. #556 은 `next` 만 올리는 PR 이라 섞지 않았다. 다음 의존성 정기 업데이트에서 올린다.
 
 ### 다시 확인하는 방법
 
 ```bash
-npm audit --json | node -e "…"        # severity 와 range
+npm audit --json | node -e "…"        # severity 와 range (node_modules 없이 보려면 --package-lock-only)
 npm view exceljs version              # 최신이 설치본과 같은지
 npm view prisma version               # 취약 범위를 벗어난 stable 이 나왔는지
+npm view braces version               # 3.0.3 을 넘는 수정이 나왔는지
 grep -rn "uuid" node_modules/exceljs/lib --include=*.js
+grep -n "rootDir" eslint.config.mjs   # 사슬 3: 없으면 fast-glob 이 돌지 않는다
+grep -rn "IN_PLACE\|addHook" app lib components hooks   # 사슬 4: 없으면 도달 불가
 ```
 
 **상위가 고쳐지면 올린다.** `prisma` 가 `deepmerge-ts >= 8` 을 물고 stable 을 내면 바로 올린다. `npm overrides` 로 강제 승격하는 방법도 있지만, 도달 불가한 advisory 를 위해 상위 패키지가 검증하지 않은 major 를 밀어 넣는 거래라 하지 않는다 — 깨지면 마이그레이션과 엑셀 내보내기가 조용히 망가진다.

@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import Link from "next/link";
 import { useAppUser } from "@/components/providers/AppAuthProvider";
+import { InternalCopyScopeProvider } from "@/components/providers/InternalCopyScopeProvider";
 import { CheckCircle2, WifiOff, AlertCircle } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd";
 import { ExamHeader } from "@/components/ExamHeader";
@@ -561,7 +562,10 @@ export default function ExamPage() {
 
   // --- Main exam UI ---
 
+  // 시험 화면 안 복사 표식에 이 세션의 범위를 담는다(#560). 채팅 복사 버튼, 문제 본문·평가 기준(CopyProtector),
+  // 답안 칸이 모두 이 안에 있다. 이 밖(과제 대화, 시험 리포트 등)의 복사 버튼은 표식을 붙이지 않는다.
   return (
+    <InternalCopyScopeProvider sessionId={sessionId}>
     <div className="flex h-screen w-full bg-background">
       <ExamQuestionNav
         questions={questionNavItems}
@@ -755,6 +759,7 @@ export default function ExamPage() {
         </SidebarProvider>
       </div>
     </div>
+    </InternalCopyScopeProvider>
   );
 }
 

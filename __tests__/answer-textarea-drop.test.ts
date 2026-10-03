@@ -75,12 +75,20 @@ let container: HTMLDivElement;
 let root: Root;
 const pastes: PasteInfo[] = [];
 
-function Harness({ initial }: { initial: string }) {
+/** `showQuestion` 을 끄면 문제 본문(CopyProtector)만 사라진다(문항 전환). 답안 칸은 그대로 남는다. */
+function Harness({ initial, showQuestion = true }: { initial: string; showQuestion?: boolean }) {
   const [value, setValue] = useState(initial);
   return createElement(
     "div",
     null,
-    createElement(CopyProtector, null, createElement("p", { id: "question" }, "문제 본문 문장입니다.")),
+    showQuestion
+      ? createElement(
+          CopyProtector,
+          null,
+          createElement("p", { id: "question" }, "문제 본문 문장입니다."),
+          createElement("a", { id: "link", href: "https://example.com/" }, "자료 링크"),
+        )
+      : null,
     createElement(AnswerTextarea, {
       value,
       onChange: setValue,
@@ -291,6 +299,102 @@ describe("답안 칸 끌어다 놓기 기록 (#561)", () => {
 
     expect(pastes).toHaveLength(1);
     expect(pastes[0]).toMatchObject({ pastedText: "붙여넣은 글", pasteStart: 0, isInternal: false });
+  });
+});
+
+describe("끌기 표시 정리와 끌기 글 맞추기 (#561 리뷰)", () => {
+  it("문제 본문에서 선택 영역을 끌면 끌기 글을 선택 글로 맞춰, 브라우저 직렬화가 달라도 내부로 기록된다", async () => {
+    const p = question();
+    selectContents(p);
+    // 브라우저가 만든 끌기 글이 selection.toString() 과 다르게 직렬화됐다고 친다(수식, 이미지 대체 글 등).
+    const dt = textData("문제 본문 [수식] 문장입니다.");
+    await act(async () => {
+      p.dispatchEvent(dragEvent("dragstart", dt));
+    });
+    expect(dt.getData("text/plain")).toBe("문제 본문 문장입니다.");
+
+    const dropped = dt.getData("text/plain");
+    const ta = textarea();
+    await act(async () => {
+      ta.dispatchEvent(dragEvent("drop", textData(dropped)));
+      ta.dispatchEvent(inputEvent("beforeinput", "insertFromDrop", dropped));
+      setNativeValue(ta, dropped + ta.value);
+      ta.setSelectionRange(dropped.length, dropped.length);
+      ta.dispatchEvent(inputEvent("input", "insertFromDrop"));
+      p.dispatchEvent(dragEvent("dragend", dt));
+    });
+
+    expect(pastes).toHaveLength(1);
+    expect(pastes[0]).toMatchObject({ pastedText: "문제 본문 문장입니다.", isInternal: true });
+  });
+
+  it("선택 밖의 링크를 끌면 끌기 데이터를 건드리지 않고 내부로 표시하지도 않는다", async () => {
+    selectContents(question());
+    const link = container.querySelector("#link") as HTMLAnchorElement;
+    const dt = textData("https://example.com/");
+    await act(async () => {
+      link.dispatchEvent(dragEvent("dragstart", dt));
+    });
+    expect(dt.getData("text/plain")).toBe("https://example.com/");
+
+    // 선택 글과 같은 글을 바깥에서 놓아도 내부가 아니다(표시가 없다).
+    await dropFromOutside("문제 본문 문장입니다.", 0);
+    expect(pastes[0].isInternal).toBe(false);
+  });
+
+  it("CopyProtector 에서 시작한 끌기가 dragend 로 끝나면 표시가 지워진다", async () => {
+    const p = question();
+    selectContents(p);
+    await act(async () => {
+      p.dispatchEvent(dragEvent("dragstart"));
+      p.dispatchEvent(dragEvent("dragend"));
+    });
+    await dropFromOutside("문제 본문 문장입니다.", 0);
+
+    expect(pastes[0].isInternal).toBe(false);
+  });
+
+  it("끌기 도중 CopyProtector 가 사라지면(문항 전환) 표시가 지워진다", async () => {
+    const p = question();
+    selectContents(p);
+    await act(async () => {
+      p.dispatchEvent(dragEvent("dragstart"));
+    });
+    await act(async () => {
+      root.render(createElement(Harness, { initial: "첫 문장. 둘째 문장.", showQuestion: false }));
+    });
+    expect(container.querySelector("#question")).toBeNull();
+
+    await dropFromOutside("문제 본문 문장입니다.", 0);
+    expect(pastes[0].isInternal).toBe(false);
+  });
+
+  it("답안 칸이 사라지면 끌어다 놓기 리스너가 떨어지고, 답안 칸에서 시작한 끌기 표시도 지워진다", async () => {
+    const ta = textarea();
+    ta.setSelectionRange(0, 5); // "첫 문장."
+    await act(async () => {
+      ta.dispatchEvent(dragEvent("dragstart"));
+    });
+    await act(async () => {
+      root.render(createElement("div"));
+    });
+
+    // 화면에서 떨어진 답안 칸에 이벤트가 와도 기록하지 않는다.
+    await act(async () => {
+      ta.dispatchEvent(dragEvent("drop", textData("첫 문장.")));
+      ta.dispatchEvent(inputEvent("beforeinput", "insertFromDrop", "첫 문장."));
+      setNativeValue(ta, "첫 문장." + ta.value);
+      ta.dispatchEvent(inputEvent("input", "insertFromDrop"));
+    });
+    expect(pastes).toEqual([]);
+
+    // 새 답안 칸에 같은 글을 바깥에서 놓으면 외부다(옛 답안 칸의 끌기 표시가 남지 않았다).
+    await act(async () => {
+      root.render(createElement(Harness, { initial: "" }));
+    });
+    await dropFromOutside("첫 문장.", 0);
+    expect(pastes).toHaveLength(1);
+    expect(pastes[0].isInternal).toBe(false);
   });
 });
 

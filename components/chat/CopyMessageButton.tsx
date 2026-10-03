@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import { Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useInternalCopyScope } from "@/components/providers/InternalCopyScopeProvider";
+import { wrapInternalCopy } from "@/lib/internal-copy";
 import toast from "react-hot-toast";
 
 interface CopyMessageButtonProps {
@@ -16,14 +18,13 @@ export function CopyMessageButton({ text, className }: CopyMessageButtonProps) {
   const t = useTranslations("assignment");
   const [copied, setCopied] = useState(false);
 
-  const INTERNAL_COPY_MARKER_START = "\u200B\u{E0001}\u200B";
-  const INTERNAL_COPY_MARKER_END = "\u200B\u{E0002}\u200B";
+  // 내부 복사 표식은 시험 응시 화면(범위가 있을 때)에서만 붙인다(#560). 이 버튼은 과제 AI 대화, 과제 기록,
+  // 시험 리포트, 교수 화면에도 있어서, 거기서 복사한 글이 시험 답안에서 내부 복사로 기록되면 안 된다.
+  const scope = useInternalCopyScope();
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(
-        INTERNAL_COPY_MARKER_START + text + INTERNAL_COPY_MARKER_END
-      );
+      await navigator.clipboard.writeText(scope === null ? text : wrapInternalCopy(text, scope));
       setCopied(true);
       toast.success(t("chat.copySuccess"), { id: "copy-message" });
       setTimeout(() => setCopied(false), 2000);

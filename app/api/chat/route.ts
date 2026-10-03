@@ -18,6 +18,7 @@ import {
   type StudentChatToolKind,
 } from "@/lib/student-chat-spec";
 import { ANALYSIS_PARTNER_CHAT_MAX_OUTPUT_TOKENS } from "@/lib/analysis-exec/limits";
+import { finishAnalysisPartnerAnswer } from "@/lib/analysis-partner-answer";
 import { handleCorsPreFlight } from "@/lib/cors";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { validateRequest, chatRequestSchema } from "@/lib/validations";
@@ -171,6 +172,14 @@ async function getRagContext(params: {
   }
 }
 
+/** 응답이 끝까지 오지 않았을 때(status incomplete)의 기록. 끝까지 왔으면 빈 객체다. */
+function incompleteResponseStamp(result: unknown): Record<string, string> {
+  const r = result as { status?: unknown; incomplete_details?: { reason?: unknown } | null } | null;
+  if (r?.status !== "incomplete") return {};
+  const reason = r.incomplete_details?.reason;
+  return { response_status: "incomplete", ...(typeof reason === "string" ? { incomplete_reason: reason } : {}) };
+}
+
 // 공통 Completion 함수 - Responses API 사용 (previous_response_id 방식)
 async function getAIResponse(
   systemPrompt: string,
@@ -247,6 +256,8 @@ async function getAIResponse(
           }),
           // 응답이 돌려준 모델명(없으면 요청한 모델명으로 대체하고 구분 표시). 던지지 않는다.
           ...buildResponseModelStamp(result, AI_MODEL),
+          // 분석 파트너 답이 끝까지 오지 않았으면(출력 상한 등) 그 이유를 남긴다(#564). 사례형 기록은 그대로다.
+          ...(isAnalysisPartnerSpec ? incompleteResponseStamp(result) : {}),
         }),
       }
     );
@@ -258,6 +269,24 @@ async function getAIResponse(
 
     // output 배열에서 텍스트 추출
     const responseText = extractResponseText(response.output);
+
+    // 분석 파트너는 답 길이 상한이 있다(#543). 상한에 걸려 잘린 답에는 잘렸다는 안내를 붙이고, 빈 답은 영어 사과문 대신
+    // 대화 언어의 안내로 저장한다(#564). 사례형은 아래 기존 처리 그대로다.
+    if (isAnalysisPartnerSpec && promptSpec) {
+      const answer = finishAnalysisPartnerAnswer({
+        text: responseText,
+        status: response.status,
+        incompleteReason: response.incomplete_details?.reason,
+        language: promptSpec.language,
+      });
+      return {
+        response: answer.content,
+        responseId: response.id,
+        tokensUsed: tracked.usage?.totalTokens ?? undefined,
+        usage: tracked.usage,
+        stamp,
+      };
+    }
 
     if (!responseText || responseText.trim().length === 0) {
       return {

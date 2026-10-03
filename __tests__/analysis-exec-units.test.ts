@@ -866,6 +866,34 @@ describe("만료 복구 입력 구성", () => {
     expect(JSON.stringify(client)).not.toContain("refs");
     expect(JSON.stringify(client)).not.toContain("m1");
   });
+
+  it("화면용 기록은 복원 셀의 결과 줄을 다시 실행한 셀 수로 바꾼다 (#564)", () => {
+    const replayCell = (status: string, logs: string) => ({
+      index: 1,
+      status,
+      code: replayExecLine(`/mnt/data/abc-${REPLAY_FILE_NAME}`),
+      logs,
+      figures: [],
+      replay: true as const,
+    });
+    const clientCell = (cell: StoredAnalysisTurn["cells"][number]) =>
+      toClientAnalysisTurn({ sessionId: SID, messageId: MID, turn: storedTurn({ cells: [cell], cited_figures: [] }) })
+        .cells[0];
+
+    expect(clientCell(replayCell("completed", `${REPLAY_MARKER} ok=3 failed=0\n`)).replayResult).toEqual({ ok: 3, failed: 0 });
+    expect(
+      clientCell(replayCell("completed", `${REPLAY_MARKER} ok=2 failed=1\n${REPLAY_MARKER}_ERROR Q1-C2 KeyError: 'x'\n`))
+        .replayResult
+    ).toEqual({ ok: 2, failed: 1 });
+    // 끝까지 돌지 못했으면(결과 줄 없음, 셀 실패) 결과가 없다. 서버의 복원 상태(incomplete)와 같은 판단이다.
+    expect(clientCell(replayCell("failed", "FileNotFoundError: quest_on_replay.py")).replayResult).toBeNull();
+    expect(clientCell(replayCell("incomplete", `${REPLAY_MARKER} ok=3 failed=0\n`)).replayResult).toBeNull();
+    // 복원 셀이 아닌 셀은 출력에 같은 줄이 있어도 결과로 읽지 않는다.
+    expect(
+      clientCell({ index: 1, status: "completed", code: "print('x')", logs: `${REPLAY_MARKER} ok=1 failed=0\n`, figures: [] })
+        .replayResult
+    ).toBeNull();
+  });
 });
 
 describe("중단된 요청과 문항 간 연결의 입력 구성", () => {

@@ -1,11 +1,23 @@
 "use client";
 
-import React from "react";
-import { endInternalDrag, startInternalDrag } from "@/lib/answer-drop";
+import React, { useEffect, useRef } from "react";
+import { cancelInternalDragFrom, endInternalDrag, startInternalDrag } from "@/lib/answer-drop";
+import { useInternalCopyScope } from "@/components/providers/InternalCopyScopeProvider";
+import {
+  INTERNAL_COPY_MIME_TYPE,
+  STANDALONE_INTERNAL_COPY_SCOPE,
+  internalCopyMimeValue,
+  wrapInternalCopy,
+} from "@/lib/internal-copy";
 
-// 내부 복사 마커는 답안 칸이 판정하고 지우는 값을 그대로 쓴다. 여기서 따로 정의했던 값(폭 없는 공백 3개)은
-// 답안 칸이 지우지 못해 문제 본문 등에서 붙여넣을 때마다 답안에 남았다(#555).
-import { INTERNAL_COPY_MARKER_END, INTERNAL_COPY_MARKER_START } from "@/components/ui/answer-textarea";
+/** 끌기를 시작한 노드가 선택 영역에 걸치는가(선택 영역을 끄는 경우). */
+function isDraggingSelection(selection: Selection, target: EventTarget): boolean {
+  if (!(target instanceof Node)) return false;
+  for (let i = 0; i < selection.rangeCount; i++) {
+    if (selection.getRangeAt(i).intersectsNode(target)) return true;
+  }
+  return false;
+}
 
 interface CopyProtectorProps {
   children: React.ReactNode;
@@ -14,6 +26,16 @@ interface CopyProtectorProps {
 }
 
 export function CopyProtector({ children, className, metadata }: CopyProtectorProps) {
+  // 표식에 시험 세션 범위를 담는다(#560). 답안 칸은 같은 범위의 표식만 내부 복사로 인정한다.
+  const scope = useInternalCopyScope() ?? STANDALONE_INTERNAL_COPY_SCOPE;
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // 이 영역에서 시작한 끌기가 끝나기 전에 영역이 사라지면(문항 전환 등) 남긴 표시를 지운다.
+  useEffect(() => {
+    const root = rootRef.current;
+    return () => cancelInternalDragFrom(root);
+  }, []);
+
   const handleCopy = (e: React.ClipboardEvent<HTMLDivElement>) => {
     const selection = window.getSelection()?.toString() ?? "";
     if (!selection) return;
@@ -22,11 +44,10 @@ export function CopyProtector({ children, className, metadata }: CopyProtectorPr
     e.preventDefault();
     
     // text/plain에 마커 추가 (AnswerTextarea의 handlePaste가 감지할 수 있도록)
-    const textWithMarker = INTERNAL_COPY_MARKER_START + selection + INTERNAL_COPY_MARKER_END;
-    e.clipboardData.setData("text/plain", textWithMarker);
+    e.clipboardData.setData("text/plain", wrapInternalCopy(selection, scope));
     
-    // Add custom internal tag (기존 호환성 유지)
-    e.clipboardData.setData("application/x-queston-internal", "true");
+    // 사용자 정의 형식에도 같은 범위를 싣는다(#560).
+    e.clipboardData.setData(INTERNAL_COPY_MIME_TYPE, internalCopyMimeValue(scope));
     
     // Add metadata if provided
     if (metadata) {
@@ -39,15 +60,26 @@ export function CopyProtector({ children, className, metadata }: CopyProtectorPr
   };
 
   // 여기서 끌어다 답안 칸에 놓은 글도 복사처럼 내부로 기록되게, 끌기 시작을 적어 둔다(#561).
-  const handleDragStart = () => {
-    startInternalDrag(window.getSelection()?.toString() ?? "");
+  //
+  // 끌기 글(text/plain)은 비교 기준인 선택 글로 맞춘다. 브라우저가 만드는 끌기 글은 수식(KaTeX), 이미지
+  // 대체 글, 링크에서 selection.toString() 과 엔진마다 다르게 직렬화될 수 있어서, 그대로 두면 내부 끌기가
+  // 외부(빨간색)로 기록될 수 있다. 선택 영역을 끄는 경우만 맞추고, 선택 밖의 이미지·링크를 끌면 브라우저가
+  // 만든 데이터(주소 등)를 그대로 둔다.
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    const selection = window.getSelection();
+    const text = selection?.toString() ?? "";
+    if (!selection || !text || !isDraggingSelection(selection, e.target)) return;
+
+    startInternalDrag(text, rootRef.current);
+    e.dataTransfer.setData("text/plain", text);
   };
 
   return (
     <div
+      ref={rootRef}
       onCopy={handleCopy}
       onDragStart={handleDragStart}
-      onDragEnd={endInternalDrag}
+      onDragEnd={() => endInternalDrag()}
       className={className}
     >
       {children}
