@@ -106,7 +106,7 @@ function Figure({ figure, index }: { figure: ClientAnalysisFigure; index: number
       <DialogTrigger asChild>
         <button
           type="button"
-          className="group/figure relative block w-full overflow-hidden rounded-md border border-border/50 bg-white"
+          className="group/figure relative block w-full overflow-hidden rounded-md border border-border/50 bg-background"
           aria-label={t("analysis.figureExpand")}
         >
           {/* 서명 URL 로 가는 권한 확인 라우트라 next/image 최적화를 거치지 않는다. */}
@@ -126,7 +126,7 @@ function Figure({ figure, index }: { figure: ClientAnalysisFigure; index: number
       <DialogContent className="max-h-[90vh] max-w-[min(95vw,64rem)] overflow-auto">
         <DialogTitle className="type-section-title">{alt}</DialogTitle>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={figure.url} alt={alt} className="h-auto w-full bg-white object-contain" />
+        <img src={figure.url} alt={alt} className="h-auto w-full bg-background object-contain" />
       </DialogContent>
     </Dialog>
   );

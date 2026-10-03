@@ -241,7 +241,14 @@ export function useExamChat({
             }
           }
           if (!finished) {
-            pushAssistant({ message: "", timestamp: new Date().toISOString(), analysisError: "failed" });
+            // 완료나 오류 이벤트 없이 스트림이 끝났다. 시간 초과면 그렇게 알리고, 언마운트나 새 요청으로
+            // 취소된 경우는 아무것도 하지 않는다.
+            if (timedOut) {
+              pushAssistant({ message: "", timestamp: new Date().toISOString(), analysisError: "timeout" });
+              setChatMessage(currentMsg);
+            } else if (!controller.signal.aborted) {
+              pushAssistant({ message: "", timestamp: new Date().toISOString(), analysisError: "failed" });
+            }
             finished = true;
           }
         }
