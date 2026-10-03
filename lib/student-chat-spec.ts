@@ -194,14 +194,14 @@ const ANALYSIS_PARTNER_V2: AnalysisPartnerV2StudentChatSpec = Object.freeze({
   effortLabel: "미지정(공급사 기본값)",
   build: buildAnalysisPartnerV2SystemPrompt,
   renderSha256: Object.freeze({
-    ko: "46ad92761710c0cbb87eb3dffbb1b94ccb31c315e3a7ac98950b4434268c1846",
+    ko: "44c05390a867be03a8048bc15153233afcb3cb7c0a3e08210f26b3101c8714c1",
   }),
   toolRenderSha256: Object.freeze({
     hosted_python: Object.freeze({
-      ko: "b509acd704031188725130a41a7985c620333dacb2fa8daab6d99bb022fdc026",
+      ko: "f42f29e5d19f6bf2ba0611dbdfc81076b920861f9f29a40e014642e9a6914d85",
     }),
   }),
-  note: "분석 파트너 v2(2026-10-03, #545 #543). @1 에 도구 있음 상태(호스팅 python, 데이터 파일 경로, print, 설치 불가, NanumGothic)와 답 길이 상한(본문 8문장, 표 상위 행, 한 번에 한 단계)을 더했다. 도구 없음 상태의 3절은 @1 과 같다. 배포 전 갱신(2026-10-03): 도구 있음 3절에 문항 간 연결 규칙(앞 문항에서 실행한 코드가 주어지면 그 처리를 이어 쓰기 전에 학생에게 확인)을 더했다. 도구 없음 렌더는 바뀌지 않았다.",
+  note: "분석 파트너 v2(2026-10-03, #545 #543). @1 에 도구 있음 상태(호스팅 python, 데이터 파일 경로, print, 설치 불가, NanumGothic)와 답 길이 상한(본문 8문장, 표 상위 행, 한 번에 한 단계)을 더했다. 도구 없음 상태의 3절은 @1 과 같다. 배포 전 갱신(2026-10-03): 도구 있음 3절에 문항 간 연결 규칙(앞 문항에서 실행한 코드가 주어지면 그 처리를 이어 쓰기 전에 학생에게 확인)을 더했다. 도구 없음 렌더는 바뀌지 않았다. 배포 전 갱신(2026-10-04, PR #562 리뷰): 4절 마지막 줄을 소유자 결정에 맞춰 바꿨다(코드 실행 오류는 고쳐 다시 실행하고 알림, 분석 선택의 타당성 의심은 먼저 꺼내지 않음). 두 상태 모두 해시가 바뀌었다.",
 });
 
 export type StudentChatSpecMap = {
