@@ -179,7 +179,7 @@ export function FinalAnswerCard({
               </div>
             )}
             {hasLegend && (
-              <div className="flex items-center gap-4 text-xs text-muted-foreground px-1">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground px-1">
                 {externalLogs.length > 0 && (
                   <span className="flex items-center gap-1.5">
                     <span className="inline-block w-3 h-3 rounded bg-destructive/25" />
