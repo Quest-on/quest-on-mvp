@@ -45,7 +45,11 @@ vi.mock("@/lib/rate-limit", () => ({
   RATE_LIMITS: { chat: { limit: 30, windowSec: 60 } },
 }));
 vi.mock("@/lib/message-classification", () => ({ classifyMessageType: vi.fn(async () => "calculation") }));
-vi.mock("@/lib/student-materials", () => ({ getStudentVisibleMaterials: () => h.visible }));
+// 공개 자료 판정만 바꾸고 나머지 내보내기(상수 등)는 실제 모듈 것을 쓴다.
+vi.mock("@/lib/student-materials", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getStudentVisibleMaterials: () => h.visible,
+}));
 vi.mock("@/lib/openai", () => ({
   AI_MODEL: "gpt-test-requested",
   isOpenAITimeoutError: () => false,

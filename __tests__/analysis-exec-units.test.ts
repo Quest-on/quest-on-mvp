@@ -6,7 +6,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/student-materials", () => ({
+vi.mock("@/lib/student-materials", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   getStudentVisibleMaterials: vi.fn(() => {
     throw new Error("column student_materials does not exist");
   }),
