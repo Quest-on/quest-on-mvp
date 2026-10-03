@@ -2,9 +2,9 @@
 
 import React from "react";
 
-// 내부 복사 마커 (AnswerTextarea와 동일한 마커 사용)
-const INTERNAL_COPY_MARKER_START = "\u200B\u200B\u200B";
-const INTERNAL_COPY_MARKER_END = "\u200B\u200B\u200B";
+// 내부 복사 마커는 답안 칸이 판정하고 지우는 값을 그대로 쓴다. 여기서 따로 정의했던 값(폭 없는 공백 3개)은
+// 답안 칸이 지우지 못해 문제 본문 등에서 붙여넣을 때마다 답안에 남았다(#555).
+import { INTERNAL_COPY_MARKER_END, INTERNAL_COPY_MARKER_START } from "@/components/ui/answer-textarea";
 
 interface CopyProtectorProps {
   children: React.ReactNode;

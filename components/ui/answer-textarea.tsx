@@ -21,8 +21,9 @@ interface AnswerTextareaProps {
 }
 
 // 내부 복사 마커 (Zero-width space 앞뒤로 추가하여 감지 용이)
-const INTERNAL_COPY_MARKER_START = "\u200B\u{E0001}\u200B";
-const INTERNAL_COPY_MARKER_END = "\u200B\u{E0002}\u200B";
+// CopyProtector 도 이 값을 가져다 쓴다. 따로 정의했다가 값이 어긋나 표식이 답안에 남았다(#555).
+export const INTERNAL_COPY_MARKER_START = "\u200B\u{E0001}\u200B";
+export const INTERNAL_COPY_MARKER_END = "\u200B\u{E0002}\u200B";
 const INTERNAL_COPY_MIME_TYPE = "application/x-queston-internal";
 
 export function AnswerTextarea({
@@ -123,7 +124,9 @@ export function AnswerTextarea({
       // 마커 제거 (실제 텍스트만 저장)
       const cleanText = pastedData
         .replace(/\u200B\u{E0001}\u200B/gu, "")
-        .replace(/\u200B\u{E0002}\u200B/gu, "");
+        .replace(/\u200B\u{E0002}\u200B/gu, "")
+        // #555 이전 CopyProtector 표식(폭 없는 공백 3개). 고치기 전 화면에서 복사해 클립보드에 남은 글에 있다.
+        .replace(/\u200B\u200B\u200B/gu, "");
 
       // 붙여넣기 전 상태 저장
       const answerLengthBefore = textarea.value.length;
