@@ -75,7 +75,7 @@ let container: HTMLDivElement;
 let root: Root;
 const pastes: PasteInfo[] = [];
 
-/** `showQuestion` 을 끄면 문제 본문(CopyProtector)만 사라진다(문항 전환). 답안 칸은 그대로 남는다. */
+/** `showQuestion` 을 끄면 문제 본문(CopyProtector)만 화면에서 빠진다(문제 패널을 접을 때처럼). 답안 칸은 그대로 남는다. */
 function Harness({ initial, showQuestion = true }: { initial: string; showQuestion?: boolean }) {
   const [value, setValue] = useState(initial);
   return createElement(
@@ -354,7 +354,7 @@ describe("끌기 표시 정리와 끌기 글 맞추기 (#561 리뷰)", () => {
     expect(pastes[0].isInternal).toBe(false);
   });
 
-  it("끌기 도중 CopyProtector 가 사라지면(문항 전환) 표시가 지워진다", async () => {
+  it("끌기 도중 CopyProtector 가 화면에서 빠지면 표시가 지워진다", async () => {
     const p = question();
     selectContents(p);
     await act(async () => {

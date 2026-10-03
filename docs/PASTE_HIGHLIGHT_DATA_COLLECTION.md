@@ -89,10 +89,12 @@ const handlePaste = useCallback(
     const clipboard = e.clipboardData;
     if (!clipboard) return;
 
-    const pastedText = clipboard.getData("text/plain");
-    const isInternal = clipboard.types.includes(
-      "application/x-queston-internal"
-    );
+    // 내부 복사 판정은 형식(application/x-queston-internal)이 있는지만 보지 않는다.
+    // 형식 값과 표식 문자에 담긴 시험 세션 범위가 이 화면의 범위와 같을 때만 내부다(#560).
+    // scope = useInternalCopyScope() ?? STANDALONE_INTERNAL_COPY_SCOPE
+    const isInternal = isInternalCopyFor(clipboard, scope); // lib/internal-copy.ts
+    // 판정한 뒤 표식 문자를 지운다(#555).
+    const pastedText = stripInternalCopyMarkers(clipboard.getData("text/plain"));
 
     // 현재 답안 상태 가져오기
     const currentAnswer = editor.getHTML();

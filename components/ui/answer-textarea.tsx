@@ -298,7 +298,8 @@ export function AnswerTextarea({
     };
   }, [handleDragStart, handleDrop, handleBeforeInput, handleInput]);
 
-  // 답안 칸에서 시작한 끌기 도중 답안 칸이 사라지면(문항 전환 등) 남긴 표시를 지운다.
+  // 답안 칸에서 시작한 끌기 도중 답안 칸이 화면에서 빠지면(시간이 끝나 제출 화면으로 바뀌는 경우 등) 남긴
+  // 표시를 지운다. 서술형 문항끼리 옮길 때는 같은 답안 칸이 그대로 남아 해당하지 않는다.
   useEffect(() => {
     const textarea = textareaRef.current;
     return () => cancelInternalDragFrom(textarea);

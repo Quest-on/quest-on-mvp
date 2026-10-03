@@ -3,32 +3,39 @@
  *
  * 버그 1: 외부 복사 오탐지 — MIME 타입 이중 감지 추가
  * 버그 2: 하이라이트 미작동 — truncation suffix 제거 + position fallback
+ *
+ * 버그 1 의 판정은 실제 코드(`lib/internal-copy.ts` 의 `isInternalCopyFor`)로 확인한다. 예전에는 이 파일이
+ * 옛 규칙(형식이나 폭 없는 공백 표식만 있으면 내부)을 따로 구현해 테스트해서, 코드가 #560 으로 세션 범위를
+ * 보게 바뀐 뒤에도 옛 규칙을 지키고 있었다.
  */
+import {
+  INTERNAL_COPY_MIME_TYPE,
+  internalCopyMimeValue,
+  internalCopyScope,
+  isInternalCopyFor,
+  wrapInternalCopy,
+} from "@/lib/internal-copy";
 
 // ============================================================
 // 1) 순수 로직 추출 (컴포넌트 외부에서 단위 테스트 가능하도록)
 // ============================================================
 
-// --- answer-textarea.tsx 로직 ---
-const INTERNAL_COPY_MARKER_START = "\u200B\u200B\u200B";
-const INTERNAL_COPY_MARKER_END = "\u200B\u200B\u200B";
-const INTERNAL_COPY_MARKER =
-  INTERNAL_COPY_MARKER_START + INTERNAL_COPY_MARKER_END;
-
+// --- 클립보드 흉내 (answer-textarea.tsx 판정은 lib/internal-copy 의 실제 함수를 쓴다) ---
 interface MockClipboard {
   types: string[];
   getData: (type: string) => string;
 }
 
-function detectIsInternal(clipboard: MockClipboard): boolean {
-  const pastedData = clipboard.getData("text/plain");
-  const hasInternalMimeType = clipboard.types.includes(
-    "application/x-queston-internal"
-  );
-  const hasInternalMarker =
-    pastedData.startsWith(INTERNAL_COPY_MARKER_START) ||
-    pastedData.includes(INTERNAL_COPY_MARKER);
-  return hasInternalMimeType || hasInternalMarker;
+/** 이 시험 세션의 범위. 답안 칸은 같은 범위의 형식·표식만 내부 복사로 인정한다(#560). */
+const SCOPE = internalCopyScope("session-under-test");
+const OTHER_SCOPE = internalCopyScope("other-session");
+
+function mockClipboard(text: string, mime?: string): MockClipboard {
+  const types = mime === undefined ? ["text/plain"] : ["text/plain", INTERNAL_COPY_MIME_TYPE];
+  return {
+    types,
+    getData: (type) => (type === "text/plain" ? text : type === INTERNAL_COPY_MIME_TYPE ? (mime ?? "") : ""),
+  };
 }
 
 // --- paste/route.ts 로직 ---
@@ -204,41 +211,35 @@ function makePasteLog(overrides: Partial<PasteLog>): PasteLog {
 // 3) 테스트
 // ============================================================
 
-describe("버그 1: 외부 복사 오탐지 수정 — MIME 타입 이중 감지", () => {
-  test("CopyProtector의 MIME 타입만 있을 때 → 내부로 판별", () => {
-    // CopyProtector가 설정하는 MIME 타입만 있고, 마커는 없는 경우
-    // (예: 브라우저 확장이 마커를 제거했지만 MIME은 유지)
-    const clipboard: MockClipboard = {
-      types: ["text/plain", "application/x-queston-internal"],
-      getData: () => "문제에서 복사한 텍스트", // 마커 없음
-    };
-    expect(detectIsInternal(clipboard)).toBe(true);
+describe("버그 1: 외부 복사 오탐지 수정 — 형식·표식 이중 감지(세션 범위, #560)", () => {
+  test("CopyProtector 의 형식만 있을 때(표식 문자 없음) → 같은 세션 범위면 내부", () => {
+    // 브라우저 확장이 표식 문자를 지웠지만 형식은 남은 경우
+    const clipboard = mockClipboard("문제에서 복사한 텍스트", internalCopyMimeValue(SCOPE));
+    expect(isInternalCopyFor(clipboard, SCOPE)).toBe(true);
   });
 
-  test("마커만 있을 때 → 내부로 판별 (기존 동작 유지)", () => {
-    const clipboard: MockClipboard = {
-      types: ["text/plain"],
-      getData: () =>
-        INTERNAL_COPY_MARKER_START + "답안 텍스트" + INTERNAL_COPY_MARKER_END,
-    };
-    expect(detectIsInternal(clipboard)).toBe(true);
+  test("형식만 있어도 범위가 다르거나 #560 이전 값(\"true\")이면 외부", () => {
+    expect(isInternalCopyFor(mockClipboard("다른 세션 글", internalCopyMimeValue(OTHER_SCOPE)), SCOPE)).toBe(false);
+    expect(isInternalCopyFor(mockClipboard("옛 화면 글", "true"), SCOPE)).toBe(false);
   });
 
-  test("MIME + 마커 둘 다 있을 때 → 내부로 판별", () => {
-    const clipboard: MockClipboard = {
-      types: ["text/plain", "application/x-queston-internal"],
-      getData: () =>
-        INTERNAL_COPY_MARKER_START + "답안 텍스트" + INTERNAL_COPY_MARKER_END,
-    };
-    expect(detectIsInternal(clipboard)).toBe(true);
+  test("표식 문자만 있을 때 → 같은 세션 범위면 내부", () => {
+    expect(isInternalCopyFor(mockClipboard(wrapInternalCopy("답안 텍스트", SCOPE)), SCOPE)).toBe(true);
+    expect(isInternalCopyFor(mockClipboard(wrapInternalCopy("답안 텍스트", OTHER_SCOPE)), SCOPE)).toBe(false);
   });
 
-  test("MIME도 마커도 없을 때 → 외부로 판별", () => {
-    const clipboard: MockClipboard = {
-      types: ["text/plain"],
-      getData: () => "외부에서 복사한 텍스트",
-    };
-    expect(detectIsInternal(clipboard)).toBe(false);
+  test("형식 + 표식 둘 다 있을 때 → 내부로 판별", () => {
+    const clipboard = mockClipboard(wrapInternalCopy("답안 텍스트", SCOPE), internalCopyMimeValue(SCOPE));
+    expect(isInternalCopyFor(clipboard, SCOPE)).toBe(true);
+  });
+
+  test("옛 CopyProtector 표식(폭 없는 공백 3개)만 있으면 외부(판정에 쓰지 않는다)", () => {
+    const clipboard = mockClipboard("\u200B\u200B\u200B답안 텍스트\u200B\u200B\u200B");
+    expect(isInternalCopyFor(clipboard, SCOPE)).toBe(false);
+  });
+
+  test("형식도 표식도 없을 때 → 외부로 판별", () => {
+    expect(isInternalCopyFor(mockClipboard("외부에서 복사한 텍스트"), SCOPE)).toBe(false);
   });
 
   test("Grammarly 등 확장이 text만 주입 → 외부로 판별", () => {
@@ -246,15 +247,11 @@ describe("버그 1: 외부 복사 오탐지 수정 — MIME 타입 이중 감지
       types: ["text/plain", "text/html"],
       getData: () => "autocorrected text",
     };
-    expect(detectIsInternal(clipboard)).toBe(false);
+    expect(isInternalCopyFor(clipboard, SCOPE)).toBe(false);
   });
 
-  test("한국어 IME에서 발생한 paste — MIME 없음 → 외부로 판별", () => {
-    const clipboard: MockClipboard = {
-      types: ["text/plain"],
-      getData: () => "가",
-    };
-    expect(detectIsInternal(clipboard)).toBe(false);
+  test("한국어 IME에서 발생한 paste — 형식 없음 → 외부로 판별", () => {
+    expect(isInternalCopyFor(mockClipboard("가"), SCOPE)).toBe(false);
   });
 });
 

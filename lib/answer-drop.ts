@@ -37,7 +37,8 @@ export function endInternalDrag(): void {
 }
 
 /**
- * 끌기를 시작한 영역이 끌기 도중 화면에서 사라지면(문항 전환 등) 그 영역이 남긴 표시만 지운다.
+ * 끌기를 시작한 영역이 끌기 도중 화면에서 빠지면(시간이 끝나 제출 화면으로 바뀌는 경우 등) 그 영역이 남긴
+ * 표시만 지운다.
  * 끌던 노드가 문서에서 떨어지면 dragend 가 그 노드에서만 나서 위에서 들을 수 없기 때문이다.
  */
 export function cancelInternalDragFrom(source: unknown): void {
