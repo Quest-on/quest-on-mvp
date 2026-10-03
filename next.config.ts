@@ -18,22 +18,36 @@ if (process.env.VERCEL === "1") {
 
 const withNextIntl = createNextIntlPlugin("./lib/i18n/request.ts");
 
-function localSupabaseConnectSources(): string {
+function localSupabaseUrl(): URL | null {
   const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!rawUrl) return "";
+  if (!rawUrl) return null;
 
   try {
     const url = new URL(rawUrl);
-    if (url.hostname !== "localhost" && url.hostname !== "127.0.0.1") return "";
-
-    const websocketProtocol = url.protocol === "https:" ? "wss:" : "ws:";
-    return ` ${url.origin} ${websocketProtocol}//${url.host}`;
+    if (url.hostname !== "localhost" && url.hostname !== "127.0.0.1") return null;
+    return url;
   } catch {
-    return "";
+    return null;
   }
 }
 
+function localSupabaseConnectSources(): string {
+  const url = localSupabaseUrl();
+  if (!url) return "";
+
+  const websocketProtocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return ` ${url.origin} ${websocketProtocol}//${url.host}`;
+}
+
+// 로컬 스택(supabase start)의 Storage 를 응시 화면의 숨긴 iframe 으로 열 수 있게 한다(#544).
+// connect-src 와 같은 조건으로 붙인다. 없으면 로컬 개발과 CI 에서 자료 내려받기가 CSP 에 막힌다.
+function localSupabaseFrameSources(): string {
+  const url = localSupabaseUrl();
+  return url ? ` ${url.origin}` : "";
+}
+
 const localSupabaseSources = localSupabaseConnectSources();
+const localSupabaseFrames = localSupabaseFrameSources();
 
 function developmentEvalSource(): string {
   return process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'";
@@ -87,7 +101,10 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: blob: https://*.supabase.co",
               "font-src 'self' data:",
               `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://va.vercel-scripts.com https://*.posthog.com${localSupabaseSources}`,
-              "frame-src 'self' https://challenges.cloudflare.com https://www.youtube.com",
+              // *.supabase.co: 응시 화면의 자료 내려받기가 숨긴 iframe 으로 Storage 공개 객체를
+              // 연다(#544). 최상위 탐색이 아니라 beforeunload 가 돌지 않게 하는 방식이다.
+              // 로컬 스택이면 그 출처도 붙인다(localSupabaseFrameSources).
+              `frame-src 'self' https://challenges.cloudflare.com https://www.youtube.com https://*.supabase.co${localSupabaseFrames}`,
               "worker-src 'self' blob:",
             ].join("; "),
           },

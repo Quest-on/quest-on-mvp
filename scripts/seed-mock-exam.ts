@@ -29,6 +29,14 @@
  * 공백으로 접힌다. 문단은 `<p>`, 목록은 `<ul><li>` 로 쓴다. 줄바꿈이 있는데 인식하는 블록 태그(`<p>`,
  * `<ul>` 등, 목록은 `BLOCK_HTML_TAG_RE`)가 없으면 스펙 검증이 막는다(줄바꿈 없는 평문 한 줄은 통과).
  *
+ * 학생 공개 자료 (#544): 스펙의 `student_material_files`(로컬 파일 경로 배열)를 `exam-materials` 버킷에
+ * 올리고, 그 공개 URL 을 `materials` 와 `student_materials` 에 함께 넣는다(모두 학생에게 공개). 로컬 파일
+ * 이름은 `material_names` 에 URL 키로 넣는다(학생이 내려받는 파일 이름). 경로 규칙은
+ * `/api/upload` 와 같은 `lib/material-object-key.ts` 이고 교수자 폴더 아래다. 확장자와 크기는 앱 허용 목록
+ * (`lib/upload-allowlist.ts`)으로 검사한다. 상대 경로는 스펙 파일이 있는 폴더 기준이다. dry-run 은 파일을
+ * 읽어 크기만 확인하고 올리지 않는다. 텍스트 추출(`materials_text`)은 하지 않는다 - 표 파일은 앱도 추출하지
+ * 않는다. 업로드 뒤 시험 행을 만들지 못하면 올린 파일을 지운다(행이 남았을 수 있는 경우는 남기고 경로를 알린다).
+ *
  * 이 스크립트가 하지 않는 것: 시험 시작/종료, 첫 발행 기록, 학생 수 집계 - 입장 RPC 와 시작
  * 라우트의 몫이다. 만든 시험은 draft 로 끝난다.
  *
@@ -41,6 +49,7 @@
  */
 
 import { readFileSync } from "fs";
+import { dirname, resolve as resolvePath } from "path";
 import { pathToFileURL } from "url";
 import { createClient as createSupabaseClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -48,6 +57,17 @@ import {
   generateExamCode,
   type ExamRubricItem,
 } from "../lib/exam-insert-payload";
+import { makeMaterialObjectKey, materialStoragePath } from "../lib/material-object-key";
+import {
+  MAX_STUDENT_MATERIALS,
+  normalizeMaterialNames,
+  validateStudentMaterials,
+} from "../lib/student-materials";
+import {
+  UPLOAD_ALLOWED_EXTENSIONS,
+  UPLOAD_ALLOWED_MIME_TYPES,
+  UPLOAD_MAX_FILE_SIZE,
+} from "../lib/upload-allowlist";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 스펙: 입력 JSON 한 개. 문항과 루브릭 문구는 이 저장소에 두지 않고 별도로 받는다.
@@ -68,9 +88,54 @@ export type MockExamSpec = {
   rubric: ExamRubricItem[];
   rubric_public: boolean;
   language: "ko" | "en";
+  /**
+   * 학생에게 공개할 로컬 파일 경로 (#544). 생략하면 빈 배열이고 자료 없이 만든다.
+   * 상대 경로는 스펙 파일이 있는 폴더 기준이다.
+   */
+  student_material_files: string[];
 };
 
-const SPEC_KEYS = ["title", "questions", "rubric", "rubric_public", "language"];
+const SPEC_KEYS = ["title", "questions", "rubric", "rubric_public", "language", "student_material_files"];
+
+/** 교수 자료 버킷. `/api/upload` 와 같은 버킷이다. */
+export const MATERIALS_BUCKET = "exam-materials";
+
+/**
+ * 확장자별로 업로드에 싣는 MIME. 앱 허용 목록(`UPLOAD_ALLOWED_EXTENSIONS`)의 모든 확장자를 덮고, 값은 모두
+ * `UPLOAD_ALLOWED_MIME_TYPES` 안에 있어야 한다(테스트가 잠근다). 버킷의 허용 MIME 은 따로다 - 스테이징과
+ * 운영 버킷은 pdf, 오피스 문서, 이미지, xls, xlsx, csv 만 받으므로(database/039) txt, hwp, zip 은 업로드
+ * 단계에서 Storage 가 거부할 수 있다.
+ */
+export const CONTENT_TYPE_BY_EXTENSION: Readonly<Record<string, string>> = {
+  ".pdf": "application/pdf",
+  ".ppt": "application/vnd.ms-powerpoint",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xls": "application/vnd.ms-excel",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".csv": "text/csv",
+  ".txt": "text/plain",
+  ".hwp": "application/x-hwp",
+  ".hwpx": "application/vnd.hancom.hwpx",
+  ".zip": "application/zip",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+};
+
+/** 경로의 마지막 조각. 스펙은 Windows 에서도 쓰므로 슬래시와 역슬래시를 모두 구분자로 본다. */
+function fileNameOfPath(path: string): string {
+  return path.split(/[\\/]/).pop() ?? "";
+}
+
+/** `/api/upload` 와 같은 규칙: 마지막 확장자만 소문자로 본다. 없으면 빈 문자열. */
+function uploadExtensionOf(fileName: string): string {
+  const match = /\.([a-zA-Z0-9]+)$/.exec(fileName);
+  return match ? `.${match[1].toLowerCase()}` : "";
+}
 const QUESTION_KEYS = ["id", "text", "type", "ai_role"];
 const RUBRIC_KEYS = ["evaluationArea", "detailedCriteria"];
 /** createExamSchema 의 title 상한과 같다. */
@@ -255,8 +320,113 @@ export function validateMockExamSpec(
     }
   }
 
+  // student_material_files: 생략하면 빈 배열. 있으면 경로 문자열 배열이고, 확장자는 앱 업로드 허용 목록에 있어야
+  // 한다. 개수는 학생 공개 상한과 같다(모든 파일을 공개하므로). 크기는 파일을 읽은 뒤 main 이 본다.
+  const studentMaterialFiles: string[] = [];
+  if (raw.student_material_files !== undefined) {
+    if (!Array.isArray(raw.student_material_files)) {
+      errors.push("student_material_files 는 로컬 파일 경로 문자열의 배열이어야 합니다.");
+    } else {
+      if (raw.student_material_files.length > MAX_STUDENT_MATERIALS) {
+        errors.push(
+          `student_material_files 는 ${MAX_STUDENT_MATERIALS}개까지입니다 (학생 공개 상한, 받은 개수 ${raw.student_material_files.length}).`
+        );
+      }
+      const seenPaths = new Set<string>();
+      raw.student_material_files.forEach((file: unknown, i: number) => {
+        const at = `student_material_files[${i}]`;
+        if (!isNonEmptyString(file)) {
+          errors.push(`${at} 는 비어 있지 않은 파일 경로 문자열이어야 합니다.`);
+          return;
+        }
+        const filePath = file.trim();
+        if (seenPaths.has(filePath)) {
+          errors.push(`${at} 가 중복입니다: "${filePath}"`);
+          return;
+        }
+        seenPaths.add(filePath);
+        const name = fileNameOfPath(filePath);
+        const ext = uploadExtensionOf(name);
+        if (!ext || !UPLOAD_ALLOWED_EXTENSIONS.has(ext)) {
+          errors.push(
+            `${at} ("${name}") 의 확장자 ${ext || "(없음)"} 는 앱 업로드 허용 목록(lib/upload-allowlist.ts)에 없습니다. 허용: ${[...UPLOAD_ALLOWED_EXTENSIONS].join(", ")}`
+          );
+          return;
+        }
+        studentMaterialFiles.push(filePath);
+      });
+    }
+  }
+
   if (errors.length > 0) return { ok: false, errors };
-  return { ok: true, spec: { title, questions, rubric, rubric_public: rubricPublic, language } };
+  return {
+    ok: true,
+    spec: {
+      title,
+      questions,
+      rubric,
+      rubric_public: rubricPublic,
+      language,
+      student_material_files: studentMaterialFiles,
+    },
+  };
+}
+
+/** 읽어 들인 공개 자료 파일 한 개. 업로드는 `seedMockExam` 이 `--apply` 에서만 한다. */
+export type SeedMaterialFile = {
+  /** 스펙에 적힌 경로 그대로. */
+  source: string;
+  /** 스펙 파일 폴더 기준으로 푼 경로. */
+  resolvedPath: string;
+  fileName: string;
+  /** 점을 포함한 소문자 확장자 (`.xlsx`). */
+  extension: string;
+  contentType: string;
+  size: number;
+  bytes: Uint8Array;
+};
+
+/**
+ * 스펙의 `student_material_files` 를 읽는다. 상대 경로는 스펙 파일이 있는 폴더 기준이다.
+ * 빈 파일과 앱 상한(`UPLOAD_MAX_FILE_SIZE`)을 넘는 파일은 거부한다. 오류는 모두 모아 돌려준다.
+ */
+export function loadMaterialFiles(
+  paths: string[],
+  specPath: string,
+  readBinary: (path: string) => Uint8Array
+): { ok: true; files: SeedMaterialFile[] } | { ok: false; errors: string[] } {
+  const errors: string[] = [];
+  const files: SeedMaterialFile[] = [];
+  const baseDir = dirname(specPath);
+  for (const source of paths) {
+    const resolvedPath = resolvePath(baseDir, source);
+    const fileName = fileNameOfPath(source);
+    const extension = uploadExtensionOf(fileName);
+    const contentType = CONTENT_TYPE_BY_EXTENSION[extension];
+    if (!contentType || !UPLOAD_ALLOWED_MIME_TYPES.has(contentType)) {
+      errors.push(`"${source}": 확장자 ${extension || "(없음)"} 의 MIME 을 정할 수 없습니다.`);
+      continue;
+    }
+    let bytes: Uint8Array;
+    try {
+      bytes = readBinary(resolvedPath);
+    } catch (e) {
+      errors.push(`"${source}" 를 읽을 수 없습니다 (${resolvedPath}): ${errText(e)}`);
+      continue;
+    }
+    if (bytes.byteLength === 0) {
+      errors.push(`"${source}" 가 빈 파일입니다.`);
+      continue;
+    }
+    if (bytes.byteLength > UPLOAD_MAX_FILE_SIZE) {
+      errors.push(
+        `"${source}" 가 앱 업로드 상한 ${UPLOAD_MAX_FILE_SIZE} bytes 를 넘습니다 (${bytes.byteLength} bytes).`
+      );
+      continue;
+    }
+    files.push({ source, resolvedPath, fileName, extension, contentType, size: bytes.byteLength, bytes });
+  }
+  return errors.length > 0 ? { ok: false, errors } : { ok: true, files };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -282,11 +452,17 @@ export const USAGE = `사용법:
 기본은 dry-run 입니다. DB 에 아무것도 쓰지 않고, 읽기 전용 사전 점검과 만들 행을 출력합니다.
 
 필수:
-  --spec <경로>                  스펙 JSON (title, questions, rubric, rubric_public, language; 문항의 ai_role 은 선택)
+  --spec <경로>                  스펙 JSON (title, questions, rubric, rubric_public, language; 문항의 ai_role 과
+                                 student_material_files 는 선택)
   --instructor-id <id>           시험 소유자(profiles.id = exams.instructor_id)
 
 문항 본문(questions[].text)은 HTML 입니다. 문단은 <p>, 목록은 <ul><li> 로 쓰세요.
 줄바꿈이 있는데 인식하는 블록 태그(<p>, <ul> 등)가 없는 본문은 화면에서 한 문단으로 접히므로 스펙 검증이 막습니다.
+
+student_material_files 는 학생에게 공개할 로컬 파일 경로 배열입니다(상대 경로는 스펙 파일 폴더 기준).
+--apply 에서 exam-materials 버킷의 교수자 폴더에 올리고 materials 와 student_materials 에 넣습니다.
+로컬 파일 이름은 material_names 에 넣어 학생이 그 이름으로 내려받습니다.
+dry-run 은 파일 크기만 확인하고 올리지 않습니다. 확장자와 크기는 앱 업로드 허용 목록을 따릅니다.
 
 옵션:
   --parent-folder-id <uuid>      드라이브에서 시험을 둘 폴더(exam_nodes.id). 없으면 루트
@@ -448,8 +624,15 @@ export type SeedOptions = {
   /** 사용자가 `--confirm-project-ref` 로 확인한 ref. */
   confirmProjectRef: string | null;
   allowDuplicateTitle?: boolean;
+  /**
+   * 스펙의 `student_material_files` 를 `loadMaterialFiles` 로 읽은 결과 (#544). 스펙에 파일이 있으면 같은
+   * 개수가 있어야 한다. `main` 이 채운다.
+   */
+  materialFiles?: SeedMaterialFile[];
   now?: () => string;
   generateCode?: () => string;
+  /** 업로드 객체 키의 uuid. 테스트가 고정값을 넣는다. */
+  uuid?: () => string;
   out?: (line: string) => void;
 };
 
@@ -466,6 +649,13 @@ export type SeedReport = {
    * none: 해당 없음 / adopted: 서버에 행이 있어 이어서 씀 / absent: 행이 없음 확인 / unknown: 확인도 실패
    */
   ambiguousInsert: "none" | "adopted" | "absent" | "unknown";
+  /** `--apply` 에서 버킷에 올린 공개 자료 (#544). */
+  uploads: Array<{ source: string; path: string; url: string }>;
+  /**
+   * 실패 뒤 올린 파일의 처리. not-needed: 올린 것이 없거나 성공 / removed: 지움 / failed: 지우지 못함 /
+   * kept: 시험 행이 남았을 수 있어 일부러 남김(경로를 출력한다).
+   */
+  uploadCleanup: "not-needed" | "removed" | "failed" | "kept";
 };
 
 type Row = Record<string, unknown>;
@@ -566,6 +756,7 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
   const now = options.now ?? (() => new Date().toISOString());
   const generateCode = options.generateCode ?? generateExamCode;
   const out = options.out ?? ((line: string) => console.log(line));
+  const materialFiles = options.materialFiles ?? [];
 
   const blockers: string[] = [];
   const warnings: string[] = [];
@@ -578,6 +769,8 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
     result: null,
     compensation: "not-needed",
     ambiguousInsert: "none",
+    uploads: [],
+    uploadCleanup: "not-needed",
   };
 
   let readStarted = false;
@@ -761,29 +954,70 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
 
   for (const w of warnings) out(w);
 
-  // ── 만들 행 ────────────────────────────────────────────────────────────────
+  // ── 올릴 파일 (#544) ───────────────────────────────────────────────────────
+  if (materialFiles.length !== spec.student_material_files.length) {
+    blockers.push(
+      `스펙의 student_material_files ${spec.student_material_files.length}개 중 읽은 파일이 ${materialFiles.length}개입니다. main 이 loadMaterialFiles 로 읽은 결과를 넘겨야 합니다.`
+    );
+  }
   const timestamp = now();
-  const built = buildExamInsertPayload({
-    title: spec.title,
-    code,
-    duration: 0,
-    questions: spec.questions,
-    materials: [],
-    materials_text: [],
-    chat_weight: null,
-    status: "draft",
-    instructor_id: instructorId,
-    created_at: timestamp,
-    updated_at: timestamp,
-    rubric: spec.rubric,
-    rubric_public: spec.rubric_public,
-    language: spec.language,
-  });
+  const hasMaterials = materialFiles.length > 0;
+  if (hasMaterials) {
+    out("");
+    out(`[올릴 파일] ${MATERIALS_BUCKET} 버킷, 모두 학생에게 공개 (${materialFiles.length}개)`);
+    const datePart = timestamp.slice(0, 10);
+    for (const f of materialFiles) {
+      out(
+        `  - ${f.source} (${f.size} bytes, ${f.contentType}) → ${materialStoragePath(instructorId, `${datePart}_<uuid>${f.extension}`)}`
+      );
+    }
+    out(
+      apply
+        ? "  uuid 는 업로드할 때 정합니다. 시험 행을 만들기 전에 올립니다."
+        : "  dry-run 이라 올리지 않습니다. uuid 는 업로드할 때 정합니다."
+    );
+  }
+
+  /**
+   * exams 행. 공개 자료가 있으면 materials 와 student_materials 에 같은 URL 목록을 넣고, material_names 에
+   * URL → 로컬 파일 이름을 넣는다(학생이 받는 파일 이름). materialUrls 는 materialFiles 와 같은 순서다.
+   */
+  const buildRow = (materialUrls: string[] | null) =>
+    buildExamInsertPayload({
+      title: spec.title,
+      code,
+      duration: 0,
+      questions: spec.questions,
+      materials: materialUrls ?? [],
+      materials_text: [],
+      ...(materialUrls
+        ? {
+            student_materials: materialUrls,
+            material_names: normalizeMaterialNames(
+              materialUrls,
+              Object.fromEntries(materialUrls.map((url, i) => [url, materialFiles[i]?.fileName]))
+            ),
+          }
+        : {}),
+      chat_weight: null,
+      status: "draft",
+      instructor_id: instructorId,
+      created_at: timestamp,
+      updated_at: timestamp,
+      rubric: spec.rubric,
+      rubric_public: spec.rubric_public,
+      language: spec.language,
+    });
+
+  // dry-run 과 미리보기에서는 URL 자리에 파일 이름을 적은 자리표시를 넣는다. 실제 URL 은 업로드 뒤에 정해진다.
+  const built = buildRow(
+    hasMaterials ? materialFiles.map((f) => `<업로드 후 정해지는 공개 URL: ${f.fileName}>`) : null
+  );
   if (!built.ok) {
     blockers.push(`exams 행을 만들 수 없습니다: ${built.message}`);
     return block();
   }
-  const examRow = built.payload;
+  let examRow = built.payload;
   const nodeRow: Row = {
     instructor_id: instructorId,
     parent_id: parentFolderId,
@@ -815,6 +1049,75 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
 
   // ── 쓰기: createExam 과 같은 순서 (exams INSERT → exam_nodes INSERT, 노드 실패 시 exams 삭제) ──
   const db = client as SupabaseClient; // apply 는 위에서 client 가 있음을 확인했다.
+
+  // 공개 자료를 먼저 올린다 (#544). 시험 행에 URL 을 넣어야 하기 때문이다.
+  // 실패하면 그때까지 올린 것(실패한 것 포함 - 응답만 잃었을 수 있다)을 지우고 시험은 만들지 않는다.
+  const uploadedPaths: string[] = [];
+  const releaseUploads = async (mode: "remove" | "keep"): Promise<void> => {
+    if (uploadedPaths.length === 0) return;
+    if (mode === "keep") {
+      report.uploadCleanup = "kept";
+      out(`올린 파일을 지우지 않았습니다(시험 행이 남았을 수 있습니다). ${MATERIALS_BUCKET} 버킷 경로:`);
+      for (const path of uploadedPaths) out(`  - ${path}`);
+      return;
+    }
+    try {
+      const { error } = await db.storage.from(MATERIALS_BUCKET).remove(uploadedPaths);
+      report.uploadCleanup = error ? "failed" : "removed";
+    } catch {
+      report.uploadCleanup = "failed";
+    }
+    if (report.uploadCleanup === "removed") {
+      out(`올린 파일 ${uploadedPaths.length}개를 지웠습니다.`);
+    } else {
+      out(`올린 파일을 지우지 못했습니다. ${MATERIALS_BUCKET} 버킷에서 직접 지우세요:`);
+      for (const path of uploadedPaths) out(`  - ${path}`);
+    }
+  };
+
+  if (hasMaterials) {
+    const uploadedAt = new Date(timestamp);
+    for (const f of materialFiles) {
+      const path = materialStoragePath(
+        instructorId,
+        makeMaterialObjectKey(f.fileName, { now: uploadedAt, uuid: options.uuid?.() })
+      );
+      uploadedPaths.push(path);
+      let uploadError: unknown = null;
+      try {
+        ({ error: uploadError } = await db.storage
+          .from(MATERIALS_BUCKET)
+          .upload(path, f.bytes, { contentType: f.contentType, upsert: false }));
+      } catch (e) {
+        uploadError = e;
+      }
+      if (uploadError) {
+        out(`파일 업로드에 실패했습니다: ${f.source} → ${path}: ${errText(uploadError)}`);
+        out("시험 행은 만들지 않았습니다.");
+        await releaseUploads("remove");
+        report.status = "failed";
+        report.exitCode = 1;
+        return report;
+      }
+      const { data: urlData } = db.storage.from(MATERIALS_BUCKET).getPublicUrl(path);
+      report.uploads.push({ source: f.source, path, url: urlData.publicUrl });
+      out(`업로드했습니다: ${f.source} → ${path}`);
+    }
+    const urls = report.uploads.map((u) => u.url);
+    // 시험 행의 불변식(학생 공개 ⊂ 자료, 자료 순서)을 앱과 같은 검증으로 확인한다.
+    const shared = validateStudentMaterials(urls, urls);
+    const rebuilt = buildRow(urls);
+    if (!shared.ok || !rebuilt.ok) {
+      out(`exams 행을 만들 수 없습니다: ${!shared.ok ? shared.message : !rebuilt.ok ? rebuilt.message : ""}`);
+      await releaseUploads("remove");
+      report.status = "failed";
+      report.exitCode = 1;
+      return report;
+    }
+    examRow = rebuilt.payload;
+    report.planned = { exams: examRow, examNode: nodeRow };
+  }
+
   let insertedId: string | null = null;
   try {
     let currentCode = code;
@@ -871,6 +1174,7 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
         );
         out("행이 있으면 그 id 로 exam_nodes 가 연결돼 있는지 보고, 노드가 없으면 그 행을 지운 뒤 다시 실행하세요.");
         out("확인 전에는 --allow-duplicate-title 로 다시 실행하지 마세요. 이 스크립트는 아무것도 더 쓰지 않고 끝납니다.");
+        await releaseUploads("keep");
         report.status = "failed";
         report.exitCode = 1;
         return report;
@@ -884,6 +1188,8 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
         out(
           `드물게 응답 유실 직후 늦게 커밋될 수 있으니, 다시 실행하기 전에 코드 ${currentCode} 또는 같은 제목의 시험이 없는지 한 번 더 조회하세요.`
         );
+        // 늦은 커밋이 생기면 그 행이 가리킬 파일이므로 지우지 않고 경로를 남긴다.
+        await releaseUploads("keep");
         report.status = "failed";
         report.exitCode = 1;
         return report;
@@ -893,6 +1199,7 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
     if (insertedId === null) {
       out(`exams INSERT 에 실패했습니다: ${errText(lastError)}`);
       out("서버가 거부했으므로 exams 에 쓴 행이 없습니다. 보상 삭제는 필요하지 않습니다.");
+      await releaseUploads("remove");
       report.status = "failed";
       report.exitCode = 1;
       return report;
@@ -927,6 +1234,10 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
     out("완료. 시험은 draft 상태입니다. 이 스크립트는 시험 시작/종료를 하지 않습니다.");
     out(`  exams.id: ${insertedId}`);
     out(`  시험 코드: ${code}`);
+    if (report.uploads.length > 0) {
+      out(`  학생 공개 자료: ${report.uploads.length}개 (materials 와 student_materials 에 넣었습니다)`);
+      for (const u of report.uploads) out(`    - ${u.source} → ${u.url}`);
+    }
     out("  시작은 교수자 계정으로 /api/exam/{id}/start 를 호출하세요 (close_at 은 재입장 마감이기도 합니다).");
     return report;
   } catch (e) {
@@ -935,6 +1246,7 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
       // INSERT 단계의 예외는 위에서 모두 오류로 바꿨다. 여기 오는 것은 그 밖의 예기치 않은 예외다.
       // 서버가 INSERT 를 끝냈는지 모르므로 다시 돌리기 전에 확인시킨다.
       out(`exams 가 만들어졌는지 알 수 없습니다. 다시 실행하기 전에 소유자 "${instructorId}" 의 같은 제목 시험이 생겼는지 조회하세요.`);
+      await releaseUploads("keep");
       report.status = "failed";
       report.exitCode = 1;
       return report;
@@ -943,8 +1255,10 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
     report.compensation = await compensateExam(db, insertedId);
     if (report.compensation === "deleted") {
       out(`보상 삭제: 방금 만든 exams 행(id=${insertedId})을 지웠습니다.`);
+      await releaseUploads("remove");
     } else {
       out(`보상 삭제에 실패했습니다. exams 행(id=${insertedId})이 노드 없이 남아 있습니다. 수동으로 지우세요.`);
+      await releaseUploads("keep");
     }
     report.status = "failed";
     report.exitCode = 1;
@@ -958,6 +1272,9 @@ export async function seedMockExam(options: SeedOptions): Promise<SeedReport> {
 export type MainDeps = {
   createClient?: typeof createSupabaseClient;
   readFile?: (path: string) => string;
+  /** 공개 자료 파일을 바이트로 읽는다 (#544). */
+  readBinaryFile?: (path: string) => Uint8Array;
+  uuid?: () => string;
   out?: (line: string) => void;
   err?: (line: string) => void;
   now?: () => string;
@@ -973,6 +1290,7 @@ export async function main(
   const out = deps.out ?? ((line: string) => console.log(line));
   const err = deps.err ?? ((line: string) => console.error(line));
   const readFile = deps.readFile ?? ((path: string) => readFileSync(path, "utf8"));
+  const readBinaryFile = deps.readBinaryFile ?? ((path: string) => readFileSync(path));
   const createClient = deps.createClient ?? createSupabaseClient;
 
   const parsed = parseArgs(argv);
@@ -998,6 +1316,14 @@ export async function main(
   if (!validated.ok) {
     err(`스펙이 올바르지 않습니다 (${args.spec}):`);
     for (const e of validated.errors) err(`  - ${e}`);
+    return 2;
+  }
+
+  // 공개 자료 파일은 접속하기 전에 읽어 크기를 확인한다. 문제가 있으면 접속하지 않고 끝낸다.
+  const loaded = loadMaterialFiles(validated.spec.student_material_files, args.spec, readBinaryFile);
+  if (!loaded.ok) {
+    err(`student_material_files 를 쓸 수 없습니다 (${args.spec}):`);
+    for (const e of loaded.errors) err(`  - ${e}`);
     return 2;
   }
 
@@ -1034,8 +1360,10 @@ export async function main(
       projectRef: connection.projectRef,
       confirmProjectRef: args.confirmProjectRef,
       allowDuplicateTitle: args.allowDuplicateTitle,
+      materialFiles: loaded.files,
       now: deps.now,
       generateCode: deps.generateCode,
+      uuid: deps.uuid,
       out,
     });
     return report.exitCode;

@@ -1,3 +1,5 @@
+import { getStudentVisibleMaterials } from "./student-materials";
+
 /**
  * Strips instructor-only / answer-key fields from exam question objects before
  * returning them to students or unauthenticated callers.
@@ -40,22 +42,37 @@ export function stripSensitiveQuestionFields<T>(
  *
  *  - questions: instructor-only fields are stripped (see stripSensitiveQuestionFields).
  *  - materials_text: emptied to []. The extracted text exists for the server-side AI only.
- *  - materials: emptied to []. Students get no file list until the instructor marks files
- *    as student-visible (a separate feature); until then no URL leaves the server.
- *    Callers should not select these columns for student paths at all; this is the
- *    second line of defence.
+ *  - materials: emptied to []. The full upload list never leaves the server.
+ *  - student_materials: the files the instructor marked as student-visible (#544), as
+ *    `{ url, fileName, extension }` items computed by `getStudentVisibleMaterials`
+ *    (intersection of `student_materials` and `materials`, in `materials` order, http(s)
+ *    URLs only). Only when `includeStudentMaterials` is true, which only the authenticated
+ *    student entry path (`init_exam_session`) passes. Everyone else, including the public
+ *    `get_exam`, gets [] (fail closed: a new caller that forgets the flag shares nothing).
+ *    Callers that pass the flag must select both `materials` and `student_materials`;
+ *    without `materials` the intersection is empty and nothing is shared. Select
+ *    `material_names` too so the items carry the original file names.
+ *  - material_names: emptied to {}. Its keys are the URLs of every upload, private ones included.
  *  - rubric: kept only when `rubric_public === true`.
  *
  * Pure function: does not mutate its input. Keys that are absent stay absent, so a
  * select list that never fetched `materials_text` does not gain it.
  */
-export function sanitizeExamForStudent<T extends Record<string, unknown>>(exam: T): T {
+export function sanitizeExamForStudent<T extends Record<string, unknown>>(
+  exam: T,
+  opts: { includeStudentMaterials?: boolean } = {}
+): T {
   const rubricPublic = exam.rubric_public === true;
   const out: Record<string, unknown> = { ...exam };
   if ("questions" in out) {
     out.questions = stripSensitiveQuestionFields(out.questions, { keepRubric: rubricPublic });
   }
+  if ("student_materials" in out) {
+    out.student_materials = opts.includeStudentMaterials ? getStudentVisibleMaterials(exam) : [];
+  }
   if ("materials" in out) out.materials = [];
+  // 이름 맵의 키는 모든 자료(비공개 포함)의 URL 이다. 공개한 파일의 이름은 student_materials 항목에 들어 있다.
+  if ("material_names" in out) out.material_names = {};
   if ("materials_text" in out) out.materials_text = [];
   if ("rubric" in out && !rubricPublic) out.rubric = null;
   return out as T;

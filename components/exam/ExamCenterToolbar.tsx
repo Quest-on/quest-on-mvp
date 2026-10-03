@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { ExamTimer } from "@/components/exam/ExamTimer";
 import { RubricSheet } from "@/components/exam/RubricSheet";
+import { MaterialsSheet } from "@/components/exam/MaterialsSheet";
 import { cn } from "@/lib/utils";
 
 interface ExamCenterToolbarProps {
@@ -22,6 +23,8 @@ interface ExamCenterToolbarProps {
   /** 서버가 내려 준 시험 rubric 그대로. 공개 여부와 모양은 RubricSheet 가 판정한다. */
   rubric?: unknown;
   rubricPublic?: boolean | null;
+  /** 서버가 내려 준 공개 자료(`exam.student_materials`) 그대로. 없으면 자료 버튼을 그리지 않는다 (#544). */
+  studentMaterials?: unknown;
   className?: string;
 }
 
@@ -38,6 +41,7 @@ export function ExamCenterToolbar({
   onToggleQuestion,
   rubric,
   rubricPublic,
+  studentMaterials,
   className,
 }: ExamCenterToolbarProps) {
   const t = useTranslations("exam");
@@ -69,6 +73,7 @@ export function ExamCenterToolbar({
             )}
           </Button>
         )}
+        <MaterialsSheet materials={studentMaterials} />
         <RubricSheet rubric={rubric} rubricPublic={rubricPublic} />
         <h2 className="text-sm sm:text-base font-semibold text-foreground truncate min-w-0">
           {examTitle}

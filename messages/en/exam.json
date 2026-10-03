@@ -51,6 +51,20 @@
     "description": "Rubric shared by your instructor. Read-only.",
     "close": "Close"
   },
+  "materials": {
+    "button": "Materials",
+    "buttonAriaLabel": "{count, plural, one {View # exam material} other {View # exam materials}}",
+    "title": "Exam materials",
+    "description": "Files shared by your instructor. You can download them.",
+    "format": "Format: {format}",
+    "formatUnknown": "Unknown",
+    "download": "Download",
+    "downloadAriaLabel": "Download {name}",
+    "close": "Close",
+    "downloadFailed": "Couldn't download the file. Try again or open it in a new tab.",
+    "openInNewTab": "Open in new tab",
+    "openInNewTabAriaLabel": "Open in new tab: {name}"
+  },
   "timer": {
     "ariaLabel": "Time remaining: {time}",
     "expiredTitle": "Time is up",

@@ -6,6 +6,10 @@
  * 반환 경로 세 곳(재응시 차단, 시간 만료 자동 제출, 일반 입장)과 공개 getExam 이 내려주는
  * 실제 응답 본문을 검사한다. 모킹된 DB 는 select 목록과 무관하게 행 전체를 돌려주므로,
  * 응답 정리와 select 목록 두 겹을 따로 확인한다.
+ *
+ * 학생 공개 자료 (#544): 교수자가 공개를 켠 파일은 인증된 입장 경로(initExamSession)에서만
+ * student_materials 로 내려간다. 비공개 파일 URL 과 추출 전문은 계속 막고, 비로그인 공개
+ * getExam 에는 공개한 파일도 내려가지 않는다(#511 과 같은 이유: 코드만 알면 누구나 부른다).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -229,7 +233,7 @@ describe("initExamSession 응답은 교수 전용 필드를 싣지 않는다", (
     expect(json).not.toContain("correctOptionIndex");
   });
 
-  it("exams 조회는 자료 컬럼을 select 하지 않는다", async () => {
+  it("exams 조회는 공개 자료를 고를 두 컬럼만 읽고 추출 전문(materials_text)은 select 하지 않는다", async () => {
     const waiting = { ...STUDENT_SESSION, status: "waiting", started_at: null, attempt_timer_started_at: null };
     const chains = queue({
       exams: [
@@ -245,8 +249,79 @@ describe("initExamSession 응답은 교수 전용 필드를 싣지 않는다", (
 
     await init();
 
-    const selectList = String(chains.exams[0].select.mock.calls[0][0]);
-    expect(selectList).not.toMatch(/materials/);
+    const columns = String(chains.exams[0].select.mock.calls[0][0]).split(",").map((c) => c.trim());
+    expect(columns).toContain("materials");
+    expect(columns).toContain("student_materials");
+    expect(columns).toContain("material_names");
+    expect(columns).not.toContain("materials_text");
+  });
+});
+
+describe("initExamSession 은 교수자가 공개한 자료만 내려준다 (#544)", () => {
+  const SHARED = "https://example.test/storage/instructor-1/2026-10-03_customers.xlsx";
+  const waiting = { ...STUDENT_SESSION, status: "waiting", started_at: null, attempt_timer_started_at: null };
+
+  async function initWith(examOverrides: Record<string, unknown>) {
+    queue({
+      exams: [
+        { data: leakyExam(examOverrides), error: null },
+        { data: { is_demo: false }, error: null },
+      ],
+      sessions: [
+        { data: [], error: null },
+        { data: waiting, error: null },
+      ],
+      submissions: [{ data: [], error: null }],
+    });
+    return init();
+  }
+
+  it("일부 공개: 공개한 파일만 오고 비공개 파일 URL 과 추출 전문은 오지 않는다", async () => {
+    const result = await initWith({ materials: [SECRETS.url, SHARED], student_materials: [SHARED] });
+
+    expect(result.status, JSON.stringify(result.body)).toBe(200);
+    expect(result.body.exam.student_materials).toEqual([
+      { url: SHARED, fileName: "2026-10-03_customers.xlsx", extension: "xlsx" },
+    ]);
+    expect(result.body.exam.materials).toEqual([]);
+    expectNoLeak(result.body.exam);
+  });
+
+  it("공개 0개: student_materials 는 빈 배열이다", async () => {
+    const result = await initWith({ materials: [SECRETS.url, SHARED], student_materials: [] });
+
+    expect(result.body.exam.student_materials).toEqual([]);
+    expect(JSON.stringify(result.body.exam)).not.toContain("example.test/storage");
+  });
+
+  it("전체 공개: 모든 파일이 materials 순서로 온다. 추출 전문은 여전히 오지 않는다", async () => {
+    const result = await initWith({ materials: [SECRETS.url, SHARED], student_materials: [SHARED, SECRETS.url] });
+
+    expect(result.body.exam.student_materials.map((m: { url: string }) => m.url)).toEqual([SECRETS.url, SHARED]);
+    expect(JSON.stringify(result.body.exam)).not.toContain(SECRETS.text);
+    expect(result.body.exam.materials).toEqual([]);
+  });
+
+  it("원래 파일 이름이 있으면 그 이름으로 오고, 이름 맵은 비어서 온다 (비공개 파일 이름이 새지 않는다)", async () => {
+    const result = await initWith({
+      materials: [SECRETS.url, SHARED],
+      student_materials: [SHARED],
+      material_names: { [SHARED]: "하냥센스_시험용_dataset.xlsx", [SECRETS.url]: "SECRET_ORIGINAL_NAME.pdf" },
+    });
+
+    expect(result.body.exam.student_materials).toEqual([
+      { url: SHARED, fileName: "하냥센스_시험용_dataset.xlsx", extension: "xlsx" },
+    ]);
+    expect(result.body.exam.material_names).toEqual({});
+    expect(JSON.stringify(result.body.exam)).not.toContain("SECRET_ORIGINAL_NAME");
+    expectNoLeak(result.body.exam);
+  });
+
+  it("지운 파일(materials 에 없는 값)은 student_materials 에 남아 있어도 오지 않는다", async () => {
+    const result = await initWith({ materials: [SHARED], student_materials: [SECRETS.url, SHARED] });
+
+    expect(result.body.exam.student_materials.map((m: { url: string }) => m.url)).toEqual([SHARED]);
+    expectNoLeak(result.body.exam);
   });
 });
 
@@ -280,5 +355,32 @@ describe("공개 getExam 은 학생과 같은 규칙을 쓴다", () => {
     await getExam({ code: "ABC123" });
 
     expect(String(chains.exams[0].select.mock.calls[0][0])).not.toMatch(/materials/);
+  });
+
+  it("교수자가 공개한 파일도 비로그인 get_exam 에는 내려가지 않는다 (#544, #511)", async () => {
+    // 모킹된 DB 는 select 와 무관하게 행 전체를 돌려준다. select 가 언젠가 두 컬럼을 읽게 되더라도
+    // 응답 정리가 막는지 본다.
+    const SHARED = "https://example.test/storage/instructor-1/2026-10-03_customers.xlsx";
+    queue({
+      exams: [
+        {
+          data: leakyExam({
+            materials: [SHARED],
+            student_materials: [SHARED],
+            material_names: { [SHARED]: "SHARED_ORIGINAL_NAME.xlsx" },
+          }),
+          error: null,
+        },
+      ],
+    });
+
+    const response = await getExam({ code: "ABC123" });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(JSON.stringify(body.exam)).not.toContain(SHARED);
+    expect(body.exam.student_materials).toEqual([]);
+    expect(body.exam.materials).toEqual([]);
+    expect(JSON.stringify(body.exam)).not.toContain("SHARED_ORIGINAL_NAME");
   });
 });

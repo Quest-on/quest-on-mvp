@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ import {
 } from "@/components/animate-ui/primitives/animate/scroll-progress";
 import { useExamDraftAutoSave } from "@/hooks/useExamDraftAutoSave";
 import { useFileUpload } from "@/hooks/useFileUpload";
+import { normalizeMaterialNames, pickStudentMaterials } from "@/lib/student-materials";
 import type { ChatMessage } from "@/hooks/useQuestionGeneration";
 import {
   buildDefaultScoreWeightsForQuestionTypes,
@@ -104,6 +106,24 @@ export default function CreateExam() {
   const [scoreWeights, setScoreWeights] = useState<ScoreWeights | null>(null);
   // 파일 업로드 + 텍스트 추출 통합 hook
   const fileUpload = useFileUpload();
+  // 학생에게 공개로 표시한 자료 URL (#544). 기본은 아무것도 공개하지 않는다.
+  // 저장할 때는 지금 업로드된 자료와의 교집합만 싣는다(pickStudentMaterials).
+  const [sharedMaterialUrls, setSharedMaterialUrls] = useState<Set<string>>(() => new Set());
+  const handleMaterialShareChange = useCallback((url: string, shared: boolean) => {
+    setSharedMaterialUrls((prev) => {
+      const next = new Set(prev);
+      if (shared) next.add(url);
+      else next.delete(url);
+      return next;
+    });
+  }, []);
+  const uploadedUrlByName = useMemo(
+    () =>
+      new Map(
+        Array.from(fileUpload.uploadedFiles.entries()).map(([name, file]) => [name, file.url])
+      ),
+    [fileUpload.uploadedFiles]
+  );
 
   // 문제 목록 참조 (스크롤용)
   const questionsListRef = useRef<HTMLDivElement>(null);
@@ -400,6 +420,9 @@ export default function CreateExam() {
 
     // hook에서도 업로드된 파일 정보 제거
     if (removedFile) {
+      // 지운 파일은 학생 공개 목록에서도 뺀다 (#544).
+      const removedUrl = fileUpload.uploadedFiles.get(removedFile.name)?.url;
+      if (removedUrl) handleMaterialShareChange(removedUrl, false);
       fileUpload.removeFile(removedFile.name);
     }
   };
@@ -535,6 +558,8 @@ export default function CreateExam() {
       chat_weight: number | null;
       score_weights: ScoreWeights | null;
       materials: string[];
+      student_materials: string[];
+      material_names: Record<string, string>;
       status: string;
       created_at: string;
       updated_at: string;
@@ -680,6 +705,15 @@ export default function CreateExam() {
         ...(courseId !== null ? { course_id: courseId } : {}),
         materials: materialUrls, // Array of file URLs
         materials_text: materialsText, // 추출된 텍스트 배열
+        // 학생에게 공개할 자료 (#544). materials 의 부분집합, materials 순서. 서버가 다시 검증한다.
+        student_materials: pickStudentMaterials(materialUrls, sharedMaterialUrls),
+        // 원래 파일 이름 (#544). 저장 경로에는 이름이 없어서 올린 화면이 알고 있는 이름을 함께 보낸다.
+        material_names: normalizeMaterialNames(
+          materialUrls,
+          Object.fromEntries(
+            Array.from(fileUpload.uploadedFiles.values()).map((file) => [file.url, file.fileName])
+          )
+        ),
         language: examData.language, // AI 시스템 프롬프트 언어 (ko | en)
         status: "draft", // Start as draft
         created_at: new Date().toISOString(),
@@ -836,6 +870,9 @@ export default function CreateExam() {
                 onDragAreaClick={handleDragAreaClick}
                 onRemoveFile={removeFile}
                 getFileIcon={getFileIcon}
+                sharedMaterialUrls={sharedMaterialUrls}
+                onMaterialShareChange={handleMaterialShareChange}
+                uploadedUrlByName={uploadedUrlByName}
                 generator={
                   <CaseQuestionGenerator
                     agentHandleRef={generatorHandleRef}

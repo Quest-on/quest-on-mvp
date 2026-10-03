@@ -373,7 +373,7 @@ export async function initExamSession(data: {
     // 1. Fetch Exam by Code
     const { data: exam, error: examError } = await getSupabase()
       .from("exams")
-      .select("id, title, code, description, duration, questions, rubric, rubric_public, chat_weight, status, instructor_id, is_demo, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, student_count, type, deadline")
+      .select("id, title, code, description, duration, questions, rubric, rubric_public, chat_weight, status, instructor_id, is_demo, created_at, updated_at, open_at, close_at, started_at, allow_draft_in_waiting, allow_chat_in_waiting, student_count, type, deadline, materials, student_materials, material_names")
       .eq("code", data.examCode)
       .single();
 
@@ -432,12 +432,15 @@ export async function initExamSession(data: {
 
     // 응시자에게 내려가는 exam 에서 교수 전용 필드를 걷어낸다 (#506).
     //  - 문항: 정답키/채점 컨텍스트(correctOptionIndex, ai_context)와 레거시 core_ability.
-    //  - 자료: materials, materials_text 는 select 하지 않는다. 혹시 객체에 들어오더라도
-    //    sanitizeExamForStudent 가 빈 배열로 비운다.
+    //  - 자료: materials_text(추출 전문)는 select 하지 않는다. materials, student_materials,
+    //    material_names 는 교수자가 학생에게 공개한 파일과 원래 이름을 고르려고 읽는다(#544). 정리 뒤
+    //    materials 는 빈 배열, material_names 는 빈 객체이고(비공개 파일의 URL 과 이름이 키와 값에 있다),
+    //    student_materials 에는 공개한 파일({ url, fileName, extension })만 남는다. 공개는 이 인증된
+    //    입장 경로만 켠다. 비로그인 공개 get_exam 은 자료를 받지 않는다.
     //  - rubric(채점 기준): 문항별, 최상위 모두 강사가 공개한 경우에만 유지.
     // 채점과 AI 호출은 서버에서 원본 exam 을 다시 읽어 수행하므로 클라이언트에는 필요 없다.
     // 아래 모든 반환 경로가 같은 exam 객체를 쓰므로 여기서 한 번만 정리한다.
-    Object.assign(exam, sanitizeExamForStudent(exam));
+    Object.assign(exam, sanitizeExamForStudent(exam, { includeStudentMaterials: true }));
 
     // 2. Get all existing sessions (most recent first)
     const { data: existingSessions, error: checkError } = await getSupabase()
