@@ -35,6 +35,11 @@ interface CaseGradingChatProps {
   initialScore?: number;
   initialComment?: string;
   onCommitPendingChange?: (pending: boolean) => void;
+  /**
+   * 대화 기록을 불러올지(기본 true). 채점이 아직 열리지 않았으면(시험 진행 중, 과제 마감 전) 서버가
+   * 409 로 거절하므로 화면이 false 를 넘긴다. 제출 여부와는 상관없다(#575).
+   */
+  historyEnabled?: boolean;
 }
 
 /** Parse optional suggested score from assistant text (e.g. "추천 점수: 85"). */
@@ -61,6 +66,7 @@ export function CaseGradingChat({
   initialScore,
   initialComment = "",
   onCommitPendingChange,
+  historyEnabled = true,
 }: CaseGradingChatProps) {
   const t = useTranslations("grading");
   const queryClient = useQueryClient();
@@ -89,7 +95,7 @@ export function CaseGradingChat({
       const json = (await res.json()) as { messages: CaseGradingChatMessage[] };
       return json.messages ?? [];
     },
-    enabled: !!sessionId,
+    enabled: !!sessionId && historyEnabled,
   });
 
   const messages = useMemo(() => data ?? [], [data]);
