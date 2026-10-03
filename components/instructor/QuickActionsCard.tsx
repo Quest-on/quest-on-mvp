@@ -21,7 +21,8 @@ interface ReportData {
     description?: string;
   };
   session: {
-    submitted_at: string;
+    /** 아직 제출하지 않은 세션은 null 이다. */
+    submitted_at: string | null;
   };
   grades: Record<
     number,

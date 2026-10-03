@@ -27,6 +27,7 @@
     "noGradesTitle": "자동 채점 결과가 없습니다",
     "gradingFailedDesc": "일부(또는 전체) 문제의 AI 채점이 실패했습니다.{progressPart} AI 재채점을 실행하거나 수동으로 채점해주세요.",
     "gradingAbsentDesc": "배경 자동 채점이 실행되지 않았거나 실패했습니다. AI 재채점을 실행해주세요.",
+    "gradingAwaitingSubmission": "자동 채점은 학생이 제출하면 시작됩니다",
     "queuingLabel": "큐 등록 중...",
     "regradeButton": "AI 재채점"
   },
@@ -59,6 +60,7 @@
     "backToAssignment": "과제로 돌아가기",
     "studentGradeTitle": "{studentName} 학생 채점",
     "submittedAt": "제출일:",
+    "notSubmitted": "아직 최종 제출하지 않았습니다",
     "studentNumber": "학번: {number}",
     "school": "학교: {school}",
     "overallScore": "전체 점수: {score}점",
@@ -72,6 +74,7 @@
     "noGradesTitle": "자동 채점 결과가 없습니다",
     "gradingFailedDesc": "일부(또는 전체) 문제의 AI 채점이 실패했습니다.{progressPart} AI 재채점을 실행하거나 수동으로 채점해주세요.",
     "gradingAbsentDesc": "배경 자동 채점이 실행되지 않았거나 실패했습니다. AI 재채점을 실행해주세요.",
+    "gradingAwaitingSubmission": "자동 채점은 학생이 제출하고 퀴즈까지 마치면 시작됩니다",
     "queuingLabel": "큐 등록 중...",
     "regradeButton": "AI 재채점"
   },
@@ -251,6 +254,7 @@
     "backToExam": "시험으로 돌아가기",
     "studentGradeTitle": "{studentName} 학생 채점",
     "submittedAt": "제출일: {date}",
+    "notSubmitted": "아직 제출하지 않았습니다",
     "studentNumber": "학번: {number}",
     "school": "학교: {school}",
     "overallScore": "총점: {score}점"

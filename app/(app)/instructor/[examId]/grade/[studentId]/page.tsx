@@ -29,7 +29,8 @@ import {
   AIOverallSummary,
   type SummaryData,
 } from "@/components/instructor/AIOverallSummary";
-import { hasAnalysisPartnerQuestions, isObjectiveQuestion, resolveByQIdx } from "@/lib/grading-helpers";
+import { hasAnalysisPartnerQuestions, isGradingOpen, isObjectiveQuestion, resolveByQIdx } from "@/lib/grading-helpers";
+import { resolveGradingStatusBanner } from "@/lib/grading-status-banner";
 import {
   buildTypedQuestionEntries,
   getSubmissionForQuestion,
@@ -50,6 +51,7 @@ import {
   AlertTriangle,
   RefreshCw,
   Loader2,
+  Clock,
 } from "lucide-react";
 import { RichTextViewer } from "@/components/ui/rich-text-viewer";
 import {
@@ -116,7 +118,8 @@ interface SessionData {
     id: string;
     exam_id: string;
     student_id: string;
-    submitted_at: string;
+    /** 아직 제출하지 않은(응시 중) 세션은 null 이다. */
+    submitted_at: string | null;
     used_clarifications: number;
     created_at: string;
     ai_summary?: SummaryData | null;
@@ -128,6 +131,11 @@ interface SessionData {
     title: string;
     code: string;
     questions: Question[];
+    // 채점이 열렸는지(isGradingOpen) 판단하는 값. 채점 GET 라우트가 시험 행에서 함께 내려준다.
+    status?: string | null;
+    type?: string | null;
+    deadline?: string | null;
+    is_demo?: boolean | null;
   };
   student: {
     name: string;
@@ -480,6 +488,10 @@ export default function GradeStudentPage({
     caseQuestionEntries.findIndex(({ arrIdx }) => arrIdx === selectedQuestionIdx),
   );
 
+  // AI 채점 대화 기록은 채점이 열린 뒤에만 부른다. 서버(requireCaseGradeAccess)와 같은 기준이다.
+  // 시험이 진행 중이면 제출 여부와 상관없이 409(EXAM_NOT_CLOSED)로 거절된다.
+  const caseGradeHistoryEnabled = isGradingOpen(sessionData.exam);
+
   return (
     <SidebarProvider defaultOpen={false} className="flex-row-reverse">
       <SidebarInset>
@@ -619,27 +631,38 @@ export default function GradeStudentPage({
             </div>
           )}
 
-          {/* AI 채점 상태 배너: 진행 중 / 실패 / 부재 3가지 경우 모두 처리 */}
+          {/* AI 채점 상태 배너: 진행 중 / 실패 / 부재 / 제출 전 */}
           {(() => {
             const gp = sessionData.gradingProgress;
-            const grades = Object.values(sessionData.grades) as Grade[];
-            const hasAiFailed = grades.some((g) => g.grade_type === "ai_failed");
-            const noGradesAtAll =
-              sessionData.overallScore === null && grades.length === 0;
-            const isQueued = gp?.status === "queued";
-            const isRunning = gp?.status === "running";
-            const isFailed = gp?.status === "failed" || hasAiFailed;
-            const inProgress = isQueued || isRunning;
+            const banner = resolveGradingStatusBanner({
+              submittedAt: sessionData.session.submitted_at,
+              gradingProgress: gp,
+              grades: Object.values(sessionData.grades) as Grade[],
+              overallScore: sessionData.overallScore,
+            });
 
             // Nothing to surface when grading completed cleanly
-            if (!inProgress && !isFailed && !noGradesAtAll) return null;
+            if (banner === "none") return null;
 
+            // 아직 제출 전 — 결과가 없는 게 정상이다. 실패로 알리지 않고 재채점 단추도 두지 않는다.
+            if (banner === "awaiting_submission") {
+              return (
+                <div className="mb-6 p-4 bg-info-surface border border-info-border rounded-lg flex items-center gap-3">
+                  <Clock className="h-5 w-5 text-info-text shrink-0" />
+                  <p className="font-medium text-info-text">
+                    {t("gradePage.gradingAwaitingSubmission")}
+                  </p>
+                </div>
+              );
+            }
+
+            const isFailed = banner === "failed";
             const done = gp ? gp.completed + gp.failed : 0;
             const total = gp?.total ?? 0;
             const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
 
             // In-progress state — show progress bar, no retry button
-            if (inProgress) {
+            if (banner === "in_progress") {
               return (
                 <div className="mb-6 p-4 bg-info-surface border border-info-border rounded-lg space-y-3">
                   <div className="flex items-center gap-3">
@@ -771,6 +794,7 @@ export default function GradeStudentPage({
                   questionNumber={selectedQuestionQIdx + 1}
                   initialScore={caseGradeInitialScore}
                   initialComment={caseGradeInitialComment}
+                  historyEnabled={caseGradeHistoryEnabled}
                 />
               )}
 

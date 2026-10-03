@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl";
 
 interface GradeHeaderProps {
   studentName: string;
-  submittedAt: string;
+  /** 아직 제출하지 않은(응시 중) 세션은 null 이다. */
+  submittedAt: string | null;
   overallScore: number | null;
   examId: string;
   studentNumber?: string;
@@ -57,7 +58,12 @@ export function GradeHeader({
         <div>
           <h1 className="text-3xl font-bold">{t("gradeHeader.studentGradeTitle", { studentName })}</h1>
           <div className="text-muted-foreground space-y-1 mt-2">
-            <p>{t("gradeHeader.submittedAt", { date: new Date(submittedAt).toLocaleString() })}</p>
+            {/* new Date(null) 은 1970 년이 된다. 제출 전이면 날짜를 만들지 않는다. */}
+            <p>
+              {submittedAt
+                ? t("gradeHeader.submittedAt", { date: new Date(submittedAt).toLocaleString() })
+                : t("gradeHeader.notSubmitted")}
+            </p>
             {studentNumber && <p>{t("gradeHeader.studentNumber", { number: studentNumber })}</p>}
             {school && <p>{t("gradeHeader.school", { school })}</p>}
           </div>

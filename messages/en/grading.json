@@ -27,6 +27,7 @@
     "noGradesTitle": "No auto-grading results available",
     "gradingFailedDesc": "AI grading failed for some or all questions.{progressPart} Run AI re-grading or grade manually.",
     "gradingAbsentDesc": "Background auto-grading did not run or failed. Please run AI re-grading.",
+    "gradingAwaitingSubmission": "Auto-grading starts when the student submits",
     "queuingLabel": "Queuing...",
     "regradeButton": "AI Re-grade"
   },
@@ -59,6 +60,7 @@
     "backToAssignment": "Back to assignment",
     "studentGradeTitle": "Grading: {studentName}",
     "submittedAt": "Submitted:",
+    "notSubmitted": "Submission not finalized yet",
     "studentNumber": "Student ID: {number}",
     "school": "School: {school}",
     "overallScore": "Total score: {score} pts",
@@ -72,6 +74,7 @@
     "noGradesTitle": "No auto-grading results available",
     "gradingFailedDesc": "AI grading failed for some or all questions.{progressPart} Run AI re-grading or grade manually.",
     "gradingAbsentDesc": "Background auto-grading did not run or failed. Please run AI re-grading.",
+    "gradingAwaitingSubmission": "Auto-grading starts once the student submits and finishes the quiz",
     "queuingLabel": "Queuing...",
     "regradeButton": "AI Re-grade"
   },
@@ -251,6 +254,7 @@
     "backToExam": "Back to exam",
     "studentGradeTitle": "Grading: {studentName}",
     "submittedAt": "Submitted: {date}",
+    "notSubmitted": "Not submitted yet",
     "studentNumber": "Student ID: {number}",
     "school": "School: {school}",
     "overallScore": "Total: {score} pts"
