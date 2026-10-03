@@ -79,6 +79,9 @@ interface Exam {
   status: string;
   startTime?: string;
   endTime?: string;
+  /** 교수자가 공개한 평가 기준. 서버는 rubric_public 일 때만 내려 주고, 배열이 아닐 수 있어 unknown 으로 둔다. */
+  rubric?: unknown;
+  rubric_public?: boolean;
   allow_draft_in_waiting?: boolean;
   allow_chat_in_waiting?: boolean;
 }
@@ -617,6 +620,8 @@ export default function ExamPage() {
                 setIsQuestionVisible(!isQuestionVisible);
                 if (!hasOpenedQuestion) setHasOpenedQuestion(true);
               }}
+              rubric={exam.rubric}
+              rubricPublic={exam.rubric_public}
             />
 
             <MainContentWrapper>

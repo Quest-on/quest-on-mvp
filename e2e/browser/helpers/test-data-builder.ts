@@ -10,6 +10,7 @@ import {
   seedGrade,
   seedStudentProfile,
   cleanupTestData,
+  setStudentDisclosureAcknowledged,
 } from "../../helpers/seed";
 
 // --------------- scenario builders ---------------
@@ -63,6 +64,11 @@ export async function seedStudentExamScenario(
     sessionStatus !== "not_joined" && sessionStatus !== "joined";
   const effectivePreflightAccepted =
     preflightAccepted ?? defaultPreflightAccepted;
+
+  // preflight 를 이미 수락한 학생은 AI 고지도 확인한 사람이다. 세션 수락만
+  // 심으면 AC-15 게이트가 최초 고지를 다시 띄운다(#482 에서 드러났다).
+  // 수락 전이면 "처음 보는 학생" 으로 — 앞 테스트의 확인을 지운다.
+  await setStudentDisclosureAcknowledged("test-student-id", effectivePreflightAccepted);
 
   const session = await seedSession(exam.id, "test-student-id", {
     status: sessionStatus,

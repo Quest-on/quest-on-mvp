@@ -387,5 +387,19 @@
     "scoreLabel": "{score}점",
     "monitoringButton": "모니터링",
     "gradeButton": "채점"
+  },
+  "studentStatus": {
+    "notStarted": "미시작",
+    "inProgress": "응시중",
+    "pending": "채점대기",
+    "grading": "채점중",
+    "proposedReady": "가채점완료",
+    "graded": "채점완료",
+    "failed": "채점실패",
+    "caseNotSubmitted": "미제출",
+    "casePartial": "일부 제출 {submitted}/{total}",
+    "caseSubmitted": "제출됨",
+    "scoreFinal": "{score}점",
+    "scoreProposed": "가채점 {score}점"
   }
 }

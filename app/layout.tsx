@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Geist, Geist_Mono, Roboto_Mono } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "next-intl/server";
 import { EnvBadge } from "@/components/system/EnvBadge";
 import { WebsiteAnalytics } from "@/components/WebsiteAnalytics";
+import { SpeedInsightsBeacon } from "@/components/SpeedInsightsBeacon";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -102,7 +102,7 @@ export default async function RootLayout({
       >
         <NextIntlClientProvider>{children}<WebsiteAnalytics /></NextIntlClientProvider>
         <EnvBadge />
-        <SpeedInsights />
+        <SpeedInsightsBeacon />
       </body>
     </html>
   );

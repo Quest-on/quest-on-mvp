@@ -469,3 +469,27 @@ export async function getGrades(sessionId: string) {
   if (error) throw new Error(`getGrades failed: ${error.message}`);
   return data ?? [];
 }
+
+/**
+ * 학생의 AI 고지 확인(사람 단위 최초 1회, AC-15)을 심거나 지운다.
+ *
+ * preflight 는 두 사실을 본다 — 이 세션의 수락(`sessions.preflight_accepted_at`)
+ * 과 이 사람의 고지 확인(`onboarding_events.student_disclosure_ack`). 세션만
+ * 수락으로 심으면 지각 승인 등으로 고지를 우회하던 구멍(#150)의 모양이라 최초
+ * 고지가 다시 뜬다. 반대로 고정 id 학생에게 앞 테스트의 확인이 남아 있으면
+ * "처음 보는 학생" 을 재현할 수 없다 — cleanupTestData 는 이 표를 안 지운다.
+ */
+export async function setStudentDisclosureAcknowledged(
+  userId: string,
+  acknowledged: boolean
+) {
+  await clearOnboardingEvents(userId, ["student_disclosure_ack"]);
+  if (!acknowledged) return;
+
+  const { error } = await supabase.from("onboarding_events").insert({
+    user_id: userId,
+    role: "student",
+    event: "student_disclosure_ack",
+  });
+  if (error) throw new Error(`setStudentDisclosureAcknowledged failed: ${error.message}`);
+}

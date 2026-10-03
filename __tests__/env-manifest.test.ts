@@ -23,6 +23,7 @@ const DEPLOYED_BASE: Record<string, string> = {
   CONSENT_RETENTION_PURGE_MODE: "dry-run",
   INCOMPLETE_ACCOUNT_PURGE_DISABLED: "1",
   INCOMPLETE_ACCOUNT_PURGE_MODE: "dry-run",
+  PASSWORD_RESET_INTENT_SECRET: "reset-intent",
 };
 
 describe("auditEnv", () => {

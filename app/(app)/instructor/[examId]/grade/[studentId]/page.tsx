@@ -14,6 +14,9 @@ import { QuestionNavigation } from "@/components/instructor/QuestionNavigation";
 import { QuestionPromptCard } from "@/components/instructor/QuestionPromptCard";
 import { AIConversationsCard } from "@/components/instructor/AIConversationsCard";
 import { FinalAnswerCard } from "@/components/instructor/FinalAnswerCard";
+import { IntegritySignalsToggle } from "@/components/instructor/IntegritySignalsToggle";
+import { useIntegritySignalsPreference } from "@/hooks/useIntegritySignalsPreference";
+import { countIntegritySignals } from "@/lib/integrity-signals";
 import { ObjectiveGradeCard } from "@/components/instructor/ObjectiveGradeCard";
 import { CaseGradingChat } from "@/components/instructor/CaseGradingChat";
 import {
@@ -188,6 +191,10 @@ export default function GradeStudentPage({
   const qIdxParam = searchParams.get("qIdx");
   const initialSelectionAppliedRef = useRef<string | null>(null);
   const [selectedQuestionIdx, setSelectedQuestionIdx] = useState<number>(0);
+  // 의심 표시(탭 전환, 외부 붙여넣기) 켜짐/꺼짐. 시험별로 브라우저에 저장돼
+  // 같은 시험의 다른 학생 페이지에서도 유지된다.
+  const [showIntegritySignals, setShowIntegritySignals] =
+    useIntegritySignalsPreference(resolvedParams.examId);
   // Redirect non-instructors
   useEffect(() => {
     if (
@@ -367,6 +374,17 @@ export default function GradeStudentPage({
   const currentGrade = resolveByQIdx(sessionData.grades, qIdxKeys) as
     | Grade
     | undefined;
+
+  // 현재 문항의 붙여넣기 로그. 카드(표시)와 토글(숨긴 기록 수)이 같은 목록을 쓴다.
+  const currentPasteLogs = currentQuestion
+    ? sessionData.pasteLogs?.[currentQuestion.id] ||
+      sessionData.pasteLogs?.[String(selectedQuestionQIdx)] ||
+      sessionData.pasteLogs?.[String(selectedQuestionIdx)]
+    : undefined;
+  const integritySignalCount = countIntegritySignals(
+    currentPasteLogs,
+    currentQuestion?.id,
+  );
 
   const caseGradeInitialScore =
     currentGrade?.stage_grading?.answer?.score ?? currentGrade?.score;
@@ -682,17 +700,19 @@ export default function GradeStudentPage({
                 <>
                   <AIConversationsCard messages={duringExamMessages} />
 
-                  <FinalAnswerCard
-                    submission={currentSubmission}
-                    pasteLogs={
-                      currentQuestion
-                        ? sessionData.pasteLogs?.[currentQuestion.id] ||
-                          sessionData.pasteLogs?.[String(selectedQuestionQIdx)] ||
-                          sessionData.pasteLogs?.[String(selectedQuestionIdx)]
-                        : undefined
-                    }
-                    questionId={currentQuestion?.id}
-                  />
+                  <div className="space-y-3">
+                    <IntegritySignalsToggle
+                      checked={showIntegritySignals}
+                      onCheckedChange={setShowIntegritySignals}
+                      signalCount={integritySignalCount}
+                    />
+                    <FinalAnswerCard
+                      submission={currentSubmission}
+                      pasteLogs={currentPasteLogs}
+                      questionId={currentQuestion?.id}
+                      showIntegritySignals={showIntegritySignals}
+                    />
+                  </div>
                 </>
               )}
             </div>

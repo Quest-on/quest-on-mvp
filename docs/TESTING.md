@@ -7,7 +7,7 @@
 | Unit          | Vitest     | `__tests__/`         | Business logic, utilities, Zod schemas                       | ✅ |
 | API           | Playwright | `e2e/api/`           | Integration tests against mock server                        | ✅ |
 | Browser smoke | Playwright | `e2e/browser/`       | 페이지 진입, 인증 가드, a11y, CSP, error boundary            | ✅ |
-| Browser flows | Playwright | `e2e/browser/flows/` | 시험 생성·응시·채점 전체 시나리오 (Page Object 기반)          | 동의 온보딩 flow 만 ✅ |
+| Browser flows | Playwright | `e2e/browser/flows/` | 시험 생성·응시·채점 전체 시나리오 (Page Object 기반)          | 동의 온보딩 flow 만 게이트 ✅ · 나머지는 야간 관측 |
 
 ### browser flows 가 대부분 CI 게이트에 없는 이유
 
@@ -16,6 +16,12 @@ flows 는 `data-testid` 와 클릭 순서에 물려 있어서 UI 를 건드릴 �
 `consent-onboarding-flow` 하나만 CI 잡(`consent-flow-test`)으로 남기고 나머지는 뺐다.
 
 flows 를 지우지는 않는다. Page Object 12개가 자산이다.
+
+**그렇다고 안 돌리지는 않는다 (#482).** 게이트에서 뺀 뒤로 flows 는 CI 에서도 로컬에서도 돌지 않았다.
+한 번 돌려 보니 실패 9건 중 5건이 실제 버그였다 — 테스트는 버그를 잡고 있었는데 아무도 결과를 안 봤다.
+그래서 `.github/workflows/flows-nightly.yml` 이 **매일 staging 을** 돌린다(머지를 막지 않는다).
+flows 나 그 헬퍼·Page Object 를 건드리는 PR 에서도 같은 잡이 돈다 — 필수 검사가 아니라 신호다.
+빨간 야간 실행은 고치거나, 낡은 테스트면 고쳐서 초록으로 되돌린다. 빨간 채로 두면 아무도 안 본다.
 
 ---
 

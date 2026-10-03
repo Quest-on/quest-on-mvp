@@ -151,6 +151,14 @@ export const ENV_MANIFEST: readonly EnvSpec[] = [
     levels: { production: "required", staging: "required", development: "required" },
   },
   {
+    name: "PASSWORD_RESET_INTENT_SECRET",
+    purpose:
+      "비밀번호 재설정 의도 쿠키의 HMAC 키(base64 32바이트 이상). 없으면 재설정 메일을 보내지 않는다(503). " +
+      "환경마다 다른 값을 쓴다. 회전하면 진행 중인 재설정(최대 10분)만 끊긴다. " +
+      "재설정은 지금 staging 에서만 열려 있다 — production 을 열 때 production 도 required 로 올린다.",
+    levels: { staging: "required" },
+  },
+  {
     name: "ADMIN_USERNAME",
     purpose: "관리자 로그인 ID.",
     levels: ALL_DEPLOYED,

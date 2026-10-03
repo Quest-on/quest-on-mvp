@@ -15,7 +15,7 @@ import { isPasswordResetEnabled } from "@/lib/password-reset-availability";
 import {
   PASSWORD_RESET_COOKIE,
   PASSWORD_RESET_PATH,
-  hasPasswordResetIntent,
+  readPasswordResetIntent,
 } from "@/lib/password-reset-intent";
 
 const isPublicRoute = (pathname: string) =>
@@ -32,6 +32,8 @@ const isPublicRoute = (pathname: string) =>
     // 만료된 링크나 주소 직접 입력으로 세션 없이 오는 경우가 있다. 여기서
     // 막으면 "링크가 만료되었습니다" 안내를 보여줄 기회 자체가 없어진다.
     "/reset-password",
+    // 메일의 복구 링크가 여는 확인 화면. 링크를 누른 사람은 아직 세션이 없다.
+    "/auth/recovery",
     "/onboarding",
     "/legal",
     "/student/profile-setup",
@@ -198,11 +200,18 @@ async function applyRouteGuards(
   // 복구 링크는 세션을 만든다. 그래서 이 화면에 도달하는 사람은 항상 로그인
   // 상태이고, 공개 라우트 목록에만 넣으면 이 블록이 대시보드로 되돌려 보낸다.
   // 그렇다고 로그인 전체에 열면 **아무 로그인 사용자나 옛 비밀번호 없이
-  // 비밀번호를 바꾸는 화면**이 열린다(#447 — Supabase 가 재인증을 강제하지
-  // 않는다).
+  // 비밀번호를 바꾸는 화면**이 열린다(#447 — Supabase 의 재인증 요구는 세션이
+  // 만들어진 지 24시간이 지난 뒤에만 걸린다. 방금 로그인한 세션은 그냥 통과한다).
   //
-  // 그래서 콜백이 복구 세션에만 심는 HttpOnly 의도 쿠키를 본다. 쿠키는
-  // `/reset-password` 경로로 한정돼 있어 다른 요청에는 실리지도 않는다.
+  // 그래서 복구 링크 확인(`POST /api/auth/password-reset/verify`)이 복구
+  // 세션에만 심는 서명된 의도 쿠키를 본다. 여기서는 서명·만료와 **이 사용자에게
+  // 발급됐는지**까지만 확인한다 — 세션 단위 대조와 화면을 실제로 여는 판단은
+  // 페이지와 완료 API 가 검증된 세션으로 한다. 이 단계는 대시보드로 튕기지
+  // 않을 사람을 고르는 것뿐이다.
+  //
+  // `/auth/recovery` 는 로그인 상태여도 통과시킨다. 다른 계정으로 로그인된
+  // 브라우저에서 복구 링크를 누를 수 있고, 확인 버튼을 누르면 그 세션이 복구
+  // 세션으로 바뀐다.
   //
   // `/forgot-password` 는 예외가 아니다 — 이미 로그인한 사람이 거기 갈 이유가
   // 없으므로 대시보드로 보내는 게 맞다.
@@ -213,12 +222,13 @@ async function applyRouteGuards(
   const resetIntent =
     isPasswordResetEnabled() &&
     pathname === PASSWORD_RESET_PATH &&
-    hasPasswordResetIntent(request.cookies.get(PASSWORD_RESET_COOKIE)?.value);
+    readPasswordResetIntent(request.cookies.get(PASSWORD_RESET_COOKIE)?.value)
+      ?.userId === userId;
 
   if (
     isPublicRoute(pathname) &&
     !resetIntent &&
-    !["/auth/callback", "/join", "/onboarding", "/legal", "/student/profile-setup"].some(
+    !["/auth/callback", "/auth/recovery", "/join", "/onboarding", "/legal", "/student/profile-setup"].some(
       (route) => pathname === route || pathname.startsWith(route + "/")
     )
   ) {

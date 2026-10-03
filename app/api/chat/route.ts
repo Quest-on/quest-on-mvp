@@ -8,7 +8,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getOpenAI, AI_MODEL } from "@/lib/openai";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { searchRelevantMaterials } from "@/lib/material-search";
-import { type PromptLanguage, buildStudentChatSystemPrompt } from "@/lib/prompts";
+import type { PromptLanguage } from "@/lib/prompts";
+import { assembleStudentChatInstructions } from "@/lib/chat-instructions";
+import { resolveExamAiProfile, type ResolvedExamAiProfile } from "@/lib/exam-ai-profile";
+import {
+  buildResponseModelStamp,
+  buildStudentChatSpecStamp,
+  type StudentChatSpecId,
+} from "@/lib/student-chat-spec";
 import { handleCorsPreFlight } from "@/lib/cors";
 import { checkRateLimitAsync, RATE_LIMITS } from "@/lib/rate-limit";
 import { validateRequest, chatRequestSchema } from "@/lib/validations";
@@ -172,7 +179,9 @@ async function getAIResponse(
     examId?: string;
     sessionId?: string;
     qIdx?: number;
-  }
+  },
+  // 이 지시문을 어느 스펙·언어로 만들었는지. 응답 기록(spec, template_sha, effort)에 쓴다.
+  promptSpec?: { specId: StudentChatSpecId; language: PromptLanguage }
 ): Promise<{
   response: string;
   responseId: string;
@@ -184,7 +193,14 @@ async function getAIResponse(
     cachedInputTokens: number | null;
     reasoningTokens: number | null;
   } | null;
+  /** messages.metadata 에 펼쳐 넣는 응답 기록. 만들지 못하면 비어 있다. */
+  stamp: Record<string, string>;
 }> {
+  // 지시문을 만든 스펙의 기록. 요청 전에 정해지므로 호출이 실패한 이벤트에도 남는다.
+  // 만들다 실패하면 빈 객체다 — 기록 때문에 학생 응답이 막히면 안 된다.
+  const specStamp: Record<string, string> = promptSpec
+    ? buildStudentChatSpecStamp(promptSpec)
+    : {};
   try {
     const tracked = await callTrackedResponse(
       () =>
@@ -205,23 +221,33 @@ async function getAIResponse(
         qIdx: tracking?.qIdx,
         metadata: buildAiTextMetadata({
           inputText: [systemPrompt, userMessage],
-          extra: previousResponseId
-            ? { previous_response_id: previousResponseId }
-            : undefined,
+          extra: {
+            ...(previousResponseId
+              ? { previous_response_id: previousResponseId }
+              : {}),
+            ...specStamp,
+          },
         }),
       },
       {
-        metadataBuilder: (result) =>
-          buildAiTextMetadata({
+        metadataBuilder: (result) => ({
+          ...buildAiTextMetadata({
             outputText: extractResponseText(
               ((result as { output?: unknown[] }).output as
                 | Parameters<typeof extractResponseText>[0]
                 | undefined) ?? []
             ),
           }),
+          // 응답이 돌려준 모델명(없으면 요청한 모델명으로 대체하고 구분 표시). 던지지 않는다.
+          ...buildResponseModelStamp(result, AI_MODEL),
+        }),
       }
     );
     const response = tracked.data;
+    const stamp: Record<string, string> = {
+      ...specStamp,
+      ...buildResponseModelStamp(response, AI_MODEL),
+    };
 
     // output 배열에서 텍스트 추출
     const responseText = extractResponseText(response.output);
@@ -232,6 +258,7 @@ async function getAIResponse(
           "I'm sorry, I couldn't process your question. Please try rephrasing it.",
         responseId: response.id,
         usage: tracked.usage,
+        stamp,
       };
     }
 
@@ -240,6 +267,7 @@ async function getAIResponse(
       responseId: response.id,
       tokensUsed: tracked.usage?.totalTokens ?? undefined,
       usage: tracked.usage,
+      stamp,
     };
   } catch (openaiError) {
     logError("OpenAI Responses API error", openaiError, { path: "/api/chat" });
@@ -410,6 +438,8 @@ async function handleChatLogic(params: {
   currentQuestionAiContext?: string;
   userId?: string;
   language?: PromptLanguage;
+  /** 이 문항의 AI 역할. 안 주면 사례형(현행). 두 경로 모두 서버가 로드한 시험 행에서 해석한다. */
+  aiProfile?: ResolvedExamAiProfile;
 }): Promise<{
   aiResponse: string;
   responseId: string;
@@ -429,6 +459,7 @@ async function handleChatLogic(params: {
     currentQuestionAiContext,
     userId,
     language,
+    aiProfile,
   } = params;
   const warnings: string[] = [];
 
@@ -483,25 +514,23 @@ async function handleChatLogic(params: {
   const previousResponseId = await previousResponsePromise;
   await insertUserPromise;
 
-  // RAG 검색 결과에 따라 주의문 추가
-  let ragWarning = "";
-  if (rag.resultsCount === 0) {
-    ragWarning = "\n\n[수업 자료 검색 결과 없음] 이 질문과 관련된 수업 자료를 찾지 못했습니다. 수업 자료에 없는 내용을 만들어내지 마세요. 모르면 모른다고 답하세요.";
-  } else if (rag.topSimilarity !== null && rag.topSimilarity < 0.3) {
-    ragWarning = "\n\n[관련성 낮음] 검색된 수업 자료의 관련성이 낮습니다. 답변 시 주의하고, 확신할 수 없는 내용은 추측하지 마세요.";
-  }
-
-  const systemPrompt = buildStudentChatSystemPrompt({
+  // 지시문 조립(프롬프트 본문 + RAG 결과에 따른 주의문)은 temp 경로와 같은 함수를 쓴다.
+  const {
+    instructions: systemPrompt,
+    specId,
+    language: promptLanguage,
+  } = assembleStudentChatInstructions({
     examTitle,
     examCode,
     questionId,
     currentQuestionText,
     currentQuestionAiContext,
-    relevantMaterialsText: rag.relevantMaterialsText,
     language,
-  }) + ragWarning;
+    rag,
+    profile: aiProfile,
+  });
 
-  const { response: aiResponse, responseId, tokensUsed, usage } = await getAIResponse(
+  const { response: aiResponse, responseId, tokensUsed, usage, stamp } = await getAIResponse(
     systemPrompt,
     message,
     previousResponseId,
@@ -510,7 +539,8 @@ async function handleChatLogic(params: {
       examId,
       sessionId,
       qIdx,
-    }
+    },
+    { specId, language: promptLanguage }
   );
 
   // AI 응답/세션 업데이트는 반드시 응답 전에 await (fetch failed 방지)
@@ -537,6 +567,9 @@ async function handleChatLogic(params: {
               reasoning_tokens: usage.reasoningTokens,
             }
           : {},
+        // 어느 스펙·모델로 답했는지 (spec, template_sha, response_model, effort).
+        // rag, usage 는 그대로 두고 키만 더한다.
+        ...stamp,
       },
     },
   ]);
@@ -581,6 +614,7 @@ async function handleChatLogic(params: {
                 reasoning_tokens: usage.reasoningTokens,
               }
             : {},
+          ...stamp,
           _retried: true,
         },
       },
@@ -681,6 +715,8 @@ export async function POST(request: NextRequest) {
       // (ai_context)를 서버에서 직접 파생하기 위함(클라이언트는 ai_context 를 받지 않음).
       let tempExamLanguage: PromptLanguage = "ko";
       let currentQuestionAiContext: string | undefined;
+      // 시험 행을 못 얻으면(examId 없음, 조회 실패) 역할도 못 정하므로 사례형(현행)이다.
+      let tempAiProfile: ResolvedExamAiProfile | undefined;
       if (examId) {
         const { data: examLangRow } = await getSupabase()
           .from("exams")
@@ -694,6 +730,10 @@ export async function POST(request: NextRequest) {
           examLangRow?.questions,
           safeQIdx
         );
+        tempAiProfile = resolveExamAiProfile({
+          exam: { language: examLangRow?.language, questions: examLangRow?.questions },
+          qIdx: safeQIdx,
+        });
       }
 
       // temp_로 남아있는 경우(DB 적재 불가): AI 응답은 하되 DB 저장은 생략
@@ -706,23 +746,21 @@ export async function POST(request: NextRequest) {
           qIdx: safeQIdx,
         });
 
-        // RAG 검색 결과에 따라 주의문 추가
-        let tempRagWarning = "";
-        if (rag.resultsCount === 0) {
-          tempRagWarning = "\n\n[수업 자료 검색 결과 없음] 이 질문과 관련된 수업 자료를 찾지 못했습니다. 수업 자료에 없는 내용을 만들어내지 마세요. 모르면 모른다고 답하세요.";
-        } else if (rag.topSimilarity !== null && rag.topSimilarity < 0.3) {
-          tempRagWarning = "\n\n[관련성 낮음] 검색된 수업 자료의 관련성이 낮습니다. 답변 시 주의하고, 확신할 수 없는 내용은 추측하지 마세요.";
-        }
-
-        const prompt = buildStudentChatSystemPrompt({
+        // 정규 경로(handleChatLogic)와 같은 함수로 지시문을 만든다.
+        const {
+          instructions: prompt,
+          specId: tempSpecId,
+          language: tempPromptLanguage,
+        } = assembleStudentChatInstructions({
           examTitle: requestExamTitle,
           examCode: requestExamCode || "TEMP",
           questionId,
           currentQuestionText,
           currentQuestionAiContext,
-          relevantMaterialsText: rag.relevantMaterialsText,
           language: tempExamLanguage,
-        }) + tempRagWarning;
+          rag,
+          profile: tempAiProfile,
+        });
 
         const previousResponseId = null;
         const { response: aiResponse } = await getAIResponse(
@@ -734,7 +772,8 @@ export async function POST(request: NextRequest) {
             examId,
             sessionId,
             qIdx: safeQIdx,
-          }
+          },
+          { specId: tempSpecId, language: tempPromptLanguage }
         );
 
         return successJson({
@@ -757,6 +796,7 @@ export async function POST(request: NextRequest) {
         currentQuestionAiContext,
         userId: user?.id ?? studentId,
         language: tempExamLanguage,
+        aiProfile: tempAiProfile,
       });
 
       return successJson({
@@ -833,6 +873,13 @@ export async function POST(request: NextRequest) {
     // 서버가 로드한 원본 exam.questions 에서 직접 파생한다.
     const currentQuestionAiContext = extractQuestionAiContext(exam.questions, safeQIdx);
 
+    // 이 문항의 AI 역할(문항 JSON 의 ai_role). 분석 파트너는 ai_role 이 analysis_partner 이고 시험 언어가
+    // ko 일 때만이다. 그 밖(키 없음, 알 수 없는 값, 영어 시험)은 사례형(현행)이다.
+    const aiProfile = resolveExamAiProfile({
+      exam: { language: exam.language, questions: exam.questions },
+      qIdx: safeQIdx,
+    });
+
     const { aiResponse, warnings } = await handleChatLogic({
       sessionId,
       message,
@@ -846,6 +893,7 @@ export async function POST(request: NextRequest) {
       currentQuestionAiContext,
       userId: user?.id ?? session.student_id,
       language: examLanguage,
+      aiProfile,
     });
 
     return successJson({

@@ -32,3 +32,31 @@ export function stripSensitiveQuestionFields<T>(
     return rest;
   }) as T;
 }
+
+/**
+ * Returns the exam row as a student (or an unauthenticated caller who knows the exam
+ * code) may see it. Student and public handlers must go through this one function so
+ * the two paths cannot drift apart.
+ *
+ *  - questions: instructor-only fields are stripped (see stripSensitiveQuestionFields).
+ *  - materials_text: emptied to []. The extracted text exists for the server-side AI only.
+ *  - materials: emptied to []. Students get no file list until the instructor marks files
+ *    as student-visible (a separate feature); until then no URL leaves the server.
+ *    Callers should not select these columns for student paths at all; this is the
+ *    second line of defence.
+ *  - rubric: kept only when `rubric_public === true`.
+ *
+ * Pure function: does not mutate its input. Keys that are absent stay absent, so a
+ * select list that never fetched `materials_text` does not gain it.
+ */
+export function sanitizeExamForStudent<T extends Record<string, unknown>>(exam: T): T {
+  const rubricPublic = exam.rubric_public === true;
+  const out: Record<string, unknown> = { ...exam };
+  if ("questions" in out) {
+    out.questions = stripSensitiveQuestionFields(out.questions, { keepRubric: rubricPublic });
+  }
+  if ("materials" in out) out.materials = [];
+  if ("materials_text" in out) out.materials_text = [];
+  if ("rubric" in out && !rubricPublic) out.rubric = null;
+  return out as T;
+}

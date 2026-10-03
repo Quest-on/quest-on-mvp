@@ -83,4 +83,22 @@ describe("#457 — 버킷마다 자기 한도를 쓴다", () => {
     );
     expect(RATE_LIMITS.passwordReset.limit).toBeLessThan(RATE_LIMITS.chat.limit);
   });
+
+  it("재설정 버킷 셋은 서로 다른 limiter 를 쓴다 (#318)", () => {
+    // 받는 주소 버킷이 IP 버킷과 한도를 공유하면, IP 를 돌리는 사람을 막는
+    // 유일한 장치가 사라진다.
+    const ip = getUpstashRatelimit(RATE_LIMITS.passwordReset);
+    const addr = getUpstashRatelimit(RATE_LIMITS.passwordResetAddress);
+    const verify = getUpstashRatelimit(RATE_LIMITS.passwordResetVerify);
+    expect(new Set([ip, addr, verify]).size).toBe(3);
+  });
+
+  it("받는 주소 버킷은 IP 버킷보다 창이 길다 — 한 받은편지함에 쌓이지 않는다", () => {
+    expect(RATE_LIMITS.passwordResetAddress.windowSec).toBeGreaterThan(
+      RATE_LIMITS.passwordReset.windowSec
+    );
+    expect(RATE_LIMITS.passwordResetAddress.limit).toBeLessThanOrEqual(
+      RATE_LIMITS.passwordReset.limit
+    );
+  });
 });

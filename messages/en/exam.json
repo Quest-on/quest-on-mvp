@@ -44,6 +44,13 @@
     "submitting": "Submitting...",
     "submitAriaLabel": "Submit exam"
   },
+  "rubric": {
+    "button": "Rubric",
+    "buttonAriaLabel": "View rubric",
+    "title": "Rubric for this exam",
+    "description": "Rubric shared by your instructor. Read-only.",
+    "close": "Close"
+  },
   "timer": {
     "ariaLabel": "Time remaining: {time}",
     "expiredTitle": "Time is up",

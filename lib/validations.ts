@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { sanitizeUserInput } from "@/lib/sanitize";
+import { sanitizeChatMessage, sanitizeUserInput } from "@/lib/sanitize";
 
 // AI 문항 생성 상한. 스트림 라우트가 문항당 병렬 OpenAI 호출을 발사하므로
 // (비용·rate-limit 폭주 방지) 보수적으로 유지한다.
@@ -10,6 +10,10 @@ const sessionId = z.string().uuid("Invalid session ID format");
 
 // Sanitized string: strips XSS vectors at validation time
 const sanitizedString = (schema: z.ZodString) => schema.transform(sanitizeUserInput);
+
+// Student chat message: strips tag-shaped text only, so comparisons like `p < 0.05 ... x>5`
+// reach the AI and the DB intact (#523). Use for text that is only ever rendered as plain text.
+const chatMessageString = (schema: z.ZodString) => schema.transform(sanitizeChatMessage);
 
 // ========== Task Type & Workspace Schemas ==========
 
@@ -83,6 +87,8 @@ export const examQuestionItemSchema = z.object({
   type: z.string().optional(),
   idx: z.number().optional(),
   ai_context: z.string().optional().nullable(),
+  /** 학생 채팅 AI 역할 (`lib/exam-ai-profile.ts`). 모르는 값은 해석 단계에서 사례형으로 떨어진다. */
+  ai_role: z.string().optional().nullable(),
   options: z.array(z.string()).optional(),
   correctOptionIndex: z.number().int().min(0).optional(),
   points: z.number().optional(),
@@ -128,7 +134,7 @@ export function safeParseJson<T>(
 
 // Chat API
 export const chatRequestSchema = z.object({
-  message: sanitizedString(z.string().min(1, "Message is required").max(10000, "Message too long")),
+  message: chatMessageString(z.string().min(1, "Message is required").max(10000, "Message too long")),
   sessionId: z.string().min(1, "Session ID is required"),
   questionId: z.string().optional(),
   questionIdx: z.union([z.number(), z.string()]).optional(),

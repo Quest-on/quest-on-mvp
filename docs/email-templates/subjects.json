@@ -1,0 +1,15 @@
+{
+  "confirmation": "Quest-On 가입 인증번호",
+  "recovery": "Quest-On 비밀번호 재설정 안내",
+  "reauthentication": "Quest-On 본인 확인 인증번호",
+  "magic_link": "Quest-On 로그인 링크",
+  "invite": "Quest-On에 초대되었습니다",
+  "email_change": "Quest-On 이메일 주소 변경 확인",
+  "password_changed_notification": "Quest-On 비밀번호가 변경되었습니다",
+  "email_changed_notification": "Quest-On 이메일 주소가 변경되었습니다",
+  "phone_changed_notification": "Quest-On 전화번호가 변경되었습니다",
+  "mfa_factor_enrolled_notification": "Quest-On 새 인증 수단이 추가되었습니다",
+  "mfa_factor_unenrolled_notification": "Quest-On 인증 수단이 삭제되었습니다",
+  "identity_linked_notification": "Quest-On 새 로그인 방식이 연결되었습니다",
+  "identity_unlinked_notification": "Quest-On 로그인 방식 연결이 해제되었습니다"
+}

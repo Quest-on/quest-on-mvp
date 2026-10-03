@@ -82,12 +82,12 @@ export function ForgotPasswordForm() {
               </p>
               <p className="type-hint">{t("sentHint")}</p>
               {/*
-                * PKCE verifier 가 **요청한 브라우저의 쿠키**에 있다. 노트북에서
-                * 요청하고 휴대폰에서 링크를 열면 교환이 실패하는데, 화면은
-                * 만료된 링크와 구분되지 않는다 — 가장 흔한 복구 동선이 그것이라
-                * 미리 알린다.
+                * 링크는 어느 기기에서 열어도 된다(토큰 해시 확인, #318). 대신
+                * 새로 요청하면 **이전 메일의 링크가 무효가 된다** — 안 와서 두 번
+                * 누른 사람이 먼저 온 메일을 열고 "만료" 를 보는 게 가장 흔한
+                * 실패라 미리 알린다.
                 */}
-              <p className="type-hint">{t("sameDeviceHint")}</p>
+              <p className="type-hint">{t("latestLinkHint")}</p>
               <Button asChild variant="outline" className="w-full min-h-[44px]">
                 <Link href="/sign-in">{t("backToSignIn")}</Link>
               </Button>

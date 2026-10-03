@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
 import { PasswordField } from "@/components/auth/PasswordField";
 import {
+  PASSWORD_MESSAGE_VALUES,
   PASSWORD_MIN_LENGTH,
   passwordUpdateErrorKey,
   validatePasswordPair,
@@ -58,7 +59,7 @@ export function ChangePasswordForm() {
   const validate = (): string | null => {
     if (hasPassword && !currentPassword) return t("currentPasswordRequired");
     const pairError = validatePasswordPair(newPassword, confirmPassword);
-    if (pairError) return t(pairError, { minLength: PASSWORD_MIN_LENGTH });
+    if (pairError) return t(pairError, PASSWORD_MESSAGE_VALUES);
     if (hasPassword && currentPassword === newPassword)
       return t("sameAsCurrentPassword");
     return null;

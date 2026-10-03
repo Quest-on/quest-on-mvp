@@ -1,5 +1,6 @@
 "use client";
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -45,12 +46,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { extractErrorMessage } from "@/lib/error-messages";
 import { createClientMessageId } from "@/lib/client-message-id";
+import { useClaimAgentCorner } from "@/components/agent/AgentPanelProvider";
 import type { ProposedGradesMap } from "@/lib/bulk-grading";
 import {
   dashboardStatus,
   dashboardStatusLabel,
   overallScoreLabel,
   type ExamStudentSummary,
+  type StudentLabelMessage,
 } from "@/lib/types/student-summary";
 
 type PermissionKey = "review_before_commit" | "no_precheck" | "ai_default";
@@ -160,6 +163,12 @@ export function BulkGradingPanel({
 }: BulkGradingPanelProps) {
   const queryClient = useQueryClient();
   const t = useTranslations("grading");
+  // 이 드로어의 전송 버튼이 우하단에 있다 — 열려 있는 동안 에이전트 FAB 을 비킨다(#495).
+  useClaimAgentCorner(open);
+  const labelText = useCallback(
+    (label: StudentLabelMessage | null) => (label ? t(label.key, label.values) : "—"),
+    [t],
+  );
 
   const PERMISSION_LABELS: Record<PermissionKey, string> = {
     review_before_commit: t("bulkGrading.permissionReviewLabel"),
@@ -428,9 +437,9 @@ export function BulkGradingPanel({
         sessionId: identity.sessionId,
         studentName: identity.name ?? summary?.name ?? `Student ${identity.sessionId.slice(0, 8)}`,
         studentMeta,
-        scoreLabel: overallScoreLabel({ overallScore: summary?.overallScore }),
+        scoreLabel: labelText(overallScoreLabel({ overallScore: summary?.overallScore })),
         statusLabel: summary
-          ? dashboardStatusLabel(dashboardStatus(summary))
+          ? labelText(dashboardStatusLabel(dashboardStatus(summary)))
           : t("bulkGrading.statusCommitted"),
       };
     });
@@ -444,13 +453,13 @@ export function BulkGradingPanel({
         sessionId: summary.sessionId,
         studentName: summary.name,
         studentMeta,
-        scoreLabel: overallScoreLabel({ overallScore: summary.overallScore }),
-        statusLabel: dashboardStatusLabel(dashboardStatus(summary)),
+        scoreLabel: labelText(overallScoreLabel({ overallScore: summary.overallScore })),
+        statusLabel: labelText(dashboardStatusLabel(dashboardStatus(summary))),
       });
     }
 
     return rows;
-  }, [data?.students, finalSummaries, finalSummariesBySessionId, t]);
+  }, [data?.students, finalSummaries, finalSummariesBySessionId, t, labelText]);
 
   const startGradingMutation = useMutation({
     mutationFn: async () => {

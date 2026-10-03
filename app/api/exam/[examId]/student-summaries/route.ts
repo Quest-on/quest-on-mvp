@@ -240,8 +240,11 @@ export function deriveOverallStatus(params: {
     return "grading";
   }
 
+  // 사례형 점수는 제출 때 자동으로 매겨지지 않는다(GRADING_PIPELINE_RUNBOOK) — 교수자가
+  // 매긴다. 도는 작업이 없는데 점수가 비어 있으면 교수자 차례다. 예전에는 이걸 grading
+  // 으로 돌려 파이프라인이 끝난 뒤에도 "채점중" 이 고정됐다 (#492).
   if (caseTotal > 0 && caseGraded < caseTotal) {
-    return gpStatus === "failed" ? "failed" : "grading";
+    return gpStatus === "failed" ? "failed" : "pending";
   }
 
   if (caseTotal === 0) return "ai_graded";

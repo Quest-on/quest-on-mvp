@@ -63,6 +63,7 @@ const REGISTRY: Record<string, { kind: Classification; why: string }> = {
   "app/api/exam/[examId]/start/route.ts": { kind: "single-exam", why: "단건 시작" },
   "app/api/exam/[examId]/student-summaries/route.ts": { kind: "single-exam", why: "단건 채점 요약" },
   "app/api/feedback/route.ts": { kind: "single-exam", why: "code 로 단건 조회" },
+  "app/api/search-materials/route.ts": { kind: "single-exam", why: "examId 로 한 건을 가리켜 소유자인지 확인하는 조회(#506)" },
   "app/api/instructor/generate-summary/route.ts": { kind: "single-exam", why: "세션의 exam 로드" },
   "app/api/onboarding/demo/route.ts": {
     kind: "single-exam",
