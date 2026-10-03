@@ -101,6 +101,37 @@
     "longLoading": "Response is taking longer than usual. Please wait a moment...",
     "networkWarning": "This may take a moment depending on your network."
   },
+  "analysis": {
+    "preparing": "Preparing the analysis environment",
+    "restarting": "Restarting the analysis environment",
+    "runningCode": "Running code (run {count})",
+    "writing": "Summarizing the results",
+    "elapsed": "{seconds}s elapsed",
+    "progressAriaLabel": "AI analysis progress",
+    "environmentRestarted": "The analysis environment restarted, so the earlier steps were run again.",
+    "recordTitle": "Execution record",
+    "cellLabel": "Code {index}",
+    "codeLines": "Python, {lines} lines",
+    "showCode": "Show code",
+    "hideCode": "Hide code",
+    "codeTruncated": "The code was long, so only the beginning was saved.",
+    "cellFailed": "This code ended with an error.",
+    "showLogs": "Show full output ({lines} lines)",
+    "hideLogs": "Hide output",
+    "logsTruncated": "The output was long, so only the beginning was saved.",
+    "figureAlt": "Chart {number} made by code the AI ran",
+    "figureExpand": "View chart larger",
+    "figureError": "Could not load the chart.",
+    "figuresDropped": "{count} chart(s) could not be saved.",
+    "errors": {
+      "limitExceeded": "The analysis ran too long and was stopped. Please split it into smaller steps and ask again.",
+      "quotaExhausted": "AI analysis is temporarily unavailable. Please tell the proctor.",
+      "rateLimited": "Too many requests to start the analysis. Please send it again in a moment.",
+      "toolUnavailable": "The analysis environment could not be prepared. Please send it again in a moment.",
+      "failed": "Something went wrong during the analysis. Please send it again.",
+      "timeout": "The response timed out. Please split it into smaller steps and ask again."
+    }
+  },
   "submissionOverlay": {
     "saving": "Securely saving your answers...",
     "preparing": "Preparing for AI grading...",

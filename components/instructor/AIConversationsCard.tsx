@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/card";
 import { MessageSquare } from "lucide-react";
 import AIMessageRenderer from "@/components/chat/AIMessageRenderer";
+import { AnalysisTurnBlock } from "@/components/chat/AnalysisTurnBlock";
+import type { ClientAnalysisTurn } from "@/lib/analysis-exec/metadata";
 import { CopyMessageButton } from "@/components/chat/CopyMessageButton";
 import { useTranslations } from "next-intl";
 
@@ -21,10 +23,15 @@ interface Conversation {
 
 interface AIConversationsCardProps {
   messages: Conversation[];
+  /**
+   * 메시지 id 별 분석 턴 실행 기록(#545). 있으면 AI 답변 아래에 코드(접힘), 결과, 그림을 읽기 전용으로 보인다.
+   */
+  analysisByMessageId?: Record<string, ClientAnalysisTurn>;
 }
 
 export function AIConversationsCard({
   messages,
+  analysisByMessageId,
 }: AIConversationsCardProps) {
   const t = useTranslations("grading");
   return (
@@ -65,6 +72,11 @@ export function AIConversationsCard({
                   <AIMessageRenderer
                     content={message.content}
                     timestamp={message.created_at}
+                    attachment={
+                      analysisByMessageId?.[message.id] ? (
+                        <AnalysisTurnBlock analysis={analysisByMessageId[message.id]} />
+                      ) : undefined
+                    }
                   />
                 )}
               </div>

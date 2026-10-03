@@ -20,12 +20,18 @@ interface AIMessageRendererProps {
   content: string;
   timestamp: string;
   variant?: "bubble" | "plain";
+  /**
+   * 본문 아래, 꼬리말 위에 붙는 내용. 분석 턴의 실행 기록(코드, 결과, 그림) 블록이 여기 들어간다(#545).
+   * 없으면 화면이 이전과 같다.
+   */
+  attachment?: React.ReactNode;
 }
 
 const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({
   content,
   timestamp,
   variant = "bubble",
+  attachment,
 }) => {
   const t = useTranslations("assignment");
   const isPlain = variant === "plain";
@@ -238,6 +244,8 @@ const AIMessageRenderer: React.FC<AIMessageRendererProps> = ({
           {normalizedContent}
         </ReactMarkdown>
       </div>
+
+      {attachment}
 
       {isPlain && (
         <div className="mt-2 flex justify-end">

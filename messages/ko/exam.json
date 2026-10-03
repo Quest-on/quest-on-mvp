@@ -101,6 +101,37 @@
     "longLoading": "답변 생성이 지연되고 있습니다. 잠시만 더 기다려주세요...",
     "networkWarning": "네트워크 상태에 따라 시간이 소요될 수 있습니다."
   },
+  "analysis": {
+    "preparing": "분석 환경을 준비하고 있습니다",
+    "restarting": "분석 환경을 다시 시작하고 있습니다",
+    "runningCode": "코드 실행 중 ({count}회째)",
+    "writing": "결과를 정리하고 있습니다",
+    "elapsed": "{seconds}초 경과",
+    "progressAriaLabel": "AI 분석 진행 상황",
+    "environmentRestarted": "분석 환경이 다시 시작되어 이전 단계를 다시 실행했습니다.",
+    "recordTitle": "실행 기록",
+    "cellLabel": "코드 {index}",
+    "codeLines": "Python {lines}줄",
+    "showCode": "코드 보기",
+    "hideCode": "코드 접기",
+    "codeTruncated": "코드가 길어 앞부분만 저장했습니다.",
+    "cellFailed": "이 코드는 실행 중 오류로 끝났습니다.",
+    "showLogs": "실행 결과 전체 보기 ({lines}줄)",
+    "hideLogs": "실행 결과 접기",
+    "logsTruncated": "실행 결과가 길어 앞부분만 저장했습니다.",
+    "figureAlt": "AI가 실행한 코드로 만든 그림 {number}",
+    "figureExpand": "그림 크게 보기",
+    "figureError": "그림을 불러오지 못했습니다.",
+    "figuresDropped": "그림 {count}장은 저장하지 못했습니다.",
+    "errors": {
+      "limitExceeded": "분석이 너무 길어 중단했습니다. 단계를 나눠 다시 요청해 주세요.",
+      "quotaExhausted": "AI 분석을 잠시 사용할 수 없습니다. 감독자에게 알려 주세요.",
+      "rateLimited": "요청이 많아 분석을 시작하지 못했습니다. 잠시 뒤 다시 보내 주세요.",
+      "toolUnavailable": "분석 환경을 준비하지 못했습니다. 잠시 뒤 다시 보내 주세요.",
+      "failed": "분석 중 문제가 생겼습니다. 다시 보내 주세요.",
+      "timeout": "응답 시간이 초과되었습니다. 단계를 나눠 다시 요청해 주세요."
+    }
+  },
   "submissionOverlay": {
     "saving": "답안을 안전하게 저장하고 있습니다...",
     "preparing": "AI가 채점을 준비하고 있습니다...",
