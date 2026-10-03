@@ -98,7 +98,7 @@ export function stripInternalCopyMarkers(text: string): string {
   return text
     .replace(START_MARKER_PATTERN, "")
     .replace(END_MARKER_PATTERN, "")
-    // #555 이전 CopyProtector 표식(폭 없는 공백 3개). 고치기 전 화면에서 복사해 클립보드에 남은 글에 있다.
+    // #560 이전 CopyProtector 표식(폭 없는 공백 3개). 고치기 전 화면에서 복사해 클립보드에 남은 글에 있다.
     // 판정에는 쓰지 않는다(범위가 없고, 폭 없는 공백만으로 내부라고 보면 바깥 글을 오인할 수 있다).
     .replace(/\u200B\u200B\u200B/gu, "");
 }

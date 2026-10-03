@@ -31,7 +31,7 @@ export function CopyProtector({ children, className, metadata }: CopyProtectorPr
   const rootRef = useRef<HTMLDivElement>(null);
 
   // 이 영역에서 시작한 끌기가 끝나기 전에 영역이 화면에서 빠지면(시간이 끝나 제출 화면으로 바뀌거나 문제
-  // 패널을 접는 경우 등) 남긴 표시를 지운다. 서술형 문항끼리 옮길 때는 같은 요소가 그대로 남아 해당하지 않는다.
+  // 패널을 접는 경우 등) 남긴 표시를 지운다. 문제 패널이 펼쳐진 채 서술형 문항끼리 옮길 때는 같은 요소가 남는다.
   useEffect(() => {
     const root = rootRef.current;
     return () => cancelInternalDragFrom(root);

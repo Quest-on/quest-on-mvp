@@ -75,7 +75,10 @@ let container: HTMLDivElement;
 let root: Root;
 const pastes: PasteInfo[] = [];
 
-/** `showQuestion` 을 끄면 문제 본문(CopyProtector)만 화면에서 빠진다(문제 패널을 접을 때처럼). 답안 칸은 그대로 남는다. */
+/**
+ * `showQuestion` 을 끄면 문제 본문(CopyProtector)만 화면에서 빠지고 답안 칸은 남는다. 테스트용 구성이다 — 실제 시험
+ * 화면에서 문제 패널을 접으면 답안 칸도 다른 자리로 옮겨 다시 그려진다.
+ */
 function Harness({ initial, showQuestion = true }: { initial: string; showQuestion?: boolean }) {
   const [value, setValue] = useState(initial);
   return createElement(

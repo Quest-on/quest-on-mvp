@@ -354,6 +354,11 @@ describe("끌어다 놓기의 표식 판정도 세션 범위를 본다 (#560, #5
     expect((await dropInto("drop-a", markedData("같은 세션 글", internalCopyScope("session-a"))))?.isInternal).toBe(true);
   });
 
+  it("형식 없이 같은 세션 범위 표식 문자만 실린 끌기도 내부다", async () => {
+    const data = textClipboard(wrapInternalCopy("표식만 있는 글", internalCopyScope("session-a")));
+    expect((await dropInto("drop-a", data))?.isInternal).toBe(true);
+  });
+
   it("다른 세션 범위의 형식·표식이 실린 끌기는 외부다", async () => {
     expect((await dropInto("drop-a", markedData("다른 세션 글", internalCopyScope("session-b"))))?.isInternal).toBe(false);
   });

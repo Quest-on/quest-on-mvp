@@ -48,8 +48,8 @@ let container: HTMLDivElement;
 let root: Root;
 const pastes: PasteInfo[] = [];
 
-function Harness() {
-  const [value, setValue] = useState("답: ");
+function Harness({ initial = "답: " }: { initial?: string }) {
+  const [value, setValue] = useState(initial);
   return createElement(
     "div",
     null,
@@ -223,5 +223,97 @@ describe("답안 칸 끌어다 놓기 표식 제거 (#555, #561 리뷰)", () => 
 
     expect(textarea().value).toBe("답: 바깥 글");
     expect(pastes[0]).toMatchObject({ pastedText: "바깥 글", pasteStart: 3, pasteEnd: 7, isInternal: false });
+  });
+});
+
+/** 타이머로 미뤄 둔 일이 있으면 다 돌게 한다. */
+async function flushTimers() {
+  for (let i = 0; i < 2; i++) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+}
+
+/** 처음 값을 바꿔 답안 칸을 새로 그린다. */
+async function remount(initial: string) {
+  await act(async () => {
+    root.render(createElement(Harness, { key: initial, initial }));
+  });
+}
+
+describe("놓은 직후 친 글자 (#555 리뷰)", () => {
+  it("표식이 든 글을 놓은 직후 친 글자가 지워지지 않고, 표식도 남지 않는다", async () => {
+    const ta = textarea();
+    const text = "\u200B\u{E0001}\u200B끌어온 글\u200B\u{E0002}\u200B";
+    const data = new FakeClipboard();
+    data.setData("text/plain", text);
+    const drop = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, "dataTransfer", { value: data });
+
+    // 놓기와 바로 이은 타이핑을, 미뤄 둔 타이머가 돌기 전에 보낸다.
+    await act(async () => {
+      const at = ta.value.length;
+      ta.dispatchEvent(drop);
+      ta.dispatchEvent(inputEvent("beforeinput", "insertFromDrop", text));
+      setNativeValue(ta, ta.value + text);
+      ta.setSelectionRange(at, at + text.length);
+      ta.dispatchEvent(inputEvent("input", "insertFromDrop"));
+
+      ta.dispatchEvent(inputEvent("beforeinput", "insertText", "가"));
+      setNativeValue(ta, ta.value + "가");
+      ta.dispatchEvent(inputEvent("input", "insertText", "가"));
+    });
+    await flushTimers();
+
+    expect(textarea().value).toBe("답: 끌어온 글가");
+    expect(pastes[0]).toMatchObject({ pastedText: "끌어온 글", pasteStart: 3, pasteEnd: 8 });
+  });
+});
+
+describe("학생 글은 바꾸지 않는다 (#555 리뷰)", () => {
+  // 표식과 같은 문자를 쓰지만 학생 글에 정당하게 들어 있는 것들
+  const SAMPLES = [
+    ["ZWJ 이모지", "👩\u200D💻"],
+    ["깃발 태그 문자열", "🏴\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}"],
+    ["URL 속 폭 없는 공백 1개", "https://exam\u200Bple.com/"],
+    ["코드 속 폭 없는 공백 2개", "print(\u200B\u200B1)"],
+  ] as const;
+
+  it.each(SAMPLES)("%s 는 붙여넣기로 그대로 들어온다", async (_name, sample) => {
+    const clip = new FakeClipboard();
+    clip.setData("text/plain", sample);
+    await pasteAtEnd(clip);
+
+    expect(textarea().value).toBe("답: " + sample);
+    expect(pastes[0].pastedText).toBe(sample);
+  });
+
+  it.each(SAMPLES)("%s 는 끌어다 놓기로 그대로 들어온다", async (_name, sample) => {
+    await dropAtEnd(sample);
+
+    expect(textarea().value).toBe("답: " + sample);
+    expect(pastes[0].pastedText).toBe(sample);
+  });
+
+  // 고치기 전에 저장된 답안처럼 옛 표식이 이미 남아 있는 답안. 들어온 글만 고치고 이 부분은 그대로 둔다.
+  const EXISTING = "옛 답안\u200B\u200B\u200B그대로 ";
+  const MARKED = "\u200B\u{E0001}\u200B새 글\u200B\u{E0002}\u200B";
+
+  it("끌어다 놓기는 들어온 구간 밖의 답안 글을 건드리지 않는다", async () => {
+    await remount(EXISTING);
+    await dropAtEnd(MARKED);
+
+    expect(textarea().value).toBe(EXISTING + "새 글");
+    expect(pastes[0]).toMatchObject({ pastedText: "새 글", pasteStart: EXISTING.length, pasteEnd: EXISTING.length + 3 });
+  });
+
+  it("붙여넣기도 들어온 구간 밖의 답안 글을 건드리지 않는다", async () => {
+    await remount(EXISTING);
+    const clip = new FakeClipboard();
+    clip.setData("text/plain", MARKED);
+    await pasteAtEnd(clip);
+
+    expect(textarea().value).toBe(EXISTING + "새 글");
   });
 });
