@@ -4,7 +4,8 @@
  * 분석 턴의 실행 기록 블록 (이슈 #545)
  *
  * 학생 채팅(응시 화면)과 교수 채점 화면이 같이 쓴다. 읽기 전용이다.
- *   - 안내: 환경 재시작, 중단(셀 수, 시간), 잔액 소진 같은 턴 결과를 한 줄로 보인다.
+ *   - 안내: 환경 재시작, 중단(셀 수, 시간, 연결 끊김), 답 잘림, 잔액 소진 같은 턴 결과를 한 줄로 보인다. 학생 화면은
+ *     학생에게 하는 말(다시 보내 주세요 등), 교수 채점 화면은 그 턴에 무슨 일이 있었는지를 설명하는 말을 쓴다.
  *   - 셀: 코드는 기본 접힘("코드 보기"), 실행 결과는 짧으면 그대로, 길면 접힘. 그림은 권한 확인 라우트로 열고
  *     누르면 크게 본다.
  * 소유자 결정: 코드는 접어서 보여 주되 전부 기록한다. 기록(저장)은 서버가 하고 이 블록은 보여 주기만 한다.
@@ -17,7 +18,7 @@ import type { SyntaxHighlighterProps } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { AlertTriangle, ChevronDown, Code2, ImageOff, Maximize2, RotateCcw } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { AnalysisErrorCode } from "@/lib/analysis-exec/client-events";
 import type { AnalysisOutcome, ClientAnalysisCell, ClientAnalysisFigure, ClientAnalysisTurn } from "@/lib/analysis-exec/metadata";
@@ -26,26 +27,40 @@ import type { AnalysisOutcome, ClientAnalysisCell, ClientAnalysisFigure, ClientA
 const LOGS_COLLAPSE_LINES = 12;
 
 type NoticeKey =
-  | "environmentRestarted"
-  | "errors.limitExceeded"
-  | "errors.quotaExhausted"
-  | "errors.rateLimited"
-  | "errors.toolUnavailable"
-  | "errors.failed"
-  | "errors.timeout";
+  | "limitExceeded"
+  | "quotaExhausted"
+  | "rateLimited"
+  | "toolUnavailable"
+  | "failed"
+  | "timeout"
+  | "clientCancelled"
+  | "incomplete";
+
+/** 누가 보는 화면인가. 학생 응시 화면과 교수 채점 화면은 같은 턴에 다른 말을 쓴다. */
+export type AnalysisViewer = "student" | "instructor";
+
+/** 안내 문구의 메시지 키. 학생은 `analysis.errors.*`, 교수는 `analysis.instructorNotices.*`. */
+export function noticeMessageKey(key: NoticeKey | "environmentRestarted", viewer: AnalysisViewer): string {
+  if (viewer === "instructor") return `analysis.instructorNotices.${key}`;
+  return key === "environmentRestarted" ? "analysis.environmentRestarted" : `analysis.errors.${key}`;
+}
 
 /** 턴 결과를 안내 문구 키로 바꾼다. 정상 완료는 안내가 없다. */
 export function outcomeNoticeKey(outcome: AnalysisOutcome): NoticeKey | null {
   switch (outcome) {
     case "cell_limit":
     case "time_limit":
-      return "errors.limitExceeded";
+      return "limitExceeded";
     case "quota_exhausted":
-      return "errors.quotaExhausted";
+      return "quotaExhausted";
     case "rate_limited":
-      return "errors.rateLimited";
+      return "rateLimited";
     case "upstream_error":
-      return "errors.failed";
+      return "failed";
+    case "client_cancelled":
+      return "clientCancelled";
+    case "incomplete":
+      return "incomplete";
     default:
       return null;
   }
@@ -55,17 +70,17 @@ export function outcomeNoticeKey(outcome: AnalysisOutcome): NoticeKey | null {
 export function errorCodeNoticeKey(code: AnalysisErrorCode | "timeout"): NoticeKey {
   switch (code) {
     case "limit_exceeded":
-      return "errors.limitExceeded";
+      return "limitExceeded";
     case "quota_exhausted":
-      return "errors.quotaExhausted";
+      return "quotaExhausted";
     case "rate_limited":
-      return "errors.rateLimited";
+      return "rateLimited";
     case "tool_unavailable":
-      return "errors.toolUnavailable";
+      return "toolUnavailable";
     case "timeout":
-      return "errors.timeout";
+      return "timeout";
     default:
-      return "errors.failed";
+      return "failed";
   }
 }
 
@@ -91,6 +106,7 @@ function Figure({ figure, index }: { figure: ClientAnalysisFigure; index: number
   const t = useTranslations("exam");
   const [failed, setFailed] = useState(false);
   const alt = t("analysis.figureAlt", { number: index });
+  const descriptionId = useId();
 
   if (failed) {
     return (
@@ -107,7 +123,7 @@ function Figure({ figure, index }: { figure: ClientAnalysisFigure; index: number
         <button
           type="button"
           className="group/figure relative block w-full overflow-hidden rounded-md border border-border/50 bg-background"
-          aria-label={t("analysis.figureExpand")}
+          aria-label={t("analysis.figureExpand", { number: index })}
         >
           {/* 서명 URL 로 가는 권한 확인 라우트라 next/image 최적화를 거치지 않는다. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -123,8 +139,11 @@ function Figure({ figure, index }: { figure: ClientAnalysisFigure; index: number
           </span>
         </button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] max-w-[min(95vw,64rem)] overflow-auto">
+      <DialogContent className="max-h-[90vh] max-w-[min(95vw,64rem)] overflow-auto" aria-describedby={descriptionId}>
         <DialogTitle className="type-section-title">{alt}</DialogTitle>
+        <DialogDescription id={descriptionId} className="sr-only">
+          {t("analysis.figureDialogDescription")}
+        </DialogDescription>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={figure.url} alt={alt} className="h-auto w-full bg-background object-contain" />
       </DialogContent>
@@ -151,7 +170,9 @@ function CellView({ cell }: { cell: ClientAnalysisCell }) {
             className="flex min-h-[36px] w-full items-center gap-2 rounded px-1 text-left text-sm hover:bg-muted/60"
           >
             <Code2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="font-medium">{t("analysis.cellLabel", { index: cell.index })}</span>
+            <span className="font-medium">
+              {cell.replay ? t("analysis.replayCellLabel") : t("analysis.cellLabel", { index: cell.index })}
+            </span>
             <span className="type-meta">{t("analysis.codeLines", { lines: codeLines })}</span>
             <span className="ml-auto flex items-center gap-1 type-meta">
               {codeOpen ? t("analysis.hideCode") : t("analysis.showCode")}
@@ -224,9 +245,11 @@ export interface AnalysisTurnBlockProps {
   analysis: ClientAnalysisTurn;
   /** 스트림 오류로 끝난 턴의 안내(저장된 결과에 없는 실시간 오류). */
   errorNotice?: AnalysisErrorCode | "timeout";
+  /** 보는 사람. 기본은 학생. 교수 채점 화면은 instructor 로 넘겨 학생에게 하는 말 대신 턴 설명을 보인다. */
+  viewer?: AnalysisViewer;
 }
 
-export function AnalysisTurnBlock({ analysis, errorNotice }: AnalysisTurnBlockProps) {
+export function AnalysisTurnBlock({ analysis, errorNotice, viewer = "student" }: AnalysisTurnBlockProps) {
   const t = useTranslations("exam");
   const restarted = analysis.notices.includes("environment_restarted");
   const outcomeKey = outcomeNoticeKey(analysis.outcome);
@@ -235,8 +258,8 @@ export function AnalysisTurnBlock({ analysis, errorNotice }: AnalysisTurnBlockPr
 
   return (
     <div className="not-prose mt-3 space-y-2" data-testid="analysis-turn-block">
-      {restarted && <Notice tone="info">{t("analysis.environmentRestarted")}</Notice>}
-      {warningKey && <Notice tone="warning">{t(`analysis.${warningKey}`)}</Notice>}
+      {restarted && <Notice tone="info">{t(noticeMessageKey("environmentRestarted", viewer))}</Notice>}
+      {warningKey && <Notice tone="warning">{t(noticeMessageKey(warningKey, viewer))}</Notice>}
       {analysis.cells.length > 0 && (
         <section aria-label={t("analysis.recordTitle")} className="space-y-2">
           <h4 className="type-meta font-semibold">{t("analysis.recordTitle")}</h4>
@@ -263,7 +286,7 @@ export function AnalysisErrorNotice({ code }: { code: AnalysisErrorCode | "timeo
   const t = useTranslations("exam");
   return (
     <div className="not-prose mt-1">
-      <Notice tone="warning">{t(`analysis.${errorCodeNoticeKey(code)}`)}</Notice>
+      <Notice tone="warning">{t(noticeMessageKey(errorCodeNoticeKey(code), "student"))}</Notice>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 /**
  * 분석 실행 단위 모듈 (이슈 #545): 셀 수집과 상한, 오류 분류, 답변 텍스트 정리, 저장 기록 모양, 켜지는 조건,
- * 컨테이너 준비와 만료 복구 입력, 문항 간 연결 입력.
+ * 컨테이너 준비와 만료 복구 입력(복원 파일, 이력 출처, 다시 복원), 문항 간 연결과 중단된 요청의 입력.
  *
  * OpenAI 는 부르지 않는다. 컨테이너 연산은 가짜 객체로 바꾼다.
  */
@@ -39,20 +39,39 @@ import {
 } from "@/lib/analysis-exec/eligibility";
 import {
   AnalysisSetupError,
+  INTERRUPTED_CODE_HEADER,
   LINKED_CODE_HEADER,
+  REPLAY_FILE_NAME,
   REPLAY_INSTRUCTION_HEADER,
+  REPLAY_MARKER,
   applyPathRewrites,
+  buildFileRestoreInstruction,
+  buildInterruptedCodeInstruction,
   buildLinkedCodeInstruction,
   buildReplayInstruction,
+  buildReplayScript,
+  capCells,
+  collectContainerHistory,
   collectLinkedCells,
-  collectReplayCells,
+  collectUnseenCells,
   ensureAnalysisContainer,
+  historyPathRewrites,
+  isReplayCellCode,
+  parseReplayResult,
+  replayExecLine,
+  restoreNeedsRetry,
   toAsciiUploadName,
   type ContainerOps,
+  type HistoryRecord,
 } from "@/lib/analysis-exec/container";
 import { buildStoredTurn, storeCellFigures, storeCitedFigures } from "@/lib/analysis-exec/persist";
 import { resolveExamAiProfile } from "@/lib/exam-ai-profile";
-import { createFigureStore, materialObjectPath } from "@/lib/analysis-exec/session-records";
+import {
+  DATA_SOURCE_DOWNLOAD_TIMEOUT_MS,
+  createFigureStore,
+  downloadDataSource,
+  materialObjectPath,
+} from "@/lib/analysis-exec/session-records";
 
 const PNG_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
@@ -286,6 +305,39 @@ function storedTurn(overrides: Partial<StoredAnalysisTurn> = {}): StoredAnalysis
   };
 }
 
+describe("검토 반영: 링크 괄호와 화면용 그림 경로", () => {
+  it("파일 이름에 괄호가 있는 sandbox 링크도 이름만 남긴다", () => {
+    expect(stripSandboxLinks("결과는 [파일](sandbox:/mnt/data/clusters (1).csv) 입니다.")).toBe("결과는 파일 입니다.");
+    expect(stripSandboxLinks("그림 ![산점도](sandbox:/mnt/data/plot (2).png) 끝")).toBe("그림  끝");
+  });
+
+  it("화면용 기록은 이 메시지 경로의 그림만 내려보낸다(다른 세션, 다른 메시지, 이름 모양이 틀린 경로 제외)", () => {
+    const turn = storedTurn({
+      cells: [
+        {
+          index: 1,
+          status: "completed",
+          code: "plot()",
+          logs: "",
+          figures: [
+            { path: `${SID}/${MID}/1.png`, mime: "image/png", bytes: 1, sha256: "a" },
+            { path: `other-session/${MID}/1-2.png`, mime: "image/png", bytes: 1, sha256: "b" },
+            { path: `${SID}/other-message/1-3.png`, mime: "image/png", bytes: 1, sha256: "c" },
+            { path: `${SID}/${MID}/../x.png`, mime: "image/png", bytes: 1, sha256: "d" },
+          ],
+        },
+      ],
+      cited_figures: [
+        { path: `${SID}/${MID}/f1.png`, mime: "image/png", bytes: 1, sha256: "e" },
+        { path: `other-session/${MID}/f2.png`, mime: "image/png", bytes: 1, sha256: "f" },
+      ],
+    });
+    const client = toClientAnalysisTurn({ sessionId: SID, messageId: MID, turn });
+    expect(client.cells[0].figures.map((f) => f.name)).toEqual(["1.png"]);
+    expect(client.figures.map((f) => f.name)).toEqual(["f1.png"]);
+  });
+});
+
 describe("저장 기록 모양과 화면용 기록", () => {
   it("readStoredAnalysisTurn 은 저장한 모양을 그대로 읽고, 틀린 모양은 null", () => {
     expect(readStoredAnalysisTurn({ analysis: storedTurn() })).toEqual(storedTurn());
@@ -479,6 +531,10 @@ function fakeOps(overrides: Partial<ContainerOps> = {}) {
       ops.calls.push(`upload:${filename}`);
       return { id: `file-up${++fileSeq}` };
     }),
+    uploadContainerFile: vi.fn(async ({ containerId, filename }) => {
+      ops.calls.push(`container-upload:${containerId}:${filename}`);
+      return { id: "cfile_replay", path: `/mnt/data/abc-${filename}` };
+    }),
     downloadDataSource: vi.fn(async () => ({ ok: true as const, bytes: new Uint8Array([1, 2, 3]) })),
     ...overrides,
   };
@@ -589,56 +645,162 @@ describe("컨테이너 준비와 만료 복구", () => {
 });
 
 describe("만료 복구 입력 구성", () => {
+  const cell = (index: number, code: string, status = "completed", extra: Record<string, unknown> = {}) => ({
+    index,
+    status,
+    code,
+    logs: "",
+    figures: [],
+    ...extra,
+  });
+  const rec = (messageId: string, qIdx: number, turn: StoredAnalysisTurn): HistoryRecord => ({ messageId, qIdx, turn });
   const turnA = storedTurn({
     container_id: "cntr_old",
-    cells: [
-      { index: 1, status: "completed", code: "df = load()", logs: "", figures: [] },
-      { index: 2, status: "failed", code: "boom()", logs: "", figures: [] },
-      { index: 3, status: "completed", code: "x" + "y".repeat(10), logs: "", figures: [], code_truncated: true },
-    ],
+    cells: [cell(1, "df = load()"), cell(2, "boom()", "failed"), cell(3, "x" + "y".repeat(10), "completed", { code_truncated: true })],
   });
-  const turnB = storedTurn({
-    container_id: "cntr_old",
-    cells: [{ index: 1, status: "completed", code: "scaled = scale(df)", logs: "", figures: [] }],
-  });
-  const other = storedTurn({
-    container_id: "cntr_older",
-    cells: [{ index: 1, status: "completed", code: "OLD", logs: "", figures: [] }],
+  const turnB = storedTurn({ container_id: "cntr_old", cells: [cell(1, "scaled = scale(df)")] });
+  const other = storedTurn({ container_id: "cntr_older", cells: [cell(1, "OLD")] });
+
+  it("이력은 그 컨테이너에서 성공한 원래 셀을 문항과 관계없이 시간 순서로 모은다(실패, 잘린 코드, 다른 컨테이너 제외)", () => {
+    expect(
+      collectContainerHistory([rec("m0", 0, other), rec("m1", 0, turnA), rec("m2", 1, turnB)], "cntr_old")
+    ).toEqual([
+      { qIdx: 0, code: "df = load()", ref: { m: "m1", i: 1 } },
+      { qIdx: 1, code: "scaled = scale(df)", ref: { m: "m2", i: 1 } },
+    ]);
   });
 
-  it("만료된 컨테이너에서 성공한 셀만 문항과 관계없이 시간 순서로 모은다(실패, 잘린 코드, 다른 컨테이너 제외)", () => {
-    expect(
-      collectReplayCells(
-        [
-          { qIdx: 0, turn: other },
-          { qIdx: 0, turn: turnA },
-          { qIdx: 1, turn: turnB },
-        ],
-        "cntr_old"
-      )
-    ).toEqual({
-      cells: [
-        { qIdx: 0, code: "df = load()" },
-        { qIdx: 1, code: "scaled = scale(df)" },
-      ],
-      omitted: 0,
+  it("길이 상한을 넘으면 앞에서부터 넣고 그 뒤 셀은 모두 빼고 센다", () => {
+    expect(capCells([{ code: "a = 1" }, { code: "b".repeat(30) }, { code: "c = a" }], 25)).toEqual({
+      cells: [{ code: "a = 1" }],
+      omitted: 2,
     });
   });
 
-  it("길이 상한을 넘으면 앞에서부터 넣고 나머지 수를 센다", () => {
-    expect(
-      collectReplayCells(
-        [
-          { qIdx: 0, turn: turnA },
-          { qIdx: 0, turn: turnB },
+  it("복원 셀을 하나로 합쳐 실행한 뒤 두 번째로 만료돼도 원래 셀로 다시 복원한다(잘린 합본에 이력이 묻히지 않음)", () => {
+    // 리뷰 재현: 원래 셀 4개(읽기, 행 제외, 표준화, KMeans) → 첫 만료 → 새 컨테이너에서 복원 셀 하나(2만 자를 넘어 잘림)와
+    // 새 셀 하나 → 두 번째 만료. 예전에는 잘린 합본이 빠지고 새 셀 하나만 남았다.
+    const original = rec(
+      "m1",
+      0,
+      storedTurn({
+        container_id: "cntr_a",
+        cells: [cell(1, "df = read()"), cell(2, "df = df[~mask]"), cell(3, "X = scale(df)"), cell(4, "km = KMeans(4).fit(X)")],
+      })
+    );
+    const restored = rec(
+      "m2",
+      1,
+      storedTurn({
+        container_id: "cntr_b",
+        cells: [
+          cell(1, `exec(open("/mnt/data/abc-${REPLAY_FILE_NAME}").read())`, "completed", { replay: true }),
+          cell(2, "merged" + "z".repeat(30), "completed", { code_truncated: true }),
+          cell(3, "profile = df.groupby(km.labels_).mean()"),
         ],
-        "cntr_old",
-        12
-      )
-    ).toEqual({ cells: [{ qIdx: 0, code: "df = load()" }], omitted: 1 });
+        restore: { refs: [{ m: "m1", i: 1 }, { m: "m1", i: 2 }, { m: "m1", i: 3 }, { m: "m1", i: 4 }], mode: "file", status: "ok", ok_cells: 4, failed_cells: 0 },
+      })
+    );
+    const history = collectContainerHistory([original, restored], "cntr_b");
+    expect(history.map((h) => h.code)).toEqual([
+      "df = read()",
+      "df = df[~mask]",
+      "X = scale(df)",
+      "km = KMeans(4).fit(X)",
+      "profile = df.groupby(km.labels_).mean()",
+    ]);
+    expect(history.map((h) => h.ref)).toEqual([
+      { m: "m1", i: 1 },
+      { m: "m1", i: 2 },
+      { m: "m1", i: 3 },
+      { m: "m1", i: 4 },
+      { m: "m2", i: 3 },
+    ]);
   });
 
-  it("복구 지시에는 표시 문구와 문제 번호가 붙은 코드가 들어가고, 다시 실행할 코드가 없으면 null", () => {
+  it("파일을 못 올려 모델이 코드를 다시 쓴 복원 턴(inline)은 이력에서 통째로 빼 같은 처리가 두 번 들어가지 않는다", () => {
+    const original = rec("m1", 0, storedTurn({ container_id: "cntr_a", cells: [cell(1, "df = df[~mask]")] }));
+    const inline = rec(
+      "m2",
+      0,
+      storedTurn({
+        container_id: "cntr_b",
+        cells: [cell(1, "df = df[~mask]  # 다시 쓴 코드")],
+        restore: { refs: [{ m: "m1", i: 1 }], mode: "inline", status: "ok" },
+      })
+    );
+    const later = rec("m3", 0, storedTurn({ container_id: "cntr_b", cells: [cell(1, "X = scale(df)")] }));
+    expect(collectContainerHistory([original, inline, later], "cntr_b").map((h) => h.code)).toEqual([
+      "df = df[~mask]",
+      "X = scale(df)",
+    ]);
+  });
+
+  it("복원이 덜 끝난 컨테이너만 다시 복원한다(실패한 셀이 있는 partial 은 다시 해도 같으므로 하지 않는다)", () => {
+    const at = (status: "ok" | "partial" | "incomplete") => [
+      rec("m1", 0, storedTurn({ container_id: "cntr_b", restore: { refs: [], mode: "file", status } })),
+    ];
+    expect(restoreNeedsRetry(at("incomplete"), "cntr_b")).toBe(true);
+    expect(restoreNeedsRetry(at("ok"), "cntr_b")).toBe(false);
+    expect(restoreNeedsRetry(at("partial"), "cntr_b")).toBe(false);
+    expect(restoreNeedsRetry(at("incomplete"), "cntr_other")).toBe(false);
+    expect(restoreNeedsRetry([rec("m1", 0, storedTurn({ container_id: "cntr_b" }))], "cntr_b")).toBe(false);
+  });
+
+  it("옛 데이터 파일 경로는 여러 세대 전 것까지 지금 경로로 바꾼다", () => {
+    const file = (path: string) => ({ name: "a.xlsx", path, file_id: path, source: "https://s/a.xlsx" });
+    const records = [
+      rec("m1", 0, storedTurn({ container_id: "a", files: [file("/mnt/data/gen1-a.xlsx")] })),
+      rec("m2", 0, storedTurn({ container_id: "b", files: [file("/mnt/data/gen2-a.xlsx")] })),
+    ];
+    expect(historyPathRewrites(records, [file("/mnt/data/gen3-a.xlsx")])).toEqual([
+      { from: "/mnt/data/gen1-a.xlsx", to: "/mnt/data/gen3-a.xlsx" },
+      { from: "/mnt/data/gen2-a.xlsx", to: "/mnt/data/gen3-a.xlsx" },
+    ]);
+  });
+
+  it("복원 파일은 ASCII 이고 셀 코드를 그대로(경로 치환 뒤) 담으며 결과 줄을 출력한다", () => {
+    const script = buildReplayScript([
+      { qIdx: 0, code: "df = pd.read_excel('/mnt/data/new-a.xlsx')\nprint(\"한글 '따옴표'\")" },
+      { qIdx: 1, code: "X = scale(df)" },
+    ]);
+    expect(/^[\x00-\x7F]*$/.test(script)).toBe(true);
+    const encoded = [...script.matchAll(/\("Q(\d)-C(\d)", "([A-Za-z0-9+/=]+)"\)/g)];
+    expect(encoded.map((m) => `Q${m[1]}-C${m[2]}`)).toEqual(["Q1-C1", "Q2-C1"]);
+    expect(Buffer.from(encoded[0][3], "base64").toString("utf8")).toBe(
+      "df = pd.read_excel('/mnt/data/new-a.xlsx')\nprint(\"한글 '따옴표'\")"
+    );
+    // 다시 실행하는 동안의 출력과 그림은 내보내지 않고, 끝나면 plt.show 를 되돌린다.
+    expect(script).toContain("redirect_stdout");
+    expect(script).toContain("_qo_plt.show = _qo_show");
+    expect(script).toContain(`print("${REPLAY_MARKER} ok=%d failed=%d"`);
+  });
+
+  it("복원 셀의 결과 줄을 읽는다. 없으면 null(복원이 끝까지 돌지 않음)", () => {
+    expect(parseReplayResult(`${REPLAY_MARKER} ok=4 failed=0\n`)).toEqual({ ok: 4, failed: 0 });
+    expect(parseReplayResult(`앞 출력\n${REPLAY_MARKER} ok=3 failed=1\n${REPLAY_MARKER}_ERROR Q1-C2 KeyError: 'x'`)).toEqual({ ok: 3, failed: 1 });
+    expect(parseReplayResult("Traceback ... FileNotFoundError")).toBeNull();
+    expect(isReplayCellCode(replayExecLine(`/mnt/data/abc-${REPLAY_FILE_NAME}`))).toBe(true);
+    expect(isReplayCellCode("print(1)")).toBe(false);
+  });
+
+  it("파일 방식 복구 지시는 한 줄 실행을 시키고 코드는 참고로만 준다(문제 번호, 지금 문항, 넣지 못한 셀)", () => {
+    const text = buildFileRestoreInstruction({
+      path: `/mnt/data/abc-${REPLAY_FILE_NAME}`,
+      reference: { cells: [{ qIdx: 0, code: "df = load()" }, { qIdx: 1, code: "km = fit(df)" }], omitted: 1 },
+      omittedFromFile: 0,
+      currentQIdx: 1,
+    });
+    expect(text.startsWith(REPLAY_INSTRUCTION_HEADER)).toBe(true);
+    expect(text).toContain(`\`\`\`python\nexec(open("/mnt/data/abc-${REPLAY_FILE_NAME}").read())\n\`\`\``);
+    expect(text).toContain("코드를 다시 쓰지 않고 이 한 줄만 실행합니다.");
+    expect(text).toContain("지금 풀고 있는 문제는 문제 2입니다. 다른 번호가 붙은 셀은 앞 문항에서 실행한 코드입니다.");
+    expect(text).toContain("# 문제 1 셀 1\ndf = load()\n\n# 문제 2 셀 1\nkm = fit(df)");
+    expect(text).toContain("참고 코드에는 길이 제한으로 마지막 셀 1개를 넣지 않았습니다(파일에는 들어 있습니다).");
+    expect(text).not.toContain("파일에도 넣지 못했습니다");
+  });
+
+  it("모델이 코드를 다시 실행하는 복구 지시(파일을 못 올렸을 때)에는 표시 문구와 문제 번호가 붙은 코드가 들어간다", () => {
     const text = buildReplayInstruction({
       cells: [
         { qIdx: 0, code: "df = load()" },
@@ -652,7 +814,6 @@ describe("만료 복구 입력 구성", () => {
     expect(text).toContain("```python");
     expect(text).toContain("# 문제 1 셀 1\ndf = load()\n\n# 문제 1 셀 2\nscaled = scale(df)");
     expect(text).toContain("마지막 셀 1개");
-    // 같은 문항의 셀만 있으면 지금 문항 안내 줄이 없다.
     expect(text).not.toContain("지금 풀고 있는 문제는");
     expect(buildReplayInstruction({ cells: [], omitted: 0, currentQIdx: 0 })).toBeNull();
   });
@@ -670,6 +831,124 @@ describe("만료 복구 입력 구성", () => {
     expect(text).toContain("# 문제 1 셀 1\ndf = load()\n\n# 문제 2 셀 1\nkm = fit(df)");
     expect(text).not.toContain(LINKED_CODE_HEADER);
     expect(text).not.toContain("길이 제한");
+  });
+
+  it("복원 기록과 복원 셀 표시는 저장한 그대로 읽히고, 화면용 기록에는 복원 출처가 없다", () => {
+    const turn = storedTurn({
+      cells: [
+        { index: 1, status: "completed", code: replayExecLine("/mnt/data/abc-x.py"), logs: "", figures: [], replay: true },
+      ],
+      cited_figures: [],
+      restore: { refs: [{ m: "m1", i: 2 }], mode: "file", status: "partial", ok_cells: 3, failed_cells: 1 },
+      interrupted_cells: 2,
+    });
+    expect(readStoredAnalysisTurn({ analysis: turn })).toEqual(turn);
+    const client = toClientAnalysisTurn({ sessionId: SID, messageId: MID, turn });
+    expect(client.cells[0].replay).toBe(true);
+    expect(JSON.stringify(client)).not.toContain("refs");
+    expect(JSON.stringify(client)).not.toContain("m1");
+  });
+});
+
+describe("중단된 요청과 문항 간 연결의 입력 구성", () => {
+  const cell = (index: number, code: string, status = "completed", extra: Record<string, unknown> = {}) => ({
+    index,
+    status,
+    code,
+    logs: "",
+    figures: [],
+    ...extra,
+  });
+  const live = { containerId: "cntr_live" };
+
+  it("같은 문항의 중단된 턴(시간 상한)이 실행한 셀은 다음 턴에 interrupted 로 알린다(리뷰 차단 1 재현)", () => {
+    const t1 = storedTurn({ container_id: "cntr_live", cells: [cell(1, "df = pd.read_excel(p)")], outcome: "completed" });
+    const t2 = storedTurn({
+      container_id: "cntr_live",
+      cells: [cell(1, "mask = iqr(df)"), cell(2, "df = df[~mask]"), cell(3, "slow()", "incomplete")],
+      outcome: "time_limit",
+    });
+    const unseen = collectUnseenCells(
+      [
+        { qIdx: 0, turn: t1 },
+        { qIdx: 0, turn: t2 },
+      ],
+      { ...live, qIdx: 0 }
+    );
+    expect(unseen.interrupted).toEqual({
+      cells: [
+        { qIdx: 0, code: "mask = iqr(df)" },
+        { qIdx: 0, code: "df = df[~mask]" },
+      ],
+      omitted: 0,
+    });
+    expect(unseen.linked).toEqual({ cells: [], omitted: 0 });
+    // 그 뒤 같은 문항에서 성공한 턴이 있으면(그 턴이 이미 알렸으므로) 더는 알리지 않는다.
+    const t3 = storedTurn({ container_id: "cntr_live", cells: [], outcome: "completed" });
+    expect(
+      collectUnseenCells(
+        [
+          { qIdx: 0, turn: t1 },
+          { qIdx: 0, turn: t2 },
+          { qIdx: 0, turn: t3 },
+        ],
+        { ...live, qIdx: 0 }
+      ).interrupted.cells
+    ).toEqual([]);
+  });
+
+  it("연결 끊김과 상류 오류로 중단된 턴도 같다. 복원 셀은 알리지 않는다", () => {
+    const t1 = storedTurn({ container_id: "cntr_live", cells: [], outcome: "completed" });
+    const cancelled = storedTurn({
+      container_id: "cntr_live",
+      cells: [cell(1, replayExecLine("/mnt/data/x.py"), "completed", { replay: true }), cell(2, "a = 1")],
+      outcome: "client_cancelled",
+    });
+    const errored = storedTurn({ container_id: "cntr_live", cells: [cell(1, "b = 2")], outcome: "upstream_error" });
+    expect(
+      collectUnseenCells(
+        [
+          { qIdx: 2, turn: t1 },
+          { qIdx: 2, turn: cancelled },
+          { qIdx: 2, turn: errored },
+        ],
+        { ...live, qIdx: 2 }
+      ).interrupted.cells.map((c) => c.code)
+    ).toEqual(["a = 1", "b = 2"]);
+  });
+
+  it("연결 블록과 중단 블록은 시간 순서로 한 상한을 나눠 쓴다", () => {
+    const other = storedTurn({ container_id: "cntr_live", cells: [cell(1, "x".repeat(20))], outcome: "completed" });
+    const failedOwn = storedTurn({ container_id: "cntr_live", cells: [cell(1, "y".repeat(20))], outcome: "cell_limit" });
+    const unseen = collectUnseenCells(
+      [
+        { qIdx: 0, turn: other },
+        { qIdx: 1, turn: failedOwn },
+      ],
+      { ...live, qIdx: 1, maxChars: 30 }
+    );
+    expect(unseen.linked).toEqual({ cells: [{ qIdx: 0, code: "x".repeat(20) }], omitted: 0 });
+    expect(unseen.interrupted).toEqual({ cells: [], omitted: 1 });
+  });
+
+  it("중단 지시는 정한 머리말, 지금 문항, 상태를 먼저 확인하라는 문장, 문제 번호가 붙은 코드를 담는다", () => {
+    const text = buildInterruptedCodeInstruction({ cells: [{ qIdx: 0, code: "df = df[~mask]" }], omitted: 0, currentQIdx: 0 })!;
+    expect(INTERRUPTED_CODE_HEADER).toBe("[직전 요청이 중단되기 전에 이미 실행된 코드 — 변수에 반영돼 있음]");
+    expect(text.startsWith(`${INTERRUPTED_CODE_HEADER}\n지금 풀고 있는 문제는 문제 1입니다.`)).toBe(true);
+    expect(text).toContain("같은 처리를 다시 하기 전에 지금 상태(행 수 등)를 먼저 확인합니다.");
+    expect(text).toContain("```python\n# 문제 1 셀 1\ndf = df[~mask]\n```");
+    expect(buildInterruptedCodeInstruction({ cells: [], omitted: 0, currentQIdx: 0 })).toBeNull();
+  });
+
+  it("문항 간 연결은 복원 셀을 빼고 원래 셀만 알린다", () => {
+    const restoredQ1 = storedTurn({
+      container_id: "cntr_live",
+      cells: [cell(1, replayExecLine("/mnt/data/x.py"), "completed", { replay: true }), cell(2, "X = scale(df)")],
+      outcome: "completed",
+    });
+    expect(collectLinkedCells([{ qIdx: 0, turn: restoredQ1 }], { ...live, qIdx: 1 }).cells).toEqual([
+      { qIdx: 0, code: "X = scale(df)" },
+    ]);
   });
 });
 
@@ -926,6 +1205,24 @@ describe("검토 반영: 자료 경로, 일부만 받은 파일, 경로 바뀜, 
     expect(applyPathRewrites("pd.read_excel('/mnt/data/file-gone-x.xlsx')", ensured.pathRewrites)).toBe(
       "pd.read_excel('/mnt/data/file-up1-dataset.xlsx')"
     );
+  });
+
+  it("공개 데이터 파일 내려받기가 응답하지 않으면 시간 제한 뒤 일시 실패로 끝낸다(다음 턴에 다시 받는다)", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", SUPA);
+      const supabase = { storage: { from: () => ({ download: () => new Promise(() => undefined) }) } } as never;
+      const pending = downloadDataSource(supabase, {
+        url: `${base}instructor-abc/2026-10-03_1f2e.xlsx`,
+        fileName: "a.xlsx",
+        extension: "xlsx",
+      });
+      await vi.advanceTimersByTimeAsync(DATA_SOURCE_DOWNLOAD_TIMEOUT_MS + 1);
+      await expect(pending).resolves.toEqual({ ok: false, permanent: false });
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+    }
   });
 
   it("그림 저장은 마감이 지나면 올리지 않고, 남은 시간이 있으면 올린다", async () => {

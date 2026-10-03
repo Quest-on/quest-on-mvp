@@ -178,6 +178,27 @@ export async function uploadFile(
   return sendJson<{ id: string }>(config, "/files", { method: "POST", body: form, signal: params.signal });
 }
 
+/**
+ * 컨테이너에 파일을 바로 올린다(`POST /containers/{id}/files`, multipart 의 `file`). 복원 파일에 쓴다. 컨테이너 안
+ * 경로는 응답의 `path` 를 쓴다(앞에 임의 접두가 붙으므로 이름으로 짐작하지 않는다). 응답에 경로가 없으면 null.
+ */
+export async function uploadContainerFile(
+  config: OpenAIHttpConfig,
+  params: { containerId: string; filename: string; bytes: Uint8Array; mime: string; signal?: AbortSignal }
+): Promise<{ id: string; path: string | null }> {
+  const form = new FormData();
+  form.append("file", new Blob([params.bytes as BlobPart], { type: params.mime }), params.filename);
+  const body = await sendJson<{ id?: unknown; path?: unknown }>(
+    config,
+    `/containers/${encodeURIComponent(params.containerId)}/files`,
+    { method: "POST", body: form, signal: params.signal }
+  );
+  return {
+    id: typeof body?.id === "string" ? body.id : "",
+    path: typeof body?.path === "string" && body.path ? body.path : null,
+  };
+}
+
 /** 컨테이너 파일(그림) 내용을 내려받는다. 상한을 넘으면 null. */
 export async function downloadContainerFile(
   config: OpenAIHttpConfig,

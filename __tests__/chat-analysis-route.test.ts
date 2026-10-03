@@ -12,17 +12,30 @@
  *   6) 셀 상한: 스트림 중단, 실패 턴으로 기록(response_id 없음).
  *   7) 문항 간 연결: 대화는 문항마다 따로지만 컨테이너는 세션에 하나라, 새 문항의 첫 턴에 앞 문항의 성공 셀 코드를
  *      developer 블록으로 알린다. 같은 문항의 이어지는 턴은 블록 없이 기존 대화를 잇고, 만료면 복구 문구가 우선한다.
+ *   8) 리뷰 반영: 같은 문항에서 중단된 요청이 실행한 셀을 다음 턴에 알린다. 만료 복구는 복원 파일을 올려 한 줄로
+ *      실행하게 하고(못 올리면 코드 다시 실행), 복원 결과를 기록해 덜 끝났으면 다음 턴에 다시 복원하며, 원래 셀의 출처로
+ *      다음 복원을 만든다. 연결이 끊겨도 턴이 끝까지 기록되도록 `after()` 에 맡긴다. 보안 확인(닫힌 시험, 속도 제한,
+ *      studentId 대조)을 테스트로 고정한다.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SseParser } from "@/lib/analysis-exec/sse";
 import { STUDENT_CHAT_SPECS } from "@/lib/student-chat-spec";
 import { ANALYSIS_MAX_OUTPUT_TOKENS } from "@/lib/analysis-exec/limits";
-import { LINKED_CODE_HEADER, REPLAY_INSTRUCTION_HEADER } from "@/lib/analysis-exec/container";
+import {
+  INTERRUPTED_CODE_HEADER,
+  LINKED_CODE_HEADER,
+  REPLAY_FILE_NAME,
+  REPLAY_INSTRUCTION_HEADER,
+  REPLAY_MARKER,
+} from "@/lib/analysis-exec/container";
+import { checkRateLimitAsync } from "@/lib/rate-limit";
 
 type Row = Record<string, unknown>;
 
 const h = vi.hoisted(() => ({
   currentUser: vi.fn(),
+  /** `after()` 에 맡긴 작업. 연결이 끊겨도 턴이 끝까지 도는지 기다려 본다. */
+  afterTasks: [] as Array<unknown>,
   logError: vi.fn(),
   visible: [] as Array<{ url: string; fileName: string; extension: string }>,
   inserts: { messages: [] as Row[], ai_events: [] as Row[] },
@@ -43,11 +56,21 @@ const h = vi.hoisted(() => ({
     containerStatus: "running" as string,
     /** 다음 컨테이너 생성 한 번을 404 로 실패시킨다(같은 파일 id 로 다시 만들 수 없는 경우). */
     failNextContainerCreate: false,
+    /** 컨테이너 파일 올리기(복원 파일)를 실패시킨다. */
+    failContainerFileUpload: false,
+    /** 컨테이너에 올린 파일(이름, 내용). */
+    containerFiles: [] as Array<{ containerId: string; name: string; text: string }>,
     responses: [] as Array<() => Response>,
   },
 }));
 
 vi.mock("@/lib/get-current-user", () => ({ currentUser: h.currentUser }));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  after: (task: unknown) => {
+    h.afterTasks.push(task);
+  },
+}));
 vi.mock("@/lib/logger", () => ({ logError: h.logError, logInfo: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimitAsync: vi.fn(async () => ({ allowed: true })),
@@ -212,6 +235,13 @@ const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
   let body: unknown = null;
   if (typeof init?.body === "string") body = JSON.parse(init.body);
   h.openai.calls.push({ method, path, body });
+  const containerFileUpload = /^\/containers\/([^/]+)\/files$/.exec(path);
+  if (method === "POST" && containerFileUpload) {
+    if (h.openai.failContainerFileUpload) return jsonResponse(500, { error: { message: "upload failed" } });
+    const file = (init?.body as FormData).get("file") as File;
+    h.openai.containerFiles.push({ containerId: containerFileUpload[1], name: file.name, text: await file.text() });
+    return jsonResponse(200, { id: "cfile_replay", object: "container.file", path: `/mnt/data/cf9-${file.name}` });
+  }
   if (method === "POST" && path === "/files") return jsonResponse(200, { id: "file-up1" });
   if (method === "POST" && path === "/containers" && h.openai.failNextContainerCreate) {
     h.openai.failNextContainerCreate = false;
@@ -256,6 +286,12 @@ async function readEvents(res: Response) {
 }
 
 const aiMessages = () => h.inserts.messages.filter((r) => r.role === "ai");
+/** 컨테이너에 올린 마지막 복원 파일이 다시 실행할 셀 코드들. */
+const replayedCodes = () => {
+  const file = h.openai.containerFiles.at(-1);
+  if (!file) return [];
+  return [...file.text.matchAll(/\("Q\d+-C\d+", "([A-Za-z0-9+/=]+)"\)/g)].map((m) => Buffer.from(m[1], "base64").toString("utf8"));
+};
 const userMessages = () => h.inserts.messages.filter((r) => r.role === "user");
 const responseCalls = () => h.openai.calls.filter((c) => c.path === "/responses");
 
@@ -274,6 +310,10 @@ beforeEach(() => {
   h.openai.responses.length = 0;
   h.openai.containerStatus = "running";
   h.openai.failNextContainerCreate = false;
+  h.openai.failContainerFileUpload = false;
+  h.openai.containerFiles.length = 0;
+  h.afterTasks.length = 0;
+  vi.mocked(checkRateLimitAsync).mockResolvedValue({ allowed: true } as never);
   h.currentUser.mockResolvedValue({ id: STUDENT, role: "student" });
   // 에픽 A 헬퍼의 fileName 은 URL 마지막 조각(날짜_uuid.확장자)이다.
   h.visible = [{ url: DATA_URL, fileName: "2026-10-03_0f8e.xlsx", extension: "xlsx" }];
@@ -522,6 +562,7 @@ describe("만료 복구", () => {
     expect(h.openai.calls.map((c) => `${c.method} ${c.path}`)).toEqual([
       "GET /containers/cntr_old",
       "POST /containers",
+      "POST /containers/cntr_1/files",
       "POST /responses",
     ]);
     expect(h.openai.calls[1].body).toMatchObject({ file_ids: ["file-keep"] });
@@ -537,8 +578,15 @@ describe("만료 복구", () => {
 
     const analysis = (aiMessages()[0].metadata as Row).analysis as Row;
     expect(analysis).toMatchObject({ container_id: "cntr_1", notices: ["environment_restarted"], replayed_cells: 1 });
+    // 모델이 복원 셀을 실행하지 않았다(이 가짜 응답에는 복원 셀이 없다). 덜 끝난 복원으로 기록해 다음 턴에 다시 한다.
+    expect(analysis.restore).toEqual({
+      refs: [{ m: "00000000-0000-4000-8000-0000000000c1", i: 1 }],
+      mode: "file",
+      status: "incomplete",
+    });
     const done = events.find((e) => e.event === "done")!.data.message as Row;
     expect((done.analysis as Row).notices).toEqual(["environment_restarted"]);
+    expect(JSON.stringify(done.analysis)).not.toContain("refs");
   });
 
   it("조회와 호출 사이에 만료되면(400 Container is expired) 한 번 복구해 다시 돈다", async () => {
@@ -684,6 +732,7 @@ describe("문항 간 연결", () => {
     expect(h.openai.calls.map((c) => `${c.method} ${c.path}`)).toEqual([
       "GET /containers/cntr_old",
       "POST /containers",
+      "POST /containers/cntr_1/files",
       "POST /responses",
     ]);
     const blocks = developerOf(responseCalls()[0]);
@@ -711,11 +760,14 @@ describe("문항 간 연결", () => {
       "POST /files",
       "POST /containers",
       "GET /containers/cntr_2/files",
+      "POST /containers/cntr_2/files",
       "POST /responses",
     ]);
     const [block] = developerOf(responseCalls()[0]);
     expect(block).toContain("# 문제 1 셀 1\ndf = pd.read_excel('/mnt/data/file-up1-a.xlsx')");
     expect(block).not.toContain("file-keep");
+    // 복원 파일 안의 코드도 새 경로로 바뀌어 있다.
+    expect(replayedCodes()).toEqual(["df = pd.read_excel('/mnt/data/file-up1-a.xlsx')", CLEAN]);
   });
 
   it("앞 문항 코드가 4만 자를 넘으면 앞에서부터 넣고, 넣지 못한 셀 수를 알린다", async () => {
@@ -728,6 +780,315 @@ describe("문항 간 연결", () => {
     expect(block).not.toContain("# C");
     expect(block).toContain("길이 제한으로 마지막 셀 1개의 코드는 넣지 못했습니다.");
     expect(storedAnalysis()).toMatchObject({ linked_cells: 2 });
+  });
+});
+
+describe("리뷰 반영: 중단된 요청과 만료 복구", () => {
+  const cell = (index: number, code: string, status = "completed", extra: Row = {}) => ({
+    index,
+    status,
+    code,
+    logs: "",
+    figures: [],
+    ...extra,
+  });
+  function record(params: {
+    n: number;
+    qIdx: number;
+    cells: Row[];
+    outcome?: string;
+    container?: string;
+    restore?: Row;
+  }) {
+    return {
+      id: `00000000-0000-4000-8000-0000000002${String(params.n).padStart(2, "0")}`,
+      q_idx: params.qIdx,
+      created_at: `2026-10-04T04:${String(params.n).padStart(2, "0")}:00.000Z`,
+      metadata: {
+        analysis: {
+          v: 1,
+          container_id: params.container ?? "cntr_old",
+          files: [{ name: "a.xlsx", path: "/mnt/data/file-keep-a.xlsx", file_id: "file-keep", source: DATA_URL }],
+          cells: params.cells,
+          cited_figures: [],
+          outcome: params.outcome ?? "completed",
+          notices: [],
+          ...(params.restore ? { restore: params.restore } : {}),
+          elapsed_ms: 1,
+        },
+      },
+    };
+  }
+  const idOf = (n: number) => `00000000-0000-4000-8000-0000000002${String(n).padStart(2, "0")}`;
+  const READ = "df = pd.read_excel('/mnt/data/file-keep-a.xlsx')";
+  const developerOf = (call: { body: unknown }) => {
+    const input = (call.body as Row).input;
+    return Array.isArray(input) ? (input as Row[]).filter((m) => m.role === "developer").map((m) => String(m.content)) : [];
+  };
+  const stored = () => (aiMessages()[0].metadata as Row).analysis as Row;
+  /** 첫 셀이 복원 파일을 실행하고 결과 줄을 출력하는 응답. */
+  function replayingTurn(result: string) {
+    const replay = {
+      type: "code_interpreter_call",
+      id: "c_replay",
+      status: "completed",
+      code: `exec(open("/mnt/data/cf9-${REPLAY_FILE_NAME}").read())`,
+      outputs: [{ type: "logs", logs: result }],
+    };
+    return sseResponse([
+      { type: "response.created", response: { id: "resp_r", model: "gpt-x" } },
+      { type: "response.output_item.added", item: { ...replay, status: "in_progress", outputs: [] } },
+      { type: "response.output_item.done", item: replay },
+      { type: "response.output_item.added", item: { type: "message", id: "m" } },
+      { type: "response.output_text.delta", delta: "군집별 고객 수입니다." },
+      {
+        type: "response.completed",
+        response: {
+          id: "resp_r",
+          model: "gpt-x",
+          output: [replay, { type: "message", content: [{ type: "output_text", text: "군집별 고객 수입니다.", annotations: [] }] }],
+          usage: { input_tokens: 10, output_tokens: 20, total_tokens: 30 },
+        },
+      },
+    ]);
+  }
+
+  it("같은 문항에서 시간 상한으로 중단된 요청이 실행한 셀을 다음 턴에 알리고, 대화는 마지막 성공 응답에서 잇는다", async () => {
+    h.db.aiMessages = [
+      record({ n: 1, qIdx: 0, cells: [cell(1, READ)] }),
+      record({
+        n: 2,
+        qIdx: 0,
+        outcome: "time_limit",
+        cells: [cell(1, "mask = iqr_mask(df)"), cell(2, "df = df[~mask]"), cell(3, "slow()", "incomplete")],
+      }),
+    ];
+    h.db.prevResponseId = "resp_t1";
+    h.db.prevResponseQIdx = 0;
+    h.openai.responses.push(() => sseResponse(turnEvents(1)));
+    await readEvents(await POST(request({ message: "IQR 1.5배로 이상치를 제거해 주세요" })));
+
+    expect(h.openai.calls.map((c) => `${c.method} ${c.path}`)).toEqual(["GET /containers/cntr_old", "POST /responses"]);
+    const body = responseCalls()[0].body as Row;
+    expect(body).toMatchObject({ previous_response_id: "resp_t1" });
+    const blocks = developerOf(responseCalls()[0]);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].startsWith(`${INTERRUPTED_CODE_HEADER}\n지금 풀고 있는 문제는 문제 1입니다.`)).toBe(true);
+    expect(blocks[0]).toContain("# 문제 1 셀 1\nmask = iqr_mask(df)\n\n# 문제 1 셀 2\ndf = df[~mask]");
+    expect(blocks[0]).not.toContain("slow()");
+    expect(blocks[0]).not.toContain(READ);
+    expect(stored()).toMatchObject({ interrupted_cells: 2 });
+    expect(h.inserts.ai_events[0].metadata).toMatchObject({ interrupted_cells: 2, linked_cells: 0 });
+  });
+
+  it("복원 파일을 실행한 셀의 결과로 복원 성공을 기록하고, 그 셀을 복원 셀로 표시한다", async () => {
+    h.db.aiMessages = [record({ n: 1, qIdx: 0, cells: [cell(1, READ), cell(2, "boom()", "failed")] })];
+    h.openai.containerStatus = "expired";
+    h.openai.responses.push(() => replayingTurn(`${REPLAY_MARKER} ok=1 failed=0\n`));
+    const events = await readEvents(await POST(request({ message: "군집별 고객 수를 다시 보여 주세요" })));
+
+    expect(h.openai.containerFiles).toHaveLength(1);
+    expect(h.openai.containerFiles[0]).toMatchObject({ containerId: "cntr_1", name: REPLAY_FILE_NAME });
+    expect(replayedCodes()).toEqual([READ]);
+    const [block] = developerOf(responseCalls()[0]);
+    expect(block).toContain(`exec(open("/mnt/data/cf9-${REPLAY_FILE_NAME}").read())`);
+    expect(block).toContain("코드를 다시 쓰지 않고 이 한 줄만 실행합니다.");
+    expect(stored().restore).toEqual({
+      refs: [{ m: idOf(1), i: 1 }],
+      mode: "file",
+      status: "ok",
+      ok_cells: 1,
+      failed_cells: 0,
+    });
+    expect((stored().cells as Row[])[0]).toMatchObject({ index: 1, replay: true });
+    expect(h.inserts.ai_events[0].metadata).toMatchObject({ restore_mode: "file", restore_status: "ok", replayed_cells: 1 });
+    const done = events.find((e) => e.event === "done")!.data.message as Row;
+    expect(((done.analysis as Row).cells as Row[])[0]).toMatchObject({ replay: true });
+  });
+
+  it("복원 중 실패한 셀이 있으면 partial 로 남기고(다시 복원하지 않음), 결과 줄이 없으면 incomplete 다", async () => {
+    h.db.aiMessages = [record({ n: 1, qIdx: 0, cells: [cell(1, READ), cell(2, "x = df['없는 열']")] })];
+    h.openai.containerStatus = "expired";
+    h.openai.responses.push(() => replayingTurn(`${REPLAY_MARKER} ok=1 failed=1\n${REPLAY_MARKER}_ERROR Q1-C2 KeyError: '없는 열'\n`));
+    await readEvents(await POST(request()));
+    expect(stored().restore).toMatchObject({ mode: "file", status: "partial", ok_cells: 1, failed_cells: 1 });
+
+    h.inserts.messages.length = 0;
+    h.inserts.ai_events.length = 0;
+    h.openai.calls.length = 0;
+    h.openai.responses.push(() => replayingTurn("Traceback (most recent call last):\nFileNotFoundError"));
+    await readEvents(await POST(request()));
+    expect(stored().restore).toMatchObject({ mode: "file", status: "incomplete" });
+  });
+
+  it("복원 파일을 올리지 못하면 모델이 코드를 다시 실행하는 지시로 물러나고 inline 으로 기록한다", async () => {
+    h.db.aiMessages = [record({ n: 1, qIdx: 0, cells: [cell(1, READ)] })];
+    h.openai.containerStatus = "expired";
+    h.openai.failContainerFileUpload = true;
+    h.openai.responses.push(() => sseResponse(turnEvents(1)));
+    await readEvents(await POST(request()));
+    const [block] = developerOf(responseCalls()[0]);
+    expect(block.startsWith(REPLAY_INSTRUCTION_HEADER)).toBe(true);
+    expect(block).toContain("아래 코드를 python 도구로 순서대로 다시 실행해 이전 상태를 복원하세요.");
+    expect(block).not.toContain("exec(open(");
+    expect(stored().restore).toMatchObject({ mode: "inline", status: "ok", refs: [{ m: idOf(1), i: 1 }] });
+    expect(h.logError.mock.calls.some((c) => String(c[0]).includes("falling back to inline replay"))).toBe(true);
+  });
+
+  it("지난 턴의 복원이 덜 끝났으면 컨테이너가 살아 있어도 새 컨테이너로 다시 복원한다(원래 셀과 그 뒤 셀로)", async () => {
+    h.db.aiMessages = [
+      record({ n: 1, qIdx: 0, container: "cntr_a", cells: [cell(1, READ), cell(2, "df = df[~mask]")] }),
+      record({
+        n: 2,
+        qIdx: 0,
+        container: "cntr_b",
+        outcome: "client_cancelled",
+        cells: [cell(1, `exec(open("/mnt/data/x-${REPLAY_FILE_NAME}").read())`, "failed", { replay: true }), cell(2, "X = scale(df)")],
+        restore: { refs: [{ m: idOf(1), i: 1 }, { m: idOf(1), i: 2 }], mode: "file", status: "incomplete" },
+      }),
+    ];
+    h.openai.containerStatus = "running";
+    h.openai.responses.push(() => replayingTurn(`${REPLAY_MARKER} ok=3 failed=0\n`));
+    const events = await readEvents(await POST(request()));
+
+    // 살아 있는 컨테이너라도 조회 없이 새로 만든다(같은 파일 id).
+    expect(h.openai.calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+      "POST /containers",
+      "POST /containers/cntr_1/files",
+      "POST /responses",
+    ]);
+    expect(replayedCodes()).toEqual([READ, "df = df[~mask]", "X = scale(df)"]);
+    expect(stored().restore).toMatchObject({
+      refs: [
+        { m: idOf(1), i: 1 },
+        { m: idOf(1), i: 2 },
+        { m: idOf(2), i: 2 },
+      ],
+      status: "ok",
+    });
+    expect(stored().notices).toEqual(["environment_restarted"]);
+    expect(h.inserts.ai_events[0].metadata).toMatchObject({ restore_retry: true });
+    expect(events.filter((e) => e.event === "status").map((e) => e.data.phase)).toContain("restarting");
+  });
+
+  it("두 번째 만료에서도 복원 셀이나 잘린 합본이 아니라 원래 셀로 복원 파일을 만든다", async () => {
+    h.db.aiMessages = [
+      record({
+        n: 1,
+        qIdx: 0,
+        container: "cntr_a",
+        cells: [cell(1, READ), cell(2, "df = df[~mask]"), cell(3, "X = scale(df)"), cell(4, "km = KMeans(4).fit(X)")],
+      }),
+      record({
+        n: 2,
+        qIdx: 1,
+        container: "cntr_b",
+        cells: [
+          cell(1, `exec(open("/mnt/data/x-${REPLAY_FILE_NAME}").read())`, "completed", { replay: true }),
+          cell(2, "merged" + "z".repeat(40), "completed", { code_truncated: true }),
+          cell(3, "profile = df.groupby(km.labels_).mean()"),
+        ],
+        restore: {
+          refs: [1, 2, 3, 4].map((i) => ({ m: idOf(1), i })),
+          mode: "file",
+          status: "ok",
+          ok_cells: 4,
+          failed_cells: 0,
+        },
+      }),
+    ];
+    h.openai.containerStatus = "expired";
+    h.openai.responses.push(() => replayingTurn(`${REPLAY_MARKER} ok=5 failed=0\n`));
+    await readEvents(await POST(request({ questionIdx: 0 })));
+    expect(replayedCodes()).toEqual([
+      READ,
+      "df = df[~mask]",
+      "X = scale(df)",
+      "km = KMeans(4).fit(X)",
+      "profile = df.groupby(km.labels_).mean()",
+    ]);
+  });
+
+  it("호출 중 만료 복구는 한 번뿐이다(두 번째도 만료면 더 돌지 않는다)", async () => {
+    h.db.aiMessages = [record({ n: 1, qIdx: 0, cells: [cell(1, READ)] })];
+    const expired = () => jsonResponse(400, { error: { message: "Container is expired.", type: "invalid_request_error" } });
+    h.openai.responses.push(expired, expired, expired);
+    const events = await readEvents(await POST(request()));
+    expect(responseCalls()).toHaveLength(2);
+    expect(events.at(-1)?.event).toBe("error");
+    expect(h.inserts.ai_events).toHaveLength(1);
+  });
+});
+
+describe("리뷰 반영: 보안 확인과 연결 끊김 뒤 기록", () => {
+  it("닫힌 시험이면 403 이고 아무것도 부르지 않는다", async () => {
+    h.db.exam = { ...h.db.exam!, status: "closed" };
+    const res = await POST(request());
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ error: "EXAM_CLOSED" });
+    expect(h.openai.calls).toEqual([]);
+    expect(h.inserts.messages).toEqual([]);
+  });
+
+  it("속도 제한에 걸리면 429 이고 아무것도 부르지 않는다", async () => {
+    vi.mocked(checkRateLimitAsync).mockResolvedValueOnce({ allowed: false } as never);
+    const res = await POST(request());
+    expect(res.status).toBe(429);
+    expect(vi.mocked(checkRateLimitAsync).mock.calls[0][0]).toBe(`chat-analysis:${STUDENT}`);
+    expect(h.openai.calls).toEqual([]);
+  });
+
+  it("요청의 studentId 가 로그인 사용자와 다르면 세션이 본인 것이어도 403 이다", async () => {
+    const res = await POST(request({ studentId: "someone-else" }));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ error: "FORBIDDEN" });
+    expect(h.openai.calls).toEqual([]);
+    expect(h.inserts.messages).toEqual([]);
+  });
+
+  it("파일 인용 그림은 이 턴의 컨테이너 것만 내려받는다(다른 컨테이너를 가리키는 인용은 무시)", async () => {
+    const text = "그림입니다.";
+    h.openai.responses.push(() =>
+      sseResponse([
+        { type: "response.created", response: { id: "resp_c", model: "gpt-x" } },
+        { type: "response.output_text.delta", delta: text },
+        {
+          type: "response.completed",
+          response: {
+            id: "resp_c",
+            model: "gpt-x",
+            output: [
+              {
+                type: "message",
+                content: [
+                  {
+                    type: "output_text",
+                    text,
+                    annotations: [
+                      { type: "container_file_citation", container_id: "cntr_other", file_id: "cfile_x", filename: "a.png" },
+                    ],
+                  },
+                ],
+              },
+            ],
+            usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
+          },
+        },
+      ])
+    );
+    await readEvents(await POST(request()));
+    expect(h.openai.calls.some((c) => c.path.includes("cntr_other"))).toBe(false);
+    expect(aiMessages()).toHaveLength(1);
+  });
+
+  it("턴을 after() 에 맡겨, 학생이 연결을 끊어도 턴이 끝까지 돌고 ai_events 를 남긴다", async () => {
+    h.openai.responses.push(() => sseResponse(turnEvents(1)));
+    const res = await POST(request());
+    expect(h.afterTasks).toHaveLength(1);
+    expect(h.afterTasks[0]).toBeInstanceOf(Promise);
+    await res.body!.cancel();
+    await h.afterTasks[0];
+    expect(h.inserts.ai_events).toHaveLength(1);
   });
 });
 

@@ -3,13 +3,14 @@
  *
  * `/api/chat/analysis` 가 인증, 소유권, 켜지는 조건을 확인한 뒤 SSE 스트림 안에서 부른다. 순서:
  *   1. 세션의 이전 분석 기록을 읽는다(마지막 기록의 컨테이너와 파일).
- *   2. 컨테이너를 준비한다. 만료면 새로 만들고 이전 셀 코드를 다시 실행하게 한다(`environment_restarted`).
- *      준비가 실패하면 아무것도 저장하지 않고 끝낸다(학생이 다시 보내면 된다).
+ *   2. 컨테이너를 준비한다. 만료면(또는 지난 복원이 덜 끝났으면) 새로 만들고 이전 상태를 되살린다
+ *      (`environment_restarted`). 원래 셀들을 복원 파일로 올리고 모델은 그 파일을 여는 한 줄만 실행한다. 파일을 못
+ *      올리면 모델이 코드를 다시 실행한다. 준비가 실패하면 아무것도 저장하지 않고 끝낸다(학생이 다시 보내면 된다).
  *   3. 학생 메시지를 저장한다(`/api/chat` 과 같은 모양).
  *   4. 지시문(`analysis-partner@2` 도구 있음)과 입력을 만들고 Responses 스트림을 돌린다. 입력 앞에는 developer
- *      메시지를 하나까지 붙인다. 컨테이너를 새로 만들었으면 복구 지시(이전 코드 다시 실행), 아니면 문항 간 연결
- *      (다른 문항에서 이 컨테이너로 실행했고 이 문항의 대화가 아직 모르는 코드)이다. 호출이 `Container is expired` 로
- *      실패하고 아직 셀이 없으면 한 번 복구해 다시 돌린다.
+ *      메시지를 붙인다. 컨테이너를 새로 만들었으면 복구 지시 하나, 아니면 이 문항의 대화가 아직 모르는 코드를 알린다:
+ *      다른 문항에서 실행한 코드(문항 간 연결)와 같은 문항에서 중단된 요청이 실행한 코드. 호출이
+ *      `Container is expired` 로 실패하고 아직 셀이 없으면 한 번 복구해 다시 돌린다.
  *   5. 그림을 비공개 버킷에 올리고, 답변의 sandbox 링크를 지우고, AI 메시지를 저장한다. 실패한 턴도 실행한 셀이
  *      있으면 기록한다("코드는 전부 기록").
  *   6. ai_events 에 정확히 한 번 기록한다(feature `student_chat_analysis`).
@@ -30,12 +31,21 @@ import {
 } from "@/lib/student-chat-spec";
 import type { AnalysisErrorCode, AnalysisStreamEvent } from "@/lib/analysis-exec/client-events";
 import {
+  REPLAY_FILE_NAME,
   applyPathRewrites,
+  buildFileRestoreInstruction,
+  buildInterruptedCodeInstruction,
   buildLinkedCodeInstruction,
   buildReplayInstruction,
-  collectLinkedCells,
-  collectReplayCells,
+  buildReplayScript,
+  capCells,
+  collectContainerHistory,
+  collectUnseenCells,
   ensureAnalysisContainer,
+  historyPathRewrites,
+  isReplayCellCode,
+  parseReplayResult,
+  restoreNeedsRetry,
   type CarriedCells,
   type ContainerOps,
   type EnsuredContainer,
@@ -47,13 +57,18 @@ import {
   ANALYSIS_MAX_OUTPUT_TOKENS,
   CITED_FIGURES_MIN_REMAINING_MS,
   MAX_FIGURE_BYTES,
+  REPLAY_CODE_MAX_CHARS,
+  REPLAY_FILE_MAX_CHARS,
 } from "@/lib/analysis-exec/limits";
 import {
   ANALYSIS_METADATA_VERSION,
   isSuccessfulOutcome,
   toClientAnalysisTurn,
+  type AnalysisCellRef,
   type AnalysisNotice,
   type AnalysisOutcome,
+  type AnalysisRestoreMode,
+  type StoredAnalysisRestore,
   type StoredAnalysisTurn,
 } from "@/lib/analysis-exec/metadata";
 import {
@@ -62,6 +77,7 @@ import {
   listContainerFiles,
   openResponseStream,
   retrieveContainer,
+  uploadContainerFile,
   uploadFile,
   type OpenAIHttpConfig,
 } from "@/lib/analysis-exec/openai-http";
@@ -111,6 +127,7 @@ function bindContainerOps(ctx: AnalysisTurnContext): ContainerOps {
     retrieveContainer: (p) => retrieveContainer(ctx.http, { ...p, signal }),
     listContainerFiles: (p) => listContainerFiles(ctx.http, { ...p, signal }),
     uploadFile: (p) => uploadFile(ctx.http, { ...p, signal }),
+    uploadContainerFile: (p) => uploadContainerFile(ctx.http, { ...p, signal }),
     downloadDataSource: (source) => downloadDataSource(ctx.supabase, source),
   };
 }
@@ -229,38 +246,128 @@ function syntheticPrevious(ensured: EnsuredContainer): StoredAnalysisTurn {
   };
 }
 
+/** 같은 옛 경로를 두 번 바꾸지 않게 앞의 짝을 남긴다. */
+function dedupeRewrites(rewrites: ReadonlyArray<{ from: string; to: string }>): Array<{ from: string; to: string }> {
+  const seen = new Set<string>();
+  return rewrites.filter((r) => (seen.has(r.from) ? false : (seen.add(r.from), true)));
+}
+
+/** 컨테이너를 새로 만든 턴의 복원 계획. */
+type RestorePlan = {
+  mode: AnalysisRestoreMode;
+  /** 되살린 이력의 출처(원래 셀). */
+  refs: AnalysisCellRef[];
+  /** 입력 앞에 붙일 복구 지시. */
+  text: string | null;
+  /** 복원 파일(file)이나 지시문(inline)에 넣은 셀 수. */
+  cells: number;
+};
+
 /**
- * 이번 호출 입력 앞에 붙일 developer 메시지와 그 안의 셀 수.
- *   - 컨테이너를 새로 만들었으면 복구 지시만 쓴다(이전 컨테이너의 셀 전부를 다시 실행). 다른 문항의 셀도 그 안에
- *     들어 있으므로 문항 간 연결 지시는 붙이지 않는다(복구 문구 우선).
- *   - 아니면 문항 간 연결 지시. 같은 문항에서 이어지는 턴은 비어 있어 아무것도 붙지 않는다.
+ * 새 컨테이너에 이전 상태를 되살릴 준비를 한다. 이전 컨테이너의 이력(원래 셀)을 모아 경로를 바꿔 넣고 복원 파일로
+ * 컨테이너에 올린다. 올리지 못하면(또는 경로를 알 수 없으면) 모델이 코드를 다시 실행하는 지시로 물러난다. 되살릴 셀이
+ * 없으면 null. 학생이 연결을 끊은 경우에만 던진다.
  */
-function carriedContextFor(
-  records: ReadonlyArray<SessionAnalysisRecord>,
-  ensured: EnsuredContainer,
-  pathRewrites: ReadonlyArray<{ from: string; to: string }>,
-  qIdx: number
-): { text: string | null; replayedCells: number; linkedCells: number } {
-  // 파일을 다시 올려 경로가 바뀌었으면 이전 코드 안의 경로를 새 경로로 바꿔 넣는다.
-  const rewrite = (carried: CarriedCells): CarriedCells => ({
-    cells: carried.cells.map((cell) => ({ ...cell, code: applyPathRewrites(cell.code, pathRewrites) })),
-    omitted: carried.omitted,
-  });
-  if (ensured.restarted) {
-    if (!ensured.previousContainerId) return { text: null, replayedCells: 0, linkedCells: 0 };
-    const replay = rewrite(collectReplayCells(records, ensured.previousContainerId));
+async function prepareRestore(params: {
+  ops: ContainerOps;
+  records: ReadonlyArray<SessionAnalysisRecord>;
+  ensured: EnsuredContainer;
+  qIdx: number;
+  clientSignal: AbortSignal;
+}): Promise<RestorePlan | null> {
+  const { ops, records, ensured } = params;
+  if (!ensured.previousContainerId) return null;
+  const history = collectContainerHistory(records, ensured.previousContainerId);
+  if (history.length === 0) return null;
+  // 파일을 다시 올려 경로가 바뀌었으면 이전 코드 안의 옛 경로(여러 세대 전 것 포함)를 새 경로로 바꿔 넣는다.
+  const rewrites = dedupeRewrites([...ensured.pathRewrites, ...historyPathRewrites(records, ensured.files)]);
+  const cells = history.map(({ qIdx, code }) => ({ qIdx, code: applyPathRewrites(code, rewrites) }));
+  const refs = history.map((h) => h.ref);
+
+  const inFile = capCells(cells, REPLAY_FILE_MAX_CHARS);
+  try {
+    const script = buildReplayScript(inFile.cells);
+    const uploaded = await ops.uploadContainerFile({
+      containerId: ensured.containerId,
+      filename: REPLAY_FILE_NAME,
+      bytes: new TextEncoder().encode(script),
+      mime: "text/x-python",
+    });
+    let path = uploaded.path;
+    if (!path && uploaded.id) {
+      const listed = await ops.listContainerFiles({ containerId: ensured.containerId }).catch(() => []);
+      path = listed.find((f) => f.id === uploaded.id)?.path ?? null;
+    }
+    if (!path) throw new Error("replay file path is unknown");
     return {
-      text: buildReplayInstruction({ ...replay, currentQIdx: qIdx }),
-      replayedCells: replay.cells.length,
-      linkedCells: 0,
+      mode: "file",
+      refs,
+      text: buildFileRestoreInstruction({
+        path,
+        reference: capCells(inFile.cells, REPLAY_CODE_MAX_CHARS),
+        omittedFromFile: inFile.omitted,
+        currentQIdx: params.qIdx,
+      }),
+      cells: inFile.cells.length,
+    };
+  } catch (error) {
+    if (params.clientSignal.aborted) throw error;
+    void logError("[chat-analysis] replay file upload failed — falling back to inline replay", error, {
+      path: ANALYSIS_ROUTE,
+    });
+    const inline = capCells(cells, REPLAY_CODE_MAX_CHARS);
+    return {
+      mode: "inline",
+      refs,
+      text: buildReplayInstruction({ ...inline, currentQIdx: params.qIdx }),
+      cells: inline.cells.length,
     };
   }
-  const linked = rewrite(collectLinkedCells(records, { containerId: ensured.containerId, qIdx }));
-  return {
-    text: buildLinkedCodeInstruction({ ...linked, currentQIdx: qIdx }),
-    replayedCells: 0,
-    linkedCells: linked.cells.length,
-  };
+}
+
+/**
+ * 복원이 끝났는가. 파일 방식은 복원 셀의 결과 줄로 판단한다(끝까지 돌았는지, 실패한 셀이 있는지). 모델이 코드를 다시
+ * 쓰는 방식은 턴이 정상으로 끝났을 때만 끝난 것으로 본다. 끝나지 않았으면 다음 턴에 새 컨테이너로 다시 복원한다.
+ */
+function restoreOutcome(
+  plan: RestorePlan,
+  cells: ReadonlyArray<{ code: string; status: string; logs: string }>,
+  outcome: AnalysisOutcome
+): StoredAnalysisRestore {
+  const base = { refs: plan.refs, mode: plan.mode };
+  if (plan.mode === "file") {
+    const replayCell = cells.find((cell) => isReplayCellCode(cell.code));
+    const parsed = replayCell && replayCell.status === "completed" ? parseReplayResult(replayCell.logs) : null;
+    if (!parsed) return { ...base, status: "incomplete" };
+    return { ...base, status: parsed.failed > 0 ? "partial" : "ok", ok_cells: parsed.ok, failed_cells: parsed.failed };
+  }
+  return { ...base, status: outcome === "completed" ? "ok" : "incomplete" };
+}
+
+/**
+ * 컨테이너를 그대로 쓰는 턴의 developer 메시지들. 이 문항의 대화가 아직 모르는, 이 컨테이너에서 실행된 코드다.
+ *   - 문항 간 연결: 다른 문항에서 실행한 코드.
+ *   - 중단된 요청: 같은 문항에서 앞선 요청이 끝나기 전에 실행한 코드(그 요청은 대화에 이어지지 않는다).
+ * 같은 문항에서 이어지는 성공 턴은 둘 다 없다(기존 대화 그대로).
+ */
+function unseenContextFor(
+  records: ReadonlyArray<SessionAnalysisRecord>,
+  ensured: EnsuredContainer,
+  qIdx: number
+): { texts: string[]; linkedCells: number; interruptedCells: number } {
+  const rewrites = historyPathRewrites(records, ensured.files);
+  const rewrite = (carried: CarriedCells): CarriedCells => ({
+    cells: carried.cells.map((cell) => ({ ...cell, code: applyPathRewrites(cell.code, rewrites) })),
+    omitted: carried.omitted,
+  });
+  const unseen = collectUnseenCells(records, { containerId: ensured.containerId, qIdx });
+  const linked = rewrite(unseen.linked);
+  const interrupted = rewrite(unseen.interrupted);
+  const texts = [
+    buildLinkedCodeInstruction({ ...linked, currentQIdx: qIdx }),
+    buildInterruptedCodeInstruction({ ...interrupted, currentQIdx: qIdx }),
+  ].filter((text): text is string => text !== null);
+  return { texts, linkedCells: linked.cells.length, interruptedCells: interrupted.cells.length };
 }
 
 /** 복구로 두 번 호출했으면 두 호출의 사용량을 더한다(비용 기록이 빠지지 않게). */
@@ -337,6 +444,8 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
       void logError("[chat-analysis] previous analysis records lookup failed", error, { path: ANALYSIS_ROUTE });
     }
     const previous = records.length > 0 ? records[records.length - 1].turn : null;
+    // 지난 턴이 이 컨테이너로 복원을 시작했는데 덜 끝났으면(복원 셀이 끝까지 돌지 못함) 새 컨테이너로 다시 복원한다.
+    const retryRestore = previous ? restoreNeedsRetry(records, previous.container_id) : false;
     const ops = bindContainerOps(ctx);
 
     // 만료 복구 전 호출의 사용량(비용). 복구 중 실패해도 기록에 넣는다.
@@ -376,8 +485,21 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
     };
 
     let ensured: EnsuredContainer;
+    // 컨테이너를 새로 만든 턴의 복원 계획과 그 컨테이너.
+    let plan: RestorePlan | null = null;
+    let planFor: string | null = null;
     try {
-      ensured = await ensureAnalysisContainer(ops, { sessionId: ctx.sessionId, previous, dataSources: ctx.dataSources });
+      ensured = await ensureAnalysisContainer(ops, {
+        sessionId: ctx.sessionId,
+        previous,
+        dataSources: ctx.dataSources,
+        forceNew: retryRestore,
+      });
+      if (ensured.restarted) {
+        send({ event: "status", data: { phase: "restarting" } });
+        plan = await prepareRestore({ ops, records, ensured, qIdx: ctx.qIdx, clientSignal: ctx.clientSignal });
+        planFor = ensured.containerId;
+      }
     } catch (error) {
       if (ctx.clientSignal.aborted) {
         await cancelledDuringSetup();
@@ -386,7 +508,6 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
       await setupFailed(error);
       return;
     }
-    if (ensured.restarted) send({ event: "status", data: { phase: "restarting" } });
 
     await insertUserMessage(ctx);
     const previousResponseId = await fetchPreviousResponseId(ctx);
@@ -394,9 +515,9 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
     let restartedAny = ensured.restarted;
     let replayedCells = 0;
     let linkedCells = 0;
+    let interruptedCells = 0;
     let attempts = 0;
     let result: StreamTurnResult;
-    let pathRewrites = [...ensured.pathRewrites];
 
     while (true) {
       attempts += 1;
@@ -411,15 +532,28 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
       const instructions = assembled.instructions;
       specId = assembled.specId;
       instructionsForLog = instructions;
-      const carried = carriedContextFor(records, ensured, pathRewrites, ctx.qIdx);
-      replayedCells = carried.replayedCells;
-      linkedCells = carried.linkedCells;
-      const input = carried.text
-        ? [
-            { role: "developer", content: carried.text },
-            { role: "user", content: ctx.message },
-          ]
-        : ctx.message;
+      // 컨테이너를 새로 만들었으면 복구 지시만(문항 간 연결과 중단된 요청의 코드도 복원 이력에 들어 있다).
+      // 아니면 이 문항의 대화가 아직 모르는 코드를 알린다.
+      let developerTexts: string[];
+      if (ensured.restarted) {
+        developerTexts = plan?.text ? [plan.text] : [];
+        replayedCells = plan?.cells ?? 0;
+        linkedCells = 0;
+        interruptedCells = 0;
+      } else {
+        const unseen = unseenContextFor(records, ensured, ctx.qIdx);
+        developerTexts = unseen.texts;
+        replayedCells = 0;
+        linkedCells = unseen.linkedCells;
+        interruptedCells = unseen.interruptedCells;
+      }
+      const input =
+        developerTexts.length > 0
+          ? [
+              ...developerTexts.map((content) => ({ role: "developer", content })),
+              { role: "user", content: ctx.message },
+            ]
+          : ctx.message;
 
       const body: Record<string, unknown> = {
         model: ctx.model,
@@ -450,7 +584,7 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
       if (!expired || attempts >= 2) break;
       earlierUsage = addUsage(earlierUsage, result.usage);
 
-      // 조회와 호출 사이에 만료됐다. 새 컨테이너를 만들고 이전 코드를 다시 실행하게 해 한 번만 다시 돈다.
+      // 조회와 호출 사이에 만료됐다. 새 컨테이너를 만들고 이전 상태를 되살려 한 번만 다시 돈다.
       try {
         ensured = await ensureAnalysisContainer(ops, {
           sessionId: ctx.sessionId,
@@ -458,6 +592,11 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
           dataSources: ctx.dataSources,
           forceNew: true,
         });
+        send({ event: "status", data: { phase: "restarting" } });
+        if (planFor !== ensured.containerId) {
+          plan = await prepareRestore({ ops, records, ensured, qIdx: ctx.qIdx, clientSignal: ctx.clientSignal });
+          planFor = ensured.containerId;
+        }
       } catch (error) {
         if (ctx.clientSignal.aborted) {
           await cancelledDuringSetup();
@@ -466,9 +605,7 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
         await setupFailed(error);
         return;
       }
-      pathRewrites = [...pathRewrites, ...ensured.pathRewrites];
       restartedAny = true;
-      send({ event: "status", data: { phase: "restarting" } });
     }
 
     if (earlierUsage) result = { ...result, usage: addUsage(earlierUsage, result.usage) };
@@ -498,10 +635,17 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
       },
       remainingMs
     );
-    const storedCells = await storeCellFigures({ store, sessionId: ctx.sessionId, messageId, cells: result.cells });
+    const restore = ensured.restarted && plan ? restoreOutcome(plan, result.cells, outcome) : null;
+    // 복원 파일을 실행한 셀은 표시해 둔다. 다음 복원과 문항 간 연결은 이 셀 대신 원래 셀을 쓴다.
+    const storedCells = (await storeCellFigures({ store, sessionId: ctx.sessionId, messageId, cells: result.cells })).map(
+      (cell) => (restore?.mode === "file" && isReplayCellCode(cell.code) ? { ...cell, replay: true as const } : cell)
+    );
+    // 파일 인용 그림은 이 턴의 컨테이너 것만 내려받는다. 같은 조직 키로는 다른 컨테이너의 파일도 받을 수 있으므로
+    // 인용이 가리키는 컨테이너를 믿지 않는다.
+    const turnContainerId = ensured.containerId;
     const citations =
       isSuccessfulOutcome(outcome) && remainingMs() > CITED_FIGURES_MIN_REMAINING_MS
-        ? collectImageCitations(result.finalOutput)
+        ? collectImageCitations(result.finalOutput).filter((c) => c.containerId === turnContainerId)
         : [];
     const turnResult = result;
     const citedFigures =
@@ -538,6 +682,8 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
       notices,
       replayedCells,
       linkedCells,
+      interruptedCells,
+      ...(restore ? { restore } : {}),
       elapsedMs: now() - ctx.startedAtMs,
     });
 
@@ -599,6 +745,9 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
         container_restarted: restartedAny,
         replayed_cells: replayedCells,
         linked_cells: linkedCells,
+        interrupted_cells: interruptedCells,
+        ...(restore ? { restore_mode: restore.mode, restore_status: restore.status } : {}),
+        restore_retry: retryRestore,
         rate_limit_retries: result.retries,
         ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
         message_saved: saved,

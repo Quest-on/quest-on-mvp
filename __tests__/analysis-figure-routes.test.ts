@@ -174,6 +174,14 @@ describe("GET /api/session/[sessionId]/analysis/figures/[messageId]/[file]", () 
     expect(h.signed).toEqual([]);
   });
 
+  it("동의 게이트가 막으면 그 응답을 그대로 돌려주고 서명하지 않는다", async () => {
+    h.currentUser.mockResolvedValue({ id: "student-1", role: "student" });
+    h.consent.mockResolvedValue(NextResponse.json({ error: "CONSENT_REQUIRED" }, { status: 428 }));
+    const res = await FIGURE(req(), figParams());
+    expect(res.status).toBe(428);
+    expect(h.signed).toEqual([]);
+  });
+
   it("그림 이름 모양이 틀리면(경로 조작) 400", async () => {
     h.currentUser.mockResolvedValue({ id: "student-1", role: "student" });
     for (const bad of ["..%2F1.png", "x.png", "1.svg"]) {

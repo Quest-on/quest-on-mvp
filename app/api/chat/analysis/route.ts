@@ -10,7 +10,7 @@
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { AI_MODEL } from "@/lib/openai";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { currentUser } from "@/lib/get-current-user";
@@ -74,7 +74,9 @@ export async function POST(request: NextRequest) {
     }
     if (!session) return errorJson("INVALID_SESSION", "Invalid session", 400);
     if (session.student_id !== user.id) return errorJson("FORBIDDEN", "Session does not belong to this user", 403);
-    if (session.submitted_at) return errorJson("SESSION_SUBMITTED", "Session already submitted", 403);
+    if (session.submitted_at) {
+      return errorJson("SESSION_SUBMITTED", "Session already submitted", 403);
+    }
     if (!session.exam_id) return errorJson("MISSING_EXAM_INFO", "Session is missing exam information", 400);
 
     // 5. 시험과 문항.
@@ -137,53 +139,22 @@ export async function POST(request: NextRequest) {
     let closed = false;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
 
-    const readable = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        const write = (chunk: string) => {
-          if (closed) return;
-          try {
-            controller.enqueue(encoder.encode(chunk));
-          } catch {
-            closed = true;
-          }
-        };
-        const send = (event: AnalysisStreamEvent) => write(formatSseEvent(event.event, event.data));
-        heartbeat = setInterval(() => write(SSE_HEARTBEAT), SSE_HEARTBEAT_INTERVAL_MS);
+    // `start` 가 생성 중에 바로 채운다. 아래 즉시 실행 함수 안에서 null 로 좁혀지지 않게 단언으로 둔다.
+    let controller = null as ReadableStreamDefaultController<Uint8Array> | null;
+    const write = (chunk: string) => {
+      if (closed || !controller) return;
+      try {
+        controller.enqueue(encoder.encode(chunk));
+      } catch {
+        closed = true;
+      }
+    };
+    const send = (event: AnalysisStreamEvent) => write(formatSseEvent(event.event, event.data));
 
-        try {
-          await runAnalysisTurn(
-            {
-              supabase,
-              http,
-              model: AI_MODEL,
-              userId: user.id,
-              sessionId,
-              examId: exam.id as string,
-              qIdx,
-              message,
-              questionId,
-              examTitle,
-              examCode: exam.code as string,
-              currentQuestionText,
-              // 교수 메모는 클라이언트에서 받지 않고 서버가 로드한 문항에서 파생한다(`/api/chat` 과 같다).
-              currentQuestionAiContext: extractQuestionAiContext(exam.questions, qIdx),
-              dataSources: decision.dataSources,
-              startedAtMs,
-              clientSignal: clientAbort.signal,
-            },
-            send
-          );
-        } finally {
-          if (heartbeat) clearInterval(heartbeat);
-          if (!closed) {
-            closed = true;
-            try {
-              controller.close();
-            } catch {
-              // 이미 닫혔으면 무시한다.
-            }
-          }
-        }
+    const readable = new ReadableStream<Uint8Array>({
+      start(c) {
+        controller = c;
+        heartbeat = setInterval(() => write(SSE_HEARTBEAT), SSE_HEARTBEAT_INTERVAL_MS);
       },
       // 학생이 탭을 닫거나 이동했다. 위층 스트림을 끊고(아무도 읽지 않는 응답에 돈을 쓰지 않게), 실행된 셀은
       // runAnalysisTurn 이 client_cancelled 로 기록한다.
@@ -193,6 +164,50 @@ export async function POST(request: NextRequest) {
         clientAbort.abort(new Error("client_cancelled"));
       },
     });
+
+    // 턴은 스트림과 따로 돈다. 연결이 끊겨도 실행된 셀의 기록(AI 메시지)과 ai_events 가 끝까지 남도록 `after()` 에
+    // 맡긴다(응답이 끝난 뒤에도 함수가 이 프로미스를 기다린다). runAnalysisTurn 은 던지지 않는다.
+    const turn = (async () => {
+      try {
+        await runAnalysisTurn(
+          {
+            supabase,
+            http,
+            model: AI_MODEL,
+            userId: user.id,
+            sessionId,
+            examId: exam.id as string,
+            qIdx,
+            message,
+            questionId,
+            examTitle,
+            examCode: exam.code as string,
+            currentQuestionText,
+            // 교수 메모는 클라이언트에서 받지 않고 서버가 로드한 문항에서 파생한다(`/api/chat` 과 같다).
+            currentQuestionAiContext: extractQuestionAiContext(exam.questions, qIdx),
+            dataSources: decision.dataSources,
+            startedAtMs,
+            clientSignal: clientAbort.signal,
+          },
+          send
+        );
+      } finally {
+        if (heartbeat) clearInterval(heartbeat);
+        if (!closed) {
+          closed = true;
+          try {
+            controller?.close();
+          } catch {
+            // 이미 닫혔으면 무시한다.
+          }
+        }
+      }
+    })();
+    try {
+      after(turn);
+    } catch {
+      // 요청 범위 밖(테스트)에서는 `after()` 를 쓸 수 없다. 턴은 그대로 돈다.
+    }
 
     return new Response(readable, {
       headers: {

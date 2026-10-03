@@ -24,6 +24,9 @@ import type { FigureStore } from "@/lib/analysis-exec/persist";
 /** 교수 자료 버킷. `app/api/upload/route.ts` 가 올리는 곳이다. */
 export const EXAM_MATERIALS_BUCKET = "exam-materials";
 
+/** 공개 데이터 파일 하나를 Storage 에서 내려받는 시간 제한. */
+export const DATA_SOURCE_DOWNLOAD_TIMEOUT_MS = 30_000;
+
 export type SessionAnalysisRecord = {
   messageId: string;
   qIdx: number;
@@ -147,14 +150,21 @@ export async function downloadDataSource(
 ): Promise<DataSourceDownload> {
   const key = materialObjectPath(source.url, process.env.NEXT_PUBLIC_SUPABASE_URL);
   if (!key) return { ok: false, permanent: true };
+  let timer: ReturnType<typeof setTimeout> | null = null;
   try {
-    const { data, error } = await supabase.storage.from(EXAM_MATERIALS_BUCKET).download(key);
+    // Storage 응답이 오지 않아도 턴 예산을 다 쓰지 않게 시간 제한을 둔다(넘으면 일시 실패, 다음 턴에 다시 받는다).
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("material download timed out")), DATA_SOURCE_DOWNLOAD_TIMEOUT_MS);
+    });
+    const { data, error } = await Promise.race([supabase.storage.from(EXAM_MATERIALS_BUCKET).download(key), timeout]);
     if (error || !data) return { ok: false, permanent: false };
     const bytes = new Uint8Array(await data.arrayBuffer());
     if (bytes.byteLength === 0 || bytes.byteLength > MAX_DATA_FILE_BYTES) return { ok: false, permanent: true };
     return { ok: true, bytes };
   } catch {
     return { ok: false, permanent: false };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

@@ -16,13 +16,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * 링크 대상(sandbox 경로). 파일 이름에 괄호 한 겹이 들어갈 수 있다(`clusters (1).csv`). 첫 `)` 에서 멈추면 링크가
+ * 중간에 잘려 `파일.csv)` 같은 찌꺼기가 남는다.
+ */
+const SANDBOX_IMAGE_RE = /!\[[^\]\n]*\]\(\s*<?sandbox:(?:[^()\n]|\([^()\n]*\))*>?\s*\)/g;
+const SANDBOX_LINK_RE = /\[([^\]\n]*)\]\(\s*<?sandbox:(?:[^()\n]|\([^()\n]*\))*>?\s*\)/g;
+
 /** 답변에서 sandbox 링크를 지우거나 이름만 남긴다. */
 export function stripSandboxLinks(text: string): string {
   let out = text;
   // 그림: ![alt](sandbox:...) 와 ![alt](<sandbox:...>)
-  out = out.replace(/!\[[^\]\n]*\]\(\s*<?sandbox:[^)\n]*>?\s*\)/g, "");
+  out = out.replace(SANDBOX_IMAGE_RE, "");
   // 링크: [label](sandbox:...) → label
-  out = out.replace(/\[([^\]\n]*)\]\(\s*<?sandbox:[^)\n]*>?\s*\)/g, (_m, label: string) => label);
+  out = out.replace(SANDBOX_LINK_RE, (_m, label: string) => label);
   // 맨 경로: sandbox:/mnt/data/dir/name.ext → name.ext
   out = out.replace(/sandbox:(?:\/[^\s)\]]*\/)?([^\s/)\]]+)/g, (_m, name: string) => name);
   // 지운 자리에 남은 빈 줄을 정리한다(세 줄 이상 빈 줄을 두 줄로).

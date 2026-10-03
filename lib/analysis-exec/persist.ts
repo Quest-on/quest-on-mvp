@@ -21,6 +21,7 @@ import {
   type StoredAnalysisCell,
   type StoredAnalysisFigure,
   type StoredAnalysisFile,
+  type StoredAnalysisRestore,
   type StoredAnalysisTurn,
 } from "@/lib/analysis-exec/metadata";
 import type { FileCitation } from "@/lib/analysis-exec/text";
@@ -110,6 +111,10 @@ export function buildStoredTurn(params: {
   replayedCells: number;
   /** 문항 간 연결로 알려 준 다른 문항의 셀 수. 없으면 0. */
   linkedCells?: number;
+  /** 같은 문항에서 중단된 요청이 실행한 셀을 알려 준 수. 없으면 0. */
+  interruptedCells?: number;
+  /** 컨테이너를 새로 만들어 이전 상태를 되살린 턴의 기록. */
+  restore?: StoredAnalysisRestore;
   elapsedMs: number;
 }): StoredAnalysisTurn {
   return {
@@ -122,6 +127,8 @@ export function buildStoredTurn(params: {
     outcome: params.outcome,
     notices: params.notices,
     ...(params.replayedCells > 0 ? { replayed_cells: params.replayedCells } : {}),
+    ...(params.restore ? { restore: params.restore } : {}),
+    ...(params.interruptedCells && params.interruptedCells > 0 ? { interrupted_cells: params.interruptedCells } : {}),
     ...(params.linkedCells && params.linkedCells > 0 ? { linked_cells: params.linkedCells } : {}),
     elapsed_ms: Math.max(0, Math.round(params.elapsedMs)),
   };

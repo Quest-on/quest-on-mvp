@@ -89,6 +89,56 @@ describe("SseParser 이벤트 경계", () => {
   });
 });
 
+describe("SseParser 처리 시간과 청크 분할", () => {
+  // 그림 data URI 가 든 `response.completed` 는 수 MB 한 줄이다. 청크마다 버퍼를 처음부터 다시 훑으면 줄 길이의 제곱만큼
+  // 걸린다(리뷰 실측 6MB 한 줄에 4.5초). 지금은 선형이라 6MB 를 16KB 청크로 넣어도 1초보다 훨씬 짧다.
+  it("6MB 한 줄을 16KB 청크로 넣어도 1초 안에 끝나고 값이 그대로다", () => {
+    const payload = "A".repeat(6 * 1024 * 1024);
+    const text = `event: response.completed\ndata: ${payload}\n\n`;
+    const parser = new SseParser();
+    const started = performance.now();
+    const events = [];
+    for (let i = 0; i < text.length; i += 16 * 1024) events.push(...parser.push(text.slice(i, i + 16 * 1024)));
+    events.push(...parser.flush());
+    const elapsed = performance.now() - started;
+    expect(events).toHaveLength(1);
+    expect(events[0].event).toBe("response.completed");
+    expect(events[0].data.length).toBe(payload.length);
+    expect(elapsed).toBeLessThan(1_000);
+  });
+
+  it("어떻게 청크를 나눠도 한 번에 넣은 것과 같은 이벤트가 나온다(CRLF, CR, 긴 줄 섞임)", () => {
+    const long = "x".repeat(5_000);
+    const text = [
+      "event: a\r\ndata: 1\r\n\r\n",
+      `event: b\ndata: ${long}\ndata: 둘째 줄\n\n`,
+      ": keep-alive\n\n",
+      "event: c\rdata: 3\r\r",
+      "data: 끝\n\n",
+    ].join("");
+    const whole = new SseParser();
+    const expected = [...whole.push(text), ...whole.flush()];
+    expect(expected.map((e) => e.event)).toEqual(["a", "b", "c", null]);
+    let seed = 7;
+    const random = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    for (let round = 0; round < 200; round++) {
+      const parser = new SseParser();
+      const got = [];
+      let i = 0;
+      while (i < text.length) {
+        const size = 1 + Math.floor(random() * (round % 2 === 0 ? 7 : 600));
+        got.push(...parser.push(text.slice(i, i + size)));
+        i += size;
+      }
+      got.push(...parser.flush());
+      expect(got).toEqual(expected);
+    }
+  });
+});
+
 describe("readSseStream 바이트 청크", () => {
   it("한글 글자의 UTF-8 바이트가 청크 경계에서 갈려도 깨지지 않는다", async () => {
     const bytes = new TextEncoder().encode('event: text\ndata: {"delta":"분석"}\n\n');

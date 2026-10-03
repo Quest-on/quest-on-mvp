@@ -82,8 +82,17 @@ export const MAX_FIGURES_PER_TURN = 24;
 /** 한 턴에서 내려받는 파일 인용(container_file_citation) 그림 수 상한. */
 export const MAX_CITED_FIGURE_DOWNLOADS = 6;
 
-/** 만료 복구 때 다시 실행하라고 넣는 이전 코드의 길이 상한(글자). */
+/**
+ * 지시문(developer 메시지)에 넣는 이전 코드의 길이 상한(글자). 만료 복구의 참고 코드, 문항 간 연결, 중단된 요청의
+ * 코드가 이 상한을 쓴다. 파일 복원을 못 해 모델이 코드를 다시 실행해야 할 때도 이 상한이다.
+ */
 export const REPLAY_CODE_MAX_CHARS = 40_000;
+
+/**
+ * 복원 파일(컨테이너에 올려 한 셀로 실행하는 파일)에 넣는 이전 코드의 길이 상한(글자). 모델이 코드를 다시 쓰지
+ * 않으므로 출력 토큰과 관계없다. 상한은 실행 시간과 파일 크기를 위한 안전선이다.
+ */
+export const REPLAY_FILE_MAX_CHARS = 200_000;
 
 /** 일반 429(TPM, RPM)의 재시도 횟수와 한 번에 기다리는 최대 시간. */
 export const RATE_LIMIT_MAX_RETRIES = 2;

@@ -259,7 +259,9 @@ export function useExamChat({
             setChatMessage(currentMsg);
           }
           // 언마운트나 새 요청으로 취소된 경우는 아무것도 하지 않는다.
-        } else {
+        } else if (!finished) {
+          // 완료나 오류 이벤트를 이미 받은 뒤 스트림만 네트워크 오류로 끝났으면 덧붙이지 않는다(끝난 턴에 오류가 하나 더
+          // 붙고 입력이 되돌려지지 않게).
           pushAssistant({ message: "", timestamp: new Date().toISOString(), analysisError: "failed" });
           setChatMessage(currentMsg);
         }

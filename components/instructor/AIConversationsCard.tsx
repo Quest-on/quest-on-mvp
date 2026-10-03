@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { MessageSquare } from "lucide-react";
+import { AlertTriangle, MessageSquare } from "lucide-react";
 import AIMessageRenderer from "@/components/chat/AIMessageRenderer";
 import { AnalysisTurnBlock } from "@/components/chat/AnalysisTurnBlock";
 import type { ClientAnalysisTurn } from "@/lib/analysis-exec/metadata";
@@ -27,11 +27,20 @@ interface AIConversationsCardProps {
    * 메시지 id 별 분석 턴 실행 기록(#545). 있으면 AI 답변 아래에 코드(접힘), 결과, 그림을 읽기 전용으로 보인다.
    */
   analysisByMessageId?: Record<string, ClientAnalysisTurn>;
+  /**
+   * 실행 기록을 불러오지 못했다(속도 제한, 네트워크 등). 빈 기록과 구분해 안내한다. 빈 기록으로 보이면 학생이 코드를
+   * 실행하지 않은 것으로 읽힌다.
+   */
+  analysisLoadFailed?: boolean;
+  /** 실행 기록을 다시 불러온다. */
+  onRetryAnalysis?: () => void;
 }
 
 export function AIConversationsCard({
   messages,
   analysisByMessageId,
+  analysisLoadFailed,
+  onRetryAnalysis,
 }: AIConversationsCardProps) {
   const t = useTranslations("grading");
   return (
@@ -44,6 +53,24 @@ export function AIConversationsCard({
         <CardDescription>{t("aiConversations.description")}</CardDescription>
       </CardHeader>
       <CardContent>
+        {analysisLoadFailed && (
+          <div
+            role="alert"
+            className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-warning-border bg-warning-surface px-3 py-2 text-sm text-warning-text"
+          >
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{t("aiConversations.analysisLoadFailed")}</span>
+            {onRetryAnalysis && (
+              <button
+                type="button"
+                onClick={onRetryAnalysis}
+                className="ml-auto min-h-[32px] rounded px-2 font-medium underline underline-offset-2 hover:no-underline"
+              >
+                {t("aiConversations.analysisRetry")}
+              </button>
+            )}
+          </div>
+        )}
         {messages.length > 0 ? (
           <div className="space-y-4 sm:space-y-6 max-h-96 overflow-y-auto p-2 sm:p-4">
             {messages.map((message) => (
@@ -74,7 +101,7 @@ export function AIConversationsCard({
                     timestamp={message.created_at}
                     attachment={
                       analysisByMessageId?.[message.id] ? (
-                        <AnalysisTurnBlock analysis={analysisByMessageId[message.id]} />
+                        <AnalysisTurnBlock analysis={analysisByMessageId[message.id]} viewer="instructor" />
                       ) : undefined
                     }
                   />

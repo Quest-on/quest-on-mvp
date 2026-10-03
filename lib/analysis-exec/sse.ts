@@ -14,6 +14,10 @@
  *
  * 바이트를 문자열로 바꾸는 일은 호출부가 `TextDecoder(stream: true)` 로 한다. 한글처럼 여러 바이트인 글자가
  * 청크 경계에서 잘려도 깨지지 않게 하려는 것이다(`readSseStream` 이 그렇게 한다).
+ *
+ * 긴 줄(그림 data URI 가 든 `response.completed` 는 수 MB 한 줄이다)에서도 처리 시간이 줄 길이에 비례하게 한다.
+ * 줄 끝이 없는 청크는 이어 붙이지 않고 모아 두기만 하고, 줄 끝을 찾을 때는 이미 훑은 앞부분을 다시 훑지 않는다.
+ * 그렇지 않으면 청크마다 쌓인 버퍼를 처음부터 다시 훑어 줄 길이의 제곱만큼 걸린다(6MB 한 줄에 4.5초, 리뷰 실측).
  */
 
 export type SseEvent = {
@@ -26,7 +30,13 @@ export type SseEvent = {
 };
 
 export class SseParser {
-  private buffer = "";
+  /**
+   * 아직 끝나지 않은 줄의 조각들. 이어 붙이지 않고 모아 둔다. 줄 끝 문자는 들어 있지 않다. 다만 마지막 조각이 `\r` 로
+   * 끝날 수 있다(`\r\n` 이 청크 경계에서 갈렸을 수 있어 보류한 것, `heldCR`).
+   */
+  private parts: string[] = [];
+  private partsLength = 0;
+  private heldCR = false;
   private eventName: string | null = null;
   private dataLines: string[] = [];
   private lastId: string | null = null;
@@ -34,16 +44,26 @@ export class SseParser {
   /** 청크 하나를 넣고 그 안에서 끝난 이벤트들을 돌려준다. */
   push(chunk: string): SseEvent[] {
     if (chunk.length === 0) return [];
-    this.buffer += chunk;
-    return this.drain(false);
+    if (!this.heldCR && chunk.indexOf("\n") === -1 && chunk.indexOf("\r") === -1) {
+      // 줄 끝이 없다. 모아 두기만 한다(앞부분을 다시 훑지 않는다).
+      this.parts.push(chunk);
+      this.partsLength += chunk.length;
+      return [];
+    }
+    // 앞 조각에는 줄 끝이 없으므로(보류한 `\r` 하나 말고는) 그 끝에서부터 훑는다.
+    const scanFrom = this.heldCR ? this.partsLength - 1 : this.partsLength;
+    const buf = this.parts.length > 0 ? this.parts.join("") + chunk : chunk;
+    return this.drain(buf, scanFrom, false);
   }
 
   /** 스트림이 끝났을 때 남은 줄을 처리한다. 빈 줄로 끝나지 않은 마지막 이벤트도 내보낸다. */
   flush(): SseEvent[] {
-    const events = this.drain(true);
-    if (this.buffer.length > 0) {
-      const ev = this.processLine(this.buffer);
-      this.buffer = "";
+    const buf = this.parts.join("");
+    const scanFrom = this.heldCR ? this.partsLength - 1 : this.partsLength;
+    const events = buf.length > 0 ? this.drain(buf, scanFrom, true) : [];
+    if (this.partsLength > 0) {
+      const ev = this.processLine(this.parts.join(""));
+      this.setRemainder("");
       if (ev) events.push(ev);
     }
     const tail = this.dispatch();
@@ -51,24 +71,41 @@ export class SseParser {
     return events;
   }
 
-  private drain(final: boolean): SseEvent[] {
+  private setRemainder(remainder: string): void {
+    this.parts = remainder.length > 0 ? [remainder] : [];
+    this.partsLength = remainder.length;
+    this.heldCR = remainder.length > 0 && remainder.charCodeAt(remainder.length - 1) === 13;
+  }
+
+  /**
+   * `buf` 에서 끝난 줄을 처리하고 남은 조각을 보관한다. `scanFrom` 앞에는 줄 끝이 없다. 다음 `\n` 과 `\r` 의 위치를
+   * 기억해 두고 지나간 것만 다시 찾으므로 전체가 선형이다.
+   */
+  private drain(buf: string, scanFrom: number, final: boolean): SseEvent[] {
     const events: SseEvent[] = [];
     let start = 0;
-    const buf = this.buffer;
-    for (let i = 0; i < buf.length; i++) {
-      const ch = buf.charCodeAt(i);
-      if (ch !== 10 && ch !== 13) continue; // \n, \r
-      if (ch === 13 && i === buf.length - 1 && !final) {
+    let pos = Math.max(0, scanFrom);
+    let nextLF = buf.indexOf("\n", pos);
+    let nextCR = buf.indexOf("\r", pos);
+    while (true) {
+      if (nextLF !== -1 && nextLF < pos) nextLF = buf.indexOf("\n", pos);
+      if (nextCR !== -1 && nextCR < pos) nextCR = buf.indexOf("\r", pos);
+      const end = nextLF === -1 ? nextCR : nextCR === -1 ? nextLF : Math.min(nextLF, nextCR);
+      if (end === -1) break;
+      const isCR = end === nextCR;
+      if (isCR && end === buf.length - 1 && !final) {
         // `\r\n` 이 청크 경계에서 갈렸을 수 있다. 다음 청크를 기다린다.
         break;
       }
-      const line = buf.slice(start, i);
-      if (ch === 13 && buf.charCodeAt(i + 1) === 10) i++; // \r\n 은 줄 끝 하나
-      start = i + 1;
+      const line = buf.slice(start, end);
+      let next = end + 1;
+      if (isCR && buf.charCodeAt(next) === 10) next++; // \r\n 은 줄 끝 하나
+      start = next;
+      pos = next;
       const ev = this.processLine(line);
       if (ev) events.push(ev);
     }
-    this.buffer = buf.slice(start);
+    this.setRemainder(start === 0 ? buf : buf.slice(start));
     return events;
   }
 

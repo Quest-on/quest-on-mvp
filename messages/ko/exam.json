@@ -120,16 +120,31 @@
     "hideLogs": "실행 결과 접기",
     "logsTruncated": "실행 결과가 길어 앞부분만 저장했습니다.",
     "figureAlt": "AI가 실행한 코드로 만든 그림 {number}",
-    "figureExpand": "그림 크게 보기",
+    "figureExpand": "그림 {number} 크게 보기",
     "figureError": "그림을 불러오지 못했습니다.",
     "figuresDropped": "그림 {count}장은 저장하지 못했습니다.",
     "errors": {
       "limitExceeded": "분석이 너무 길어 중단했습니다. 단계를 나눠 다시 요청해 주세요.",
-      "quotaExhausted": "AI 분석을 잠시 사용할 수 없습니다. 감독자에게 알려 주세요.",
+      "quotaExhausted": "AI 분석을 잠시 사용할 수 없습니다. 잠시 후 다시 시도하거나 담당 교수자에게 알려 주세요.",
       "rateLimited": "요청이 많아 분석을 시작하지 못했습니다. 잠시 뒤 다시 보내 주세요.",
       "toolUnavailable": "분석 환경을 준비하지 못했습니다. 잠시 뒤 다시 보내 주세요.",
       "failed": "분석 중 문제가 생겼습니다. 다시 보내 주세요.",
-      "timeout": "응답 시간이 초과되었습니다. 단계를 나눠 다시 요청해 주세요."
+      "timeout": "응답 시간이 초과되었습니다. 단계를 나눠 다시 요청해 주세요.",
+      "clientCancelled": "연결이 끊겨 답변이 중간에 멈췄습니다. 실행된 코드는 아래에 남아 있습니다. 이어서 요청해 주세요.",
+      "incomplete": "답변이 길어 중간에 끊겼습니다. 이어서 요청해 주세요."
+    },
+    "figureDialogDescription": "AI가 실행한 코드로 만든 그림을 크게 보여 줍니다.",
+    "replayCellLabel": "이전 단계 다시 실행",
+    "instructorNotices": {
+      "environmentRestarted": "분석 환경이 다시 시작되어 이전 코드를 다시 실행한 턴입니다.",
+      "limitExceeded": "셀 수나 시간 상한에 걸려 중단된 턴입니다.",
+      "quotaExhausted": "AI 분석을 사용할 수 없어 답하지 못한 턴입니다.",
+      "rateLimited": "요청이 많아 분석을 시작하지 못한 턴입니다.",
+      "toolUnavailable": "분석 환경을 준비하지 못한 턴입니다.",
+      "failed": "분석 중 오류로 끝난 턴입니다.",
+      "timeout": "응답 시간이 초과된 턴입니다.",
+      "clientCancelled": "학생 연결이 끊겨 중간에 멈춘 턴입니다. 실행된 코드는 남아 있습니다.",
+      "incomplete": "출력 상한에 걸려 답이 중간에 잘린 턴입니다."
     }
   },
   "submissionOverlay": {

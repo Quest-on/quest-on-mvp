@@ -40,6 +40,37 @@ export type StoredAnalysisCell = {
   figures: StoredAnalysisFigure[];
   /** 크기 상한이나 저장 실패로 남기지 못한 그림 수. */
   figures_dropped?: number;
+  /**
+   * 서버가 올린 복원 파일을 실행한 셀(이전 셀들을 다시 실행해 상태를 되살림). 다음 복원과 문항 간 연결은 이 셀
+   * 대신 원래 셀을 쓴다(이 셀의 코드는 파일을 여는 한 줄뿐이다).
+   */
+  replay?: true;
+};
+
+/** 원래 셀 하나를 가리키는 출처: 그 셀이 있는 AI 메시지 id 와 셀 번호. */
+export type AnalysisCellRef = { m: string; i: number };
+
+export const ANALYSIS_RESTORE_MODES = ["file", "inline"] as const;
+export type AnalysisRestoreMode = (typeof ANALYSIS_RESTORE_MODES)[number];
+
+export const ANALYSIS_RESTORE_STATUSES = ["ok", "partial", "incomplete"] as const;
+export type AnalysisRestoreStatus = (typeof ANALYSIS_RESTORE_STATUSES)[number];
+
+/**
+ * 컨테이너를 새로 만들어 이전 상태를 되살린 턴의 기록. 서버 전용이다.
+ *   - refs: 되살린 이력의 출처(원래 셀들, 시간 순서). 복원 셀이나 모델이 다시 쓴 코드는 들어가지 않는다. 다음 복원은
+ *     이 목록과 그 뒤에 이 컨테이너에서 실행한 셀로 만든다(잘린 합본이 아니라 원래 셀).
+ *   - mode: file 은 서버가 올린 복원 파일을 한 셀로 실행, inline 은 파일을 못 올려 지시문 안의 코드를 모델이 다시 실행.
+ *   - status: ok 는 복원이 끝났고 실패한 셀이 없음, partial 은 끝났지만 실패한 셀이 있음(다시 해도 같으므로 다시
+ *     복원하지 않는다), incomplete 는 복원을 마치지 못함(다음 턴에 새 컨테이너로 다시 복원한다).
+ */
+export type StoredAnalysisRestore = {
+  refs: AnalysisCellRef[];
+  mode: AnalysisRestoreMode;
+  status: AnalysisRestoreStatus;
+  /** 파일 방식에서 복원 셀이 출력한 성공, 실패 셀 수. */
+  ok_cells?: number;
+  failed_cells?: number;
 };
 
 export type StoredAnalysisFile = {
@@ -87,6 +118,10 @@ export type StoredAnalysisTurn = {
   notices: AnalysisNotice[];
   /** 만료 복구로 다시 실행하라고 넣은 이전 셀 수. */
   replayed_cells?: number;
+  /** 컨테이너를 새로 만들어 이전 상태를 되살린 턴이면 그 기록. */
+  restore?: StoredAnalysisRestore;
+  /** 같은 문항에서 중단된 요청이 실행한 셀을 알려 준 수. */
+  interrupted_cells?: number;
   /** 문항 간 연결로 알려 준 다른 문항의 셀 수(변수가 남아 있어 다시 실행하지 않는다). */
   linked_cells?: number;
   elapsed_ms: number;
@@ -173,6 +208,27 @@ function readCell(value: unknown): StoredAnalysisCell | null {
     ...(typeof value.figures_dropped === "number" && value.figures_dropped > 0
       ? { figures_dropped: value.figures_dropped }
       : {}),
+    ...(value.replay === true ? { replay: true as const } : {}),
+  };
+}
+
+function readRestore(value: unknown): StoredAnalysisRestore | null {
+  if (!isRecord(value)) return null;
+  const mode = (ANALYSIS_RESTORE_MODES as readonly unknown[]).includes(value.mode) ? (value.mode as AnalysisRestoreMode) : null;
+  const status = (ANALYSIS_RESTORE_STATUSES as readonly unknown[]).includes(value.status)
+    ? (value.status as AnalysisRestoreStatus)
+    : null;
+  if (!mode || !status || !Array.isArray(value.refs)) return null;
+  const refs: AnalysisCellRef[] = [];
+  for (const ref of value.refs) {
+    if (isRecord(ref) && typeof ref.m === "string" && ref.m && typeof ref.i === "number") refs.push({ m: ref.m, i: ref.i });
+  }
+  return {
+    refs,
+    mode,
+    status,
+    ...(typeof value.ok_cells === "number" ? { ok_cells: value.ok_cells } : {}),
+    ...(typeof value.failed_cells === "number" ? { failed_cells: value.failed_cells } : {}),
   };
 }
 
@@ -199,6 +255,7 @@ export function readStoredAnalysisTurn(metadata: unknown): StoredAnalysisTurn | 
     ? (raw.outcome as AnalysisOutcome)
     : null;
   if (!outcome) return null;
+  const restore = readRestore(raw.restore);
   return {
     v: ANALYSIS_METADATA_VERSION,
     container_id: raw.container_id,
@@ -217,6 +274,8 @@ export function readStoredAnalysisTurn(metadata: unknown): StoredAnalysisTurn | 
       ? raw.notices.filter((n): n is AnalysisNotice => (ANALYSIS_NOTICES as readonly unknown[]).includes(n))
       : [],
     ...(typeof raw.replayed_cells === "number" ? { replayed_cells: raw.replayed_cells } : {}),
+    ...(restore ? { restore } : {}),
+    ...(typeof raw.interrupted_cells === "number" ? { interrupted_cells: raw.interrupted_cells } : {}),
     ...(typeof raw.linked_cells === "number" ? { linked_cells: raw.linked_cells } : {}),
     elapsed_ms: typeof raw.elapsed_ms === "number" ? raw.elapsed_ms : 0,
   };
@@ -237,6 +296,8 @@ export type ClientAnalysisCell = {
   logsTruncated: boolean;
   figures: ClientAnalysisFigure[];
   figuresDropped: number;
+  /** 서버가 올린 복원 파일을 실행해 이전 단계를 다시 실행한 셀. 화면은 "이전 단계 다시 실행"으로 보인다. */
+  replay: boolean;
 };
 
 export type ClientAnalysisTurn = {
@@ -279,6 +340,7 @@ export function toClientAnalysisTurn(params: {
       logsTruncated: cell.logs_truncated === true,
       figures: cell.figures.filter(own).map((figure) => toClientFigure(sessionId, messageId, figure)),
       figuresDropped: cell.figures_dropped ?? 0,
+      replay: cell.replay === true,
     })),
     figures: turn.cited_figures.filter(own).map((figure) => toClientFigure(sessionId, messageId, figure)),
   };

@@ -42,10 +42,13 @@ export function AnalysisProgressIndicator({ progress }: { progress: AnalysisProg
       <div className="flex items-center gap-3">
         <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary motion-reduce:animate-none" aria-hidden="true" />
         <span className="text-sm text-foreground">{label}</span>
-        <span className="ml-auto type-meta tabular-nums">{t("analysis.elapsed", { seconds })}</span>
+        {/* 경과 시간은 매초 바뀐다. 화면 낭독기가 계속 읽지 않게 알림 영역에서 뺀다(단계 글자만 알린다). */}
+        <span className="ml-auto type-meta tabular-nums" aria-hidden="true">
+          {t("analysis.elapsed", { seconds })}
+        </span>
       </div>
       {progress.preview && (
-        <p className="line-clamp-4 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+        <p className="line-clamp-4 whitespace-pre-wrap break-words text-sm text-muted-foreground" aria-hidden="true">
           {progress.preview.slice(-600)}
         </p>
       )}

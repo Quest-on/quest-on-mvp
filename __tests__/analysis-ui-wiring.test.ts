@@ -13,7 +13,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseAnalysisStreamEvent } from "@/lib/analysis-exec/client-events";
 import { ANALYSIS_CLIENT_TIMEOUT_MS } from "@/lib/analysis-exec/limits";
-import { errorCodeNoticeKey, outcomeNoticeKey } from "@/components/chat/AnalysisTurnBlock";
+import { errorCodeNoticeKey, noticeMessageKey, outcomeNoticeKey } from "@/components/chat/AnalysisTurnBlock";
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 
@@ -39,6 +39,17 @@ describe("학생 채팅 배선", () => {
     expect(hook).toContain("/api/session/${sessionId}/analysis");
   });
 
+  it("완료 뒤 스트림만 네트워크 오류로 끝나면 오류를 덧붙이지 않는다", () => {
+    const hook = read("hooks/useExamChat.ts");
+    expect(hook).toContain("} else if (!finished) {");
+  });
+
+  it("진행 표시는 단계 글자만 알리고 매초 바뀌는 경과 시간과 미리보기는 화면 낭독기에서 뺀다", () => {
+    const indicator = read("components/exam/AnalysisProgressIndicator.tsx");
+    expect(indicator).toMatch(/aria-hidden="true">\s*\{t\("analysis\.elapsed"/);
+    expect(indicator).toMatch(/line-clamp-4[^"]*" aria-hidden="true"/);
+  });
+
   it("사이드바가 진행 표시와 셀 블록을 그린다", () => {
     expect(sidebar).toContain("<AnalysisProgressIndicator");
     expect(sidebar).toContain("<AnalysisTurnBlock");
@@ -53,7 +64,21 @@ describe("교수 채점 화면 배선", () => {
     const card = read("components/instructor/AIConversationsCard.tsx");
     expect(grade).toContain("qk.session.analysis(resolvedParams.studentId)");
     expect(grade).toContain("analysisByMessageId={analysisTurns}");
-    expect(card).toContain("<AnalysisTurnBlock analysis={analysisByMessageId[message.id]} />");
+    // 교수 화면은 학생에게 하는 말 대신 턴 설명을 보인다.
+    expect(card).toContain('<AnalysisTurnBlock analysis={analysisByMessageId[message.id]} viewer="instructor" />');
+  });
+
+  it("실행 기록을 못 불러오면(429 등) 빈 기록으로 캐시하지 않고 다시 시도를 보인다", () => {
+    const grade = read("app/(app)/instructor/[examId]/grade/[studentId]/page.tsx");
+    const card = read("components/instructor/AIConversationsCard.tsx");
+    // 실패를 빈 기록({})으로 돌려주면 60초 동안 "코드를 실행하지 않았다"로 보인다.
+    expect(grade).not.toContain("if (!response.ok) return {} as Record<string, ClientAnalysisTurn>;");
+    expect(grade).toMatch(/if \(!response\.ok\) throw new Error/);
+    expect(grade).toContain("retry: false");
+    expect(grade).toContain("analysisLoadFailed={analysisQuery.isError}");
+    expect(grade).toContain("onRetryAnalysis={() => void analysisQuery.refetch()}");
+    expect(card).toContain('t("aiConversations.analysisLoadFailed")');
+    expect(card).toContain('t("aiConversations.analysisRetry")');
   });
 });
 
@@ -76,11 +101,21 @@ describe("화면 이벤트 파서", () => {
   });
 
   it("오류 코드와 턴 결과를 안내 문구 키로 바꾼다", () => {
-    expect(errorCodeNoticeKey("limit_exceeded")).toBe("errors.limitExceeded");
-    expect(errorCodeNoticeKey("quota_exhausted")).toBe("errors.quotaExhausted");
-    expect(errorCodeNoticeKey("timeout")).toBe("errors.timeout");
-    expect(outcomeNoticeKey("time_limit")).toBe("errors.limitExceeded");
+    expect(errorCodeNoticeKey("limit_exceeded")).toBe("limitExceeded");
+    expect(errorCodeNoticeKey("quota_exhausted")).toBe("quotaExhausted");
+    expect(errorCodeNoticeKey("timeout")).toBe("timeout");
+    expect(outcomeNoticeKey("time_limit")).toBe("limitExceeded");
     expect(outcomeNoticeKey("completed")).toBeNull();
+    // 연결이 끊긴 턴과 출력 상한에 잘린 턴도 안내가 있다(새로고침하면 잘린 답처럼만 보이지 않게).
+    expect(outcomeNoticeKey("client_cancelled")).toBe("clientCancelled");
+    expect(outcomeNoticeKey("incomplete")).toBe("incomplete");
+  });
+
+  it("학생 화면과 교수 화면은 같은 턴에 다른 문구 키를 쓴다", () => {
+    expect(noticeMessageKey("quotaExhausted", "student")).toBe("analysis.errors.quotaExhausted");
+    expect(noticeMessageKey("quotaExhausted", "instructor")).toBe("analysis.instructorNotices.quotaExhausted");
+    expect(noticeMessageKey("environmentRestarted", "student")).toBe("analysis.environmentRestarted");
+    expect(noticeMessageKey("environmentRestarted", "instructor")).toBe("analysis.instructorNotices.environmentRestarted");
   });
 });
 
@@ -100,8 +135,22 @@ describe("문구", () => {
     const map = Object.fromEntries(flatten(ko));
     expect(map.environmentRestarted).toBe("분석 환경이 다시 시작되어 이전 단계를 다시 실행했습니다.");
     expect(map["errors.limitExceeded"]).toBe("분석이 너무 길어 중단했습니다. 단계를 나눠 다시 요청해 주세요.");
-    expect(map["errors.quotaExhausted"]).toBe("AI 분석을 잠시 사용할 수 없습니다. 감독자에게 알려 주세요.");
+    // 비동시 시험에는 감독자가 없다(리뷰 반영).
+    expect(map["errors.quotaExhausted"]).toBe(
+      "AI 분석을 잠시 사용할 수 없습니다. 잠시 후 다시 시도하거나 담당 교수자에게 알려 주세요."
+    );
     expect(map.runningCode).toBe("코드 실행 중 ({count}회째)");
+    expect(map["instructorNotices.quotaExhausted"]).toBe("AI 분석을 사용할 수 없어 답하지 못한 턴입니다.");
+    for (const [key, value] of flatten(ko)) expect(value, key).not.toContain("감독자");
+  });
+
+  it("학생 문구의 모든 안내 키에 교수용 설명이 있다", () => {
+    const keys = new Set(flatten(ko).map(([k]) => k));
+    for (const key of ["limitExceeded", "quotaExhausted", "rateLimited", "toolUnavailable", "failed", "timeout", "clientCancelled", "incomplete"]) {
+      expect(keys.has(`errors.${key}`), key).toBe(true);
+      expect(keys.has(`instructorNotices.${key}`), key).toBe(true);
+    }
+    expect(keys.has("instructorNotices.environmentRestarted")).toBe(true);
   });
 
   it("가운뎃점과 낫표를 쓰지 않는다", () => {

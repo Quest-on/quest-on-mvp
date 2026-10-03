@@ -238,11 +238,13 @@ export default function GradeStudentPage({
   });
 
   // 학생 대화의 분석 턴 실행 기록(#545). 코드 실행이 붙은 문항에서만 내용이 있다. 실패해도 대화는 그대로 보인다.
-  const { data: analysisTurns } = useQuery({
+  // 실패(속도 제한 429, 네트워크)는 빈 기록으로 캐시하지 않는다. 빈 기록으로 보이면 학생이 코드를 실행하지 않은 것으로
+  // 읽히므로, 오류로 두고 카드에 "다시 시도"를 보인다.
+  const analysisQuery = useQuery({
     queryKey: qk.session.analysis(resolvedParams.studentId),
     queryFn: async ({ signal }) => {
       const response = await fetch(`/api/session/${resolvedParams.studentId}/analysis`, { signal });
-      if (!response.ok) return {} as Record<string, ClientAnalysisTurn>;
+      if (!response.ok) throw new Error(`analysis records request failed: ${response.status}`);
       const data = (await response.json()) as { turns?: Array<ClientAnalysisTurn & { createdAt: string; qIdx: number }> };
       const byMessageId: Record<string, ClientAnalysisTurn> = {};
       for (const turn of data.turns ?? []) {
@@ -258,7 +260,9 @@ export default function GradeStudentPage({
     },
     enabled: !!(isLoaded && isSignedIn && (profile?.role as string) === "instructor"),
     staleTime: 60_000,
+    retry: false,
   });
+  const analysisTurns = analysisQuery.data;
 
   // URL 파라미터(qIdx 우선, questionType 보조)에 따라 초기 문항만 선택한다.
   useEffect(() => {
@@ -722,7 +726,12 @@ export default function GradeStudentPage({
                 />
               ) : (
                 <>
-                  <AIConversationsCard messages={duringExamMessages} analysisByMessageId={analysisTurns} />
+                  <AIConversationsCard
+                    messages={duringExamMessages}
+                    analysisByMessageId={analysisTurns}
+                    analysisLoadFailed={analysisQuery.isError}
+                    onRetryAnalysis={() => void analysisQuery.refetch()}
+                  />
 
                   <div className="space-y-3">
                     <IntegritySignalsToggle
