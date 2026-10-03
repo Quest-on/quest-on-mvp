@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import koAuthoring from "@/messages/ko/authoring.json";
 import { QuestionNavigation } from "@/components/instructor/QuestionNavigation";
+import { formatSummaryScoreLabel } from "@/lib/grading-helpers";
 
 /**
  * 채점 화면 문항 탭의 점수 배지 (#577)
@@ -24,17 +25,18 @@ function render(grades: Record<number, GradeInput>, hideScores = false): string 
     Object.entries(grades).map(([k, g]) => [k, { id: `g${k}`, q_idx: Number(k), comment: "", ...g }])
   );
   return renderToStaticMarkup(
-    createElement(
-      NextIntlClientProvider,
-      { locale: "ko", messages: { authoring: koAuthoring }, timeZone: "Asia/Seoul" },
-      createElement(QuestionNavigation, {
+    createElement(NextIntlClientProvider, {
+      locale: "ko",
+      messages: { authoring: koAuthoring },
+      timeZone: "Asia/Seoul",
+      children: createElement(QuestionNavigation, {
         questions,
         selectedQuestionIdx: 0,
         onSelectQuestion: () => {},
         grades: rows,
         hideScores,
-      })
-    )
+      }),
+    })
   );
 }
 
@@ -74,6 +76,24 @@ describe("문항 탭 점수 배지 (#577)", () => {
 
   it("hideScores 면 점수 배지를 숨긴다", () => {
     expect(scoreBadges(render({ 0: { score: 85, grade_type: "manual" } }, true))).toEqual([]);
+  });
+});
+
+describe("문항 평가 요약 프롬프트의 점수 줄 (#577)", () => {
+  // 시험 문항 요약 프롬프트가 평가 요약 자리 표시 행(또는 행 없음)의 0 을 "점수: 0점"으로 받으면, 교수가
+  // 채점하기 전인데 AI 평가가 0점을 전제로 쓰일 수 있었다. 세션 종합 요약처럼 "미채점"으로 넘긴다.
+  const grading = readFileSync(path.resolve(__dirname, "..", "lib/grading.ts"), "utf8").replace(/\r\n/g, "\n");
+
+  it("미채점 서술형은 '미채점', 교수가 준 점수는 그 점수로 적는다", () => {
+    expect(formatSummaryScoreLabel({ score: 0, ungraded: true, hasSubmission: true, questionType: "essay" })).toBe("미채점");
+    expect(formatSummaryScoreLabel({ score: 85, ungraded: false, hasSubmission: true, questionType: "essay" })).toBe("85점");
+    expect(formatSummaryScoreLabel({ score: 0, ungraded: false, hasSubmission: true, questionType: "essay" })).toBe("0점");
+  });
+
+  it("문항 요약은 점수 행이 아니면 ungraded 로 표시하고, 시험 프롬프트의 점수 줄이 그 판정을 쓴다", () => {
+    expect(grading).toMatch(/ungraded: !isScoringGrade\(typedGrade\),/);
+    expect(grading).toMatch(/점수: \$\{formatSummaryScoreLabel\(\{\n  score: grade\.score,\n  ungraded: grade\.ungraded,/);
+    expect(grading).not.toMatch(/\n점수: \$\{grade\.score\}점\n/);
   });
 });
 
