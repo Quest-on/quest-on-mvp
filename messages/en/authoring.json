@@ -172,7 +172,7 @@
     "internalTitle": "Internal copy activity",
     "internalLog": "• {chars} characters copied internally ({time})",
     "legendExternal": "External paste",
-    "legendInternal": "Internal copy (AI response)",
+    "legendInternal": "Internal copy (AI response, question text, rubric)",
     "legendModified": "Modified after paste",
     "emptyAnswer": "No answer provided.",
     "noSubmission": "No submission found.",
