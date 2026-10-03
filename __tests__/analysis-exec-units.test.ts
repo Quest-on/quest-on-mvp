@@ -67,6 +67,7 @@ import {
   type HistoryRecord,
 } from "@/lib/analysis-exec/container";
 import { buildStoredTurn, storeCellFigures, storeCitedFigures } from "@/lib/analysis-exec/persist";
+import { isReplayOnlyCellCode, replayCellRemainder } from "@/lib/analysis-exec/replay-file";
 import { resolveExamAiProfile } from "@/lib/exam-ai-profile";
 import {
   DATA_SOURCE_DOWNLOAD_TIMEOUT_MS,
@@ -1338,5 +1339,126 @@ describe("검토 반영: 자료 경로, 일부만 받은 파일, 경로 바뀜, 
     const inTime = createFigureStore(supabase, undefined, () => 60_000);
     expect(await inTime.upload("s/m/1.png", new Uint8Array([1]), "image/png")).toBe(true);
     expect(upload).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("복원 실행 줄만 있는 셀과 분석 코드를 덧붙인 복원 셀 (#564 후속)", () => {
+  const PATH = `/mnt/data/cf9-${REPLAY_FILE_NAME}`;
+  const RUN = replayExecLine(PATH);
+  const cell = (index: number, code: string, status = "completed", extra: Record<string, unknown> = {}) => ({
+    index,
+    status,
+    code,
+    logs: "",
+    figures: [],
+    ...extra,
+  });
+  const rec = (messageId: string, qIdx: number, turn: StoredAnalysisTurn): HistoryRecord => ({ messageId, qIdx, turn });
+
+  it("주석과 빈 줄을 빼면 복원 실행 줄뿐인 셀은 실행 줄만 있는 셀이다(서버가 주는 줄과 흔한 변형)", () => {
+    for (const code of [
+      RUN,
+      `${RUN}\n`,
+      `# 이전 상태 복원\n\n${RUN}\n\n# 끝`,
+      `exec(open('${PATH}').read())`,
+      `exec(open("${PATH}", encoding="utf-8").read())`,
+      `exec( open( "${PATH}" , "r" ).read() , globals() )`,
+      `${RUN};  # 복원`,
+      `${RUN}\r\n`,
+      `${RUN}\n${RUN}`,
+    ]) {
+      expect(isReplayOnlyCellCode(code), code).toBe(true);
+    }
+  });
+
+  it("실행 줄 뒤에 분석 코드를 덧붙였거나 실행 줄을 떼어 낼 수 없으면 실행 줄만 있는 셀이 아니다", () => {
+    for (const code of [
+      `${RUN}\nprofile = df.groupby('region')['sales'].mean()`,
+      `${RUN}\nplt.hist(df['sales'])\nplt.show()`,
+      `${RUN}; df.head()`,
+      `try:\n    ${RUN}\nexcept FileNotFoundError:\n    df = pd.read_csv('/mnt/data/sales.csv')`,
+      `exec(open(\n    "${PATH}"\n).read())`,
+      `exec(open("${PATH}.bak").read())`,
+      `# ${REPLAY_FILE_NAME} 를 실행한다`,
+      "print(1)",
+      "",
+    ]) {
+      expect(isReplayOnlyCellCode(code), code).toBe(false);
+    }
+  });
+
+  it("다음 복원에 넣을 코드는 실행 줄을 뺀 나머지이고, 실행 줄뿐이거나 떼어 낼 수 없으면 없다", () => {
+    expect(replayCellRemainder(`${RUN}\n\n# 지역별 평균\nprofile = df.groupby('region')['sales'].mean()\n`)).toBe(
+      "# 지역별 평균\nprofile = df.groupby('region')['sales'].mean()"
+    );
+    expect(replayCellRemainder(`# 복원\n${RUN}\n`)).toBeNull();
+    // 들여쓴 실행 줄(try 블록 안)은 떼어 내면 코드가 깨지므로 통째로 뺀다.
+    expect(replayCellRemainder(`try:\n    ${RUN}\nexcept FileNotFoundError:\n    pass\nx = 1`)).toBeNull();
+    // 남은 코드가 아직 복원 파일을 가리키면 복원 파일 안에서 복원 파일을 다시 열 수 있으므로 뺀다.
+    expect(replayCellRemainder(`${RUN}\nprint(open("${PATH}").read()[:80])`)).toBeNull();
+    expect(replayCellRemainder("profile = df.mean()")).toBeNull();
+  });
+
+  it("덧붙인 분석 코드는 다음 복원 이력에 들어가고, 두 번째 만료 뒤 그 복원의 출처로 펼쳐도 나머지만 들어간다", () => {
+    const original = rec("m1", 0, storedTurn({ container_id: "cntr_a", cells: [cell(1, "df = read()"), cell(2, "X = scale(df)")] }));
+    const restored = rec(
+      "m2",
+      0,
+      storedTurn({
+        container_id: "cntr_b",
+        cells: [
+          cell(1, `${RUN}\nprofile = df.groupby(km.labels_).mean()`, "completed", { replay: true }),
+          cell(2, "top = profile.head()"),
+        ],
+        restore: { refs: [{ m: "m1", i: 1 }, { m: "m1", i: 2 }], mode: "file", status: "ok", ok_cells: 2, failed_cells: 0 },
+      })
+    );
+    const history = collectContainerHistory([original, restored], "cntr_b");
+    expect(history.map((h) => h.code)).toEqual(["df = read()", "X = scale(df)", "profile = df.groupby(km.labels_).mean()", "top = profile.head()"]);
+    expect(history.map((h) => h.ref)).toEqual([
+      { m: "m1", i: 1 },
+      { m: "m1", i: 2 },
+      { m: "m2", i: 1 },
+      { m: "m2", i: 2 },
+    ]);
+    // 복원 파일에 실행 줄이 들어가지 않는다(복원 파일이 복원 파일을 다시 실행하지 않게).
+    expect(history.some((h) => h.code.includes(REPLAY_FILE_NAME))).toBe(false);
+
+    const third = rec(
+      "m3",
+      0,
+      storedTurn({
+        container_id: "cntr_c",
+        cells: [cell(1, RUN, "completed", { replay: true })],
+        restore: { refs: history.map((h) => h.ref), mode: "file", status: "ok", ok_cells: 4, failed_cells: 0 },
+      })
+    );
+    expect(collectContainerHistory([original, restored, third], "cntr_c").map((h) => h.code)).toEqual([
+      "df = read()",
+      "X = scale(df)",
+      "profile = df.groupby(km.labels_).mean()",
+      "top = profile.head()",
+    ]);
+  });
+
+  it("떼어 낼 수 없는 복원 셀과 실패한 복원 셀은 예전처럼 통째로 빼고, 다른 문항에 알리는 코드에도 나머지만 들어간다", () => {
+    const restored = rec(
+      "m2",
+      1,
+      storedTurn({
+        container_id: "cntr_b",
+        cells: [
+          cell(1, `try:\n    ${RUN}\nexcept Exception:\n    df = read()`, "completed", { replay: true }),
+          cell(2, `${RUN}\nkm = KMeans(4).fit(X)`, "completed", { replay: true }),
+          cell(3, `${RUN}\nboom()`, "failed", { replay: true }),
+        ],
+        restore: { refs: [], mode: "file", status: "ok", ok_cells: 0, failed_cells: 0 },
+        outcome: "completed",
+      })
+    );
+    expect(collectContainerHistory([restored], "cntr_b").map((h) => h.code)).toEqual(["km = KMeans(4).fit(X)"]);
+    expect(collectUnseenCells([restored], { containerId: "cntr_b", qIdx: 0 }).linked.cells).toEqual([
+      { qIdx: 1, code: "km = KMeans(4).fit(X)" },
+    ]);
   });
 });

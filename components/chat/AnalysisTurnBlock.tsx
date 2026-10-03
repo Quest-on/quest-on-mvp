@@ -8,8 +8,8 @@
  *     학생에게 하는 말(다시 보내 주세요 등), 교수 채점 화면은 그 턴에 무슨 일이 있었는지를 설명하는 말을 쓴다.
  *   - 셀: 코드는 기본 접힘("코드 보기"), 실행 결과는 짧으면 그대로, 길면 접힘. 그림은 권한 확인 라우트로 열고
  *     누르면 크게 본다.
- *   - 복원 셀(만료 복구로 이전 단계를 다시 실행한 셀): 코드와 결과 줄 대신 "이전 단계 다시 실행"과 다시 실행한 셀 수만
- *     한 줄로 보인다(#564).
+ *   - 복원 셀(만료 복구로 이전 단계를 다시 실행한 셀): 복원 실행 줄만 있으면 코드와 결과 줄 대신 "이전 단계 다시
+ *     실행"과 다시 실행한 셀 수만 한 줄로 보인다. 같은 셀에 다른 분석 코드가 있으면 보통 셀로 보인다(#564).
  * 소유자 결정: 코드는 접어서 보여 주되 전부 기록한다. 기록(저장)은 서버가 하고 이 블록은 보여 주기만 한다.
  *
  * 문법 강조(react-syntax-highlighter)는 정적으로 import 하지 않는다(#564). 이 블록은 응시 화면의 채팅 사이드바가
@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 import { cn } from "@/lib/utils";
 import type { AnalysisErrorCode } from "@/lib/analysis-exec/client-events";
 import type { AnalysisOutcome, ClientAnalysisCell, ClientAnalysisFigure, ClientAnalysisTurn } from "@/lib/analysis-exec/metadata";
+import { isReplayOnlyCellCode } from "@/lib/analysis-exec/replay-file";
 
 /** 실행 결과가 이 줄 수를 넘으면 접어서 보여 준다. */
 const LOGS_COLLAPSE_LINES = 12;
@@ -205,6 +206,15 @@ function CodeView({ code }: { code: string }) {
 }
 
 /**
+ * "이전 단계 다시 실행" 한 줄로 접는 복원 셀인가(#564). 복원 표시가 있고 코드가 복원 실행 줄뿐일 때만이다(주석과 빈
+ * 줄은 보지 않는다). 모델이 같은 셀에 다른 분석 코드를 덧붙였으면 그 출력과 그림이 분석 기록(채점 근거)이므로 보통
+ * 셀로 보인다. 그림 번호도 이 판단을 따른다(접은 셀의 그림은 보이지 않으므로 세지 않는다).
+ */
+export function isCollapsedReplayCell(cell: Pick<ClientAnalysisCell, "replay" | "code" | "codeTruncated">): boolean {
+  return cell.replay && !cell.codeTruncated && isReplayOnlyCellCode(cell.code);
+}
+
+/**
  * 복원 셀(#564). 만료 복구 때 서버가 올린 복원 파일을 여는 한 줄이라 코드와 결과 줄(내부 표식)은 읽을 것이 없다.
  * "이전 단계 다시 실행"이라는 이름과 다시 실행한 셀 수만 한 줄로 보인다. 펼칠 내용이 없어 접고 펴는 단추를 두지 않는다.
  * 다시 실행하는 동안의 출력과 그림은 복원 파일이 버리므로 이 셀에는 보일 그림도 없다.
@@ -250,7 +260,10 @@ function CellView({ cell }: { cell: ClientAnalysisCell }) {
             className="flex min-h-[36px] w-full items-center gap-2 rounded px-1 text-left text-sm hover:bg-muted/60"
           >
             <Code2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="font-medium">{t("analysis.cellLabel", { index: cell.index })}</span>
+            {/* 복원 실행 줄 뒤에 분석 코드를 덧붙인 복원 셀은 보통 셀로 보이되 이름은 예전처럼 "이전 단계 다시 실행"이다. */}
+            <span className="font-medium">
+              {cell.replay ? t("analysis.replayCellLabel") : t("analysis.cellLabel", { index: cell.index })}
+            </span>
             <span className="type-meta">{t("analysis.codeLines", { lines: codeLines })}</span>
             <span className="ml-auto flex items-center gap-1 type-meta">
               {codeOpen ? t("analysis.hideCode") : t("analysis.showCode")}
@@ -338,7 +351,7 @@ export function AnalysisTurnBlock({ analysis, errorNotice, viewer = "student" }:
           <h4 className="type-meta font-semibold">{t("analysis.recordTitle")}</h4>
           <ol className="space-y-2">
             {analysis.cells.map((cell) =>
-              cell.replay ? <ReplayCellView key={cell.index} cell={cell} /> : <CellView key={cell.index} cell={cell} />
+              isCollapsedReplayCell(cell) ? <ReplayCellView key={cell.index} cell={cell} /> : <CellView key={cell.index} cell={cell} />
             )}
           </ol>
         </section>
@@ -349,8 +362,8 @@ export function AnalysisTurnBlock({ analysis, errorNotice, viewer = "student" }:
             <Figure
               key={figure.url}
               figure={figure}
-              // 셀 그림 다음 번호. 복원 셀은 그림을 보이지 않으므로 세지 않는다.
-              index={analysis.cells.reduce((n, c) => (c.replay ? n : n + c.figures.length), 0) + i + 1}
+              // 셀 그림 다음 번호. 한 줄로 접은 복원 셀은 그림을 보이지 않으므로 세지 않는다(덧붙인 코드가 있는 복원 셀은 센다).
+              index={analysis.cells.reduce((n, c) => (isCollapsedReplayCell(c) ? n : n + c.figures.length), 0) + i + 1}
             />
           ))}
         </div>

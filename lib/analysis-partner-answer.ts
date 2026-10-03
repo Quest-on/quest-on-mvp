@@ -30,21 +30,155 @@ export type AnalysisPartnerAnswer = {
   truncated: boolean;
 };
 
-/** 잘린 자리가 코드 블록(```)이나 수식 블록($$) 안이면 닫는다. 코드 블록 안의 $$ 는 세지 않는다. */
-function closeOpenBlocks(text: string): string {
-  let inFence = false;
-  let inMath = false;
-  for (const line of text.split("\n")) {
-    if (/^[ \t]*```/.test(line)) {
-      inFence = !inFence;
+/**
+ * 닫히지 않은 채 끝난 코드 블록(``` 나 ~~~)이나 수식 블록($$). 답은 `AIMessageRenderer`(react-markdown + remark-gfm +
+ * remark-math)로 그려지므로 그 파서(CommonMark, micromark)의 규칙을 줄 단위로 따른다.
+ */
+type OpenBlock = {
+  /** 여는 표시의 문자(` ~ $)와 길이. 닫는 표시는 같은 문자로 이 길이 이상이어야 한다. */
+  char: string;
+  size: number;
+  /** 여는 줄의 인용 표시(>) 수. 이보다 적은 줄이 오면 인용이 끝나 블록도 함께 끝난다. */
+  quotes: number;
+  /** 블록을 담은 목록 항목의 내용 열(목록 밖이면 0). 이보다 덜 들여쓴 줄이 오면 항목이 끝나 블록도 함께 끝난다. */
+  col: number;
+  /** 닫는 줄 앞에 붙일 글. 여는 줄의 인용 표시와, 목록 표시를 칸으로 바꾼 들여쓰기다. */
+  prefix: string;
+};
+
+const FENCE_OPEN = /^(`{3,}|~{3,})(.*)$/;
+// 수식 블록은 $ 두 개 이상으로 열고, 같은 줄 나머지에 $ 가 있으면 블록이 아니다(`$$x$$` 는 글 속 수식).
+const MATH_OPEN = /^(\${2,})([^$]*)$/;
+const LIST_MARKER = /^([-*+]|\d{1,9}[.)])([ \t]+|$)/;
+const THEMATIC_BREAK = /^([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
+const ATX_HEADING = /^#{1,6}(?:[ \t]|$)/;
+
+/** `column` 열에서 시작하는 공백 글 `text` 뒤의 열. 탭은 4칸 단위로 펼친다. */
+function advance(column: number, text: string): number {
+  let at = column;
+  for (const ch of text) at = ch === "\t" ? at + 4 - (at % 4) : at + 1;
+  return at;
+}
+
+/** 줄 앞의 인용 표시(>)를 `max` 개까지 떼어 낸다. */
+function stripQuotes(line: string, max: number): { quotes: number; prefix: string; rest: string } {
+  let quotes = 0;
+  let prefix = "";
+  let rest = line;
+  for (let m = /^ {0,3}>[ \t]?/.exec(rest); m && quotes < max; m = /^ {0,3}>[ \t]?/.exec(rest)) {
+    quotes += 1;
+    prefix += m[0];
+    rest = rest.slice(m[0].length);
+  }
+  return { quotes, prefix, rest };
+}
+
+/** 줄 앞 공백의 너비와 그 뒤의 글. */
+function splitIndent(text: string): { width: number; body: string } {
+  const space = /^[ \t]*/.exec(text)?.[0] ?? "";
+  return { width: advance(0, space), body: text.slice(space.length) };
+}
+
+/** 이 글(들여쓰기 뒤)이 코드 블록이나 수식 블록을 여는가. 백틱으로 연 줄의 나머지에 백틱이 있으면 글 속 코드다. */
+function blockOpener(body: string): { char: string; size: number } | null {
+  const fence = FENCE_OPEN.exec(body);
+  if (fence && !(fence[1][0] === "`" && fence[2].includes("`"))) return { char: fence[1][0], size: fence[1].length };
+  const math = MATH_OPEN.exec(body);
+  return math ? { char: "$", size: math[1].length } : null;
+}
+
+/** 문단을 끊고 새 블록을 시작하는 줄인가(그렇지 않은 줄은 덜 들여써도 앞 문단에 이어진다). */
+function startsBlock(body: string): boolean {
+  return blockOpener(body) !== null || LIST_MARKER.test(body) || THEMATIC_BREAK.test(body) || ATX_HEADING.test(body);
+}
+
+/** 열린 블록을 닫는 줄인가. 같은 문자가 여는 표시 길이 이상 이어지고 그 뒤에 공백만 있다. */
+function isCloser(body: string, block: OpenBlock): boolean {
+  let n = 0;
+  while (n < body.length && body[n] === block.char) n += 1;
+  return n >= block.size && body.slice(n).trim() === "";
+}
+
+/**
+ * 글 끝에서 열려 있는 코드 블록이나 수식 블록. 줄마다 인용 표시와 목록 항목(내용 열)을 따라가며 본다.
+ *   - 여는 줄: 들여쓰기가 담은 목록 항목의 내용 열보다 4칸 이상 깊지 않다(깊으면 들여쓴 코드다). 목록 표시 바로 뒤에서
+ *     열 수도 있다("1. ```python").
+ *   - 블록 안의 줄: 같은 문자, 같거나 긴 표시로만 닫는다(코드 블록 안의 $$, 수식 블록 안의 ``` 는 세지 않는다). 담은
+ *     목록 항목보다 덜 들여쓴 줄이나 인용 표시가 모자란 줄이 오면 그 항목, 인용과 함께 블록도 끝난다.
+ *   - 글 속 수식($$x$$, `$$`)과 줄 가운데의 $$ 는 블록을 열지 않는다(블록은 줄 머리에서만 열린다).
+ * HTML 블록과 표 안의 세부 규칙은 보지 않는다.
+ */
+function findOpenBlock(text: string): OpenBlock | null {
+  const lists: number[] = [];
+  let listQuotes = 0;
+  let open: OpenBlock | null = null;
+  let paragraph = false;
+  for (const raw of text.split("\n")) {
+    const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
+    if (open) {
+      const quoted = stripQuotes(line, open.quotes);
+      const { width, body } = splitIndent(quoted.rest);
+      const ended = quoted.quotes < open.quotes || (body !== "" && width < open.col);
+      if (!ended) {
+        if (width - open.col <= 3 && isCloser(body, open)) open = null;
+        continue;
+      }
+      // 블록을 담은 인용이나 목록 항목이 끝나 블록도 함께 끝났다. 이 줄은 블록 밖에서 다시 읽는다.
+      open = null;
+    }
+
+    const quoted = stripQuotes(line, Number.POSITIVE_INFINITY);
+    if (quoted.quotes !== listQuotes) {
+      lists.length = 0;
+      listQuotes = quoted.quotes;
+    }
+    const { width, body } = splitIndent(quoted.rest);
+    if (body === "") {
+      paragraph = false;
       continue;
     }
-    if (inFence) continue;
-    if ((line.match(/\$\$/g) ?? []).length % 2 === 1) inMath = !inMath;
+    // 문단의 게으른 이어짐(덜 들여써도 앞 문단에 이어지는 글)은 목록 항목을 끝내지 않는다.
+    if (paragraph && !startsBlock(body)) continue;
+    while (lists.length > 0 && width < lists[lists.length - 1]) lists.pop();
+
+    let col = lists.length > 0 ? lists[lists.length - 1] : 0;
+    let column = width;
+    let rest = body;
+    while (column - col <= 3 && !THEMATIC_BREAK.test(rest)) {
+      const marker = LIST_MARKER.exec(rest);
+      if (!marker) break;
+      const markerEnd = column + marker[1].length;
+      const after = advance(markerEnd, marker[2]);
+      // 표시 뒤가 비었거나(빈 항목) 5칸 이상 띄었으면(들여쓴 코드) 내용 열은 표시 다음 칸이고 이 줄에서 블록이 열리지 않는다.
+      const plain = marker[2] !== "" && after - markerEnd <= 4;
+      col = plain ? after : markerEnd + 1;
+      lists.push(col);
+      if (!plain) {
+        rest = "";
+        break;
+      }
+      column = after;
+      rest = rest.slice(marker[0].length);
+    }
+
+    const opener = rest !== "" && column - col <= 3 ? blockOpener(rest) : null;
+    if (opener) {
+      open = { ...opener, quotes: quoted.quotes, col, prefix: quoted.prefix + " ".repeat(column) };
+      paragraph = false;
+      continue;
+    }
+    paragraph = rest !== "" && !THEMATIC_BREAK.test(rest) && !ATX_HEADING.test(rest);
   }
-  if (inFence) return `${text}\n\`\`\``;
-  if (inMath) return `${text}\n$$`;
-  return text;
+  return open;
+}
+
+/**
+ * 잘린 자리가 코드 블록이나 수식 블록 안이면 닫는다. 닫는 줄은 여는 줄과 같은 인용 표시, 들여쓰기, 문자, 길이다.
+ * 목록 안에서 들여 연 블록을 0열 표시로 닫으면 목록이 끝나고 그 표시가 새 블록을 열어 안내까지 코드로 보인다(#564 후속).
+ */
+function closeOpenBlocks(text: string): string {
+  const open = findOpenBlock(text);
+  return open ? `${text}\n${open.prefix}${open.char.repeat(open.size)}` : text;
 }
 
 export function finishAnalysisPartnerAnswer(params: {

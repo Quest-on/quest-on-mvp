@@ -306,11 +306,15 @@ export type ClientAnalysisCell = {
   logsTruncated: boolean;
   figures: ClientAnalysisFigure[];
   figuresDropped: number;
-  /** 서버가 올린 복원 파일을 실행해 이전 단계를 다시 실행한 셀. 화면은 "이전 단계 다시 실행"으로 보인다. */
+  /**
+   * 서버가 올린 복원 파일을 실행해 이전 단계를 다시 실행한 셀. 화면은 "이전 단계 다시 실행"으로 보인다. 코드가 복원 실행
+   * 줄뿐이면 한 줄로 접고, 다른 분석 코드가 같이 있으면 보통 셀로 보인다(`AnalysisTurnBlock` 의 isCollapsedReplayCell).
+   */
   replay: boolean;
   /**
    * 복원 셀이 다시 실행한 원래 셀 수(성공, 실패). 복원 셀이 끝까지 돌아 결과 줄을 남겼을 때만 있고, 그 밖(복원 셀이
-   * 아님, 끝까지 돌지 못함)은 null 이다. 화면은 복원 셀의 코드(파일을 여는 한 줄)와 결과 줄 대신 이 값을 보인다(#564).
+   * 아님, 끝까지 돌지 못함)은 null 이다. 화면은 한 줄로 접은 복원 셀의 코드(파일을 여는 한 줄)와 결과 줄 대신 이 값을
+   * 보인다(#564).
    */
   replayResult: ReplayResult | null;
 };

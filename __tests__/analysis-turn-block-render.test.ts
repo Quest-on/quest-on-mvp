@@ -7,7 +7,8 @@
  *       보이고, 받은 뒤에는 python 문법 강조로 바뀐다. 하이라이터를 정적으로 불러오지 않는다는 소스 검사는
  *       `exam-bundle-highlighter.test.ts` 에 있다.
  *   12. 만료 복구의 복원 셀은 파일을 여는 코드 한 줄과 내부 결과 줄 대신 "이전 단계 다시 실행"과 다시 실행한 셀 수를
- *       한 줄로 보인다. 학생 화면과 교수 채점 화면이 같다.
+ *       한 줄로 보인다. 학생 화면과 교수 채점 화면이 같다. 실행 줄 뒤에 분석 코드를 덧붙인 복원 셀은 접지 않고 보통
+ *       셀로 보인다(후속, 그 출력과 그림이 채점 근거다).
  *   13. 그림 크게 보기 대화상자는 기본 너비(sm 이상 32rem)에 묶이지 않는다. CSS 는 jsdom 이 계산하지 않으므로 실제로
  *       붙는 클래스(tailwind-merge 결과)를 본다.
  *
@@ -19,7 +20,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { NextIntlClientProvider } from "next-intl";
 import koExam from "../messages/ko/exam.json";
-import { AnalysisTurnBlock, type AnalysisViewer } from "@/components/chat/AnalysisTurnBlock";
+import { AnalysisTurnBlock, isCollapsedReplayCell, type AnalysisViewer } from "@/components/chat/AnalysisTurnBlock";
 import type { ClientAnalysisCell, ClientAnalysisTurn } from "@/lib/analysis-exec/metadata";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -224,5 +225,56 @@ describe("그림 크게 보기는 기본 대화상자 너비에 묶이지 않는
     const enlarged = content!.querySelector("img");
     expect(enlarged?.getAttribute("src")).toBe(figure.url);
     expect(enlarged?.className.split(/\s+/)).toEqual(expect.arrayContaining(["w-full", "h-auto", "object-contain"]));
+  });
+});
+
+describe("실행 줄 뒤에 분석 코드를 덧붙인 복원 셀은 보통 셀로 보인다 (#564 후속)", () => {
+  const MIXED_CODE = `${REPLAY_CODE}\nimport matplotlib.pyplot as plt\nplt.hist(df['sales'])\nplt.show()\nprint(df['sales'].mean())`;
+  const figure = (name: string) => ({ url: `/api/session/s1/analysis/figures/m1/${name}.png`, name: `${name}.png` });
+  const figureAlt = (url: string) => container.querySelector(`img[src="${url}"]`)?.getAttribute("alt");
+
+  it("접는 것은 복원 표시가 있고 코드가 복원 실행 줄뿐인 셀이다(주석과 빈 줄은 보지 않는다)", () => {
+    expect(isCollapsedReplayCell(replayCell())).toBe(true);
+    expect(isCollapsedReplayCell(replayCell({ code: `# 이전 상태 복원\n\n${REPLAY_CODE}\n` }))).toBe(true);
+    expect(isCollapsedReplayCell(replayCell({ code: MIXED_CODE }))).toBe(false);
+    expect(isCollapsedReplayCell(replayCell({ codeTruncated: true }))).toBe(false);
+    expect(isCollapsedReplayCell(cell({ code: REPLAY_CODE }))).toBe(false);
+  });
+
+  it.each<AnalysisViewer>(["student", "instructor"])("%s 화면: 덧붙인 코드의 출력과 그림, 코드 보기가 모두 보인다", async (viewer) => {
+    const plot = figure("hist");
+    await mount(turn([replayCell({ code: MIXED_CODE, logs: "QUEST_ON_REPLAY ok=3 failed=0\n412.5", figures: [plot] })]), viewer);
+
+    expect(container.querySelector('[data-testid="analysis-replay-cell"]')).toBeNull();
+    // 이름은 예전처럼 "이전 단계 다시 실행"이다.
+    expect(text()).toContain("이전 단계 다시 실행");
+    expect(text()).toContain("412.5");
+    expect(figureAlt(plot.url)).toBe("AI가 실행한 코드로 만든 그림 1");
+    expect(buttonsWithText("코드 보기")).toHaveLength(1);
+    await click(buttonsWithText("코드 보기")[0]);
+    await waitFor(() => text().includes("plt.hist(df['sales'])"), "mixed replay cell code");
+  });
+
+  it("주석과 빈 줄만 덧붙인 복원 셀은 그대로 한 줄로 접는다", async () => {
+    await mount(turn([replayCell({ code: `# 이전 상태 복원\n\n${REPLAY_CODE}\n` })]));
+    expect(container.querySelectorAll('[data-testid="analysis-replay-cell"]')).toHaveLength(1);
+    expect(buttonsWithText("코드 보기")).toHaveLength(0);
+  });
+
+  it("턴 그림 번호는 덧붙인 복원 셀의 그림을 센다", async () => {
+    const cited = figure("cited");
+    await mount({
+      ...turn([replayCell({ code: MIXED_CODE, figures: [figure("hist")] }), cell({ index: 2, figures: [figure("box")] })]),
+      figures: [cited],
+    });
+    expect(figureAlt(cited.url)).toBe("AI가 실행한 코드로 만든 그림 3");
+  });
+
+  it("한 줄로 접은 복원 셀의 그림은 보이지 않으므로 턴 그림 번호에서 세지 않는다", async () => {
+    const hidden = figure("hidden");
+    const cited = figure("cited");
+    await mount({ ...turn([replayCell({ figures: [hidden] }), cell({ index: 2, figures: [figure("box")] })]), figures: [cited] });
+    expect(container.querySelector(`img[src="${hidden.url}"]`)).toBeNull();
+    expect(figureAlt(cited.url)).toBe("AI가 실행한 코드로 만든 그림 2");
   });
 });
