@@ -1,7 +1,7 @@
 /**
  * 채점 화면 '의심 표시' 토글의 렌더 결과 (이슈 #514).
  *
- * 이 저장소에는 `@testing-library/*`·`jsdom` 이 없다. 그래서 `react-dom/server` 로
+ * 이 저장소에는 `@testing-library/*` 가 없다. 그래서 `react-dom/server` 로
  * 컴포넌트를 실제 렌더하고, next-intl 만 키를 그대로 돌려주는 가짜로 바꾼다
  * (`password-reset-recovery-page.test.ts` 와 같은 방식). 렌더 결과의 한계: 클릭으로
  * 토글이 바뀌는 상호작용은 증명하지 못한다. 그건 스테이징 QA 의 몫이다.
