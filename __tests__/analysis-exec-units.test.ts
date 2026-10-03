@@ -67,6 +67,7 @@ import {
   type HistoryRecord,
 } from "@/lib/analysis-exec/container";
 import { buildStoredTurn, storeCellFigures, storeCitedFigures } from "@/lib/analysis-exec/persist";
+import { isReplayOnlyCellCode } from "@/lib/analysis-exec/replay-file";
 import { resolveExamAiProfile } from "@/lib/exam-ai-profile";
 import {
   DATA_SOURCE_DOWNLOAD_TIMEOUT_MS,
@@ -1338,5 +1339,125 @@ describe("검토 반영: 자료 경로, 일부만 받은 파일, 경로 바뀜, 
     const inTime = createFigureStore(supabase, undefined, () => 60_000);
     expect(await inTime.upload("s/m/1.png", new Uint8Array([1]), "image/png")).toBe(true);
     expect(upload).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("복원 실행 줄만 있는 셀과 분석 코드를 덧붙인 복원 셀 (#564 후속)", () => {
+  const PATH = `/mnt/data/cf9-${REPLAY_FILE_NAME}`;
+  const RUN = replayExecLine(PATH);
+  const cell = (index: number, code: string, status = "completed", extra: Record<string, unknown> = {}) => ({
+    index,
+    status,
+    code,
+    logs: "",
+    figures: [],
+    ...extra,
+  });
+  const rec = (messageId: string, qIdx: number, turn: StoredAnalysisTurn): HistoryRecord => ({ messageId, qIdx, turn });
+
+  it("주석과 빈 줄을 빼면 복원 실행 줄뿐인 셀은 실행 줄만 있는 셀이다(서버가 주는 줄과 흔한 변형)", () => {
+    for (const code of [
+      RUN,
+      `${RUN}\n`,
+      `# 이전 상태 복원\n\n${RUN}\n\n# 끝`,
+      `exec(open('${PATH}').read())`,
+      `exec(open("${PATH}", encoding="utf-8").read())`,
+      `exec( open( "${PATH}" , "r" ).read() , globals() )`,
+      `${RUN};  # 복원`,
+      `${RUN}\r\n`,
+      `${RUN}\n${RUN}`,
+    ]) {
+      expect(isReplayOnlyCellCode(code), code).toBe(true);
+    }
+  });
+
+  it("실행 줄 뒤에 분석 코드를 덧붙였거나 실행 줄을 떼어 낼 수 없으면 실행 줄만 있는 셀이 아니다", () => {
+    for (const code of [
+      `${RUN}\nprofile = df.groupby('region')['sales'].mean()`,
+      `${RUN}\nplt.hist(df['sales'])\nplt.show()`,
+      `${RUN}; df.head()`,
+      `try:\n    ${RUN}\nexcept FileNotFoundError:\n    df = pd.read_csv('/mnt/data/sales.csv')`,
+      `exec(open(\n    "${PATH}"\n).read())`,
+      `exec(open("${PATH}.bak").read())`,
+      `# ${REPLAY_FILE_NAME} 를 실행한다`,
+      "print(1)",
+      "",
+    ]) {
+      expect(isReplayOnlyCellCode(code), code).toBe(false);
+    }
+  });
+
+  it("공백이 긴 줄도 줄 길이에 비례하는 시간에 판별한다(화면이 그릴 때마다 돈다)", () => {
+    // 공백 반복이 맞붙은 정규식(`\s*;?\s*`)은 맞지 않는 긴 줄에서 길이의 제곱만큼 돈다(5만 칸이면 수 초).
+    const long = `${RUN}${" ".repeat(50_000)}x`;
+    const started = performance.now();
+    expect(isReplayOnlyCellCode(long)).toBe(false);
+    expect(isReplayOnlyCellCode(`${RUN}${" ".repeat(50_000)};${" ".repeat(50_000)}# 끝`)).toBe(true);
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
+  // 리뷰 재현: 실행 줄이 예외로 멈춰도 셀은 완료(결과는 오류 출력)로 기록된다. 덧붙인 코드가 실제로 돌았는지 코드만으로는
+  // 알 수 없으므로, 그 코드를 이력에 넣으면 모델이 다른 셀에서 다시 실행한 처리가 두 번 들어갈 수 있다. 화면은 이런 셀을
+  // 보통 셀로 보이지만(채점 근거), 다음 복원과 문항 간 연결은 #571 과 같게 복원 셀을 통째로 뺀다.
+  const tracebackLogs = "Traceback (most recent call last):\nFileNotFoundError: [Errno 2] No such file or directory";
+
+  it("덧붙인 분석 코드가 있는 복원 셀도 다음 복원 이력에서 통째로 빠진다(두 번째 만료 뒤 펼친 이력도 같다)", () => {
+    const original = rec("m1", 0, storedTurn({ container_id: "cntr_a", cells: [cell(1, "df = read()"), cell(2, "X = scale(df)")] }));
+    const restored = rec(
+      "m2",
+      0,
+      storedTurn({
+        container_id: "cntr_b",
+        cells: [
+          cell(1, `${RUN}\ndf['sales'] = df['sales'] / 1000`, "completed", { replay: true, logs: tracebackLogs }),
+          cell(2, "top = df.head()"),
+        ],
+        restore: { refs: [{ m: "m1", i: 1 }, { m: "m1", i: 2 }], mode: "file", status: "incomplete" },
+      })
+    );
+    const history = collectContainerHistory([original, restored], "cntr_b");
+    expect(history.map((h) => h.code)).toEqual(["df = read()", "X = scale(df)", "top = df.head()"]);
+    expect(history.map((h) => h.ref)).toEqual([
+      { m: "m1", i: 1 },
+      { m: "m1", i: 2 },
+      { m: "m2", i: 2 },
+    ]);
+    expect(history.some((h) => h.code.includes(REPLAY_FILE_NAME) || h.code.includes("/ 1000"))).toBe(false);
+
+    const third = rec(
+      "m3",
+      0,
+      storedTurn({
+        container_id: "cntr_c",
+        cells: [cell(1, RUN, "completed", { replay: true })],
+        restore: { refs: history.map((h) => h.ref), mode: "file", status: "ok", ok_cells: 3, failed_cells: 0 },
+      })
+    );
+    expect(collectContainerHistory([original, restored, third], "cntr_c").map((h) => h.code)).toEqual([
+      "df = read()",
+      "X = scale(df)",
+      "top = df.head()",
+    ]);
+  });
+
+  it("덧붙인 분석 코드가 있는 복원 셀은 다른 문항에 알리는 코드에서도 빠진다", () => {
+    const restored = rec(
+      "m2",
+      1,
+      storedTurn({
+        container_id: "cntr_b",
+        cells: [
+          cell(1, `try:\n    ${RUN}\nexcept Exception:\n    df = read()`, "completed", { replay: true }),
+          cell(2, `${RUN}\nkm = KMeans(4).fit(X)`, "completed", { replay: true }),
+          cell(3, "labels = km.labels_"),
+        ],
+        restore: { refs: [], mode: "file", status: "ok", ok_cells: 0, failed_cells: 0 },
+        outcome: "completed",
+      })
+    );
+    expect(collectContainerHistory([restored], "cntr_b").map((h) => h.code)).toEqual(["labels = km.labels_"]);
+    expect(collectUnseenCells([restored], { containerId: "cntr_b", qIdx: 0 }).linked.cells).toEqual([
+      { qIdx: 1, code: "labels = km.labels_" },
+    ]);
   });
 });
