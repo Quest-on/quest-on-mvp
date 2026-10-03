@@ -16,21 +16,32 @@
 // 넣으면 브라우저가 그 문자까지 답안에 넣는다. 그래서 같은 문서 안에서 시작한 끌기는 메모리에만 적어 둔다.
 // 다른 창·탭에서 끌어온 글은 여기에 없으므로 외부로 판정된다.
 
-let activeInternalDrag: string | null = null;
+let activeInternalDrag: { text: string; source: unknown } | null = null;
 
 /** 줄바꿈(CRLF/LF)과 목록 들여쓰기는 브라우저 직렬화마다 달라서 비교에서 뺀다. */
 function normalizeDragText(text: string): string {
   return text.replace(/\s+/g, "");
 }
 
-/** 시험 화면 안(문제 본문, AI 대화, 평가 기준, 답안 칸)에서 글을 끌기 시작했다. */
-export function startInternalDrag(text: string): void {
+/**
+ * 시험 화면 안(문제 본문, AI 대화, 평가 기준, 답안 칸)에서 글을 끌기 시작했다.
+ * `source` 는 끌기를 시작한 영역(요소)이다. 그 영역이 사라질 때 표시를 지우는 데 쓴다.
+ */
+export function startInternalDrag(text: string, source?: unknown): void {
   const normalized = normalizeDragText(text);
-  activeInternalDrag = normalized ? normalized : null;
+  activeInternalDrag = normalized ? { text: normalized, source } : null;
 }
 
 export function endInternalDrag(): void {
   activeInternalDrag = null;
+}
+
+/**
+ * 끌기를 시작한 영역이 끌기 도중 화면에서 사라지면(문항 전환 등) 그 영역이 남긴 표시만 지운다.
+ * 끌던 노드가 문서에서 떨어지면 dragend 가 그 노드에서만 나서 위에서 들을 수 없기 때문이다.
+ */
+export function cancelInternalDragFrom(source: unknown): void {
+  if (activeInternalDrag !== null && activeInternalDrag.source === source) activeInternalDrag = null;
 }
 
 /**
@@ -39,7 +50,7 @@ export function endInternalDrag(): void {
  * 오인하지 않게 한다.
  */
 export function isInternalDrag(droppedText: string): boolean {
-  return activeInternalDrag !== null && activeInternalDrag === normalizeDragText(droppedText);
+  return activeInternalDrag !== null && activeInternalDrag.text === normalizeDragText(droppedText);
 }
 
 // ── 들어온 구간 찾기 ─────────────────────────────────────────────

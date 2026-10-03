@@ -4,11 +4,21 @@ import { useRef, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import {
+  cancelInternalDragFrom,
   endInternalDrag,
   isInternalDrag,
   locateInsertedText,
   startInternalDrag,
 } from "@/lib/answer-drop";
+import { useInternalCopyScope } from "@/components/providers/InternalCopyScopeProvider";
+import {
+  INTERNAL_COPY_MIME_TYPE,
+  STANDALONE_INTERNAL_COPY_SCOPE,
+  internalCopyMimeValue,
+  isInternalCopyFor,
+  stripInternalCopyMarkers,
+  wrapInternalCopy,
+} from "@/lib/internal-copy";
 
 interface AnswerTextareaProps {
   value: string;
@@ -26,21 +36,6 @@ interface AnswerTextareaProps {
   }) => void;
 }
 
-// 내부 복사 마커 (Zero-width space 앞뒤로 추가하여 감지 용이)
-const INTERNAL_COPY_MARKER_START = "\u200B\u{E0001}\u200B";
-const INTERNAL_COPY_MARKER_END = "\u200B\u{E0002}\u200B";
-const INTERNAL_COPY_MIME_TYPE = "application/x-queston-internal";
-
-/**
- * 붙여넣기·끌어다 놓기 데이터에 시험 화면 안 복사 표식(형식 또는 표식 문자)이 있는가.
- * 두 경로가 같은 기준으로 판정하도록 한 곳에 둔다(#561).
- */
-function hasInternalCopySignal(data: Pick<DataTransfer, "types" | "getData">): boolean {
-  if (data.types.includes(INTERNAL_COPY_MIME_TYPE)) return true;
-  const text = data.getData("text/plain");
-  return text.includes(INTERNAL_COPY_MARKER_START) || text.includes(INTERNAL_COPY_MARKER_END);
-}
-
 export function AnswerTextarea({
   value,
   onChange,
@@ -52,6 +47,8 @@ export function AnswerTextarea({
   const t = useTranslations("common.answerTextarea");
   const resolvedPlaceholder = placeholder ?? t("placeholder");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // 표식에 시험 세션 범위를 담고, 같은 범위의 표식만 내부 복사로 인정한다(#560).
+  const scope = useInternalCopyScope() ?? STANDALONE_INTERNAL_COPY_SCOPE;
 
   // Copy 이벤트 핸들러 - 내부 복사 마커 추가
   const handleCopy = useCallback(
@@ -72,15 +69,12 @@ export function AnswerTextarea({
       // 기본 복사 동작을 막고 마커 포함 텍스트를 강제로 주입
       if (e.clipboardData) {
         e.preventDefault(); // 먼저 기본 동작 차단
-        e.clipboardData.setData(
-          "text/plain",
-          INTERNAL_COPY_MARKER_START + selectedText + INTERNAL_COPY_MARKER_END
-        );
+        e.clipboardData.setData("text/plain", wrapInternalCopy(selectedText, scope));
         // More robust internal copy signal than zero-width markers alone.
-        e.clipboardData.setData(INTERNAL_COPY_MIME_TYPE, "1");
+        e.clipboardData.setData(INTERNAL_COPY_MIME_TYPE, internalCopyMimeValue(scope));
       }
     },
-    []
+    [scope]
   );
 
   // Cut 이벤트 핸들러 - 복사와 같은 내부 표식을 붙이고 선택 영역을 직접 지운다.
@@ -99,11 +93,8 @@ export function AnswerTextarea({
 
       // 기본 잘라내기를 막았으므로 선택 영역 삭제도 여기서 한다.
       e.preventDefault();
-      e.clipboardData.setData(
-        "text/plain",
-        INTERNAL_COPY_MARKER_START + selectedText + INTERNAL_COPY_MARKER_END
-      );
-      e.clipboardData.setData(INTERNAL_COPY_MIME_TYPE, "1");
+      e.clipboardData.setData("text/plain", wrapInternalCopy(selectedText, scope));
+      e.clipboardData.setData(INTERNAL_COPY_MIME_TYPE, internalCopyMimeValue(scope));
 
       const currentValue = textarea.value;
       onChange(currentValue.substring(0, selectionStart) + currentValue.substring(selectionEnd));
@@ -111,7 +102,7 @@ export function AnswerTextarea({
         textarea.setSelectionRange(selectionStart, selectionStart);
       }, 0);
     },
-    [onChange]
+    [onChange, scope]
   );
 
   // Paste 이벤트 핸들러
@@ -129,13 +120,11 @@ export function AnswerTextarea({
       const pastedData = clipboard.getData("text/plain");
       if (!pastedData) return;
 
-      // 내부 복사 표식(형식 또는 마커) 확인
-      const isInternal = hasInternalCopySignal(clipboard);
+      // 내부 복사 표식 확인 — 이 시험 세션(범위)에서 복사한 것만 내부다(#560).
+      const isInternal = isInternalCopyFor(clipboard, scope);
 
-      // 마커 제거 (실제 텍스트만 저장)
-      const cleanText = pastedData
-        .replace(/\u200B\u{E0001}\u200B/gu, "")
-        .replace(/\u200B\u{E0002}\u200B/gu, "");
+      // 마커 제거 (실제 텍스트만 저장). 범위가 다른 표식도 지운다.
+      const cleanText = stripInternalCopyMarkers(pastedData);
 
       // 붙여넣기 전 상태 저장
       const answerLengthBefore = textarea.value.length;
@@ -175,7 +164,7 @@ export function AnswerTextarea({
         });
       }
     },
-    [onChange, onPaste]
+    [onChange, onPaste, scope]
   );
 
   // 끌어다 놓기(drop)도 붙여넣기와 같은 onPaste 로 기록한다(#561). paste 만 기록하면 다른 창의 글을
@@ -195,7 +184,7 @@ export function AnswerTextarea({
   const handleDragStart = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    startInternalDrag(textarea.value.substring(textarea.selectionStart, textarea.selectionEnd));
+    startInternalDrag(textarea.value.substring(textarea.selectionStart, textarea.selectionEnd), textarea);
   }, []);
 
   const handleDrop = useCallback((e: DragEvent) => {
@@ -204,7 +193,7 @@ export function AnswerTextarea({
 
     const droppedText = e.dataTransfer.getData("text/plain");
     const pending = {
-      isInternal: isInternalDrag(droppedText) || hasInternalCopySignal(e.dataTransfer),
+      isInternal: isInternalDrag(droppedText) || isInternalCopyFor(e.dataTransfer, scope),
       valueBefore: textarea.value,
       hint: droppedText,
     };
@@ -216,7 +205,7 @@ export function AnswerTextarea({
     setTimeout(() => {
       if (pendingDropRef.current === pending) pendingDropRef.current = null;
     }, 0);
-  }, []);
+  }, [scope]);
 
   const handleBeforeInput = useCallback((e: Event) => {
     const textarea = textareaRef.current;
@@ -294,6 +283,12 @@ export function AnswerTextarea({
       textarea.removeEventListener("input", handleInput);
     };
   }, [handleDragStart, handleDrop, handleBeforeInput, handleInput]);
+
+  // 답안 칸에서 시작한 끌기 도중 답안 칸이 사라지면(문항 전환 등) 남긴 표시를 지운다.
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    return () => cancelInternalDragFrom(textarea);
+  }, []);
 
   return (
     <textarea
