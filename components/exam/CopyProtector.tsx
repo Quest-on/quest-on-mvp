@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { endInternalDrag, startInternalDrag } from "@/lib/answer-drop";
 
 // 내부 복사 마커는 답안 칸이 판정하고 지우는 값을 그대로 쓴다. 여기서 따로 정의했던 값(폭 없는 공백 3개)은
 // 답안 칸이 지우지 못해 문제 본문 등에서 붙여넣을 때마다 답안에 남았다(#555).
@@ -37,8 +38,18 @@ export function CopyProtector({ children, className, metadata }: CopyProtectorPr
     }
   };
 
+  // 여기서 끌어다 답안 칸에 놓은 글도 복사처럼 내부로 기록되게, 끌기 시작을 적어 둔다(#561).
+  const handleDragStart = () => {
+    startInternalDrag(window.getSelection()?.toString() ?? "");
+  };
+
   return (
-    <div onCopy={handleCopy} className={className}>
+    <div
+      onCopy={handleCopy}
+      onDragStart={handleDragStart}
+      onDragEnd={endInternalDrag}
+      className={className}
+    >
       {children}
     </div>
   );
