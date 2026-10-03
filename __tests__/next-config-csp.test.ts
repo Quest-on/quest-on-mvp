@@ -30,4 +30,16 @@ describe("Next.js CSP mode contract", () => {
   it("production never permits unsafe-eval", async () => {
     expect(await contentSecurityPolicy("production")).not.toContain("'unsafe-eval'");
   });
+
+  it("frame-src permits *.supabase.co — 자료 내려받기가 숨긴 iframe 으로 Storage 를 연다 (#544, #546 리뷰 B1)", async () => {
+    const csp = await contentSecurityPolicy("production");
+    const frameSrc = csp
+      .split(";")
+      .map((d) => d.trim())
+      .find((d) => d.startsWith("frame-src"));
+    expect(frameSrc).toBeTruthy();
+    expect(frameSrc).toContain("https://*.supabase.co");
+    // frame-src 를 전체 허용(frame-src *)으로 넓히지 않는다.
+    expect(frameSrc).not.toBe("frame-src *");
+  });
 });

@@ -1,7 +1,7 @@
 /**
  * 교수 자료 중 학생에게 공개한 파일 (#544).
  *
- * 저장 모양 (database/040_exam_student_materials.sql):
+ * 저장 모양 (database/041_exam_student_materials.sql):
  *   - `exams.materials`         업로드한 자료의 공개 URL 문자열 배열 (교수자 전용)
  *   - `exams.student_materials` 그중 학생에게 공개한 URL 문자열 배열. 항상 `materials` 의 부분집합이고
  *                               순서는 `materials` 순서를 따른다.
@@ -15,6 +15,12 @@
  * `instructor-<교수자 id>/<YYYY-MM-DD>_<uuid>.<확장자>` 로 만들고 원래 이름은 응답 메타데이터로만
  * 돌려준다(`lib/material-object-key.ts`). 그래서 원래 이름은 업로드한 화면이 `material_names` 에 담아
  * 저장한다. 이름이 없는 자료(이 컬럼 전에 올린 자료)는 경로의 마지막 조각을 디코드한 값을 이름으로 쓴다.
+ *
+ * ⚠️ 이 모듈의 어떤 함수도 URL 을 직접 fetch 하지 않고, 그렇게 써서도 안 된다. `exams.materials` 는
+ * 교수자가 보낸 문자열을 그대로 저장하므로 `getStudentVisibleMaterials` 의 `url` 은 임의의 http(s)
+ * 주소일 수 있다(내부 주소 포함). 서버가 이 `url` 로 fetch 하면 SSRF 가 된다. 서버에서 파일이 필요하면
+ * URL 을 파싱하지 말고 Storage 객체 키(`instructor-<id>/<날짜>_<uuid>.<확장자>`)로 서비스 롤 Storage
+ * API 를 쓴다. 이 `url` 을 직접 여는 것은 학생 브라우저의 내려받기 링크뿐이다.
  */
 
 /** 한 시험에서 학생에게 공개할 수 있는 파일 수 상한. 서버 검증과 입력 스키마가 같은 값을 쓴다. */
@@ -79,9 +85,11 @@ function ownValue(record: Record<string, unknown>, key: string): unknown {
 }
 
 // C0, DEL, C1 제어문자.
-const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/g;
+const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f\u200b\u2028\u2029]/g; // 줄·문단 구분자와 폭 없는 공백도 지운다.
 // 글자 방향 제어문자. RLO(U+202E) 를 끼워 "보고서xslx.exe" 가 다른 확장자처럼 보이게 하는 데 쓰인다.
-const BIDI_CONTROLS = /[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
+const BIDI_CONTROLS = /[\u200e\u200f\u202a-\u202e\u2066-\u2069\u061c]/g; // U+061C(ARABIC LETTER MARK) 포함
+// 짝 없는 서로게이트. encodeURIComponent 가 URIError 를 던지므로 내려받기 주소를 만들기 전에 지운다.
+const LONE_SURROGATES = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
 
 /**
  * 원래 파일 이름을 저장, 표시할 수 있게 정규화한다. 쓸 수 없으면 null.
@@ -95,7 +103,7 @@ const BIDI_CONTROLS = /[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
  */
 export function normalizeMaterialName(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  const cleaned = value.replace(CONTROL_CHARS, "").replace(BIDI_CONTROLS, "");
+  const cleaned = value.replace(CONTROL_CHARS, "").replace(BIDI_CONTROLS, "").replace(LONE_SURROGATES, "");
   const name = (cleaned.split(/[\\/]/).pop() ?? "").trim();
   if (name === "" || name === "." || name === "..") return null;
   const chars = Array.from(name);
@@ -128,8 +136,10 @@ export function normalizeMaterialNames(materials: unknown, names: unknown): Reco
 function toVisibleMaterial(url: string, originalName?: unknown): StudentVisibleMaterial | null {
   const parsed = parseHttpUrl(url);
   if (!parsed) return null;
-  const segment = lastPathSegment(parsed);
-  if (segment.trim() === "") return null;
+  // URL 조각 폴백도 원래 이름과 같은 정규화를 거친다. 조각에 경로가 인코딩돼 있으면(%2F..%2F)
+  // 이 값을 문자열로 받는 쪽(에픽 B 의 샌드박스 경로 등)에서 경로 탈출이 되지 않게 한다.
+  const segment = normalizeMaterialName(lastPathSegment(parsed));
+  if (segment === null) return null;
   const fileName = normalizeMaterialName(originalName) ?? segment;
   // 확장자는 저장된 객체 이름(업로드 때 원래 이름에서 정한 값)이 먼저다. 없으면 원래 이름에서 본다.
   return { url, fileName, extension: extensionOf(segment) || extensionOf(fileName) };
@@ -196,7 +206,12 @@ export type StudentMaterialsValidation =
  *
  * - 배열이어야 하고 원소는 모두 문자열이어야 한다.
  * - 중복을 뺀 개수가 `MAX_STUDENT_MATERIALS` 이하여야 한다.
- * - 원소는 http(s) URL 이어야 하고 `materials` 에 들어 있어야 한다(지운 파일, 다른 시험의 파일 거부).
+ * - 원소는 http(s) URL 이어야 하고 `materials` 에 들어 있어야 한다.
+ *
+ * 한계: `materials` 자체가 같은 요청에 실려 오는 배열이므로 이 검사는 "이번 저장의 자료 목록 안"만
+ * 보장한다. 교수자가 `materials` 에 임의의 http(s) URL 을 함께 넣고 그것을 공개하면 통과한다(버킷이
+ * 공개라 기밀성이 새로 깨지지는 않지만 "다른 시험의 파일 거부"는 아니다). 목록을 프로젝트 Storage
+ * 경로로 묶는 것은 별도 검증이 필요하다.
  *
  * 통과하면 `materials` 순서로 정렬하고 중복을 뺀 배열을 돌려준다. 이 값을 그대로 저장한다.
  */
@@ -257,6 +272,45 @@ export function readStudentMaterialItems(value: unknown): StudentVisibleMaterial
 
 /** Supabase Storage 공개 객체 경로. 이 경로만 `download` 쿼리 파라미터를 알아듣는다. */
 const SUPABASE_PUBLIC_OBJECT_PATH = "/storage/v1/object/public/";
+/** 허용 호스트의 접미사. 점 경계로 붙는다(`.supabase.co`). */
+const SUPABASE_STORAGE_HOST_SUFFIX = ".supabase.co";
+
+/**
+ * Storage 공개 객체를 내놓는 Supabase 호스트인가.
+ *
+ * 같은 탭 링크는 페이지 이동으로 처리될 수 있어 잘못 걸면 응시 화면을 떠나게 한다. 그래서 경로뿐 아니라
+ * 호스트를 명시적으로 검사한다. 통과하는 경우는 두 가지다:
+ *   1. URL 의 호스트가 프로젝트 스토리지 호스트(`NEXT_PUBLIC_SUPABASE_URL` 의 hostname)와 정확히 같다.
+ *      커스텀 도메인 스토리지 배포는 이 경로로 통과한다.
+ *   2. 프로젝트 호스트가 `*.supabase.co` 이고 URL 의 호스트도 점 경계로 `*.supabase.co` 서픽스를 가진다.
+ * `evil.example`, `abc.supabase.co.evil.com`, `abc.supabase.co@evil.com`(URL 파서가 호스트를 evil.com
+ * 으로 읽는다)은 모두 제외된다. 프로젝트가 커스텀 도메인이면 남의 *.supabase.co 주소도 제외된다.
+ */
+function isSupabaseStorageHost(parsed: URL): boolean {
+  const host = parsed.hostname.toLowerCase();
+
+  const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (projectUrl) {
+    let projectHost: string | null = null;
+    try {
+      projectHost = new URL(projectUrl).hostname.toLowerCase();
+    } catch {
+      // NEXT_PUBLIC_SUPABASE_URL 이 URL 이 아니면 서픽스 규칙만 따른다.
+    }
+    if (projectHost !== null) {
+      // 프로젝트 호스트와 정확히 같으면 통과(커스텀 도메인 스토리지 포함).
+      if (host === projectHost) return true;
+      // *.supabase.co 프로젝트라면 같은 서픽스의 다른 프로젝트도 통과. 프로젝트가 커스텀
+      // 도메인이면 위 정확 일치만 통과하므로 남의 *.supabase.co 주소는 제외된다.
+      if (projectHost.endsWith(SUPABASE_STORAGE_HOST_SUFFIX)) {
+        return host.endsWith(SUPABASE_STORAGE_HOST_SUFFIX) && host !== SUPABASE_STORAGE_HOST_SUFFIX.slice(1);
+      }
+      return false;
+    }
+  }
+  // NEXT_PUBLIC_SUPABASE_URL 이 없으면 서픽스 규칙만 따른다. "supabase.co" 자체(빈 라벨)는 제외.
+  return host.endsWith(SUPABASE_STORAGE_HOST_SUFFIX) && host !== SUPABASE_STORAGE_HOST_SUFFIX.slice(1);
+}
 
 /**
  * 같은 탭에서 파일로 내려받게 하는 링크 주소. 쓸 수 없으면 null.
@@ -273,10 +327,17 @@ const SUPABASE_PUBLIC_OBJECT_PATH = "/storage/v1/object/public/";
 export function materialDownloadHref(url: string, fileName: string): string | null {
   const parsed = parseHttpUrl(url);
   if (!parsed || !parsed.pathname.includes(SUPABASE_PUBLIC_OBJECT_PATH)) return null;
-  const name = normalizeMaterialName(fileName) ?? lastPathSegment(parsed);
+  if (!isSupabaseStorageHost(parsed)) return null;
+  const name = normalizeMaterialName(fileName) ?? normalizeMaterialName(lastPathSegment(parsed));
+  if (name === null) return null;
   parsed.searchParams.delete("download");
-  // URLSearchParams 는 공백을 + 로 쓴다. 이름은 encodeURIComponent 로 직접 붙여 %20 으로 보낸다.
-  const rest = parsed.searchParams.toString();
-  parsed.search = `${rest ? `${rest}&` : ""}download=${encodeURIComponent(name)}`;
+  try {
+    // URLSearchParams 는 공백을 + 로 쓴다. 이름은 encodeURIComponent 로 직접 붙여 %20 으로 보낸다.
+    const rest = parsed.searchParams.toString();
+    parsed.search = `${rest ? `${rest}&` : ""}download=${encodeURIComponent(name)}`;
+  } catch {
+    // 이름에 encodeURIComponent 가 거부하는 글자가 남아 있으면 새 탭 경로로 물러난다.
+    return null;
+  }
   return parsed.toString();
 }

@@ -26,7 +26,7 @@ import { createExam, updateExam } from "@/app/api/supa/handlers/exam-handlers";
 import { createExamSchema, updateExamSchema } from "@/lib/validations";
 import { buildCopiedExamPayload } from "@/lib/exam-copy";
 import { buildExamInsertPayload } from "@/lib/exam-insert-payload";
-import { MAX_STUDENT_MATERIALS } from "@/lib/student-materials";
+import { MAX_STUDENT_MATERIALS, MAX_STUDENT_MATERIAL_URL_LENGTH } from "@/lib/student-materials";
 
 const INSTRUCTOR_ID = "instructor-1";
 const EXAM_ID = "11111111-1111-4111-8111-111111111111";
@@ -110,6 +110,17 @@ describe("1) 요청 스키마", () => {
     expect(
       updateExamSchema.safeParse({ id: EXAM_ID, update: { student_materials: many.slice(0, MAX_STUDENT_MATERIALS) } }).success
     ).toBe(true);
+  });
+
+  it(`URL 하나가 ${MAX_STUDENT_MATERIAL_URL_LENGTH}자를 넘으면 거부한다 (#546 리뷰 S12)`, () => {
+    const long = `${BASE}/${"f".repeat(MAX_STUDENT_MATERIAL_URL_LENGTH)}.csv`;
+    expect(long.length).toBeGreaterThan(MAX_STUDENT_MATERIAL_URL_LENGTH);
+    expect(createExamSchema.safeParse(createInput({ student_materials: [long] })).success).toBe(false);
+    expect(updateExamSchema.safeParse({ id: EXAM_ID, update: { student_materials: [long] } }).success).toBe(false);
+    // 경계값 하나 전은 통과한다.
+    const edge = `${BASE}/${"f".repeat(MAX_STUDENT_MATERIAL_URL_LENGTH - BASE.length - 5)}.csv`;
+    expect(edge.length).toBeLessThanOrEqual(MAX_STUDENT_MATERIAL_URL_LENGTH);
+    expect(updateExamSchema.safeParse({ id: EXAM_ID, update: { student_materials: [edge] } }).success).toBe(true);
   });
 });
 

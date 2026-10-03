@@ -401,7 +401,8 @@ export async function updateExam(data: {
 
     // 학생 공개 자료 (#544): 항상 materials 의 부분집합, materials 순서.
     //  - student_materials 를 보내면 저장될 materials(이번에 보낸 값, 없으면 지금 값) 기준으로 검증한다.
-    //    부분집합이 아니면 거부한다. 지운 파일이나 다른 시험의 URL 을 공개로 남기지 않는다.
+    //    부분집합이 아니면 거부한다. 이번 저장의 materials 목록에 없는 URL 은 공개로 남지 않는다.
+    //    (materials 자체를 임의 URL 로 채워 보내면 통과한다 - 검사의 한계는 lib/student-materials.ts 참고.)
     //  - materials 만 보내면 빠진 파일을 공개 목록에서도 지운다.
     // 학생이 이미 입장한 시험도 바꿀 수 있다(시험 중에 파일을 더 공개하는 경우). 학생 화면에는 다시 입장할 때 반영된다.
     if (touchesMaterials && currentExam) {

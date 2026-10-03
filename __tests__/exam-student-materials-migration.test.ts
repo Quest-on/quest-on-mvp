@@ -1,5 +1,5 @@
 /**
- * database/040 — exams.student_materials, exams.material_names (#544)
+ * database/041 — exams.student_materials, exams.material_names (#544)
  *
  * SQL 을 실제로 실행하지는 않는다(AGENTS.md 의 DB 안전 규칙). CI 의 테스트 DB 셋업
  * (.github/actions/test-setup/action.yml)이 prisma db push 뒤에 이 파일을 두 번 적용해 문법과 멱등성을
@@ -12,7 +12,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = path.resolve(__dirname, "..");
-const FILE = "040_exam_student_materials.sql";
+const FILE = "041_exam_student_materials.sql";
 const read = (rel: string) => readFileSync(path.join(root, rel), "utf8").replace(/\r\n/g, "\n");
 
 const sql = read(`database/${FILE}`);
@@ -22,16 +22,28 @@ const executable = sql
   .filter((line) => !line.trimStart().startsWith("--"))
   .join("\n");
 
-describe("040 exams.student_materials, exams.material_names 마이그레이션", () => {
-  it("040 이 database 디렉터리에서 유일한 순번이다", () => {
+describe("041 exams.student_materials, exams.material_names 마이그레이션", () => {
+  it("041 이 database 디렉터리에서 유일한 순번이다", () => {
     const files = readdirSync(path.join(root, "database"));
     expect(files).toContain(FILE);
-    expect(files.filter((f) => f.startsWith("040_"))).toHaveLength(1);
+    expect(files.filter((f) => f.startsWith("041_"))).toHaveLength(1);
   });
 
   it("단일 트랜잭션이다", () => {
     expect(executable.match(/^BEGIN;$/gm)).toHaveLength(1);
     expect(executable.match(/^COMMIT;$/gm)).toHaveLength(1);
+  });
+
+  it("트랜잭션 안에서 잠금 대기를 5초로 제한하고 커밋 뒤 PostgREST 캐시를 갱신한다 (#546 리뷰 5)", () => {
+    // ADD COLUMN/CONSTRAINT 는 ACCESS EXCLUSIVE 잠금을 잡는다. 무한 대기하면 학생 입장 조회가 줄을 선다.
+    const beginAt = executable.indexOf("BEGIN;");
+    const lockAt = executable.indexOf("SET LOCAL lock_timeout = '5s';");
+    const commitAt = executable.indexOf("COMMIT;");
+    expect(lockAt).toBeGreaterThan(beginAt);
+    expect(lockAt).toBeLessThan(commitAt);
+    // NOTIFY 로 스키마 캐시가 바로 갱신되게 한다. COMMIT 뒤 트랜잭션 밖에서 실행한다.
+    expect(executable.match(/^NOTIFY pgrst, 'reload schema';$/gm)).toHaveLength(1);
+    expect(executable.indexOf("NOTIFY")).toBeGreaterThan(commitAt);
   });
 
   it("jsonb NOT NULL DEFAULT '[]' 컬럼을 IF NOT EXISTS 로 더한다", () => {
@@ -102,12 +114,12 @@ describe("040 exams.student_materials, exams.material_names 마이그레이션",
     );
   });
 
-  it("CI 테스트 DB 셋업이 prisma db push 뒤에 040 을 두 번 적용한다 (문법과 멱등성)", () => {
+  it("CI 테스트 DB 셋업이 prisma db push 뒤에 041 을 두 번 적용한다 (문법과 멱등성)", () => {
     const action = read(".github/actions/test-setup/action.yml");
     const pushAt = action.indexOf("npx prisma db push");
-    const applyAt = action.indexOf("-f database/040_exam_student_materials.sql");
+    const applyAt = action.indexOf("-f database/041_exam_student_materials.sql");
     expect(pushAt).toBeGreaterThan(-1);
     expect(applyAt).toBeGreaterThan(pushAt);
-    expect(action.match(/-f database\/040_exam_student_materials\.sql/g)).toHaveLength(2);
+    expect(action.match(/-f database\/041_exam_student_materials\.sql/g)).toHaveLength(2);
   });
 });

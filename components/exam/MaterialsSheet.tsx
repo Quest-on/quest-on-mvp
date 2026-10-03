@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { Download, Paperclip } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -26,15 +26,38 @@ interface MaterialsListProps {
   items: StudentVisibleMaterial[];
 }
 
+/**
+ * 숨긴 iframe 으로 내려받는다 (#546 리뷰 B1).
+ *
+ * 같은 탭 `<a href>` 로는 브라우저가 이 클릭을 페이지 이동으로 처리한다. 첨부 응답(Content-Disposition:
+ * attachment)에서도 `beforeunload` 가 실행돼 세션이 비활성이 되고, 답안이 있으면 나가기 확인 창이 뜨고,
+ * Storage 오류 응답에는 시험 페이지가 오류 JSON 화면으로 넘어간다(리뷰의 헤드리스 Chromium 측정).
+ * iframe 의 `src` 를 바꾸면 어떤 응답이든 최상위 창의 탐색이 아니므로 `beforeunload` 가 돌지 않는다.
+ * 같은 측정에서 확인 창 없이 원래 이름으로 저장됐다. CSP `frame-src` 에 `https://*.supabase.co` 가
+ * 필요하다(next.config.ts).
+ */
+function HiddenDownloadFrame() {
+  const ref = useRef<HTMLIFrameElement | null>(null);
+  const download = useCallback((href: string) => {
+    // 같은 iframe 을 다시 쓴다. src 가 같으면 브라우저가 다시 요청하지 않으니 앞에 빈 조각을 붙여
+    // 매번 다른 URL 로 만든다. 해시는 Storage 가 무시한다.
+    ref.current?.setAttribute("src", `${href}#d${Date.now()}`);
+  }, []);
+  return { frame: <iframe ref={ref} title="" aria-hidden="true" tabIndex={-1} className="sr-only" />, download };
+}
+
 /** 공개 자료를 파일마다 이름, 형식, 내려받기 링크로 나열한다. 입력 요소는 없다. */
 export function MaterialsList({ items }: MaterialsListProps) {
   const t = useTranslations("exam");
+  const { frame, download } = HiddenDownloadFrame();
   return (
+    <>
+      {frame}
     <ul className="space-y-3">
       {items.map((item) => {
         const format = item.extension ? item.extension.toUpperCase() : t("materials.formatUnknown");
-        // Supabase 공개 객체면 ?download=<원래 이름> 으로 같은 탭에서 파일로 내려받는다(시험 화면을 떠나지
-        // 않아 탭 전환 기록이 생기지 않는다). 그 밖의 주소는 그 파라미터를 모르는 서버라 새 탭으로 연다.
+        // Supabase 공개 객체면 ?download=<원래 이름> 을 숨긴 iframe 으로 연다(위 HiddenDownloadFrame 주석).
+        // 그 밖의 주소는 그 파라미터를 모르는 서버라 새 탭으로 연다.
         const downloadHref = materialDownloadHref(item.url, item.fileName);
         return (
           <li
@@ -51,21 +74,25 @@ export function MaterialsList({ items }: MaterialsListProps) {
               Storage 의 download 쿼리 파라미터(Content-Disposition: attachment)가 정한다.
               download 속성은 같은 출처일 때를 위해 남긴다.
             */}
-            <Button asChild variant="outline" size="sm" className="min-h-[40px] shrink-0 gap-1.5">
-              <a
-                href={downloadHref ?? item.url}
-                download={item.fileName}
-                {...(downloadHref ? {} : { target: "_blank", rel: "noopener noreferrer" })}
-                aria-label={t("materials.downloadAriaLabel", { name: item.fileName })}
-              >
-                <Download className="size-4 shrink-0" aria-hidden="true" />
-                <span>{t("materials.download")}</span>
-              </a>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="min-h-[40px] shrink-0 gap-1.5"
+              onClick={() => {
+                if (downloadHref) download(downloadHref);
+                else window.open(item.url, "_blank", "noopener,noreferrer");
+              }}
+              aria-label={t("materials.downloadAriaLabel", { name: item.fileName })}
+            >
+              <Download className="size-4 shrink-0" aria-hidden="true" />
+              <span>{t("materials.download")}</span>
             </Button>
           </li>
         );
       })}
     </ul>
+    </>
   );
 }
 

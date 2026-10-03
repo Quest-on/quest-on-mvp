@@ -2184,6 +2184,28 @@ describe("seedMockExam: 학생 공개 자료 --apply (#544)", () => {
     expect(leftStorage.ops.some((o) => o.op === "remove")).toBe(false);
   });
 
+  it("응답 유실 뒤 재조회에서 행이 없음이 확인돼도(늦은 커밋 가능) 올린 파일을 지우지 않는다 (#546 리뷰 D4)", async () => {
+    // absent 분기: INSERT 응답은 유실됐지만 재조회에 행이 없다. 그래도 늦게 커밋되면 그 행이
+    // 파일을 가리키므로 releaseUploads("keep") 이어야 한다. remove 로 바꾸면 이 테스트가 실패한다.
+    const storage = createFakeStorage();
+    const db = withStorage(
+      createFakeDb(verifiedWorld, {
+        failInsert: (table, _p, n) => (table === "exams" && n === 1 ? LOST : null),
+      }),
+      storage
+    );
+
+    const { report, output } = await run(db, { ...apply, spec: specWithFiles, materialFiles: loadedFiles(), uuid: UUIDS() });
+
+    expect(report.status).toBe("failed");
+    expect(report.ambiguousInsert).toBe("absent");
+    expect(report.uploadCleanup).toBe("kept");
+    expect(storage.ops.some((o) => o.op === "remove")).toBe(false);
+    expect(storage.objects.size).toBe(2);
+    expect(output).toContain(XLSX_PATH);
+    expect(output).toMatch(/늦게 커밋|남았을 수 있/);
+  });
+
   it("파일 삭제가 실패하면 직접 지울 경로를 출력한다", async () => {
     const storage = createFakeStorage({
       failUpload: (_p, n) => (n === 2 ? { message: "boom" } : null),

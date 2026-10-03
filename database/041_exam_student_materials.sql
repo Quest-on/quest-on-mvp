@@ -1,4 +1,4 @@
--- 040: exams.student_materials, exams.material_names — 교수 자료 중 학생에게 공개한 파일과 원래 이름 (이슈 #544)
+-- 041: exams.student_materials, exams.material_names — 교수 자료 중 학생에게 공개한 파일과 원래 이름 (이슈 #544)
 --
 -- 교수자가 올린 자료(exams.materials, 공개 URL 문자열 배열)는 #508 뒤로 학생 응답에서 빠진다.
 -- 교수자가 파일마다 학생 공개를 켜면, 그 URL 을 student_materials 에 담고 학생 응시 화면이 공개한
@@ -31,7 +31,10 @@
 --     않는다(메타데이터만 바뀐다). 기존 행은 모두 [] 와 {} 로 읽힌다.
 --   - CHECK 제약 두 개는 이름(exams_student_materials_is_array, exams_material_names_is_object)으로
 --     존재를 확인하고 없을 때만 더한다. 더할 때 기존 행을 한 번 검사한다. 모든 행이 기본값이라 실패하지 않는다.
---   - 멱등: 여러 번 실행해도 결과가 같다. CI 의 테스트 DB 처럼 prisma db push 가 컬럼을 먼저
+--   - 멱등: 여러 번 실행해도 결과가 같다.
+--   - SET LOCAL lock_timeout = 5s: 잠금을 5초 안에 못 얻으면 실패한다(트랜잭션 안에서만).
+--   - COMMIT 뒤 NOTIFY pgrst 로 PostgREST 스키마 캐시를 바로 갱신한다.
+ CI 의 테스트 DB 처럼 prisma db push 가 컬럼을 먼저
 --     만든 DB 에서도 컬럼 추가는 건너뛰고 제약만 더한다.
 --
 -- 확인 쿼리 (적용 후):
@@ -55,6 +58,11 @@
 --   exams.material_names 가 없어야 한다.
 
 BEGIN;
+
+-- ADD COLUMN 와 ADD CONSTRAINT 는 ACCESS EXCLUSIVE 잠금을 잡는다. 오래 걸리는 트랜잭션이 exams 를
+-- 잡고 있으면 뒤따르는 학생 입장 조회가 모두 줄을 선다. 5초 안에 잠금을 못 얻으면 실패하는 편이
+-- 응시 화면 전체를 멈추는 것보다 낫다(재적용하면 된다 - 멱등). SET LOCAL 이라 이 트랜잭션에만 적용된다.
+SET LOCAL lock_timeout = '5s';
 
 ALTER TABLE public.exams
   ADD COLUMN IF NOT EXISTS student_materials jsonb NOT NULL DEFAULT '[]'::jsonb;
@@ -89,6 +97,10 @@ END
 $$;
 
 COMMIT;
+
+-- PostgREST 스키마 캐시를 바로 갱신한다. 이 NOTIFY 가 없으면 새 컬럼 select 가 몇 초간
+-- 실패한다(schema cache 미스). CI 의 테스트 DB 셋업도 같은 NOTIFY 로 끝낸다.
+NOTIFY pgrst, 'reload schema';
 
 -- ─────────────────────────────────────────────────────────────
 -- 롤백 (롤백 프로시저 검토 후 수동 실행)

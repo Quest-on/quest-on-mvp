@@ -87,7 +87,9 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: blob: https://*.supabase.co",
               "font-src 'self' data:",
               `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://va.vercel-scripts.com https://*.posthog.com${localSupabaseSources}`,
-              "frame-src 'self' https://challenges.cloudflare.com https://www.youtube.com",
+              // *.supabase.co: 응시 화면의 자료 내려받기가 숨긴 iframe 으로 Storage 공개 객체를
+              // 연다(#544). 최상위 탐색이 아니라 beforeunload 가 돌지 않게 하는 방식이다.
+              "frame-src 'self' https://challenges.cloudflare.com https://www.youtube.com https://*.supabase.co",
               "worker-src 'self' blob:",
             ].join("; "),
           },

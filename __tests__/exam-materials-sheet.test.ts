@@ -51,12 +51,6 @@ const ITEMS = [
   { url: PDF, fileName: "2026-10-03_b.pdf", extension: "pdf" },
 ];
 
-/** 마크업에서 href 가 주어진 값으로 시작하는 a 태그 하나. & 는 마크업에서 &amp; 로 나온다. */
-function anchorFor(html: string, hrefPrefix: string): string {
-  const escaped = hrefPrefix.replace(/&/g, "&amp;").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return html.match(new RegExp(`<a[^>]*href="${escaped}[^"]*"[^>]*>`))?.[0] ?? "";
-}
-
 async function renderSheet(locale: Locale, materials: unknown, defaultOpen = false) {
   const { MaterialsSheet } = await import("@/components/exam/MaterialsSheet");
   return withIntl(locale, createElement(MaterialsSheet, { materials, defaultOpen }));
@@ -104,55 +98,39 @@ describe("열린 시트 - 파일마다 이름, 형식, 내려받기 링크", () 
     expect(html).toContain(`id="${labelledBy}"`);
   });
 
-  it("파일마다 원래 이름, 형식, 내려받기 링크가 있다", async () => {
+  /** 열린 시트의 내려받기 버튼들(순서대로). 이제 링크가 아니라 버튼이다(#546 리뷰 B1). */
+  function downloadButtons(html: string): string[] {
+    return [...html.matchAll(/<button[^>]*aria-label="[^"]*내려받기"[^>]*>/g)].map((m) => m[0]);
+  }
+
+  it("파일마다 원래 이름, 형식, 내려받기 버튼이 있다", async () => {
     const html = await renderSheet("ko", ITEMS, true);
     expect((html.match(/<li\b/g) ?? []).length).toBe(2);
-    expect(html).toContain(`>${ORIGINAL}</p>`);
-    // 저장 경로 이름은 링크 주소에만 있고 화면 글자로는 보이지 않는다.
+    expect(html).toContain(`>` + ORIGINAL + `</p>`);
     expect(html).not.toContain(">2026-10-03_a.xlsx<");
     expect(html).toContain("형식: XLSX");
     expect(html).toContain("형식: PDF");
-    const link = anchorFor(html, XLSX);
-    expect(link).toContain(`aria-label="${ORIGINAL} 내려받기"`);
-    expect(link).toContain(`download="${ORIGINAL}"`);
+    const buttons = downloadButtons(html);
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]).toContain(`aria-label="` + ORIGINAL + ` 내려받기"`);
   });
 
-  it("Supabase 공개 객체는 같은 탭에서 ?download=<인코딩한 원래 이름> 으로 내려받는다 (새 탭 없음, 탭 전환 기록 없음)", async () => {
+  it("내려받기는 최상위 탐색이 아니다 - 숨긴 iframe 이 있고 <a href> 로 걸지 않는다 (beforeunload 가 돌지 않게, #546 리뷰 B1)", async () => {
     const html = await renderSheet("ko", ITEMS, true);
-    const link = anchorFor(html, XLSX);
-    expect(link).toContain(`href="${XLSX}?download=${encodeURIComponent(ORIGINAL)}"`);
-    expect(link).not.toContain("target=");
-    expect(link).not.toContain("noopener");
-    const pdf = anchorFor(html, PDF);
-    expect(pdf).toContain(`href="${PDF}?download=${encodeURIComponent("2026-10-03_b.pdf")}"`);
-    expect(pdf).not.toContain("target=");
+    const iframe = html.match(/<iframe[^>]*>/)?.[0] ?? "";
+    expect(iframe).toContain('aria-hidden="true"');
+    expect(iframe).toContain('tabindex="-1"');
+    expect(iframe).toMatch(/\bsr-only\b/);
+    expect(iframe).not.toContain("src=");
+    expect(html).not.toMatch(/<a[^>]*href="https?:\/\/[\w.-]*supabase/);
   });
 
-  it("Supabase 공개 객체가 아닌 주소는 download 파라미터를 붙이지 않고 새 탭으로 연다 (시험 화면을 떠나지 않게)", async () => {
-    const other = "https://files.example.test/guide.pdf";
-    const html = await renderSheet("ko", [{ url: other, fileName: "안내.pdf", extension: "pdf" }], true);
-    const link = anchorFor(html, other);
-    expect(link).toContain(`href="${other}"`);
-    expect(link).toContain('target="_blank"');
-    expect(link).toContain('rel="noopener noreferrer"');
+  it("내려받기 버튼은 Supabase 공개 객체를 iframe src 로, 그 밖의 주소를 window.open 으로 연다", async () => {
+    const src = read("components/exam/MaterialsSheet.tsx");
+    expect(src).toMatch(/if \(downloadHref\) download\(downloadHref\);/);
+    expect(src).toMatch(/window\.open\(item\.url, "_blank", "noopener,noreferrer"\)/);
+    expect(src).toMatch(/setAttribute\("src", `/);
   });
-
-  it("http(s) 가 아닌 링크는 그리지 않는다", async () => {
-    const html = await renderSheet("ko", [...ITEMS, { url: "javascript:alert(1)", fileName: "x.csv" }], true);
-    expect(html).not.toContain("javascript:");
-    expect((html.match(/<li\b/g) ?? []).length).toBe(2);
-  });
-
-  it("파일 이름은 이스케이프된다 (HTML 로 해석하지 않는다)", async () => {
-    const html = await renderSheet(
-      "ko",
-      [{ url: "https://x.test/a.csv", fileName: "<img src=x onerror=alert(1)>.csv", extension: "csv" }],
-      true,
-    );
-    expect(html).not.toContain("<img");
-    expect(html).toContain("&lt;img");
-  });
-
   it("확장자가 없으면 형식은 '알 수 없음' 이다", async () => {
     const html = await renderSheet("ko", [{ url: "https://x.test/README", fileName: "README", extension: "" }], true);
     expect(html).toContain("형식: 알 수 없음");

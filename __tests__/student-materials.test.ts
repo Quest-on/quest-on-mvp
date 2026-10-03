@@ -6,7 +6,11 @@
  * 여기서 잠근다. 서버 저장 검증(`validateStudentMaterials`), 교수자 화면의 페이로드(`pickStudentMaterials`),
  * 학생 화면의 응답 읽기(`readStudentMaterialItems`), 업로드 객체 키 규칙도 함께 본다.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 import {
   MAX_MATERIAL_NAME_LENGTH,
   MAX_STUDENT_MATERIALS,
@@ -343,6 +347,28 @@ describe("원래 파일 이름 (material_names, #544 추가 반영)", () => {
     });
   });
 
+  it("이름이 없을 때 쓰는 URL 조각도 같은 정규화를 거친다 (#546 리뷰 4)", () => {
+    // %E2%80%AE = RLO, %2F = /
+    const dirty = "https://proj.supabase.co/storage/v1/object/public/exam-materials/i/1/%E2%80%AEfoo%2F..%2Fbar.exe";
+    const [item] = getStudentVisibleMaterials({ materials: [dirty], student_materials: [dirty] });
+    expect(item.fileName).toBe("bar.exe");
+    // 조각이 정규화 뒤 비면(예: 경로만 있거나 . 뿐) 항목 자체를 뺀다
+    const dot = "https://proj.supabase.co/storage/v1/object/public/b/%2E%2E";
+    expect(getStudentVisibleMaterials({ materials: [dot], student_materials: [dot] })).toEqual([]);
+  });
+
+  it("짝 없는 서로게이트와 U+061C, U+200B, U+2028 을 이름에서 지운다 (#546 리뷰 3)", () => {
+    expect(normalizeMaterialName("a\ud800b.xlsx")).toBe("ab.xlsx");
+    expect(normalizeMaterialName("a\udc00b.xlsx")).toBe("ab.xlsx");
+    expect(normalizeMaterialName("보고서\u061Cxslx.exe")).toBe("보고서xslx.exe");
+    expect(normalizeMaterialName("a\u200bb.csv")).toBe("ab.csv");
+    expect(normalizeMaterialName("a\u2028b.csv")).toBe("ab.csv");
+    // 짝이 맞는 서로게이트(이모지)는 지우지 않는다
+    expect(normalizeMaterialName("\ud83d\ude00.csv")).toBe("\ud83d\ude00.csv");
+    // 짝 없는 서로게이트는 정규화에서 지워지므로 download 주소 생성이 깨지지 않는다(URIError 없음)
+    expect(materialDownloadHref(XLSX, "x\ud800.xlsx")).toContain("download=x.xlsx");
+  });
+
   it("학생 화면도 서버가 준 원래 이름을 같은 규칙으로 읽는다", () => {
     const items = readStudentMaterialItems([{ url: XLSX, fileName: `\u202E${ORIGINAL}`, extension: "xlsx" }]);
     expect(items).toEqual([{ url: XLSX, fileName: ORIGINAL, extension: "xlsx" }]);
@@ -381,5 +407,38 @@ describe("materialDownloadHref (같은 탭에서 원래 이름으로 내려받�
     expect(materialDownloadHref("https://example.test/files/a.xlsx", "a.xlsx")).toBeNull();
     expect(materialDownloadHref("https://proj.supabase.co/storage/v1/object/sign/exam-materials/a.xlsx", "a.xlsx")).toBeNull();
     expect(materialDownloadHref("javascript:alert(1)//storage/v1/object/public/a.xlsx", "a.xlsx")).toBeNull();
+  });
+
+  it("커스텀 도메인 스토리지를 쓰는 배포에서는 프로젝트 호스트와 정확히 같을 때만 같은 탭 취급을 한다 (#546 리뷰 2)", () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://storage.quest-on.app");
+    const mine = materialDownloadHref("https://storage.quest-on.app/storage/v1/object/public/exam-materials/i/a.xlsx", "a.xlsx");
+    expect(mine).toContain("download=a.xlsx");
+    // 프로젝트가 커스텀 도메인인데 *.supabase.co 로 온 URL 은 다른 프로젝트다.
+    expect(materialDownloadHref(XLSX, "a.xlsx")).toBeNull();
+    // 비슷한 서브도메인도 안 된다.
+    expect(
+      materialDownloadHref("https://evil.storage.quest-on.app/storage/v1/object/public/e.html", "e.html")
+    ).toBeNull();
+  });
+
+  it("NEXT_PUBLIC_SUPABASE_URL 이 없으면 *.supabase.co 서픽스 규칙만 따른다", () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+    expect(materialDownloadHref(XLSX, "a.xlsx")).toContain("download=a.xlsx");
+  });
+
+  it("호스트가 Supabase 스토리지가 아니면 같은 탭 취급을 하지 않는다 (#546 리뷰 2)", () => {
+    // 경로만 같고 호스트가 다른 경우
+    expect(materialDownloadHref("https://evil.example/storage/v1/object/public/x.html", "x.html")).toBeNull();
+    // 서픽스를 흉내 낸 타 도메인(점 경계 아님)
+    expect(
+      materialDownloadHref("https://abc.supabase.co.evil.com/storage/v1/object/public/a.xlsx", "a.xlsx")
+    ).toBeNull();
+    // userinfo 로 호스트를 속이는 트릭 - URL 파서는 호스트를 evil.com 으로 읽는다
+    expect(
+      materialDownloadHref("https://abc.supabase.co@evil.com/storage/v1/object/public/a.xlsx", "a.xlsx")
+    ).toBeNull();
+    // 대문자 호스트는 정규화 뒤 허용된다
+    const upper = materialDownloadHref("https://PROJ.SUPABASE.CO/storage/v1/object/public/b/a.xlsx", "a.xlsx");
+    expect(upper).toContain("download=a.xlsx");
   });
 });
