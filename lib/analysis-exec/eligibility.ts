@@ -58,10 +58,25 @@ export function selectDataSources(materials: ReadonlyArray<VisibleMaterial>): An
   return sources;
 }
 
+/** URL 경로의 마지막 조각(디코드). 업로드 객체 이름(`날짜_uuid.확장자`)이다. */
+function urlLastSegment(url: string): string {
+  try {
+    const segment = new URL(url).pathname.split("/").pop() ?? "";
+    try {
+      return decodeURIComponent(segment);
+    } catch {
+      return segment;
+    }
+  } catch {
+    return "";
+  }
+}
+
 /**
- * 업로드 URL 의 마지막 조각은 `날짜_uuid.확장자` 라 원래 파일 이름이 없다(에픽 A 의 `fileName` 도 그 값이다).
- * 자료 텍스트 추출 기록(`exams.materials_text` 의 `{ url, fileName }`)에 원래 이름이 있으면 그 이름으로 바꾼다.
- * 지시문의 데이터 파일 목록에서 학생이 말하는 파일 이름과 맞추려는 것이다. 없으면 그대로 둔다.
+ * 원래 파일 이름을 채운다. 에픽 A 헬퍼는 `exams.material_names`(URL → 원래 이름)가 있으면 `fileName` 에 원래
+ * 이름을 넣고, 없으면(그 컬럼 전에 올린 자료) URL 마지막 조각(`날짜_uuid.확장자`)을 넣는다. 뒤의 경우에만 자료 텍스트
+ * 추출 기록(`exams.materials_text` 의 `{ url, fileName }`)의 이름으로 바꾼다. 헬퍼가 준 원래 이름은 그대로 둔다.
+ * 지시문의 데이터 파일 목록과 업로드 이름이 학생이 아는 파일 이름과 맞도록 하려는 것이다.
  */
 export function withOriginalFileNames(
   materials: ReadonlyArray<VisibleMaterial>,
@@ -77,7 +92,8 @@ export function withOriginalFileNames(
   }
   return materials.map((m) => {
     const original = names.get(m.url);
-    return original ? { ...m, fileName: original } : { ...m };
+    const fromUrl = !m.fileName || m.fileName === urlLastSegment(m.url);
+    return original && fromUrl ? { ...m, fileName: original } : { ...m };
   });
 }
 

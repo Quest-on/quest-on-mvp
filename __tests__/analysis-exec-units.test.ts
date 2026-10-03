@@ -424,16 +424,26 @@ describe("켜지는 조건: 분석 파트너 + 학생 공개 데이터 파일", 
     expect(normalizeDataExtension({ url: "https://x/y.xlsx", fileName: "y.xlsx", extension: "pdf" })).toBeNull();
   });
 
+  it("헬퍼가 원래 이름(material_names)을 줬으면 그대로 두고, URL 조각일 때만 텍스트 추출 기록의 이름을 쓴다", () => {
+    const fromNames = [{ url: "https://s/x/2026-10-03_ccc.xlsx", fileName: "하냥센스_시험용_dataset.xlsx", extension: "xlsx" }];
+    expect(
+      withOriginalFileNames(fromNames, [{ url: "https://s/x/2026-10-03_ccc.xlsx", fileName: "다른 이름.xlsx" }])[0].fileName
+    ).toBe("하냥센스_시험용_dataset.xlsx");
+  });
+
   it("원래 파일 이름은 텍스트 추출 기록에서 가져오고, 없으면 그대로 둔다", () => {
     const visible = [
-      { url: "https://s/1.xlsx", fileName: "2026-10-03_aaa.xlsx", extension: "xlsx" },
-      { url: "https://s/2.csv", fileName: "2026-10-03_bbb.csv", extension: "csv" },
+      { url: "https://s/2026-10-03_aaa.xlsx", fileName: "2026-10-03_aaa.xlsx", extension: "xlsx" },
+      { url: "https://s/2026-10-03_bbb.csv", fileName: "2026-10-03_bbb.csv", extension: "csv" },
     ];
     expect(
-      withOriginalFileNames(visible, [{ url: "https://s/1.xlsx", fileName: "고객 데이터.xlsx" }, { url: "https://s/2.csv", fileName: " " }])
+      withOriginalFileNames(visible, [
+        { url: "https://s/2026-10-03_aaa.xlsx", fileName: "고객 데이터.xlsx" },
+        { url: "https://s/2026-10-03_bbb.csv", fileName: " " },
+      ])
     ).toEqual([
-      { url: "https://s/1.xlsx", fileName: "고객 데이터.xlsx", extension: "xlsx" },
-      { url: "https://s/2.csv", fileName: "2026-10-03_bbb.csv", extension: "csv" },
+      { url: "https://s/2026-10-03_aaa.xlsx", fileName: "고객 데이터.xlsx", extension: "xlsx" },
+      { url: "https://s/2026-10-03_bbb.csv", fileName: "2026-10-03_bbb.csv", extension: "csv" },
     ]);
     expect(withOriginalFileNames(visible, null)).toEqual(visible);
   });

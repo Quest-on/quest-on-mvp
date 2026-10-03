@@ -25,6 +25,7 @@ const h = vi.hoisted(() => ({
   inserts: { messages: [] as Row[], ai_events: [] as Row[] },
   uploads: [] as Array<{ bucket: string; path: string; contentType?: string }>,
   materialsSelects: 0,
+  materialsSelectCols: "",
   materialsError: null as { code: string; message: string } | null,
   db: {
     session: null as Row | null,
@@ -50,7 +51,11 @@ vi.mock("@/lib/message-classification", () => ({ classifyMessageType: vi.fn(asyn
 vi.mock("@/lib/student-materials", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   // 실제 헬퍼처럼 두 컬럼을 함께 읽었을 때만 공개 자료가 있다.
-  getStudentVisibleMaterials: (exam: { student_materials?: unknown }) => (Array.isArray(exam?.student_materials) ? h.visible : []),
+  // material_names(URL → 원래 이름)가 있으면 fileName 에 원래 이름을 넣는다(#544 계약).
+  getStudentVisibleMaterials: (exam: { student_materials?: unknown; material_names?: Record<string, string> }) =>
+    Array.isArray(exam?.student_materials)
+      ? h.visible.map((v) => ({ ...v, fileName: exam.material_names?.[v.url] ?? v.fileName }))
+      : [],
 }));
 vi.mock("@/lib/openai", () => ({
   AI_MODEL: "gpt-test-requested",
@@ -94,13 +99,15 @@ function makeSupabase() {
         if (table === "exams") {
           if (state.select?.includes("student_materials")) {
             h.materialsSelects += 1;
+            h.materialsSelectCols = state.select;
             if (h.materialsError) return { data: null, error: h.materialsError };
             return {
               data: {
                 materials: [],
                 student_materials: [],
-                // 업로드 URL 에는 원래 이름이 없고, 텍스트 추출 기록에 있다.
-                materials_text: [{ url: DATA_URL, fileName: "하냥센스_시험용_dataset.xlsx", text: "..." }],
+                // 원래 이름은 material_names(#544)에 있다. 텍스트 추출 기록의 이름은 원래 이름이 없을 때만 쓴다.
+                material_names: { [DATA_URL]: "하냥센스_시험용_dataset.xlsx" },
+                materials_text: [{ url: DATA_URL, fileName: "추출 기록 이름.xlsx", text: "..." }],
               },
               error: null,
             };
@@ -356,9 +363,11 @@ describe("첫 분석 턴", () => {
     expect(instructions).toContain("pandas.read_excel");
     expect(instructions).toContain("NanumGothic");
     expect(instructions).toContain("교수 메모(학생에게 공개하지 않음): <<<교수 메모>>>");
-    // 원래 파일 이름은 텍스트 추출 기록에서 온다(URL 조각이 아니다).
+    // 원래 파일 이름은 material_names 에서 온다(URL 조각도, 추출 기록 이름도 아니다).
+    expect(h.materialsSelectCols).toContain("material_names");
     expect(instructions).toContain("(원래 파일 이름: <<<하냥센스_시험용_dataset.xlsx>>>)");
     expect(instructions).not.toContain("2026-10-03_0f8e");
+    expect(instructions).not.toContain("추출 기록 이름");
 
     // 진행 이벤트
     expect(events.filter((e) => e.event === "status").map((e) => e.data)).toEqual([

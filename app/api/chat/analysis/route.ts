@@ -96,10 +96,11 @@ export async function POST(request: NextRequest) {
     const profile = resolveExamAiProfile({ exam: { language: exam.language, questions: exam.questions }, qIdx });
     if (profile.role !== "analysis_partner") return unavailable("not_analysis_partner");
 
-    // 공개 자료 컬럼(에픽 A)은 따로 읽는다. 컬럼이 아직 없는 DB 에서 위 조회까지 실패하지 않게 하려는 것이다.
+    // 공개 자료 컬럼(에픽 A: student_materials, 원래 이름 material_names)은 따로 읽는다. 컬럼이 아직 없는 DB 에서
+    // 위 조회까지 실패하지 않게 하려는 것이다.
     const { data: materialsRow, error: materialsError } = await supabase
       .from("exams")
-      .select("materials, materials_text, student_materials")
+      .select("materials, materials_text, student_materials, material_names")
       .eq("id", exam.id)
       .maybeSingle();
     if (materialsError) {
