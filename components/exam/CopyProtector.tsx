@@ -1,10 +1,13 @@
 "use client";
 
 import React from "react";
-
-// 내부 복사 마커 (AnswerTextarea와 동일한 마커 사용)
-const INTERNAL_COPY_MARKER_START = "\u200B\u200B\u200B";
-const INTERNAL_COPY_MARKER_END = "\u200B\u200B\u200B";
+import { useInternalCopyScope } from "@/components/providers/InternalCopyScopeProvider";
+import {
+  INTERNAL_COPY_MIME_TYPE,
+  STANDALONE_INTERNAL_COPY_SCOPE,
+  internalCopyMimeValue,
+  wrapInternalCopy,
+} from "@/lib/internal-copy";
 
 interface CopyProtectorProps {
   children: React.ReactNode;
@@ -13,6 +16,9 @@ interface CopyProtectorProps {
 }
 
 export function CopyProtector({ children, className, metadata }: CopyProtectorProps) {
+  // 표식에 시험 세션 범위를 담는다(#560). 답안 칸은 같은 범위의 표식만 내부 복사로 인정한다.
+  const scope = useInternalCopyScope() ?? STANDALONE_INTERNAL_COPY_SCOPE;
+
   const handleCopy = (e: React.ClipboardEvent<HTMLDivElement>) => {
     const selection = window.getSelection()?.toString() ?? "";
     if (!selection) return;
@@ -21,11 +27,10 @@ export function CopyProtector({ children, className, metadata }: CopyProtectorPr
     e.preventDefault();
     
     // text/plain에 마커 추가 (AnswerTextarea의 handlePaste가 감지할 수 있도록)
-    const textWithMarker = INTERNAL_COPY_MARKER_START + selection + INTERNAL_COPY_MARKER_END;
-    e.clipboardData.setData("text/plain", textWithMarker);
+    e.clipboardData.setData("text/plain", wrapInternalCopy(selection, scope));
     
-    // Add custom internal tag (기존 호환성 유지)
-    e.clipboardData.setData("application/x-queston-internal", "true");
+    // 사용자 정의 형식에도 같은 범위를 싣는다(#560).
+    e.clipboardData.setData(INTERNAL_COPY_MIME_TYPE, internalCopyMimeValue(scope));
     
     // Add metadata if provided
     if (metadata) {

@@ -3,6 +3,15 @@
 import { useRef, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
+import { useInternalCopyScope } from "@/components/providers/InternalCopyScopeProvider";
+import {
+  INTERNAL_COPY_MIME_TYPE,
+  STANDALONE_INTERNAL_COPY_SCOPE,
+  internalCopyMimeValue,
+  isInternalCopyFor,
+  stripInternalCopyMarkers,
+  wrapInternalCopy,
+} from "@/lib/internal-copy";
 
 interface AnswerTextareaProps {
   value: string;
@@ -20,11 +29,6 @@ interface AnswerTextareaProps {
   }) => void;
 }
 
-// 내부 복사 마커 (Zero-width space 앞뒤로 추가하여 감지 용이)
-const INTERNAL_COPY_MARKER_START = "\u200B\u{E0001}\u200B";
-const INTERNAL_COPY_MARKER_END = "\u200B\u{E0002}\u200B";
-const INTERNAL_COPY_MIME_TYPE = "application/x-queston-internal";
-
 export function AnswerTextarea({
   value,
   onChange,
@@ -36,6 +40,8 @@ export function AnswerTextarea({
   const t = useTranslations("common.answerTextarea");
   const resolvedPlaceholder = placeholder ?? t("placeholder");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // 표식에 시험 세션 범위를 담고, 같은 범위의 표식만 내부 복사로 인정한다(#560).
+  const scope = useInternalCopyScope() ?? STANDALONE_INTERNAL_COPY_SCOPE;
 
   // Copy 이벤트 핸들러 - 내부 복사 마커 추가
   const handleCopy = useCallback(
@@ -56,15 +62,12 @@ export function AnswerTextarea({
       // 기본 복사 동작을 막고 마커 포함 텍스트를 강제로 주입
       if (e.clipboardData) {
         e.preventDefault(); // 먼저 기본 동작 차단
-        e.clipboardData.setData(
-          "text/plain",
-          INTERNAL_COPY_MARKER_START + selectedText + INTERNAL_COPY_MARKER_END
-        );
+        e.clipboardData.setData("text/plain", wrapInternalCopy(selectedText, scope));
         // More robust internal copy signal than zero-width markers alone.
-        e.clipboardData.setData(INTERNAL_COPY_MIME_TYPE, "1");
+        e.clipboardData.setData(INTERNAL_COPY_MIME_TYPE, internalCopyMimeValue(scope));
       }
     },
-    []
+    [scope]
   );
 
   // Cut 이벤트 핸들러 - 복사와 같은 내부 표식을 붙이고 선택 영역을 직접 지운다.
@@ -83,11 +86,8 @@ export function AnswerTextarea({
 
       // 기본 잘라내기를 막았으므로 선택 영역 삭제도 여기서 한다.
       e.preventDefault();
-      e.clipboardData.setData(
-        "text/plain",
-        INTERNAL_COPY_MARKER_START + selectedText + INTERNAL_COPY_MARKER_END
-      );
-      e.clipboardData.setData(INTERNAL_COPY_MIME_TYPE, "1");
+      e.clipboardData.setData("text/plain", wrapInternalCopy(selectedText, scope));
+      e.clipboardData.setData(INTERNAL_COPY_MIME_TYPE, internalCopyMimeValue(scope));
 
       const currentValue = textarea.value;
       onChange(currentValue.substring(0, selectionStart) + currentValue.substring(selectionEnd));
@@ -95,7 +95,7 @@ export function AnswerTextarea({
         textarea.setSelectionRange(selectionStart, selectionStart);
       }, 0);
     },
-    [onChange]
+    [onChange, scope]
   );
 
   // Paste 이벤트 핸들러
@@ -110,20 +110,14 @@ export function AnswerTextarea({
       const clipboard = e.clipboardData;
       if (!clipboard) return;
 
-      const isInternalByMime = clipboard.types.includes(INTERNAL_COPY_MIME_TYPE);
       const pastedData = clipboard.getData("text/plain");
       if (!pastedData) return;
 
-      // 내부 복사 마커 확인
-      const isInternalByMarker =
-        pastedData.includes("\u200B\u{E0001}\u200B") ||
-        pastedData.includes("\u200B\u{E0002}\u200B");
-      const isInternal = isInternalByMime || isInternalByMarker;
+      // 내부 복사 표식 확인 — 이 시험 세션(범위)에서 복사한 것만 내부다(#560).
+      const isInternal = isInternalCopyFor(clipboard, scope);
 
-      // 마커 제거 (실제 텍스트만 저장)
-      const cleanText = pastedData
-        .replace(/\u200B\u{E0001}\u200B/gu, "")
-        .replace(/\u200B\u{E0002}\u200B/gu, "");
+      // 마커 제거 (실제 텍스트만 저장). 범위가 다른 표식도 지운다.
+      const cleanText = stripInternalCopyMarkers(pastedData);
 
       // 붙여넣기 전 상태 저장
       const answerLengthBefore = textarea.value.length;
@@ -163,7 +157,7 @@ export function AnswerTextarea({
         });
       }
     },
-    [onChange, onPaste]
+    [onChange, onPaste, scope]
   );
 
   // Copy 이벤트 리스너 등록
