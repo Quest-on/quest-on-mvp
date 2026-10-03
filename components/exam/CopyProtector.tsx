@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { endInternalDrag, startInternalDrag } from "@/lib/answer-drop";
 
 // 내부 복사 마커 (AnswerTextarea와 동일한 마커 사용)
 const INTERNAL_COPY_MARKER_START = "\u200B\u200B\u200B";
@@ -37,8 +38,18 @@ export function CopyProtector({ children, className, metadata }: CopyProtectorPr
     }
   };
 
+  // 여기서 끌어다 답안 칸에 놓은 글도 복사처럼 내부로 기록되게, 끌기 시작을 적어 둔다(#561).
+  const handleDragStart = () => {
+    startInternalDrag(window.getSelection()?.toString() ?? "");
+  };
+
   return (
-    <div onCopy={handleCopy} className={className}>
+    <div
+      onCopy={handleCopy}
+      onDragStart={handleDragStart}
+      onDragEnd={endInternalDrag}
+      className={className}
+    >
       {children}
     </div>
   );
