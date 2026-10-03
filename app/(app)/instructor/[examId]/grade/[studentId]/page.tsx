@@ -29,7 +29,7 @@ import {
   AIOverallSummary,
   type SummaryData,
 } from "@/components/instructor/AIOverallSummary";
-import { hasAnalysisPartnerQuestions, isObjectiveQuestion, resolveByQIdx } from "@/lib/grading-helpers";
+import { hasAnalysisPartnerQuestions, isGradingOpen, isObjectiveQuestion, resolveByQIdx } from "@/lib/grading-helpers";
 import { resolveGradingStatusBanner } from "@/lib/grading-status-banner";
 import {
   buildTypedQuestionEntries,
@@ -131,6 +131,11 @@ interface SessionData {
     title: string;
     code: string;
     questions: Question[];
+    // 채점이 열렸는지(isGradingOpen) 판단하는 값. 채점 GET 라우트가 시험 행에서 함께 내려준다.
+    status?: string | null;
+    type?: string | null;
+    deadline?: string | null;
+    is_demo?: boolean | null;
   };
   student: {
     name: string;
@@ -483,6 +488,10 @@ export default function GradeStudentPage({
     caseQuestionEntries.findIndex(({ arrIdx }) => arrIdx === selectedQuestionIdx),
   );
 
+  // AI 채점 대화 기록은 채점이 열린 뒤에만 부른다. 서버(requireCaseGradeAccess)와 같은 기준이다.
+  // 시험이 진행 중이면 제출 여부와 상관없이 409(EXAM_NOT_CLOSED)로 거절된다.
+  const caseGradeHistoryEnabled = isGradingOpen(sessionData.exam);
+
   return (
     <SidebarProvider defaultOpen={false} className="flex-row-reverse">
       <SidebarInset>
@@ -785,6 +794,7 @@ export default function GradeStudentPage({
                   questionNumber={selectedQuestionQIdx + 1}
                   initialScore={caseGradeInitialScore}
                   initialComment={caseGradeInitialComment}
+                  historyEnabled={caseGradeHistoryEnabled}
                 />
               )}
 

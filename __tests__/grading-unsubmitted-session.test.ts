@@ -259,6 +259,31 @@ describe.each(PAGES)("$name 페이지 배선", ({ path, ns }) => {
   });
 });
 
+describe.each(PAGES)("$name 페이지 — AI 채점 대화 기록은 채점이 열린 뒤에만 부른다", ({ path }) => {
+  const page = read(path);
+
+  it("서버와 같은 isGradingOpen 기준으로 historyEnabled 를 정해 패널에 넘긴다", () => {
+    // 서버(requireCaseGradeAccess 의 requireGradable)는 채점이 열리기 전 요청을 409 로 거절한다.
+    expect(page).toMatch(/import\s*\{[^}]*\bisGradingOpen\b[^}]*\}\s*from\s*["']@\/lib\/grading-helpers["']/);
+    const gate = page.match(/const (\w+) = isGradingOpen\(sessionData\.exam\);/);
+    expect(gate, "isGradingOpen(sessionData.exam) 로 판정한다").not.toBeNull();
+    const at = page.indexOf("<CaseGradingChat");
+    expect(at, "<CaseGradingChat 를 그린다").toBeGreaterThan(-1);
+    const chat = page.slice(at, page.indexOf("/>", at));
+    expect(chat).toContain(`historyEnabled={${gate![1]}}`);
+  });
+});
+
+describe("채점 GET 라우트", () => {
+  it("화면이 채점 열림을 판단하는 시험 값(is_demo, status, type, deadline)을 내려준다", () => {
+    const route = read("app/api/session/[sessionId]/grade/route.ts");
+    const select = route.match(/\.from\("exams"\)\s*\.select\("([^"]*)"\)/);
+    expect(select, "GET 의 exams 조회").not.toBeNull();
+    const columns = select![1].split(",").map((c) => c.trim());
+    expect(columns).toEqual(expect.arrayContaining(["is_demo", "status", "type", "deadline"]));
+  });
+});
+
 describe("머리글 배선", () => {
   it("시험 채점 페이지는 submitted_at 을 그대로 GradeHeader 에 넘긴다 (null 처리는 GradeHeader 가 한다)", () => {
     const page = read(PAGES[0].path);
