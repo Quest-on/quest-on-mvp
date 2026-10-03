@@ -172,7 +172,7 @@
     "internalTitle": "내부 복사 활동",
     "internalLog": "• {chars}자 내부 복사 ({time})",
     "legendExternal": "외부 복사",
-    "legendInternal": "내부 복사 (AI 답변, 문제 본문, 평가 기준)",
+    "legendInternal": "내부 복사 (시험 화면 안에서 복사)",
     "legendModified": "붙여넣기 후 수정됨",
     "emptyAnswer": "답안이 없습니다.",
     "noSubmission": "제출된 답안이 없습니다.",
