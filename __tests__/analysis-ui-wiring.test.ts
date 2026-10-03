@@ -30,8 +30,8 @@ describe("학생 채팅 배선", () => {
     expect(hook.indexOf('fetch("/api/chat/analysis"')).toBeLessThan(hook.indexOf('fetch("/api/chat",'));
   });
 
-  it("분석 턴의 클라이언트 타임아웃은 서버 함수 시간(300초)과 같다", () => {
-    expect(ANALYSIS_CLIENT_TIMEOUT_MS).toBe(300_000);
+  it("분석 턴의 클라이언트 타임아웃은 서버 함수 시간(300초)보다 10초 길다(서버가 저장을 마칠 때까지 기다린다)", () => {
+    expect(ANALYSIS_CLIENT_TIMEOUT_MS).toBe(310_000);
     expect(hook).toContain("ANALYSIS_CLIENT_TIMEOUT_MS");
   });
 

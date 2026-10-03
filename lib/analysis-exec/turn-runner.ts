@@ -28,6 +28,7 @@ import {
 } from "@/lib/student-chat-spec";
 import type { AnalysisErrorCode, AnalysisStreamEvent } from "@/lib/analysis-exec/client-events";
 import {
+  applyPathRewrites,
   buildReplayInstruction,
   collectReplayCells,
   ensureAnalysisContainer,
@@ -36,7 +37,12 @@ import {
 } from "@/lib/analysis-exec/container";
 import type { AnalysisDataSource } from "@/lib/analysis-exec/eligibility";
 import { OpenAIHttpError } from "@/lib/analysis-exec/errors";
-import { ANALYSIS_MAX_OUTPUT_TOKENS, MAX_FIGURE_BYTES } from "@/lib/analysis-exec/limits";
+import {
+  ANALYSIS_FINALIZE_DEADLINE_MS,
+  ANALYSIS_MAX_OUTPUT_TOKENS,
+  CITED_FIGURES_MIN_REMAINING_MS,
+  MAX_FIGURE_BYTES,
+} from "@/lib/analysis-exec/limits";
 import {
   ANALYSIS_METADATA_VERSION,
   isSuccessfulOutcome,
@@ -62,6 +68,7 @@ import {
   type SessionAnalysisRecord,
 } from "@/lib/analysis-exec/session-records";
 import { runStreamTurn, type StreamTurnResult } from "@/lib/analysis-exec/stream-turn";
+import type { AiUsageSnapshot } from "@/lib/ai-pricing";
 import { collectImageCitations, collectOutputText, stripSandboxLinks } from "@/lib/analysis-exec/text";
 
 export const ANALYSIS_ROUTE = "/api/chat/analysis";
@@ -208,6 +215,7 @@ function syntheticPrevious(ensured: EnsuredContainer): StoredAnalysisTurn {
     v: ANALYSIS_METADATA_VERSION,
     container_id: ensured.restarted && ensured.previousContainerId ? ensured.previousContainerId : ensured.containerId,
     files: ensured.files,
+    sources: ensured.sources,
     cells: [],
     cited_figures: [],
     outcome: "completed",
@@ -216,13 +224,33 @@ function syntheticPrevious(ensured: EnsuredContainer): StoredAnalysisTurn {
   };
 }
 
-function replayFor(records: ReadonlyArray<SessionAnalysisRecord>, ensured: EnsuredContainer) {
+function replayFor(
+  records: ReadonlyArray<SessionAnalysisRecord>,
+  ensured: EnsuredContainer,
+  pathRewrites: ReadonlyArray<{ from: string; to: string }>
+) {
   if (!ensured.restarted || !ensured.previousContainerId) return { text: null as string | null, cells: 0 };
   const replay = collectReplayCells(
     records.map((r) => r.turn),
     ensured.previousContainerId
   );
-  return { text: buildReplayInstruction(replay), cells: replay.codes.length };
+  // 파일을 다시 올려 경로가 바뀌었으면 이전 코드 안의 경로를 새 경로로 바꿔 넣는다.
+  const codes = replay.codes.map((code) => applyPathRewrites(code, pathRewrites));
+  return { text: buildReplayInstruction({ codes, omitted: replay.omitted }), cells: codes.length };
+}
+
+/** 복구로 두 번 호출했으면 두 호출의 사용량을 더한다(비용 기록이 빠지지 않게). */
+function addUsage(a: AiUsageSnapshot | null, b: AiUsageSnapshot | null): AiUsageSnapshot | null {
+  if (!a) return b;
+  if (!b) return a;
+  const sum = (x: number | null, y: number | null) => (x === null && y === null ? null : (x ?? 0) + (y ?? 0));
+  return {
+    inputTokens: sum(a.inputTokens, b.inputTokens),
+    outputTokens: sum(a.outputTokens, b.outputTokens),
+    cachedInputTokens: sum(a.cachedInputTokens, b.cachedInputTokens),
+    reasoningTokens: sum(a.reasoningTokens, b.reasoningTokens),
+    totalTokens: sum(a.totalTokens, b.totalTokens),
+  };
 }
 
 /**
@@ -308,11 +336,19 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
       send({ event: "error", data: { code: quota ? "quota_exhausted" : "tool_unavailable" } });
     };
 
+    const cancelledDuringSetup = async () => {
+      // 준비 중에 학생이 연결을 끊었다. 컨테이너와 파일 API 는 이미 불렀으므로 이벤트는 남긴다.
+      await recordEvent({ status: "client_cancelled", metadata: { analysis_outcome: "client_cancelled_setup" } });
+    };
+
     let ensured: EnsuredContainer;
     try {
       ensured = await ensureAnalysisContainer(ops, { sessionId: ctx.sessionId, previous, dataSources: ctx.dataSources });
     } catch (error) {
-      if (ctx.clientSignal.aborted) return;
+      if (ctx.clientSignal.aborted) {
+        await cancelledDuringSetup();
+        return;
+      }
       await setupFailed(error);
       return;
     }
@@ -325,6 +361,9 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
     let replayedCells = 0;
     let attempts = 0;
     let result: StreamTurnResult;
+    let pathRewrites = [...ensured.pathRewrites];
+    // 만료 복구 전 호출의 사용량(비용). 마지막 결과에 더한다.
+    let earlierUsage: AiUsageSnapshot | null = null;
 
     while (true) {
       attempts += 1;
@@ -339,7 +378,7 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
       const instructions = assembled.instructions;
       specId = assembled.specId;
       instructionsForLog = instructions;
-      const replay = replayFor(records, ensured);
+      const replay = replayFor(records, ensured, pathRewrites);
       replayedCells = replay.cells;
       const input = replay.text
         ? [
@@ -375,6 +414,7 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
 
       const expired = result.failure?.kind === "container_expired" && result.cells.length === 0;
       if (!expired || attempts >= 2) break;
+      earlierUsage = addUsage(earlierUsage, result.usage);
 
       // 조회와 호출 사이에 만료됐다. 새 컨테이너를 만들고 이전 코드를 다시 실행하게 해 한 번만 다시 돈다.
       try {
@@ -385,14 +425,19 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
           forceNew: true,
         });
       } catch (error) {
-        if (ctx.clientSignal.aborted) return;
+        if (ctx.clientSignal.aborted) {
+          await cancelledDuringSetup();
+          return;
+        }
         await setupFailed(error);
         return;
       }
+      pathRewrites = [...pathRewrites, ...ensured.pathRewrites];
       restartedAny = true;
       send({ event: "status", data: { phase: "restarting" } });
     }
 
+    if (earlierUsage) result = { ...result, usage: addUsage(earlierUsage, result.usage) };
     const outcome = outcomeOf(result);
     if (result.failure) {
       void logError(
@@ -408,11 +453,22 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
 
     // 저장
     const messageId = randomUUID();
-    const store = createFigureStore(ctx.supabase, (path, error) => {
-      void logError("[chat-analysis] figure upload failed", error, { path: ANALYSIS_ROUTE, additionalData: { figurePath: path } });
-    });
+    // 스트림 뒤 작업(그림 저장, 인용 그림 내려받기)에도 마감을 둔다. 함수 시간(300초)에 죽으면 AI 메시지와
+    // ai_events 가 모두 사라지므로, 마감이 지나면 그림을 버리고 저장으로 넘어간다.
+    const finalizeDeadline = ctx.startedAtMs + ANALYSIS_FINALIZE_DEADLINE_MS;
+    const remainingMs = () => finalizeDeadline - now();
+    const store = createFigureStore(
+      ctx.supabase,
+      (path, error) => {
+        void logError("[chat-analysis] figure upload failed", error, { path: ANALYSIS_ROUTE, additionalData: { figurePath: path } });
+      },
+      remainingMs
+    );
     const storedCells = await storeCellFigures({ store, sessionId: ctx.sessionId, messageId, cells: result.cells });
-    const citations = isSuccessfulOutcome(outcome) ? collectImageCitations(result.finalOutput) : [];
+    const citations =
+      isSuccessfulOutcome(outcome) && remainingMs() > CITED_FIGURES_MIN_REMAINING_MS
+        ? collectImageCitations(result.finalOutput)
+        : [];
     const turnResult = result;
     const citedFigures =
       citations.length > 0
@@ -422,7 +478,14 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
             messageId,
             citations,
             download: (c) =>
-              downloadContainerFile(ctx.http, { containerId: c.containerId, fileId: c.fileId, maxBytes: MAX_FIGURE_BYTES }),
+              remainingMs() > CITED_FIGURES_MIN_REMAINING_MS
+                ? downloadContainerFile(ctx.http, {
+                    containerId: c.containerId,
+                    fileId: c.fileId,
+                    maxBytes: MAX_FIGURE_BYTES,
+                    timeoutMs: Math.min(15_000, remainingMs() - CITED_FIGURES_MIN_REMAINING_MS / 2),
+                  })
+                : Promise.resolve(null),
             knownHashes: turnResult.collector.figureHashes(),
             takeSlot: () => turnResult.collector.takeFigureSlot(),
           })
@@ -434,6 +497,7 @@ export async function runAnalysisTurn(ctx: AnalysisTurnContext, send: (event: An
     const storedTurn = buildStoredTurn({
       containerId: ensured.containerId,
       files: ensured.files,
+      sources: ensured.sources,
       cells: storedCells,
       citedFigures,
       outcome,

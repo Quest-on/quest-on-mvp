@@ -102,6 +102,7 @@ export async function storeCitedFigures(params: {
 export function buildStoredTurn(params: {
   containerId: string;
   files: StoredAnalysisFile[];
+  sources?: string[];
   cells: StoredAnalysisCell[];
   citedFigures: StoredAnalysisFigure[];
   outcome: AnalysisOutcome;
@@ -113,6 +114,7 @@ export function buildStoredTurn(params: {
     v: ANALYSIS_METADATA_VERSION,
     container_id: params.containerId,
     files: params.files,
+    ...(params.sources ? { sources: params.sources } : {}),
     cells: params.cells,
     cited_figures: params.citedFigures,
     outcome: params.outcome,

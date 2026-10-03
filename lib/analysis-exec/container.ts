@@ -32,10 +32,20 @@ export type ContainerOps = {
 export type EnsuredContainer = {
   containerId: string;
   files: StoredAnalysisFile[];
+  /**
+   * 이 컨테이너를 준비할 때 본 공개 데이터 파일 URL 전부(내려받지 못해 건너뛴 것 포함). 다음 턴에 공개 자료가
+   * 바뀌었는지 이 목록으로 비교한다. 올린 파일(`files`)로 비교하면 늘 못 받는 파일 하나 때문에 턴마다 새로 만든다.
+   */
+  sources: string[];
   /** 이전 컨테이너가 있었는데 새로 만들었다(만료, 없음, 공개 자료 변경). */
   restarted: boolean;
   /** 새로 만들기 전의 컨테이너. 이 컨테이너에서 실행한 셀을 다시 실행한다. */
   previousContainerId: string | null;
+  /**
+   * 다시 올려서 파일 id(그래서 경로)가 바뀐 파일의 옛 경로와 새 경로. 이전 셀 코드를 다시 실행하기 전에 경로를
+   * 바꿔 넣는다. 같은 파일 id 를 재사용했으면 비어 있다.
+   */
+  pathRewrites: Array<{ from: string; to: string }>;
 };
 
 /** 데이터 파일을 하나도 올리지 못해 컨테이너를 준비할 수 없다. */
@@ -73,10 +83,27 @@ export function toAsciiUploadName(fileName: string, extension: AnalysisDataSourc
   return `${ascii || `data${index + 1}`}.${extension}`;
 }
 
+/** 이전 기록이 본 공개 데이터 URL. 예전 기록(sources 없음)은 올린 파일의 원본 URL 로 대신한다. */
+function previousSources(previous: StoredAnalysisTurn): string[] {
+  return previous.sources && previous.sources.length > 0 ? previous.sources : previous.files.map((f) => f.source);
+}
+
 function sameSources(previous: StoredAnalysisTurn, sources: ReadonlyArray<AnalysisDataSource>): boolean {
-  if (previous.files.length !== sources.length) return false;
-  const prev = new Set(previous.files.map((f) => f.source));
-  return sources.every((s) => prev.has(s.url));
+  const prev = new Set(previousSources(previous));
+  const next = new Set(sources.map((s) => s.url));
+  if (prev.size !== next.size) return false;
+  for (const url of next) if (!prev.has(url)) return false;
+  return true;
+}
+
+/** 같은 원본 URL 의 파일 경로가 바뀌었으면 옛 경로와 새 경로를 짝짓는다. */
+function rewritesBetween(before: ReadonlyArray<StoredAnalysisFile>, after: ReadonlyArray<StoredAnalysisFile>) {
+  const rewrites: Array<{ from: string; to: string }> = [];
+  for (const old of before) {
+    const now = after.find((f) => f.source === old.source);
+    if (now && now.path !== old.path) rewrites.push({ from: old.path, to: now.path });
+  }
+  return rewrites;
 }
 
 async function uploadAll(ops: ContainerOps, sources: ReadonlyArray<AnalysisDataSource>) {
@@ -150,26 +177,33 @@ export async function ensureAnalysisContainer(
 ): Promise<EnsuredContainer> {
   const { sessionId, previous, dataSources } = params;
 
+  const sources = dataSources.map((s) => s.url);
+
   if (!previous) {
     const fresh = await createFresh(ops, sessionId, dataSources);
-    return { ...fresh, restarted: false, previousContainerId: null };
+    return { ...fresh, sources, restarted: false, previousContainerId: null, pathRewrites: [] };
   }
+
+  const reuse = (): EnsuredContainer => ({
+    containerId: previous.container_id,
+    files: previous.files,
+    sources,
+    restarted: false,
+    previousContainerId: null,
+    pathRewrites: [],
+  });
 
   const same = sameSources(previous, dataSources);
 
   if (same && !params.forceNew) {
     try {
       const info = await ops.retrieveContainer({ containerId: previous.container_id });
-      if (!isDeadStatus(info.status)) {
-        return { containerId: previous.container_id, files: previous.files, restarted: false, previousContainerId: null };
-      }
+      if (!isDeadStatus(info.status)) return reuse();
     } catch (error) {
       const dead =
         error instanceof OpenAIHttpError && (error.kind === "container_expired" || error.status === 404);
       if (error instanceof OpenAIHttpError && error.kind === "quota_exhausted") throw error;
-      if (!dead) {
-        return { containerId: previous.container_id, files: previous.files, restarted: false, previousContainerId: null };
-      }
+      if (!dead) return reuse();
     }
   }
 
@@ -183,8 +217,10 @@ export async function ensureAnalysisContainer(
       return {
         containerId: container.id,
         files: previous.files,
+        sources,
         restarted: true,
         previousContainerId: previous.container_id,
+        pathRewrites: [],
       };
     } catch (error) {
       if (error instanceof OpenAIHttpError && error.kind === "quota_exhausted") throw error;
@@ -193,7 +229,22 @@ export async function ensureAnalysisContainer(
   }
 
   const fresh = await createFresh(ops, sessionId, dataSources);
-  return { ...fresh, restarted: true, previousContainerId: previous.container_id };
+  return {
+    ...fresh,
+    sources,
+    restarted: true,
+    previousContainerId: previous.container_id,
+    pathRewrites: rewritesBetween(previous.files, fresh.files),
+  };
+}
+
+/** 이전 셀 코드 안의 옛 데이터 파일 경로를 새 경로로 바꾼다. */
+export function applyPathRewrites(code: string, rewrites: ReadonlyArray<{ from: string; to: string }>): string {
+  let out = code;
+  for (const { from, to } of rewrites) {
+    if (from) out = out.split(from).join(to);
+  }
+  return out;
 }
 
 /**

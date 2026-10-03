@@ -92,8 +92,19 @@ export async function resolveSessionAnalysisAccess(
 }
 
 /**
+ * 교수 자료 객체 키의 모양: `instructor-<교수자 id>/<YYYY-MM-DD>_<uuid>.<확장자>`(`/api/upload`,
+ * `/api/upload/signed-url`, `lib/material-object-key.ts`). 두 조각이고 각 조각은 영숫자와 `._-` 만 쓴다.
+ * 둘째 조각은 점으로 시작하지 않는다(`.`, `..` 금지).
+ */
+const MATERIAL_OBJECT_KEY_RE = /^instructor-[A-Za-z0-9_-]{1,128}\/[A-Za-z0-9_-][A-Za-z0-9._-]{0,255}$/;
+
+/**
  * 교수 자료 URL 에서 `exam-materials` 버킷의 객체 경로를 꺼낸다. 우리 Supabase 프로젝트의 Storage 주소가
- * 아니거나 다른 버킷이면 null.
+ * 아니거나, 다른 버킷이거나, 객체 키가 교수 자료 키 모양이 아니면 null.
+ *
+ * 디코드한 **뒤에** 키 모양을 검사한다. 인코딩된 `%2F..%2F` 는 디코드 전 검사를 통과하고, Storage 클라이언트가
+ * 디코드된 키를 그대로 URL 에 이어 붙이면 `..` 가 풀려 다른 버킷(비공개 `analysis-outputs` 등)의 객체를 서비스
+ * 롤로 읽게 된다. `exams.materials` 는 교수가 쓰는 임의 문자열이므로 믿지 않는다.
  */
 export function materialObjectPath(url: string, supabaseUrl: string | undefined): string | null {
   let parsed: URL;
@@ -116,13 +127,13 @@ export function materialObjectPath(url: string, supabaseUrl: string | undefined)
   const rest = parsed.pathname.slice(at + marker.length).replace(/^(?:public|sign|authenticated)\//, "");
   const prefix = `${EXAM_MATERIALS_BUCKET}/`;
   if (!rest.startsWith(prefix)) return null;
-  const key = rest.slice(prefix.length);
-  if (!key || key.split("/").some((part) => part === ".." || part === "")) return null;
+  let key: string;
   try {
-    return decodeURIComponent(key);
+    key = decodeURIComponent(rest.slice(prefix.length));
   } catch {
     return null;
   }
+  return MATERIAL_OBJECT_KEY_RE.test(key) ? key : null;
 }
 
 /** 공개 데이터 파일을 교수 자료 버킷에서 내려받는다. 못 읽거나 상한을 넘으면 null. */
@@ -139,17 +150,34 @@ export async function downloadDataSource(
   return bytes;
 }
 
-/** 그림을 비공개 버킷에 올리는 저장소. 실패하면 false(던지지 않는다). */
+/** 그림 업로드 하나를 기다리는 최대 시간. */
+const FIGURE_UPLOAD_TIMEOUT_MS = 15_000;
+
+/**
+ * 그림을 비공개 버킷에 올리는 저장소. 실패하거나 시간이 다 되면 false(던지지 않는다).
+ * `remainingMs` 를 주면 남은 시간과 15초 중 짧은 쪽까지만 기다린다. 남은 시간이 없으면 올리지 않는다.
+ */
 export function createFigureStore(
   supabase: SupabaseClient,
-  onError?: (path: string, error: unknown) => void
+  onError?: (path: string, error: unknown) => void,
+  remainingMs?: () => number
 ): FigureStore {
   return {
     async upload(path: string, bytes: Uint8Array, mime: AnalysisFigureMime): Promise<boolean> {
+      const budget = Math.min(FIGURE_UPLOAD_TIMEOUT_MS, remainingMs ? remainingMs() : FIGURE_UPLOAD_TIMEOUT_MS);
+      if (budget <= 0) {
+        onError?.(path, new Error("figure upload skipped: finalize deadline passed"));
+        return false;
+      }
+      let timer: ReturnType<typeof setTimeout> | null = null;
       try {
-        const { error } = await supabase.storage
+        const timeout = new Promise<{ error: Error }>((resolve) => {
+          timer = setTimeout(() => resolve({ error: new Error(`figure upload timed out after ${budget}ms`) }), budget);
+        });
+        const upload = supabase.storage
           .from(ANALYSIS_OUTPUTS_BUCKET)
           .upload(path, Buffer.from(bytes), { contentType: mime, upsert: true, cacheControl: "3600" });
+        const { error } = await Promise.race([upload, timeout]);
         if (error) {
           onError?.(path, error);
           return false;
@@ -158,6 +186,8 @@ export function createFigureStore(
       } catch (error) {
         onError?.(path, error);
         return false;
+      } finally {
+        if (timer) clearTimeout(timer);
       }
     },
   };

@@ -266,15 +266,19 @@ export function useExamChat({
         finished = true;
       } finally {
         clearTimeout(timeoutId);
-        setAnalysisProgress(null);
       }
 
+      // 이 요청이 새 요청에 밀려 취소됐으면 화면 상태(진행 표시, 입력 잠금)는 새 요청의 것이다. 건드리지 않는다.
+      if (abortControllerRef.current !== controller) return;
+
       if (!fallBackToChat) {
+        setAnalysisProgress(null);
         scrollToBottom();
         setIsLoading(false);
         setIsTyping(false);
         return;
       }
+      setAnalysisProgress(null);
     }
 
     // ── 기존 경로 (/api/chat) ─────────────────────────────────────────────

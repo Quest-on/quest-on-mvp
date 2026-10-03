@@ -39,6 +39,7 @@ import {
 } from "@/lib/analysis-exec/eligibility";
 import {
   AnalysisSetupError,
+  applyPathRewrites,
   buildReplayInstruction,
   collectReplayCells,
   ensureAnalysisContainer,
@@ -47,6 +48,7 @@ import {
 } from "@/lib/analysis-exec/container";
 import { buildStoredTurn, storeCellFigures, storeCitedFigures } from "@/lib/analysis-exec/persist";
 import { resolveExamAiProfile } from "@/lib/exam-ai-profile";
+import { createFigureStore, materialObjectPath } from "@/lib/analysis-exec/session-records";
 
 const PNG_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
@@ -483,6 +485,8 @@ describe("컨테이너 준비와 만료 복구", () => {
       ],
       restarted: false,
       previousContainerId: null,
+      sources: [SOURCES[0].url],
+      pathRewrites: [],
     });
   });
 
@@ -606,5 +610,87 @@ describe("만료 복구 입력 구성", () => {
     expect(text).toContain("# 이전 셀 2\nscaled = scale(df)");
     expect(text).toContain("마지막 셀 1개");
     expect(buildReplayInstruction({ codes: [], omitted: 0 })).toBeNull();
+  });
+});
+
+describe("검토 반영: 자료 경로, 일부만 받은 파일, 경로 바뀜, 마감", () => {
+  const SUPA = "https://proj.supabase.co";
+  const base = `${SUPA}/storage/v1/object/public/exam-materials/`;
+
+  it("교수 자료 키 모양만 받는다. 인코딩한 .. 로 다른 버킷을 가리키면 거절한다", () => {
+    expect(materialObjectPath(`${base}instructor-abc/2026-10-03_1f2e.xlsx`, SUPA)).toBe("instructor-abc/2026-10-03_1f2e.xlsx");
+    for (const bad of [
+      `${base}x%2F..%2F..%2Fanalysis-outputs%2Fs%2Fm%2F1.png%3F.csv`,
+      `${base}instructor-abc/..%2F..%2Fanalysis-outputs/s.png`,
+      `${base}instructor-abc/sub/dir.xlsx`,
+      `${base}instructor-abc/.hidden.xlsx`,
+      `${base}other/2026.xlsx`,
+      `${SUPA}/storage/v1/object/public/analysis-outputs/instructor-abc/a.xlsx`,
+      `https://evil.example/storage/v1/object/public/exam-materials/instructor-abc/a.xlsx`,
+      `${base}instructor-abc/a%ZZ.xlsx`,
+    ]) {
+      expect(materialObjectPath(bad, SUPA), bad).toBeNull();
+    }
+  });
+
+  const twoSources = [
+    { url: "https://s/exam-materials/a.xlsx", fileName: "a.xlsx", extension: "xlsx" as const },
+    { url: "https://s/exam-materials/big.csv", fileName: "big.csv", extension: "csv" as const },
+  ];
+
+  it("한 파일을 못 받아도 본 공개 자료 목록을 남겨, 다음 턴에 같은 자료면 컨테이너를 그대로 쓴다", async () => {
+    const ops = fakeOps({
+      downloadDataSource: vi.fn(async (s) => (s.url.endsWith("big.csv") ? null : new Uint8Array([1]))),
+    });
+    const first = await ensureAnalysisContainer(ops, { sessionId: SID, previous: null, dataSources: twoSources });
+    expect(first.files).toHaveLength(1);
+    expect(first.sources).toEqual(twoSources.map((s) => s.url));
+
+    const recorded = buildStoredTurn({
+      containerId: first.containerId,
+      files: first.files,
+      sources: first.sources,
+      cells: [],
+      citedFigures: [],
+      outcome: "completed",
+      notices: [],
+      replayedCells: 0,
+      elapsedMs: 1,
+    });
+    const roundTrip = readStoredAnalysisTurn({ analysis: recorded });
+    const ops2 = fakeOps();
+    const second = await ensureAnalysisContainer(ops2, { sessionId: SID, previous: roundTrip, dataSources: twoSources });
+    expect(second).toMatchObject({ containerId: first.containerId, restarted: false });
+    expect(ops2.calls).toEqual([`get:${first.containerId}`]);
+  });
+
+  it("파일을 다시 올려 경로가 바뀌면 옛 경로와 새 경로를 짝지어 돌려주고, 이전 코드의 경로를 바꿔 넣는다", async () => {
+    const previous = storedTurn({
+      container_id: "cntr_old",
+      files: [{ name: "x.xlsx", path: "/mnt/data/file-gone-x.xlsx", file_id: "file-gone", source: SOURCES[0].url }],
+    });
+    const create = vi
+      .fn()
+      .mockRejectedValueOnce(new OpenAIHttpError({ message: "file not found", status: 404 }))
+      .mockResolvedValueOnce({ id: "cntr_new", status: "running" });
+    const ops = fakeOps({ createContainer: create, retrieveContainer: vi.fn(async () => ({ id: "x", status: "expired" })) });
+    const ensured = await ensureAnalysisContainer(ops, { sessionId: SID, previous, dataSources: SOURCES });
+    expect(ensured.pathRewrites).toEqual([{ from: "/mnt/data/file-gone-x.xlsx", to: "/mnt/data/file-up1-dataset.xlsx" }]);
+    expect(applyPathRewrites("pd.read_excel('/mnt/data/file-gone-x.xlsx')", ensured.pathRewrites)).toBe(
+      "pd.read_excel('/mnt/data/file-up1-dataset.xlsx')"
+    );
+  });
+
+  it("그림 저장은 마감이 지나면 올리지 않고, 남은 시간이 있으면 올린다", async () => {
+    const upload = vi.fn(async () => ({ data: {}, error: null }));
+    const supabase = { storage: { from: () => ({ upload }) } } as never;
+    const errors: string[] = [];
+    const late = createFigureStore(supabase, (p) => errors.push(p), () => 0);
+    expect(await late.upload("s/m/1.png", new Uint8Array([1]), "image/png")).toBe(false);
+    expect(upload).not.toHaveBeenCalled();
+    expect(errors).toEqual(["s/m/1.png"]);
+    const inTime = createFigureStore(supabase, undefined, () => 60_000);
+    expect(await inTime.upload("s/m/1.png", new Uint8Array([1]), "image/png")).toBe(true);
+    expect(upload).toHaveBeenCalledTimes(1);
   });
 });

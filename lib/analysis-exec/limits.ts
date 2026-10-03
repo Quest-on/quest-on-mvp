@@ -24,8 +24,20 @@ export const ANALYSIS_TURN_BUDGET_MS = 240_000;
  */
 export const ANALYSIS_ROUTE_MAX_DURATION_SEC = 300;
 
-/** 브라우저가 분석 턴 하나를 기다리는 시간. 서버의 함수 시간과 같다. */
-export const ANALYSIS_CLIENT_TIMEOUT_MS = ANALYSIS_ROUTE_MAX_DURATION_SEC * 1000;
+/**
+ * 스트림 뒤 작업(그림 저장, 파일 인용 그림 내려받기)의 마감(요청 시작부터). 이 뒤에는 그림을 버리고 메시지 저장과
+ * ai_events 기록으로 넘어간다. 함수 시간(300초)까지 15초를 남긴다.
+ */
+export const ANALYSIS_FINALIZE_DEADLINE_MS = 285_000;
+
+/** 파일 인용 그림을 내려받으려면 마감까지 이만큼은 남아 있어야 한다. */
+export const CITED_FIGURES_MIN_REMAINING_MS = 20_000;
+
+/**
+ * 브라우저가 분석 턴 하나를 기다리는 시간. 서버 함수 시간보다 10초 길다. 서버가 저장을 마치기 전에 화면이 먼저
+ * 끊기면 학생이 같은 요청을 다시 보내 턴이 두 번 생긴다.
+ */
+export const ANALYSIS_CLIENT_TIMEOUT_MS = (ANALYSIS_ROUTE_MAX_DURATION_SEC + 10) * 1000;
 
 /** 출력 속도의 보수적 추정(초당 토큰). #543 실측에서 가장 느린 모델의 값이다. */
 export const CONSERVATIVE_OUTPUT_TOKENS_PER_SEC = 55;

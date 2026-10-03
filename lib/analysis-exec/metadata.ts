@@ -77,6 +77,8 @@ export type StoredAnalysisTurn = {
   /** 서버 전용. 이 턴이 쓴 컨테이너. */
   container_id: string;
   files: StoredAnalysisFile[];
+  /** 컨테이너를 준비할 때 본 공개 데이터 URL 전부(못 받아 건너뛴 것 포함). 서버 전용. */
+  sources?: string[];
   cells: StoredAnalysisCell[];
   /** 최종 답변의 파일 인용(container_file_citation)으로 받은 그림. 셀 출력과 같은 그림은 빠진다. */
   cited_figures: StoredAnalysisFigure[];
@@ -200,6 +202,9 @@ export function readStoredAnalysisTurn(metadata: unknown): StoredAnalysisTurn | 
     files: Array.isArray(raw.files)
       ? raw.files.map(readFile).filter((f): f is StoredAnalysisFile => f !== null)
       : [],
+    ...(Array.isArray(raw.sources)
+      ? { sources: raw.sources.filter((u): u is string => typeof u === "string") }
+      : {}),
     cells: Array.isArray(raw.cells)
       ? raw.cells.map(readCell).filter((c): c is StoredAnalysisCell => c !== null)
       : [],

@@ -104,6 +104,11 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
     if (materialsError) {
       void logError("[chat-analysis] student materials lookup failed", materialsError, { path: ANALYSIS_ROUTE });
+      // 컬럼이 아직 없는 DB(#544 의 DDL 전)는 공개 자료가 없는 것과 같다 — 도구 없는 경로로 보낸다.
+      // 그 밖의 조회 오류는 일시적일 수 있다. 409 를 주면 화면이 그 문항을 도구 없는 경로로 고정하므로 503 을 준다.
+      if ((materialsError as { code?: string }).code !== "42703") {
+        return errorJson("ANALYSIS_LOOKUP_FAILED", "Could not load exam materials. Please try again.", 503);
+      }
     }
     const visible = listStudentVisibleMaterials((materialsRow ?? {}) as Record<string, unknown>);
     if (visible.error) {

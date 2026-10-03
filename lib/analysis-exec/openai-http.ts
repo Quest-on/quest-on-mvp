@@ -181,12 +181,16 @@ export async function uploadFile(
 /** 컨테이너 파일(그림) 내용을 내려받는다. 상한을 넘으면 null. */
 export async function downloadContainerFile(
   config: OpenAIHttpConfig,
-  params: { containerId: string; fileId: string; maxBytes: number; signal?: AbortSignal }
+  params: { containerId: string; fileId: string; maxBytes: number; signal?: AbortSignal; timeoutMs?: number }
 ): Promise<Uint8Array | null> {
   const response = await send(
     config,
     `/containers/${encodeURIComponent(params.containerId)}/files/${encodeURIComponent(params.fileId)}/content`,
-    { method: "GET", signal: params.signal, timeoutMs: OPENAI_SETUP_CALL_TIMEOUT_MS }
+    {
+      method: "GET",
+      signal: params.signal,
+      timeoutMs: Math.max(1_000, Math.min(params.timeoutMs ?? OPENAI_SETUP_CALL_TIMEOUT_MS, OPENAI_SETUP_CALL_TIMEOUT_MS)),
+    }
   );
   const declared = Number(response.headers.get("content-length") ?? "NaN");
   if (Number.isFinite(declared) && declared > params.maxBytes) return null;

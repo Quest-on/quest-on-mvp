@@ -25,6 +25,7 @@ const h = vi.hoisted(() => ({
   inserts: { messages: [] as Row[], ai_events: [] as Row[] },
   uploads: [] as Array<{ bucket: string; path: string; contentType?: string }>,
   materialsSelects: 0,
+  materialsError: null as { code: string; message: string } | null,
   db: {
     session: null as Row | null,
     exam: null as Row | null,
@@ -48,7 +49,8 @@ vi.mock("@/lib/message-classification", () => ({ classifyMessageType: vi.fn(asyn
 // 공개 자료 판정만 바꾸고 나머지 내보내기(상수 등)는 실제 모듈 것을 쓴다.
 vi.mock("@/lib/student-materials", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  getStudentVisibleMaterials: () => h.visible,
+  // 실제 헬퍼처럼 두 컬럼을 함께 읽었을 때만 공개 자료가 있다.
+  getStudentVisibleMaterials: (exam: { student_materials?: unknown }) => (Array.isArray(exam?.student_materials) ? h.visible : []),
 }));
 vi.mock("@/lib/openai", () => ({
   AI_MODEL: "gpt-test-requested",
@@ -92,6 +94,7 @@ function makeSupabase() {
         if (table === "exams") {
           if (state.select?.includes("student_materials")) {
             h.materialsSelects += 1;
+            if (h.materialsError) return { data: null, error: h.materialsError };
             return {
               data: {
                 materials: [],
@@ -128,7 +131,7 @@ import { POST } from "@/app/api/chat/analysis/route";
 const SID = "00000000-0000-4000-8000-0000000000aa";
 const EXAM_ID = "00000000-0000-4000-8000-000000000001";
 const STUDENT = "student-1";
-const DATA_URL = "https://proj.supabase.co/storage/v1/object/public/exam-materials/instructor-x/2026/a.xlsx";
+const DATA_URL = "https://proj.supabase.co/storage/v1/object/public/exam-materials/instructor-x/2026-10-03_0f8e.xlsx";
 const PNG_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
@@ -241,6 +244,7 @@ beforeEach(() => {
   h.inserts.ai_events.length = 0;
   h.uploads.length = 0;
   h.materialsSelects = 0;
+  h.materialsError = null;
   h.openai.calls.length = 0;
   h.openai.responses.length = 0;
   h.openai.containerStatus = "running";
@@ -279,6 +283,18 @@ describe("켜지는 조건이 아니면 아무것도 저장하지 않고 409", (
     h.db.exam!.questions = [{ id: "q-1" }];
     expect((await POST(request())).status).toBe(409);
     expect(h.materialsSelects).toBe(0);
+  });
+
+  it("공개 자료 컬럼이 아직 없는 DB(42703)는 공개 자료 없음(409)이고, 그 밖의 조회 오류는 503 이다", async () => {
+    h.materialsError = { code: "42703", message: "column exams.student_materials does not exist" };
+    const missing = await POST(request());
+    expect(missing.status).toBe(409);
+    expect(await missing.json()).toMatchObject({ details: { reason: "no_data_files" } });
+
+    h.materialsError = { code: "08006", message: "connection failure" };
+    const transient = await POST(request());
+    expect(transient.status).toBe(503);
+    expect(h.inserts.messages).toEqual([]);
   });
 
   it("temp 세션은 temp_session 이다", async () => {
@@ -578,5 +594,37 @@ describe("ai_events 는 정확히 한 번", () => {
     expect(sent.at(-1)).toBe("error");
     expect(h.inserts.ai_events).toHaveLength(1);
     expect(h.inserts.ai_events[0]).toMatchObject({ status: "success" });
+  });
+});
+
+describe("준비 중 연결 끊김", () => {
+  it("컨테이너 준비 중에 학생이 끊어도 ai_events 를 한 번 남기고 아무것도 저장하지 않는다", async () => {
+    const { runAnalysisTurn } = await import("@/lib/analysis-exec/turn-runner");
+    const client = new AbortController();
+    // 파일 업로드 도중 끊긴다.
+    fetchMock.mockImplementationOnce(async () => {
+      client.abort();
+      throw new DOMException("aborted", "AbortError");
+    });
+    await runAnalysisTurn(
+      {
+        supabase: makeSupabase() as never,
+        http: { apiKey: "test-key-not-real", baseUrl: "https://api.openai.test/v1" },
+        model: "gpt-test-requested",
+        userId: STUDENT,
+        sessionId: SID,
+        examId: EXAM_ID,
+        qIdx: 0,
+        message: "데이터를 점검해 주세요",
+        examCode: "TST001",
+        dataSources: [{ url: DATA_URL, fileName: "a.xlsx", extension: "xlsx" }],
+        startedAtMs: Date.now(),
+        clientSignal: client.signal,
+      },
+      () => undefined
+    );
+    expect(h.inserts.messages).toEqual([]);
+    expect(h.inserts.ai_events).toHaveLength(1);
+    expect(h.inserts.ai_events[0]).toMatchObject({ status: "client_cancelled", feature: "student_chat_analysis" });
   });
 });
