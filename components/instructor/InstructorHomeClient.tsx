@@ -373,7 +373,11 @@ export default function InstructorHome() {
 
   const isFiltering = searchQuery.trim().length > 0;
   const isExamFilterActive = examFilter !== "all";
-  const hasResults = folderNodes.length > 0 || filteredExamNodes.length > 0;
+  // 첫 사용 빈 화면("아직 만든 시험이 없습니다")은 칩 필터를 걸기 전 목록으로 고른다(#567).
+  // 칩 필터 결과로 고르면 폴더 없는 교수가 "진행 중"을 눌러 0건일 때 시험이 사라진 것처럼
+  // 보이고, 칩 줄까지 함께 사라져 "전체"로 돌아갈 수 없었다. 0건이면 섹션 안의
+  // "선택한 조건에 맞는 시험/과제가 없습니다"가 대신 뜬다. 검색은 examNodes 에 이미 반영돼 있다.
+  const hasResults = folderNodes.length > 0 || examNodes.length > 0;
 
   // Intersection Observer sentinel for infinite scroll
   const sentinelRef = useRef<HTMLDivElement>(null);

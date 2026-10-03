@@ -32,6 +32,7 @@ const ALL_CASES: DriveCardExam[] = [
   { type: "report", status: "draft", deadline: iso(NOW + HOUR) },
   { type: "report", status: "draft", deadline: iso(NOW - HOUR) },
   { type: "report", status: "draft", deadline: iso(NOW + 2 * HOUR), open_at: iso(NOW + HOUR) },
+  { type: "report", status: "draft", deadline: null },
 ];
 
 describe("교수 홈 시험 카드의 상태 판정 (#567)", () => {
@@ -114,6 +115,13 @@ describe("과제 카드는 지금처럼 기간으로 판정한다", () => {
     });
   });
 
+  it("마감일 없는 과제(카드 '복사'로 만든 복사본)는 '활성'이고 진행 중 필터에 잡힌다", () => {
+    // 복사(lib/exam-copy.ts)는 deadline·close_at 을 비운 채 만든다. 입장을 막는 기간이 없어 학생이
+    // 들어올 수 있으므로 배지 '활성'과 같은 쪽(진행 중)에 둔다. 예전에는 배지만 '활성'이고 어느 필터에도 없었다.
+    expect(assignment({ deadline: null })).toEqual({ label: "drive.statusActive", filter: "in-progress" });
+    expect(assignment({ deadline: "not-a-date" }).filter).toBe("in-progress");
+  });
+
   it("과제는 status 를 보지 않는다", () => {
     // 과제에는 시작·종료 버튼이 없어서 status 가 기간을 말해 주지 않는다.
     for (const status of ["running", "closed", "archived", "active", "completed"]) {
@@ -173,7 +181,19 @@ describe("교수 홈이 판정 함수를 실제로 쓴다", () => {
   const home = read("components/instructor/InstructorHomeClient.tsx");
 
   it("카드 배지와 필터가 판정 함수를 부른다", () => {
-    expect((home.match(/resolveDriveCardStatus\(/g) ?? []).length).toBeGreaterThan(0);
+    // 한쪽만 함수를 쓰면 다시 갈라진다. 두 자리를 따로 본다.
+    expect(home, "필터").toMatch(/resolveDriveCardStatus\(node\.exams, now\)\.filter === examFilter/);
+    expect(home, "배지").toMatch(/const \{ badge \} = resolveDriveCardStatus\(node\.exams\)/);
+  });
+
+  it("칩 필터 결과가 비어도 첫 사용 빈 화면으로 넘어가지 않는다", () => {
+    // 첫 사용 빈 화면은 칩 필터 전 목록(examNodes)으로 고른다. 칩 필터 결과(filteredExamNodes)로
+    // 고르면 폴더 없는 교수가 '진행 중'을 눌러 0건일 때 "아직 만든 시험이 없습니다"가 뜨고 칩 줄도 사라졌다.
+    const decl = home.match(/const hasResults =([^;]+);/)?.[1] ?? "";
+    expect(decl).toMatch(/examNodes\.length > 0/);
+    expect(decl).not.toMatch(/filteredExamNodes/);
+    // 0건이면 섹션 안에 칩 필터용 문구가 뜬다.
+    expect(home).toMatch(/isFiltering \|\| isExamFilterActive\s*\?\s*t\("drive\.noExamsFiltered"\)/);
   });
 
   it("화면이 exams.status 를 직접 해석하지 않는다", () => {
