@@ -27,8 +27,10 @@ import {
   RefreshCw,
   Loader2,
   ArrowLeft,
+  Clock,
 } from "lucide-react";
 import { StageGrading, QuestionSummaryData, GradingProgress } from "@/lib/types/grading";
+import { resolveGradingStatusBanner } from "@/lib/grading-status-banner";
 
 interface Conversation {
   id: string;
@@ -104,7 +106,8 @@ interface SessionData {
     id: string;
     exam_id: string;
     student_id: string;
-    submitted_at: string;
+    /** 아직 최종 제출하지 않은(작성 중이거나 퀴즈 중인) 세션은 null 이다. */
+    submitted_at: string | null;
     used_clarifications: number;
     created_at: string;
     ai_summary?: SummaryData;
@@ -364,9 +367,16 @@ export default function AssignmentGradePage({
                   {t("assignmentGradePage.studentGradeTitle", { studentName: sessionData.student.name })}
                 </h1>
                 <div className="text-muted-foreground space-y-1 mt-2">
+                  {/* new Date(null) 은 1970 년이 된다. 제출 전이면 날짜를 만들지 않는다. */}
                   <p>
-                    {t("assignmentGradePage.submittedAt")}{" "}
-                    {new Date(sessionData.session.submitted_at).toLocaleString()}
+                    {sessionData.session.submitted_at ? (
+                      <>
+                        {t("assignmentGradePage.submittedAt")}{" "}
+                        {new Date(sessionData.session.submitted_at).toLocaleString()}
+                      </>
+                    ) : (
+                      t("assignmentGradePage.notSubmitted")
+                    )}
                   </p>
                   {sessionData.student.student_number && (
                     <p>{t("assignmentGradePage.studentNumber", { number: sessionData.student.student_number })}</p>
@@ -398,25 +408,36 @@ export default function AssignmentGradePage({
             </div>
           )}
 
-          {/* AI 채점 상태 배너: 진행 중 / 실패 / 부재 3가지 경우 처리 */}
+          {/* AI 채점 상태 배너: 진행 중 / 실패 / 부재 / 제출 전 */}
           {(() => {
             const gp = sessionData.gradingProgress;
-            const grades = Object.values(sessionData.grades) as Grade[];
-            const hasAiFailed = grades.some((g) => g.grade_type === "ai_failed");
-            const noGradesAtAll =
-              sessionData.overallScore === null && grades.length === 0;
-            const isQueued = gp?.status === "queued";
-            const isRunning = gp?.status === "running";
-            const isFailed = gp?.status === "failed" || hasAiFailed;
-            const inProgress = isQueued || isRunning;
+            const banner = resolveGradingStatusBanner({
+              submittedAt: sessionData.session.submitted_at,
+              gradingProgress: gp,
+              grades: Object.values(sessionData.grades) as Grade[],
+              overallScore: sessionData.overallScore,
+            });
 
-            if (!inProgress && !isFailed && !noGradesAtAll) return null;
+            if (banner === "none") return null;
 
+            // 아직 최종 제출 전 — 결과가 없는 게 정상이다. 실패로 알리지 않고 재채점 단추도 두지 않는다.
+            if (banner === "awaiting_submission") {
+              return (
+                <div className="mb-6 p-4 bg-info-surface border border-info-border rounded-lg flex items-center gap-3">
+                  <Clock className="h-5 w-5 text-info-text shrink-0" />
+                  <p className="font-medium text-info-text">
+                    {t("assignmentGradePage.gradingAwaitingSubmission")}
+                  </p>
+                </div>
+              );
+            }
+
+            const isFailed = banner === "failed";
             const done = gp ? gp.completed + gp.failed : 0;
             const total = gp?.total ?? 0;
             const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
 
-            if (inProgress) {
+            if (banner === "in_progress") {
               return (
                 <div className="mb-6 p-4 bg-info-surface border border-info-border rounded-lg space-y-3">
                   <div className="flex items-center gap-3">

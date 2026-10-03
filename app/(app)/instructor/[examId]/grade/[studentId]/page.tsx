@@ -30,6 +30,7 @@ import {
   type SummaryData,
 } from "@/components/instructor/AIOverallSummary";
 import { isObjectiveQuestion, resolveByQIdx } from "@/lib/grading-helpers";
+import { resolveGradingStatusBanner } from "@/lib/grading-status-banner";
 import {
   buildTypedQuestionEntries,
   getSubmissionForQuestion,
@@ -50,6 +51,7 @@ import {
   AlertTriangle,
   RefreshCw,
   Loader2,
+  Clock,
 } from "lucide-react";
 import { RichTextViewer } from "@/components/ui/rich-text-viewer";
 import {
@@ -114,7 +116,8 @@ interface SessionData {
     id: string;
     exam_id: string;
     student_id: string;
-    submitted_at: string;
+    /** 아직 제출하지 않은(응시 중) 세션은 null 이다. */
+    submitted_at: string | null;
     used_clarifications: number;
     created_at: string;
     ai_summary?: SummaryData | null;
@@ -614,27 +617,38 @@ export default function GradeStudentPage({
             </div>
           )}
 
-          {/* AI 채점 상태 배너: 진행 중 / 실패 / 부재 3가지 경우 모두 처리 */}
+          {/* AI 채점 상태 배너: 진행 중 / 실패 / 부재 / 제출 전 */}
           {(() => {
             const gp = sessionData.gradingProgress;
-            const grades = Object.values(sessionData.grades) as Grade[];
-            const hasAiFailed = grades.some((g) => g.grade_type === "ai_failed");
-            const noGradesAtAll =
-              sessionData.overallScore === null && grades.length === 0;
-            const isQueued = gp?.status === "queued";
-            const isRunning = gp?.status === "running";
-            const isFailed = gp?.status === "failed" || hasAiFailed;
-            const inProgress = isQueued || isRunning;
+            const banner = resolveGradingStatusBanner({
+              submittedAt: sessionData.session.submitted_at,
+              gradingProgress: gp,
+              grades: Object.values(sessionData.grades) as Grade[],
+              overallScore: sessionData.overallScore,
+            });
 
             // Nothing to surface when grading completed cleanly
-            if (!inProgress && !isFailed && !noGradesAtAll) return null;
+            if (banner === "none") return null;
 
+            // 아직 제출 전 — 결과가 없는 게 정상이다. 실패로 알리지 않고 재채점 단추도 두지 않는다.
+            if (banner === "awaiting_submission") {
+              return (
+                <div className="mb-6 p-4 bg-info-surface border border-info-border rounded-lg flex items-center gap-3">
+                  <Clock className="h-5 w-5 text-info-text shrink-0" />
+                  <p className="font-medium text-info-text">
+                    {t("gradePage.gradingAwaitingSubmission")}
+                  </p>
+                </div>
+              );
+            }
+
+            const isFailed = banner === "failed";
             const done = gp ? gp.completed + gp.failed : 0;
             const total = gp?.total ?? 0;
             const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
 
             // In-progress state — show progress bar, no retry button
-            if (inProgress) {
+            if (banner === "in_progress") {
               return (
                 <div className="mb-6 p-4 bg-info-surface border border-info-border rounded-lg space-y-3">
                   <div className="flex items-center gap-3">

@@ -29,7 +29,8 @@ export interface ReportCardProps {
   studentName: string;
   studentNumber?: string;
   school?: string;
-  submittedAt: string;
+  /** 아직 제출하지 않은 세션은 null 이다. */
+  submittedAt: string | null;
   overallScore: number | null;
   questions: Question[];
   grades: Record<number, Grade>;
@@ -78,13 +79,16 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
       return t("gradeF");
     }
 
-    const formattedDate = formatDateTime(submittedAt, locale, {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    // 제출 전이면 날짜를 만들지 않는다(new Date(null) 은 1970 년). 줄은 학번·학교처럼 뺀다.
+    const formattedDate = submittedAt
+      ? formatDateTime(submittedAt, locale, {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : null;
 
     return (
       <div
@@ -242,27 +246,29 @@ export const ReportCardTemplate = forwardRef<HTMLDivElement, ReportCardProps>(
                 </span>
               </div>
             )}
-            <div style={{ display: "flex" }}>
-              <span
-                style={{
-                  width: "64px",
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  color: "#64748b",
-                }}
-              >
-                {t("studentInfo.submittedAt")}
-              </span>
-              <span
-                style={{
-                  flex: 1,
-                  fontSize: "10px",
-                  color: "#334155",
-                }}
-              >
-                {formattedDate}
-              </span>
-            </div>
+            {formattedDate && (
+              <div style={{ display: "flex" }}>
+                <span
+                  style={{
+                    width: "64px",
+                    fontSize: "10px",
+                    fontWeight: "bold",
+                    color: "#64748b",
+                  }}
+                >
+                  {t("studentInfo.submittedAt")}
+                </span>
+                <span
+                  style={{
+                    flex: 1,
+                    fontSize: "10px",
+                    color: "#334155",
+                  }}
+                >
+                  {formattedDate}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Exam Info */}
