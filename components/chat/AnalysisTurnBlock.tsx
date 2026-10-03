@@ -8,14 +8,17 @@
  *     학생에게 하는 말(다시 보내 주세요 등), 교수 채점 화면은 그 턴에 무슨 일이 있었는지를 설명하는 말을 쓴다.
  *   - 셀: 코드는 기본 접힘("코드 보기"), 실행 결과는 짧으면 그대로, 길면 접힘. 그림은 권한 확인 라우트로 열고
  *     누르면 크게 본다.
+ *   - 복원 셀(만료 복구로 이전 단계를 다시 실행한 셀): 코드와 결과 줄 대신 "이전 단계 다시 실행"과 다시 실행한 셀 수만
+ *     한 줄로 보인다(#564).
  * 소유자 결정: 코드는 접어서 보여 주되 전부 기록한다. 기록(저장)은 서버가 하고 이 블록은 보여 주기만 한다.
+ *
+ * 문법 강조(react-syntax-highlighter)는 정적으로 import 하지 않는다(#564). 이 블록은 응시 화면의 채팅 사이드바가
+ * 정적으로 불러오므로, 여기서 하이라이터를 import 하면 분석 문항이 없는 시험까지 첫 로딩에 하이라이터가 들어간다.
+ * 코드 보기를 펼칠 때 `AnalysisCodeHighlighter` 를 동적으로 받는다.
  */
 
-import { useId, useState } from "react";
+import { Component, lazy, Suspense, useId, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import type { SyntaxHighlighterProps } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { AlertTriangle, ChevronDown, Code2, ImageOff, Maximize2, RotateCcw } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -142,7 +145,12 @@ function Figure({ figure, index }: { figure: ClientAnalysisFigure; index: number
           </span>
         </button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] max-w-[min(95vw,64rem)] overflow-auto" aria-describedby={descriptionId}>
+      {/*
+        기본 DialogContent 는 sm 이상에서 sm:max-w-lg(32rem)로 좁힌다. 같은 sm: 변형으로 덮어야 크게 보기가 실제로 커진다
+        (변형 없는 max-w 는 sm 이상에서 지고, 본문 그림보다 작게 보였다, #564). 640px 아래는 기본(화면 너비 - 2rem)이다.
+        다른 대화상자는 건드리지 않는다.
+      */}
+      <DialogContent className="max-h-[90vh] overflow-auto sm:max-w-[min(95vw,64rem)]" aria-describedby={descriptionId}>
         <DialogTitle className="type-section-title">{alt}</DialogTitle>
         <DialogDescription id={descriptionId} className="sr-only">
           {t("analysis.figureDialogDescription")}
@@ -151,6 +159,75 @@ function Figure({ figure, index }: { figure: ClientAnalysisFigure; index: number
         <img src={figure.url} alt={alt} className="h-auto w-full bg-background object-contain" />
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * 문법 강조 모듈은 코드 보기를 처음 펼칠 때 받는다(#564). 코드 보기는 접힌 채로 그려지므로 서버 렌더와 첫 화면에는
+ * 없고, 그래서 hydration 과도 관계가 없다. 한 번 받으면 다른 셀을 펼칠 때 다시 받지 않는다.
+ */
+const AnalysisCodeHighlighter = lazy(() => import("@/components/chat/AnalysisCodeHighlighter"));
+
+/** 꾸밈 없는 코드. 하이라이터와 같은 바탕색과 글자 크기(vscDarkPlus)로 보여, 받은 뒤에 화면이 크게 바뀌지 않게 한다. */
+function PlainCode({ code }: { code: string }) {
+  return (
+    <pre className="m-0 max-h-96 overflow-auto bg-[#1e1e1e] p-4 font-mono text-xs text-[#d4d4d4]" data-testid="analysis-code-plain">
+      <code>{code}</code>
+    </pre>
+  );
+}
+
+/**
+ * 문법 강조 모듈을 받지 못하면(배포 직후 사라진 옛 청크, 네트워크 오류) 꾸밈 없는 코드로 둔다. 오류가 응시 화면이나
+ * 채점 화면 전체 오류로 번지지 않게 이 자리에서 멈춘다.
+ */
+class HighlighterLoadBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+function CodeView({ code }: { code: string }) {
+  const plain = <PlainCode code={code} />;
+  return (
+    <HighlighterLoadBoundary fallback={plain}>
+      <Suspense fallback={plain}>
+        <AnalysisCodeHighlighter code={code} />
+      </Suspense>
+    </HighlighterLoadBoundary>
+  );
+}
+
+/**
+ * 복원 셀(#564). 만료 복구 때 서버가 올린 복원 파일을 여는 한 줄이라 코드와 결과 줄(내부 표식)은 읽을 것이 없다.
+ * "이전 단계 다시 실행"이라는 이름과 다시 실행한 셀 수만 한 줄로 보인다. 펼칠 내용이 없어 접고 펴는 단추를 두지 않는다.
+ * 다시 실행하는 동안의 출력과 그림은 복원 파일이 버리므로 이 셀에는 보일 그림도 없다.
+ */
+function ReplayCellView({ cell }: { cell: ClientAnalysisCell }) {
+  const t = useTranslations("exam");
+  const result = cell.replayResult ?? null;
+  const summary = !result
+    ? t("analysis.replayCellIncomplete")
+    : result.failed > 0
+      ? t("analysis.replayCellPartial", { total: result.ok + result.failed, failed: result.failed })
+      : t("analysis.replayCellDone", { count: result.ok });
+
+  return (
+    <li className="rounded-md border border-border/50 bg-background/60 p-2" data-testid="analysis-replay-cell">
+      <div className="flex min-h-[36px] items-start gap-2 px-1 text-sm">
+        <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <div className="space-y-0.5">
+          <p className="font-medium">{t("analysis.replayCellLabel")}</p>
+          <p className={cn("type-meta", (!result || result.failed > 0) && "text-warning-text")}>{summary}</p>
+        </div>
+      </div>
+    </li>
   );
 }
 
@@ -173,9 +250,7 @@ function CellView({ cell }: { cell: ClientAnalysisCell }) {
             className="flex min-h-[36px] w-full items-center gap-2 rounded px-1 text-left text-sm hover:bg-muted/60"
           >
             <Code2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="font-medium">
-              {cell.replay ? t("analysis.replayCellLabel") : t("analysis.cellLabel", { index: cell.index })}
-            </span>
+            <span className="font-medium">{t("analysis.cellLabel", { index: cell.index })}</span>
             <span className="type-meta">{t("analysis.codeLines", { lines: codeLines })}</span>
             <span className="ml-auto flex items-center gap-1 type-meta">
               {codeOpen ? t("analysis.hideCode") : t("analysis.showCode")}
@@ -188,15 +263,7 @@ function CellView({ cell }: { cell: ClientAnalysisCell }) {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="mt-1 overflow-hidden rounded-md border border-border/50">
-            <SyntaxHighlighter
-              style={vscDarkPlus as SyntaxHighlighterProps["style"]}
-              language="python"
-              PreTag="div"
-              className="!m-0 max-h-96 !rounded-none !bg-[#1e1e1e] text-xs"
-              showLineNumbers
-            >
-              {cell.code}
-            </SyntaxHighlighter>
+            <CodeView code={cell.code} />
           </div>
           {cell.codeTruncated && <p className="mt-1 type-meta">{t("analysis.codeTruncated")}</p>}
         </CollapsibleContent>
@@ -270,16 +337,21 @@ export function AnalysisTurnBlock({ analysis, errorNotice, viewer = "student" }:
         <section aria-label={t("analysis.recordTitle")} className="space-y-2">
           <h4 className="type-meta font-semibold">{t("analysis.recordTitle")}</h4>
           <ol className="space-y-2">
-            {analysis.cells.map((cell) => (
-              <CellView key={cell.index} cell={cell} />
-            ))}
+            {analysis.cells.map((cell) =>
+              cell.replay ? <ReplayCellView key={cell.index} cell={cell} /> : <CellView key={cell.index} cell={cell} />
+            )}
           </ol>
         </section>
       )}
       {analysis.figures.length > 0 && (
         <div className="grid gap-2">
           {analysis.figures.map((figure, i) => (
-            <Figure key={figure.url} figure={figure} index={analysis.cells.reduce((n, c) => n + c.figures.length, 0) + i + 1} />
+            <Figure
+              key={figure.url}
+              figure={figure}
+              // 셀 그림 다음 번호. 복원 셀은 그림을 보이지 않으므로 세지 않는다.
+              index={analysis.cells.reduce((n, c) => (c.replay ? n : n + c.figures.length), 0) + i + 1}
+            />
           ))}
         </div>
       )}

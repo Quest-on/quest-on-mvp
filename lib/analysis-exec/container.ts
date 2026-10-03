@@ -32,6 +32,7 @@ import {
   type StoredAnalysisTurn,
 } from "@/lib/analysis-exec/metadata";
 import type { ContainerFileInfo, ContainerInfo } from "@/lib/analysis-exec/openai-http";
+import { REPLAY_MARKER } from "@/lib/analysis-exec/replay-file";
 
 /**
  * 공개 데이터 파일 내려받기 결과. 실패는 두 가지다.
@@ -594,11 +595,8 @@ export function buildInterruptedCodeInstruction(interrupted: CarriedCells & { cu
 // 복원 파일
 // ---------------------------------------------------------------------------
 
-/** 복원 파일 이름. ASCII 이고 밑줄로 시작하지 않는다(컨테이너 경로가 앞 밑줄과 한글을 지운다, 스파이크 T8). */
-export const REPLAY_FILE_NAME = "quest_on_replay.py";
-
-/** 복원 파일이 마지막에 출력하는 결과 줄의 머리. 서버가 이 줄로 복원 성공 여부를 판단한다. */
-export const REPLAY_MARKER = "QUEST_ON_REPLAY";
+// 복원 파일 이름과 결과 줄 형식은 화면용 기록도 읽으므로 `replay-file.ts` 에 둔다. 기존 호출부를 위해 여기서도 내보낸다.
+export { REPLAY_FILE_NAME, REPLAY_MARKER, isReplayCellCode, parseReplayResult } from "@/lib/analysis-exec/replay-file";
 
 function toBase64(text: string): string {
   return Buffer.from(text, "utf8").toString("base64");
@@ -653,15 +651,4 @@ export function buildReplayScript(cells: ReadonlyArray<CarriedCell>): string {
     "del _qo_cells, _qo_failed",
     "",
   ].join("\n");
-}
-
-/** 복원 셀의 출력에서 결과 줄을 읽는다. 없으면 null(복원이 끝까지 돌지 않았다). */
-export function parseReplayResult(logs: string): { ok: number; failed: number } | null {
-  const match = new RegExp(`^${REPLAY_MARKER} ok=(\\d+) failed=(\\d+)\\s*$`, "m").exec(logs);
-  return match ? { ok: Number(match[1]), failed: Number(match[2]) } : null;
-}
-
-/** 이 셀이 복원 파일을 실행한 셀인가(코드에 복원 파일 이름이 있다). */
-export function isReplayCellCode(code: string): boolean {
-  return code.includes(REPLAY_FILE_NAME);
 }

@@ -12,6 +12,8 @@
  * 이 모듈은 순수하다.
  */
 
+import { parseReplayResult, type ReplayResult } from "@/lib/analysis-exec/replay-file";
+
 export const ANALYSIS_METADATA_VERSION = 1;
 
 /** 그림을 두는 비공개 Storage 버킷. 오케스트레이터가 스테이징과 운영에 만든다(private, png/jpeg, 10MB). */
@@ -306,6 +308,11 @@ export type ClientAnalysisCell = {
   figuresDropped: number;
   /** 서버가 올린 복원 파일을 실행해 이전 단계를 다시 실행한 셀. 화면은 "이전 단계 다시 실행"으로 보인다. */
   replay: boolean;
+  /**
+   * 복원 셀이 다시 실행한 원래 셀 수(성공, 실패). 복원 셀이 끝까지 돌아 결과 줄을 남겼을 때만 있고, 그 밖(복원 셀이
+   * 아님, 끝까지 돌지 못함)은 null 이다. 화면은 복원 셀의 코드(파일을 여는 한 줄)와 결과 줄 대신 이 값을 보인다(#564).
+   */
+  replayResult: ReplayResult | null;
 };
 
 export type ClientAnalysisTurn = {
@@ -349,6 +356,8 @@ export function toClientAnalysisTurn(params: {
       figures: cell.figures.filter(own).map((figure) => toClientFigure(sessionId, messageId, figure)),
       figuresDropped: cell.figures_dropped ?? 0,
       replay: cell.replay === true,
+      // 서버가 복원 결과를 기록할 때와 같은 판단이다(끝까지 돈 복원 셀의 결과 줄, `turn-runner.ts` 의 restoreOutcome).
+      replayResult: cell.replay === true && cell.status === "completed" ? parseReplayResult(cell.logs) : null,
     })),
     figures: turn.cited_figures.filter(own).map((figure) => toClientFigure(sessionId, messageId, figure)),
   };

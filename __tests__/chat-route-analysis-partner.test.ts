@@ -10,6 +10,7 @@
  *   3) 영어 시험은 사례형으로 폴백한다 (v1 은 한국어만).
  *   4) 문항별로 갈린다 (같은 시험의 다른 문항은 사례형).
  *   5) 정규 경로와 temp 경로 모두에서 같다. temp 경로에서 시험 정보를 못 얻으면 사례형이다.
+ *   6) 출력 상한에 걸려 잘린 분석 파트너 답에는 안내가 붙고, 빈 답은 영어 사과문 대신 한국어 안내다(#564). 사례형은 그대로다.
  *
  * 하네스는 `chat-route-prompt-stamp.test.ts`(#515)와 같은 모양이다. 그 파일은 #515 의 것이라
  * 건드리지 않고 필요한 만큼만 옮겼다.
@@ -18,6 +19,7 @@ import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { STUDENT_CHAT_SPECS } from "@/lib/student-chat-spec";
 import { ANALYSIS_PARTNER_CHAT_MAX_OUTPUT_TOKENS } from "@/lib/analysis-exec/limits";
+import koExam from "../messages/ko/exam.json";
 
 type Row = Record<string, unknown>;
 
@@ -421,5 +423,102 @@ describe("temp 경로에서 시험 정보를 못 얻으면 사례형이다", () 
 
     expect(instructionsSent()).toContain("역할(Role):");
     expect(studentChatEvents()[0].metadata).toMatchObject({ spec: "case@1" });
+  });
+});
+
+describe("출력 상한에 걸린 분석 파트너 답 (#564 4, 11번)", () => {
+  const KO = koExam.analysis.chatAnswer;
+  const ENGLISH_APOLOGY = "I'm sorry, I couldn't process your question. Please try rephrasing it.";
+
+  /** 출력 상한에 걸려 끝난 응답. 본문이 비면 추론에 상한을 다 쓴 경우다(메시지 항목 없이 reasoning 만 있다). */
+  function cutResponse(text: string, reason: string = "max_output_tokens"): Row {
+    return {
+      ...openaiResponse(),
+      status: "incomplete",
+      incomplete_details: { reason },
+      output: text
+        ? [{ type: "message", role: "assistant", content: [{ type: "output_text", text }] }]
+        : [{ type: "reasoning", id: "rs_1", summary: [] }],
+    };
+  }
+
+  async function ask(path: Path) {
+    const res = await POST(chatRequest(path));
+    expect(res.status).toBe(200);
+    return ((await res.json()) as { response: string }).response;
+  }
+
+  it.each(PATHS)("%s 경로: 상한에 걸려 잘린 답은 끝에 안내를 붙여 돌려주고 같은 글을 저장한다", async (path) => {
+    setup({ lang: "ko", state: "normal", questions: PARTNER_QUESTIONS });
+    h.responsesCreate.mockResolvedValue(cutResponse("평균은 3.2이고, 분산은"));
+
+    const response = await ask(path);
+    expect(response).toBe(`평균은 3.2이고, 분산은\n\n---\n\n${KO.truncated}`);
+    if (path !== "temp-no-db") expect(aiMessages()[0].content).toBe(response);
+  });
+
+  it("코드 블록이나 수식 블록 안에서 잘렸으면 블록을 닫고 안내를 붙인다(안내가 코드나 수식으로 보이지 않게)", async () => {
+    setup({ lang: "ko", state: "normal", questions: PARTNER_QUESTIONS });
+    h.responsesCreate.mockResolvedValue(cutResponse("이렇게 계산합니다.\n\n```python\ndf.groupby('지역')"));
+    expect(await ask("regular")).toBe(`이렇게 계산합니다.\n\n\`\`\`python\ndf.groupby('지역')\n\`\`\`\n\n---\n\n${KO.truncated}`);
+
+    setup({ lang: "ko", state: "normal", questions: PARTNER_QUESTIONS });
+    h.responsesCreate.mockResolvedValue(cutResponse("분산은\n\n$$\n\\sigma^2 = \\frac{1}{n}"));
+    expect(await ask("regular")).toBe(`분산은\n\n$$\n\\sigma^2 = \\frac{1}{n}\n$$\n\n---\n\n${KO.truncated}`);
+
+    // 코드 블록 안의 $$ 는 수식 블록으로 세지 않는다.
+    setup({ lang: "ko", state: "normal", questions: PARTNER_QUESTIONS });
+    h.responsesCreate.mockResolvedValue(cutResponse("```python\nprint('$$')\n```\n\n결론은"));
+    expect(await ask("regular")).toBe(`\`\`\`python\nprint('$$')\n\`\`\`\n\n결론은\n\n---\n\n${KO.truncated}`);
+  });
+
+  it.each(PATHS)("%s 경로: 본문이 비면 영어 사과문 대신 한국어 안내를 저장한다", async (path) => {
+    setup({ lang: "ko", state: "normal", questions: PARTNER_QUESTIONS });
+    h.responsesCreate.mockResolvedValue(cutResponse(""));
+
+    const response = await ask(path);
+    expect(response).toBe(KO.empty);
+    expect(response).not.toContain("I'm sorry");
+    if (path !== "temp-no-db") {
+      expect(aiMessages()[0].content).toBe(KO.empty);
+      // 쓴 토큰(추론)은 그대로 기록한다.
+      expect(aiMessages()[0].tokens_used).toBe(120);
+    }
+  });
+
+  it("상한이 아닌 이유로 끝났거나 정상으로 끝난 답은 그대로다", async () => {
+    setup({ lang: "ko", state: "normal", questions: PARTNER_QUESTIONS });
+    h.responsesCreate.mockResolvedValue(cutResponse("부분 답", "content_filter"));
+    expect(await ask("regular")).toBe("부분 답");
+
+    setup({ lang: "ko", state: "normal", questions: PARTNER_QUESTIONS });
+    expect(await ask("regular")).toBe("답변입니다.");
+    expect(aiMessages()[0].content).toBe("답변입니다.");
+  });
+
+  it("ai_events 에 끝까지 오지 않은 이유가 남는다(정상 완료는 남기지 않는다)", async () => {
+    setup({ lang: "ko", state: "normal", questions: PARTNER_QUESTIONS });
+    h.responsesCreate.mockResolvedValue(cutResponse("평균은"));
+    await ask("regular");
+    expect(studentChatEvents()[0].metadata).toMatchObject({
+      response_status: "incomplete",
+      incomplete_reason: "max_output_tokens",
+    });
+
+    setup({ lang: "ko", state: "normal", questions: PARTNER_QUESTIONS });
+    await ask("regular");
+    expect(studentChatEvents()[0].metadata).not.toHaveProperty("response_status");
+  });
+
+  it("사례형은 그대로다: 잘린 응답이어도 안내를 붙이지 않고, 빈 본문은 기존 문구다", async () => {
+    const caseQuestions = [{ ai_context: "채점 맥락" }];
+    setup({ lang: "ko", state: "normal", questions: caseQuestions });
+    h.responsesCreate.mockResolvedValue(cutResponse("부분 답"));
+    expect(await ask("regular")).toBe("부분 답");
+    expect(studentChatEvents()[0].metadata).not.toHaveProperty("response_status");
+
+    setup({ lang: "ko", state: "normal", questions: caseQuestions });
+    h.responsesCreate.mockResolvedValue(cutResponse(""));
+    expect(await ask("regular")).toBe(ENGLISH_APOLOGY);
   });
 });
