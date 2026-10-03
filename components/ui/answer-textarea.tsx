@@ -42,6 +42,18 @@ function hasInternalCopySignal(data: Pick<DataTransfer, "types" | "getData">): b
   return text.includes(INTERNAL_COPY_MARKER_START) || text.includes(INTERNAL_COPY_MARKER_END);
 }
 
+/**
+ * 표식 문자를 걷어 낸다. 붙여넣기와 끌어다 놓기가 같이 쓴다(#555).
+ * 판정은 지우기 전에 한다(`hasInternalCopySignal`).
+ */
+function stripInternalCopyMarkers(text: string): string {
+  return text
+    .replace(/\u200B\u{E0001}\u200B/gu, "")
+    .replace(/\u200B\u{E0002}\u200B/gu, "")
+    // #555 이전 CopyProtector 표식(폭 없는 공백 3개). 고치기 전 화면에서 복사해 클립보드에 남은 글에 있다.
+    .replace(/\u200B\u200B\u200B/gu, "");
+}
+
 export function AnswerTextarea({
   value,
   onChange,
@@ -134,11 +146,7 @@ export function AnswerTextarea({
       const isInternal = hasInternalCopySignal(clipboard);
 
       // 마커 제거 (실제 텍스트만 저장)
-      const cleanText = pastedData
-        .replace(/\u200B\u{E0001}\u200B/gu, "")
-        .replace(/\u200B\u{E0002}\u200B/gu, "")
-        // #555 이전 CopyProtector 표식(폭 없는 공백 3개). 고치기 전 화면에서 복사해 클립보드에 남은 글에 있다.
-        .replace(/\u200B\u200B\u200B/gu, "");
+      const cleanText = stripInternalCopyMarkers(pastedData);
 
       // 붙여넣기 전 상태 저장
       const answerLengthBefore = textarea.value.length;
@@ -240,18 +248,32 @@ export function AnswerTextarea({
 
       const after = textarea.value;
       const range = locateInsertedText(pending.valueBefore, after, textarea.selectionEnd, pending.hint);
-      if (!range || !onPaste) return;
+      if (!range) return;
+
+      // 놓인 글에 표식 문자가 섞여 있으면(표식이 든 채팅 글을 끌어온 경우 등) 붙여넣기처럼 지운다(#555).
+      // 이 리스너는 React 의 onChange 보다 먼저 돌므로, 브라우저가 넣은 값을 React 가 반영한 뒤에 고친다.
+      const inserted = after.substring(range.start, range.end);
+      const cleaned = stripInternalCopyMarkers(inserted);
+      if (cleaned !== inserted) {
+        const cleanedValue = after.substring(0, range.start) + cleaned + after.substring(range.end);
+        const caret = range.start + cleaned.length;
+        setTimeout(() => {
+          onChange(cleanedValue);
+          setTimeout(() => textarea.setSelectionRange(caret, caret), 0);
+        }, 0);
+      }
+      if (!onPaste) return;
 
       onPaste({
-        pastedText: after.substring(range.start, range.end),
+        pastedText: cleaned,
         pasteStart: range.start,
-        pasteEnd: range.end,
+        pasteEnd: range.start + cleaned.length,
         answerLengthBefore: pending.valueBefore.length,
         answerTextBefore: pending.valueBefore,
         isInternal: pending.isInternal,
       });
     },
-    [onPaste]
+    [onChange, onPaste]
   );
 
   // Copy 이벤트 리스너 등록

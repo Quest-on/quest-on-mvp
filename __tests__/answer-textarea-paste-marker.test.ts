@@ -96,6 +96,42 @@ async function pasteAtEnd(clip: FakeClipboard) {
   });
 }
 
+function inputEvent(type: "beforeinput" | "input", inputType: string, data: string | null = null) {
+  return new InputEvent(type, { bubbles: true, cancelable: type === "beforeinput", inputType, data });
+}
+
+/** React 가 감시하는 value setter 를 건너뛰어야 input 이벤트에서 onChange 가 불린다(브라우저가 값을 바꾼 것처럼). */
+function setNativeValue(el: HTMLTextAreaElement, value: string) {
+  Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(el, value);
+}
+
+/**
+ * 바깥에서 끌어 온 글을 답안 끝에 놓는다. 브라우저는 text/plain 을 그대로(표식 문자까지) 넣고 넣은 글을
+ * 선택한다(Chromium). 이벤트 순서는 #561 테스트와 같다.
+ */
+async function dropAtEnd(text: string) {
+  const ta = textarea();
+  const data = new FakeClipboard();
+  data.setData("text/plain", text);
+  const drop = new Event("drop", { bubbles: true, cancelable: true });
+  Object.defineProperty(drop, "dataTransfer", { value: data });
+  await act(async () => {
+    const at = ta.value.length;
+    ta.dispatchEvent(drop);
+    ta.dispatchEvent(inputEvent("beforeinput", "insertFromDrop", text));
+    setNativeValue(ta, ta.value + text);
+    ta.setSelectionRange(at, at + text.length);
+    ta.dispatchEvent(inputEvent("input", "insertFromDrop"));
+  });
+  // 표식 정리는 브라우저가 넣은 값을 React 가 반영한 다음 타이머에서 한다.
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
 beforeEach(async () => {
   pastes.length = 0;
   container = document.createElement("div");
@@ -162,5 +198,30 @@ describe("답안 칸 붙여넣기 표식 제거 (#555)", () => {
 
     expect(textarea().value).toBe("답: 다른 곳의 글");
     expect(pastes[0]).toMatchObject({ pastedText: "다른 곳의 글", isInternal: false });
+  });
+});
+
+describe("답안 칸 끌어다 놓기 표식 제거 (#555, #561 리뷰)", () => {
+  it("끌어다 놓은 글에 표식 문자가 섞여 있어도 답안과 기록에 남지 않는다", async () => {
+    // 표식이 든 글: 답안 칸에서 복사한 글을 채팅 입력에 붙여 보낸 메시지를 다시 끌어오는 경우 등.
+    await dropAtEnd("\u200B\u{E0001}\u200B끌어온 글\u200B\u{E0002}\u200B");
+
+    expect(textarea().value).toBe("답: 끌어온 글");
+    expect(pastes).toHaveLength(1);
+    expect(pastes[0]).toMatchObject({ pastedText: "끌어온 글", pasteStart: 3, pasteEnd: 8 });
+  });
+
+  it("고치기 전 문제 본문 표식(폭 없는 공백 3개)도 지운다", async () => {
+    await dropAtEnd("\u200B\u200B\u200B옛 표식 글\u200B\u200B\u200B");
+
+    expect(textarea().value).toBe("답: 옛 표식 글");
+    expect(pastes[0]).toMatchObject({ pastedText: "옛 표식 글", pasteStart: 3, pasteEnd: 9 });
+  });
+
+  it("표식이 없는 글은 브라우저가 넣은 그대로 둔다", async () => {
+    await dropAtEnd("바깥 글");
+
+    expect(textarea().value).toBe("답: 바깥 글");
+    expect(pastes[0]).toMatchObject({ pastedText: "바깥 글", pasteStart: 3, pasteEnd: 7, isInternal: false });
   });
 });
